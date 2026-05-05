@@ -1,0 +1,12 @@
+---
+description: Mongoose models and MongoDB usage for this codebase
+globs: models/**/*.ts, lib/mongodb.ts
+alwaysApply: false
+---
+
+# Data layer (MongoDB / Mongoose)
+
+- **Connection**: Central connection logic is **`lib/mongodb.ts`** — reuse it; avoid opening ad-hoc connections from random files.
+- **Models**: Schemas live under **`models/`** — follow field naming, exports, and index patterns from the closest existing model (e.g. `User`, `CommunityAlert`).
+- **Usage**: API routes import models after DB is ready; keep schema definitions free of request-specific logic.
+- **Types**: Align TypeScript types with mongoose shapes used elsewhere (`lib/types/` when applicable).

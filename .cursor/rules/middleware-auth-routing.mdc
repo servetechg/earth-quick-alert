@@ -1,0 +1,12 @@
+---
+description: Session, roles, and redirects — editing middleware.ts
+globs: middleware.ts
+alwaysApply: false
+---
+
+# `middleware.ts` — auth and routing
+
+- **Impact**: Changes here affect **every matched page** — be deliberate; the matcher intentionally excludes `api`, `_next/static`, `_next/image`, `favicon.ico`.
+- **Cookies**: Logic assumes **`session`**, **`userRole`**, **`accountStatus`** (see existing branches). Keep behavior consistent with **`/login`**, **`/signup`**, **`/pending-approval`**, and role-specific dashboards.
+- **Roles**: Multiple roles exist (e.g. admin, super-admin, EOC roles). Redirect rules are interconnected — after edits, reason through admin vs user vs Virtual EOC paths.
+- **Prefer**: Minimal, well-commented diffs; avoid duplicating role lists across files without a shared constant if the project already uses one.

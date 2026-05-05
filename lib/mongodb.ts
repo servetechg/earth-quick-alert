@@ -1,6 +1,8 @@
 import mongoose from 'mongoose';
 
 const MONGODB_URI = process.env.MONGODB_URI;
+/** Use `MONGODB_DB` to override; defaults to `ready2go` when the URI has no database path. */
+const DEFAULT_DB = process.env.MONGODB_DB || 'ready2go';
 
 /**
  * Global is used here to maintain a cached connection across hot reloads
@@ -11,6 +13,26 @@ let cached = (global as any).mongoose;
 
 if (!cached) {
     cached = (global as any).mongoose = { conn: null, promise: null };
+}
+
+/** Ensures a database name so collections resolve (e.g. users) instead of defaulting to `test`. */
+function withDefaultDatabase(uri: string): string {
+    try {
+        const u = new URL(uri);
+        if (u.pathname === '/' || u.pathname === '') {
+            u.pathname = `/${DEFAULT_DB}`;
+            return u.href;
+        }
+        return uri;
+    } catch {
+        const q = uri.includes('?') ? uri.slice(uri.indexOf('?')) : '';
+        const base = q ? uri.slice(0, uri.indexOf('?')) : uri;
+        const afterScheme = base.split('://')[1] ?? '';
+        const lastSlash = afterScheme.lastIndexOf('/');
+        const afterSlash = lastSlash >= 0 ? afterScheme.slice(lastSlash + 1) : '';
+        if (afterSlash.length > 0) return uri;
+        return `${base.replace(/\/$/, '')}/${DEFAULT_DB}${q}`;
+    }
 }
 
 async function connectDB() {
@@ -24,33 +46,7 @@ async function connectDB() {
         );
     }
 
-    let connectionString = MONGODB_URI;
-    // try {
-    //     if (connectionString.startsWith('mongodb+srv://')) {
-    //         const url = new URL(connectionString);
-    //         if (!url.pathname || url.pathname === '/') {
-    //             url.pathname = '/ready2go';
-    //             connectionString = url.toString();
-    //         }
-    //     }
-    // } catch (err) {
-    //     console.error('Error parsing MONGODB_URI:', err);
-
-    // Manually handle database name for multi-host URIs (URL constructor fails on them)
-    if (connectionString.includes('://')) {
-        const [protocol, rest] = connectionString.split('://');
-        const [hostsAndDb, query] = rest.split('?');
-
-        // If there is no / after the last @ or after the protocol (if no @), or if it's just a trailing /
-        const lastSlashIndex = hostsAndDb.lastIndexOf('/');
-        const hasDb = lastSlashIndex !== -1 && lastSlashIndex !== 0 && hostsAndDb.substring(lastSlashIndex + 1).length > 0;
-
-        if (!hasDb) {
-            const cleanHosts = hostsAndDb.endsWith('/') ? hostsAndDb.slice(0, -1) : hostsAndDb;
-            connectionString = `${protocol}://${cleanHosts}/ready2go${query ? '?' + query : ''}`;
-            console.log('Appended database name to connection string');
-        }
-    }
+    const connectionString = withDefaultDatabase(MONGODB_URI);
 
     if (!cached.promise) {
         const opts = {
@@ -58,7 +54,6 @@ async function connectDB() {
         };
 
         console.log('Connecting to MongoDB...');
-        // Obfuscate URI for logging
         const obfuscatedUri = connectionString.replace(/:([^@]+)@/, ':****@');
         console.log(`Using URI: ${obfuscatedUri}`);
 

@@ -1,0 +1,12 @@
+---
+description: Next.js app pages, layouts, and shared React UI for this project
+globs: app/**/*.tsx, components/**/*.tsx
+alwaysApply: false
+---
+
+# App Router UI (`app/**`, `components/**`)
+
+- **Routes**: `page.tsx` / `layout.tsx` use the project’s existing default-export pattern and provider wrapping from `app/layout.tsx` (`AuthProvider`, `SafetyProvider`, `EmergencyProvider`, etc.).
+- **UI kit**: Prefer **`components/ui/`** primitives (Radix + Tailwind) over ad-hoc markup; match spacing/typography of neighboring screens.
+- **Roles**: Admin vs user vs EOC experiences are enforced in **`middleware.ts`** — UI should not assume access that the server would deny.
+- **Data**: Fetch from **`/api/...`** route handlers; avoid calling mongoose or service secrets from client components — use existing hooks/API modules if present.

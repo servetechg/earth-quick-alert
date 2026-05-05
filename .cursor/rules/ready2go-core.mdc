@@ -1,0 +1,14 @@
+---
+description: Ready2Go emergency platform — stack, layout, and agent defaults for this repo
+alwaysApply: true
+---
+
+# Ready2Go / Earthquickalert — core context
+
+- **Product**: Ready2Go–style emergency management (dashboards, Virtual EOC, alerts, GIS, preparedness/recovery). Marketing strings may say “Emergency Dashboard” / “Hazard Portal”.
+- **Repo folder**: `earthquickalert`. **`package.json` `name`** may still be a scaffold name — do not rename unless the user asks.
+- **Stack (verify in `package.json`)**: Next.js 15 App Router, React 19, TypeScript, Tailwind 4, Radix/shadcn-style UI under `components/ui/`, MongoDB via **mongoose** (`lib/mongodb.ts`).
+- **Auth & gates**: HTTP-only style flow uses cookies such as **`session`**, **`userRole`**, **`accountStatus`**. **Role and pending-account logic lives in `middleware.ts`** — read it before changing protected routes or redirects.
+- **Main directories**: `app/` (routes + `app/api/`), `components/`, `lib/` (services, stores, utils), `models/` (Mongoose schemas).
+- **Longer narrative / route map**: `PROJECT_ARCHITECTURE.md` — treat versions inside it as approximate; **`package.json` wins** for dependency versions.
+- **Changes**: Only modify what the task needs; match naming, imports, and patterns in files you touch. No secrets in code — use env vars (see `.env` / deployment config).

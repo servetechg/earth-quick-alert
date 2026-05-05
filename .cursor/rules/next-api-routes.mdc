@@ -1,0 +1,13 @@
+---
+description: Conventions for Next.js App Router API route handlers in app/api
+globs: app/api/**/*.ts
+alwaysApply: false
+---
+
+# API routes (`app/api/**/route.ts`)
+
+- **Runtime**: Keep secret handling and external API keys **server-side only** — never expose keys to client components.
+- **DB**: Connect MongoDB using the shared helper in **`lib/mongodb.ts`** before using Mongoose models; follow existing routes as templates.
+- **Validation**: Use **zod** (and patterns already used in sibling handlers) for request body/query where inputs vary or are user-supplied.
+- **Responses**: Use `NextResponse.json()` with appropriate HTTP status codes; align error shape with nearby routes.
+- **Auth**: Respect session/role the same way comparable admin vs user routes do (cookies/JWT pattern in `app/api/login`, `middleware.ts`).
