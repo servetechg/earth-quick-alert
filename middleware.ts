@@ -39,7 +39,8 @@ export function middleware(request: NextRequest) {
             '/emergency-plan',
             '/preparedness-information',
             '/virtual-eoc-settings',
-            '/admin/users'
+            '/admin/users',
+            '/ai-risk-assessment',
         ]
 
         const isAdminRoute = adminRoutes.some(route => pathname.startsWith(route))
