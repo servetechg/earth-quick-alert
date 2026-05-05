@@ -108,6 +108,166 @@ export class WeatherAPIService {
     }
 
     /**
+     * Active NWS alerts only — no synthetic/mock fallback. Used for Alerts & Communication DB sync.
+     */
+    async fetchNWSActiveAlertsForPoint(lat: number, lon: number): Promise<APIWeatherAlert[]> {
+        try {
+            return await this.fetchNWSAlerts(lat, lon);
+        } catch (error) {
+            console.error('NWS active alerts fetch failed:', error);
+            return [];
+        }
+    }
+
+    /**
+     * All **active** NWS alerts for the United States (paginated `GET /alerts/active`).
+     * Use for nationwide dashboard sync; honors `NWS_ALERTS_MAX_PAGES` to cap pagination depth.
+     */
+    async fetchNWSActiveAlertsNationwide(): Promise<APIWeatherAlert[]> {
+        try {
+            return await this.fetchAllActiveNWSAlertsPaginated();
+        } catch (error) {
+            console.error('NWS nationwide active alerts fetch failed:', error);
+            return [];
+        }
+    }
+
+    private nwsRequestHeaders(): HeadersInit {
+        return {
+            Accept: 'application/geo+json',
+            'User-Agent': process.env.NWS_USER_AGENT || 'ready2go-emergency-dashboard (non-production)',
+        };
+    }
+
+    /** Representative coordinates from GeoJSON geometry, or fallback (e.g. point-query lat/lon). */
+    private coordsFromNwsFeature(
+        feature: any,
+        fallback?: { lat: number; lon: number }
+    ): { lat: number; lon: number } {
+        const US_CENTER = { lat: 39.8283, lon: -98.5795 };
+        const g = feature?.geometry;
+        if (!g?.type) {
+            return fallback ?? US_CENTER;
+        }
+        if (g.type === 'Point' && Array.isArray(g.coordinates) && g.coordinates.length >= 2) {
+            const [lon, lat] = g.coordinates;
+            if (Number.isFinite(lat) && Number.isFinite(lon)) return { lat, lon };
+        }
+        const avgRing = (ring: number[][]): { lat: number; lon: number } | null => {
+            let sLat = 0;
+            let sLon = 0;
+            let n = 0;
+            for (const pt of ring) {
+                if (Array.isArray(pt) && pt.length >= 2 && Number.isFinite(pt[1]) && Number.isFinite(pt[0])) {
+                    sLon += pt[0];
+                    sLat += pt[1];
+                    n += 1;
+                }
+            }
+            if (n === 0) return null;
+            return { lat: sLat / n, lon: sLon / n };
+        };
+        if (g.type === 'Polygon' && Array.isArray(g.coordinates?.[0])) {
+            const c = avgRing(g.coordinates[0]);
+            if (c) return c;
+        }
+        if (g.type === 'MultiPolygon' && Array.isArray(g.coordinates?.[0]?.[0])) {
+            const c = avgRing(g.coordinates[0][0]);
+            if (c) return c;
+        }
+        return fallback ?? US_CENTER;
+    }
+
+    private mapNwsGeoJsonFeature(
+        feature: any,
+        pointFallback?: { lat: number; lon: number }
+    ): APIWeatherAlert {
+        const props = feature.properties || {};
+        const severity = this.mapNwsSeverity(props.severity);
+        const event: string = props.event || 'Weather Alert';
+
+        const descriptionParts: string[] = [];
+        if (props.headline) descriptionParts.push(props.headline);
+        if (props.description) descriptionParts.push(props.description);
+        if (props.instruction) descriptionParts.push(`Instructions: ${props.instruction}`);
+
+        const areaDesc: string = props.areaDesc || '';
+        const geocode = props.geocode || {};
+        const ugcZones: string[] = Array.isArray(geocode.UGC) ? geocode.UGC : [];
+
+        const affectedAreas: string[] = [];
+        if (areaDesc) {
+            affectedAreas.push(...areaDesc.split(';').map((s: string) => s.trim()).filter(Boolean));
+        }
+        if (affectedAreas.length === 0 && ugcZones.length > 0) {
+            affectedAreas.push(...ugcZones);
+        }
+
+        const { lat, lon } = this.coordsFromNwsFeature(feature, pointFallback);
+
+        return {
+            id: props.id || feature.id || `nws-${Date.now()}`,
+            source: AlertSource.WEATHER_API,
+            severity,
+            title: props.headline || event,
+            description: descriptionParts.join('\n\n') || 'Official weather alert from National Weather Service.',
+            timestamp: props.sent || props.effective || new Date().toISOString(),
+            expiresAt: props.expires || props.ends || undefined,
+            event,
+            areaDesc,
+            zones: ugcZones,
+            weatherType: this.mapNwsEventToWeatherType(event),
+            temperature: undefined,
+            windSpeed: undefined,
+            humidity: undefined,
+            precipitation: undefined,
+            coordinates: { lat, lon },
+            affectedAreas,
+        };
+    }
+
+    /**
+     * Paginated nationwide active alerts (`status=actual` omits test/exercise products).
+     */
+    private async fetchAllActiveNWSAlertsPaginated(): Promise<APIWeatherAlert[]> {
+        const maxPages = Math.min(
+            500,
+            Math.max(1, parseInt(process.env.NWS_ALERTS_MAX_PAGES ?? '100', 10))
+        );
+
+        let nextUrl: string | null = `${this.nwsBaseURL}/alerts/active?status=actual`;
+        const alerts: APIWeatherAlert[] = [];
+        let pages = 0;
+
+        while (nextUrl && pages < maxPages) {
+            pages += 1;
+            const response = await fetch(nextUrl, {
+                method: 'GET',
+                headers: this.nwsRequestHeaders(),
+            });
+
+            if (!response.ok) {
+                throw new Error(`NWS API error: ${response.status} ${response.statusText}`);
+            }
+
+            const data = await response.json();
+            const features = Array.isArray(data.features) ? data.features : [];
+            for (const feature of features) {
+                alerts.push(this.mapNwsGeoJsonFeature(feature));
+            }
+
+            const pagination = data.pagination as { next?: string } | undefined;
+            const next = pagination?.next;
+            nextUrl =
+                typeof next === 'string' && (next.startsWith('http://') || next.startsWith('https://'))
+                    ? next
+                    : null;
+        }
+
+        return alerts;
+    }
+
+    /**
      * Fetch active alerts from National Weather Service for a specific point.
      */
     private async fetchNWSAlerts(lat: number, lon: number): Promise<APIWeatherAlert[]> {
@@ -116,10 +276,7 @@ export class WeatherAPIService {
 
         const response = await fetch(url, {
             method: 'GET',
-            headers: {
-                'Accept': 'application/geo+json',
-                'User-Agent': process.env.NWS_USER_AGENT || 'ready2go-emergency-dashboard (non-production)',
-            },
+            headers: this.nwsRequestHeaders(),
         });
 
         if (!response.ok) {
@@ -129,48 +286,7 @@ export class WeatherAPIService {
         const data = await response.json();
         const features = Array.isArray(data.features) ? data.features : [];
 
-        return features.map((feature: any): APIWeatherAlert => {
-            const props = feature.properties || {};
-            const severity = this.mapNwsSeverity(props.severity);
-            const event: string = props.event || 'Weather Alert';
-
-            const descriptionParts: string[] = [];
-            if (props.headline) descriptionParts.push(props.headline);
-            if (props.description) descriptionParts.push(props.description);
-            if (props.instruction) descriptionParts.push(`Instructions: ${props.instruction}`);
-
-            const areaDesc: string = props.areaDesc || '';
-            const geocode = props.geocode || {};
-            const ugcZones: string[] = Array.isArray(geocode.UGC) ? geocode.UGC : [];
-
-            const affectedAreas: string[] = [];
-            if (areaDesc) {
-                affectedAreas.push(...areaDesc.split(';').map((s: string) => s.trim()).filter(Boolean));
-            }
-            if (affectedAreas.length === 0 && ugcZones.length > 0) {
-                affectedAreas.push(...ugcZones);
-            }
-
-            return {
-                id: props.id || feature.id || `nws-${Date.now()}`,
-                source: AlertSource.WEATHER_API,
-                severity,
-                title: props.headline || event,
-                description: descriptionParts.join('\n\n') || 'Official weather alert from National Weather Service.',
-                timestamp: props.sent || props.effective || new Date().toISOString(),
-                expiresAt: props.expires || props.ends || undefined,
-                event,
-                areaDesc,
-                zones: ugcZones,
-                weatherType: this.mapNwsEventToWeatherType(event),
-                temperature: undefined,
-                windSpeed: undefined,
-                humidity: undefined,
-                precipitation: undefined,
-                coordinates: { lat, lon },
-                affectedAreas,
-            };
-        });
+        return features.map((feature: any) => this.mapNwsGeoJsonFeature(feature, { lat, lon }));
     }
 
     /**
