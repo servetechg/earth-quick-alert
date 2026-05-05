@@ -684,7 +684,7 @@ export default function RiskAssessment() {
   };
 
   return (
-    <div className="space-y-8 p-6 max-w-7xl mx-auto">
+    <div className="p-8 space-y-10 max-w-[1800px] mx-auto">
       {/* Header */}
       <Card className="rounded-2xl border-l-4 border-l-[#33375D] bg-white p-7 shadow-xl shadow-slate-200/50">
         <div className="flex flex-wrap items-start justify-between gap-4">
