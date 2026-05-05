@@ -141,7 +141,7 @@ export default function PreparednessInformationPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <div className="flex flex-col items-center gap-4">
-          <Loader2 className="w-10 h-10 text-blue-600 animate-spin" />
+          <Loader2 className="w-10 h-10 text-[#33375D] animate-spin" />
           <p className="text-slate-500 font-bold animate-pulse">Synchronizing Intelligence...</p>
         </div>
       </div>
@@ -154,7 +154,7 @@ export default function PreparednessInformationPage() {
       <div className="px-6 lg:px-12 pt-8 space-y-8 max-w-[1800px] mx-auto">
         {/* Main Header Card */}
         <Card className="p-8 border-slate-200 rounded-2xl shadow-sm relative overflow-hidden bg-white group transition-all hover:shadow-md">
-          <div className="absolute top-0 left-0 w-1.5 h-full bg-slate-900 group-hover:bg-blue-600 transition-colors" />
+          <div className="absolute top-0 left-0 w-1.5 h-full bg-[#33375D] transition-colors" />
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
               <h1 className="text-3xl font-black text-slate-900 tracking-tight mb-2">Preparedness Information</h1>

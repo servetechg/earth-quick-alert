@@ -23,6 +23,7 @@ import {
   Wrench,
   CloudRain,
   RefreshCw,
+  Sparkles,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import Image from 'next/image'
@@ -35,6 +36,7 @@ export const menuItems = [
   { icon: Map, label: 'GIS & Mapping', href: '/gis-mapping' },
   { icon: Bell, label: 'Alerts & Communication', href: '/alerts-communication' },
   { icon: Brain, label: 'Virtual EOC / AI Center', href: '/virtual-eoc-ai-center' },
+  { icon: Sparkles, label: 'AI Risk Assessment', href: '/ai-risk-assessment' },
   { icon: ClipboardList, label: 'After Action Review', href: '/after-action-review' },
   { icon: FileText, label: 'COOP/BC Plans', href: '/emergency-plan' },
   { icon: FileText, label: 'Preparedness Information', href: '/preparedness-information' },
@@ -77,7 +79,8 @@ export function Sidebar() {
       { icon: FileText, label: 'Preparedness Information', href: '/preparedness-information' },
       { icon: Building2, label: 'Licenses', href: '/admin/licenses' },
       { icon: Shield, label: 'Sub-Admins', href: '/admin/sub-admins' },
-      { icon: Users, label: 'Responder and Leader Approval', href: '/admin/users' }
+      { icon: Users, label: 'Responder and Leader Approval', href: '/admin/users' },
+      { icon: Sparkles, label: 'AI Risk Assessment', href: '/ai-risk-assessment' },
     ]
     : isEOCRole
       ? eocMenuItems
@@ -90,7 +93,7 @@ export function Sidebar() {
           ...menuItems,
         ]
 
-  const filteredBottomItems = isSuperAdminRole 
+  const filteredBottomItems = isSuperAdminRole
     ? bottomItems.filter(item => item.label === 'Log out')
     : bottomItems;
 

@@ -56,10 +56,10 @@ export function Header({ userName = 'Admin User', onLogout }: HeaderProps) {
         </div>
       </div>
 
-      <div className="flex items-center gap-6">
-        <div className="flex items-center gap-4 border-r border-slate-100 pr-6 mr-1">
+      <div className="flex items-center gap-2 ">
+        <div className="flex items-center gap-4 border-r border-slate-100 pr-4 mr-1">
           <div className="relative p-2 hover:bg-slate-50 rounded-xl transition-colors cursor-pointer group">
-            <Bell size={22} className="text-slate-900 group-hover:text-indigo-600 transition-colors" />
+            <Bell fill='#33375D' size={22} className="text-slate-900 transition-colors" />
             <span className="absolute top-1.5 right-1.5 h-4 w-4 bg-rose-600 text-[9px] font-black text-white flex items-center justify-center rounded-full border-2 border-white">3</span>
           </div>
         </div>
