@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, Fragment, type ElementType, type ReactNode } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,7 +18,6 @@ import {
   Users,
   AlertTriangle,
   Gauge,
-  Rocket,
   CheckCircle2,
   History,
   TrendingDown,
@@ -37,107 +36,7 @@ import {
   CartesianGrid,
   Cell,
 } from "recharts";
-
-interface RecommendationItem {
-  priority: "IMMEDIATE" | "URGENT" | "STANDARD";
-  action: string;
-  deployable: boolean;
-}
-interface DomainSeverities {
-  meteorological?: string;
-  hydrological?: string;
-  fire?: string;
-}
-interface DistroPoint {
-  category: string;
-  count: number;
-}
-interface HistoricalAnalysis {
-  matched_event?: string;
-  match_confidence?: number;
-  similarity_summary?: string;
-  past_damages?: string[];
-  past_procedures?: string[];
-  current_procedures?: string[];
-  future_measures?: string[];
-}
-interface RiskReport {
-  id: string;
-  generated_at: string;
-  overall_risk_level: string;
-  ai_confidence: number;
-  populations_at_risk: number;
-  domain_severities: DomainSeverities;
-  meteorological_findings: string[];
-  hydrological_findings: string[];
-  fire_findings: string[];
-  recommendations_list: RecommendationItem[];
-  incident_distribution: DistroPoint[];
-  historical_analysis: HistoricalAnalysis;
-  sources_count: number;
-  alerts_count: number;
-  meteorological_summary: string;
-  hydrological_risk: string;
-  fire_threats: string;
-  recommendations: string;
-}
-
-const MOCK_REPORT: RiskReport = {
-  id: "mock-1",
-  generated_at: new Date().toISOString(),
-  overall_risk_level: "HIGH",
-  ai_confidence: 92,
-  populations_at_risk: 50000,
-  domain_severities: {
-    meteorological: "Monitor",
-    hydrological: "Elevated",
-    fire: "High Risk"
-  },
-  meteorological_findings: [
-    "Winds at Cedar Ridge Wildfire are 25 mph from the NE, hindering containment.",
-    "No immediate meteorological threats are indicated for other active incidents.",
-    "NOAA predicts +2.1 ft above MHHW high tide for Outer Banks, NC."
-  ],
-  hydrological_findings: [
-    "Trinity River near Trinity County, TX: USGS gauge 08066500 is at 18.4 ft, rising 0.3 ft/hr (action stage 19 ft).",
-    "Mississippi River at St. Louis, MO: USGS gauge 07010000 is at 41.2 ft (major flood stage 40 ft), with NOAA forecasting a crest of 43.1 ft in 18 hours.",
-    "Coastal Flood Watch issued for Outer Banks, NC, due to predicted high tides."
-  ],
-  fire_findings: [
-    "Cedar Ridge Wildfire (Cedar Ridge, CA): 3,200 acres burning, 0% contained, high confidence from NASA FIRMS.",
-    "Pine Hollow Wildfire (Pine Hollow, OR): 480 acres, 15% contained, 2 structures threatened (InciWeb incident #2026-OR-PHF).",
-    "Brush Fire (Sector 14B, NV): Approximately 12 acres, low confidence, remote location (NASA FIRMS MODIS detection)."
-  ],
-  recommendations_list: [
-    { priority: "IMMEDIATE", action: "Deploy additional firefighting resources to Cedar Ridge Wildfire.", deployable: true },
-    { priority: "URGENT", action: "Issue evacuation warnings for areas affected by the Mississippi River flood in St. Louis.", deployable: false },
-    { priority: "STANDARD", action: "Monitor Trinity River levels and prepare for potential flood stage.", deployable: false },
-    { priority: "STANDARD", action: "Assess potential impact and prepare for response to Ridgecrest, CA M5.4 earthquake.", deployable: false }
-  ],
-  incident_distribution: [
-    { category: "wildfire", count: 3 },
-    { category: "flood", count: 3 },
-    { category: "earthquake", count: 1 }
-  ],
-  historical_analysis: {
-    matched_event: "Camp Fire 2018 Pattern",
-    match_confidence: 85,
-    similarity_summary: "Similar high wind conditions and rapid spread in dry vegetation areas.",
-    past_damages: ["Widespread structural loss", "Evacuation route congestion"],
-    past_procedures: ["Early mass evacuation", "Staging resources outside active zones"],
-    current_procedures: ["Active monitoring", "Resource staging"],
-    future_measures: ["Enhanced vegetation management", "Improved alert systems"]
-  },
-  sources_count: 5,
-  alerts_count: 7,
-  meteorological_summary: "",
-  hydrological_risk: "",
-  fire_threats: "",
-  recommendations: ""
-};
-
-const MOCK_MAJOR_COUNT = 4;
-const MOCK_MINOR_COUNT = 3;
+import type { HistoricalAnalysis, RiskReport } from "@/lib/types/risk-assessment";
 
 const overallTone = (level: string) => {
   switch (level) {
@@ -242,8 +141,8 @@ function KpiCard({
   icon: Icon,
 }: {
   label: string;
-  children: React.ReactNode;
-  icon: React.ElementType;
+  children: ReactNode;
+  icon: ElementType;
 }) {
   return (
     <Card className="rounded-2xl bg-white p-5 shadow-xl shadow-slate-200/50 border-slate-100">
@@ -258,6 +157,74 @@ function KpiCard({
   );
 }
 
+/** Collapse consecutive duplicate lines from upstream feeds (e.g. repeated FEMA declarations). */
+function dedupeConsecutiveBullets(xs: string[]): string[] {
+  return xs.filter((line, i) => i === 0 || line !== xs[i - 1]);
+}
+
+/**
+ * Highlights measurements and IDs in ingest bullet lines (quake magnitudes, gauges, hotspots, dates).
+ */
+function renderFindingEmphasis(text: string): ReactNode {
+  const patterns = [
+    /\bM\d+(?:\.\d+)?\b/gi,
+    /Hotspot\s+lat\s+[-]?\d+(?:\.\d+)?\s+lon\s+[-]?\d+(?:\.\d+)?/gi,
+    /\d+\.?\d*°[NS]\s+[-]?\d+\.?\d*°[EW]/g,
+    /latest\s*=\s*[\d,]+(?:\.\d+)?/gi,
+    /\bSite\s+[\d.]+\b/gi,
+    /\bLID\s+[A-Z0-9]+\b/gi,
+    /\(\s*CSV\s+row\s+\d+\s*\)/gi,
+    /\(\s*Flood\s*\)/gi,
+    /—\s*[A-Z]{2}\s+\d{4}-\d{2}-\d{2}T[\d:.]+Z?/gi,
+    /\d{1,2}\/\d{1,2}\/\d{4}(?:,\s*\d{1,2}:\d{2}:\d{2}\s*(?:AM|PM)\s*UTC)?/gi,
+    /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z/gi,
+    /\b\d[\d,]*(?:\.\d+)?\s?(?:cubic\s+feet\s+per\s+second|cfs)\b/gi,
+    /\b\d[\d,]*(?:\.\d+)?\s?(?:ft\.?|feet)\b/gi,
+    /\b\d[\d,]*(?:\.\d+)?%/gi,
+    /\b\d[\d,]*(?:\.\d+)?\s?acres\b/gi,
+    /\b\d[\d,]*(?:\.\d+)?\s?mph\b/gi,
+    /\b\d[\d,]*(?:\.\d+)?\s?(?:°F|°C)\b/gi,
+    /\blat\s+[-]?\d+(?:\.\d+)?\s+lon\s+[-]?\d+(?:\.\d+)?/gi,
+  ];
+
+  const findFirstSpan = (remaining: string) => {
+    let best: { start: number; end: number; text: string } | null = null;
+    for (const p of patterns) {
+      const m = new RegExp(p.source, p.flags.includes("i") ? "gi" : "g").exec(remaining);
+      if (!m) continue;
+      const start = m.index;
+      const end = start + m[0].length;
+      if (!best || start < best.start || (start === best.start && end > best.end)) {
+        best = { start, end, text: m[0] };
+      }
+    }
+    return best;
+  };
+
+  const nodes: ReactNode[] = [];
+  let remaining = text;
+  let k = 0;
+  let guard = 0;
+  while (remaining.length > 0 && guard++ < 512) {
+    const span = findFirstSpan(remaining);
+    if (!span) {
+      nodes.push(<span key={`t-${k++}`}>{remaining}</span>);
+      break;
+    }
+    if (span.start > 0) {
+      nodes.push(<span key={`t-${k++}`}>{remaining.slice(0, span.start)}</span>);
+    }
+    nodes.push(
+      <strong key={`b-${k++}`} className="font-bold text-[#232a43] tabular-nums">
+        {span.text}
+      </strong>,
+    );
+    remaining = remaining.slice(span.end);
+  }
+
+  return nodes.length <= 1 ? (nodes[0] ?? text) : <Fragment>{nodes}</Fragment>;
+}
+
 function FindingsCard({
   icon: Icon,
   title,
@@ -265,51 +232,61 @@ function FindingsCard({
   bullets,
   tone,
 }: {
-  icon: React.ElementType;
+  icon: ElementType;
   title: string;
   severity?: string;
   bullets: string[];
   tone: "blue" | "primary" | "red";
 }) {
-  const toneClass = {
-    blue: "bg-blue-500/10 text-blue-600",
-    primary: "bg-slate-100 text-slate-800",
-    red: "bg-red-500/10 text-red-600",
+  const toneWrap = {
+    blue: "h-10 w-10 rounded-xl border-2 border-blue-600 bg-white text-blue-600 shadow-sm shadow-blue-100/80",
+    primary:
+      "h-10 w-10 rounded-xl bg-sky-100 text-sky-700 ring-1 ring-sky-200/80 shadow-sm shadow-sky-100/60",
+    red: "h-11 w-11 shrink-0 rounded-full bg-rose-100 text-red-600 ring-4 ring-rose-50",
   }[tone];
+  const bulletsDeduped = useMemo(() => dedupeConsecutiveBullets(bullets), [bullets]);
+
+  const badgeLabel = severity?.trim()
+    ? severity.replace(/\w+/g, (w) => w.toUpperCase())
+    : "";
+
   return (
-    <Card className="flex h-full flex-col rounded-2xl bg-white p-6 shadow-xl shadow-slate-200/50 border-slate-100">
+    <Card className="flex h-full flex-col rounded-2xl border border-slate-200/90 bg-white p-6 shadow-md shadow-slate-200/40">
       <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${toneClass}`}>
-            <Icon className="h-5 w-5" />
+        <div className="flex min-w-0 items-start gap-3">
+          <div
+            className={`flex shrink-0 items-center justify-center ${tone === "red" ? "" : "h-10 w-10"} ${toneWrap}`}
+          >
+            <Icon
+              className={tone === "red" ? "h-5 w-5" : "h-[22px] w-[22px]"}
+              strokeWidth={2}
+            />
           </div>
-          <h3 className="text-base font-extrabold tracking-tight text-slate-800">{title}</h3>
+          <h3 className="text-[15px] font-extrabold leading-snug tracking-tight text-[#252d45]">
+            {title}
+          </h3>
         </div>
-        {severity && (
-          <Badge variant="outline" className={`text-[10px] font-extrabold uppercase ${domainTone(severity)}`}>
-            {severity}
+        {badgeLabel && (
+          <Badge variant="outline" className={`shrink-0 text-[10px] font-extrabold ${domainTone(severity)}`}>
+            {badgeLabel}
           </Badge>
         )}
       </div>
-      <ul className="mt-4 space-y-3">
-        {bullets.map((b, i) => (
-          <li key={i} className="flex gap-3 text-sm leading-relaxed text-slate-600">
-            <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-slate-400" />
-            <span dangerouslySetInnerHTML={{ __html: highlightNumbers(b) }} />
-          </li>
-        ))}
-      </ul>
+      {bulletsDeduped.length === 0 ? (
+        <p className="mt-5 text-sm italic leading-relaxed text-slate-400">
+          No findings for this domain in this pull.
+        </p>
+      ) : (
+        <ul className="mt-5 space-y-3.5">
+          {bulletsDeduped.map((b, i) => (
+            <li key={i} className="flex gap-3 text-[13px] leading-relaxed text-slate-600">
+              <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-slate-400" />
+              <span className="min-w-0">{renderFindingEmphasis(b)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
     </Card>
-  );
-}
-
-function highlightNumbers(text: string) {
-  const escaped = text.replace(/[&<>]/g, (c) =>
-    c === "&" ? "&amp;" : c === "<" ? "&lt;" : "&gt;",
-  );
-  return escaped.replace(
-    /(\b\d[\d,\.]*\s?(?:mph|kph|km\/h|acres|ft|m|inches|in|cfs|°F|°C|%|people|residents|homes)?\b)/gi,
-    '<strong class="text-slate-800 font-bold">$1</strong>',
   );
 }
 
@@ -330,12 +307,13 @@ function HistoryBulletList({
           : "bg-blue-500";
   if (!items?.length)
     return <p className="text-xs italic text-slate-400">No data available.</p>;
+  const list = dedupeConsecutiveBullets(items);
   return (
     <ul className="space-y-2.5">
-      {items.map((b, i) => (
+      {list.map((b, i) => (
         <li key={i} className="flex gap-2.5 text-sm leading-relaxed text-slate-600">
           <span className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${dot}`} />
-          <span dangerouslySetInnerHTML={{ __html: highlightNumbers(b) }} />
+          <span className="min-w-0">{renderFindingEmphasis(b)}</span>
         </li>
       ))}
     </ul>
@@ -350,7 +328,7 @@ function HistoricalQuadrant({
   accent,
   iconBg,
 }: {
-  icon: React.ElementType;
+  icon: ElementType;
   title: string;
   subtitle: string;
   items?: string[];
@@ -411,10 +389,9 @@ function HistoricalAnalysisSection({ data }: { data?: HistoricalAnalysis }) {
           {h.matched_event ?? "No comparable historical event identified."}
         </p>
         {h.similarity_summary && (
-          <p
-            className="mt-1.5 text-sm leading-relaxed text-slate-600"
-            dangerouslySetInnerHTML={{ __html: highlightNumbers(h.similarity_summary) }}
-          />
+          <p className="mt-1.5 text-sm leading-relaxed text-slate-600">
+            {renderFindingEmphasis(h.similarity_summary)}
+          </p>
         )}
       </div>
 
@@ -460,6 +437,11 @@ export default function RiskAssessment() {
   const [report, setReport] = useState<RiskReport | null>(null);
   const [loading, setLoading] = useState(false);
   const [bootstrapping, setBootstrapping] = useState(true);
+  const [ingestMeta, setIngestMeta] = useState<{
+    successfulSources: number;
+    sources: { source: string; ok: boolean; error?: string }[];
+    reachableReady2GoUsers?: number;
+  } | null>(null);
 
   useEffect(() => {
     // Simulate loading initial data
@@ -471,11 +453,44 @@ export default function RiskAssessment() {
 
   const generate = async () => {
     setLoading(true);
+    setIngestMeta(null);
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-      setReport(MOCK_REPORT);
-      toast.success("AI Risk Assessment generated.");
+      const res = await fetch("/api/risk-assessment/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          stateCd: "ca",
+          nwpsGaugeId: "SACC1",
+          usgsSite: "11447650",
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data?.error || data?.message || `Request failed (${res.status})`);
+      }
+      if (!data?.report) {
+        throw new Error("Invalid response: missing report");
+      }
+      setReport(data.report as RiskReport);
+      if (data.ingest) {
+        setIngestMeta({
+          successfulSources: data.ingest.successfulSources,
+          sources: data.ingest.sources ?? [],
+          reachableReady2GoUsers: data.ingest.reachableReady2GoUsers,
+        });
+        const srcList = data.ingest.sources ?? [];
+        const totalFeeds = srcList.length || 8;
+        const failed = srcList.filter((s: { ok: boolean }) => !s.ok).length;
+        if (failed > 0) {
+          toast.success("Risk report generated.", {
+            description: `${data.ingest.successfulSources}/${totalFeeds} feeds OK · ${failed} need attention (see console/logs).`,
+          });
+        } else {
+          toast.success("AI Risk Assessment generated from live feeds.");
+        }
+      } else {
+        toast.success("AI Risk Assessment generated.");
+      }
     } catch (e: any) {
       toast.error(e?.message ?? "Failed to generate report.");
     } finally {
@@ -483,8 +498,8 @@ export default function RiskAssessment() {
     }
   };
 
-  const majorCount = report ? MOCK_MAJOR_COUNT : 0;
-  const minorCount = report ? MOCK_MINOR_COUNT : 0;
+  const majorCount = report?.major_incidents ?? 0;
+  const minorCount = report?.minor_incidents ?? 0;
 
   const distribution = report?.incident_distribution ?? [];
 
@@ -538,7 +553,16 @@ export default function RiskAssessment() {
     };
 
     writeKv("AI Confidence", `${report.ai_confidence}%`);
-    writeKv("Populations at Risk", report.populations_at_risk.toLocaleString());
+    writeKv(
+      "Population at risk (ACS counties)",
+      `${report.populations_at_risk.toLocaleString()} — from NOAA + NWS derived jurisdictions.`,
+    );
+    if (report.ready2go_users_reachable != null) {
+      writeKv(
+        "Reachable via Ready2Go",
+        `${report.ready2go_users_reachable.toLocaleString()} approved users in exposure cues or NWPS / quake proximity.`,
+      );
+    }
     writeKv("Active Incidents", `${report.alerts_count} (Major ${majorCount} / Minor ${minorCount})`);
     writeKv("Sources Aggregated", `${report.sources_count}`);
     y += 8;
@@ -660,7 +684,7 @@ export default function RiskAssessment() {
   };
 
   return (
-    <div className="space-y-8 p-6 max-w-7xl mx-auto">
+    <div className="p-8 space-y-10 max-w-[1800px] mx-auto">
       {/* Header */}
       <Card className="rounded-2xl border-l-4 border-l-[#33375D] bg-white p-7 shadow-xl shadow-slate-200/50">
         <div className="flex flex-wrap items-start justify-between gap-4">
@@ -672,8 +696,8 @@ export default function RiskAssessment() {
               </h1>
             </div>
             <p className="max-w-3xl text-sm leading-relaxed text-slate-500">
-              Multi-source intelligence aggregator. Synthesizes USGS, NOAA, NASA FIRMS,
-              FEMA and InciWeb signals into a structured situational report.
+              Multi-source intelligence aggregator. Synthesizes USGS water + earthquake feeds,
+              NOAA (NWS / NWPS), NASA FIRMS, FEMA, Esri wildfire layers, and InciWeb (when reachable).
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
@@ -734,6 +758,23 @@ export default function RiskAssessment() {
 
       {report && (
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-8">
+          {ingestMeta && (
+            <p className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 text-xs text-slate-600">
+              <span className="font-bold text-slate-700">Upstream feeds:</span>{" "}
+              {ingestMeta.successfulSources}/{ingestMeta.sources.length || 8} succeeded.
+              {ingestMeta.sources.some((s) => !s.ok) && (
+                <span className="text-amber-700">
+                  {" "}
+                  Check:{" "}
+                  {ingestMeta.sources
+                    .filter((s) => !s.ok)
+                    .map((s) => s.source)
+                    .join(", ")}
+                  .
+                </span>
+              )}
+            </p>
+          )}
           {/* KPI Row */}
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <KpiCard label="Overall Threat Level" icon={ShieldAlert}>
@@ -775,12 +816,20 @@ export default function RiskAssessment() {
               </div>
             </KpiCard>
 
-            <KpiCard label="Populations at Risk" icon={Users}>
+            <KpiCard label="Population at Risk" icon={Users}>
               <p className="text-3xl font-extrabold tabular-nums text-slate-800">
                 {report.populations_at_risk.toLocaleString()}
               </p>
-              <p className="mt-2 text-[11px] text-slate-500">
-                Estimated across affected zones
+              <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
+                Estimated across affected zones (ACS county / parish roll-up from NOAA + NWS geography)
+              </p>
+              <p className="mt-3 flex items-start gap-1.5 text-[12px] font-bold leading-snug text-emerald-700">
+                <span className="mt-0.5 inline-block h-2.5 w-2.5 shrink-0 rounded-full bg-emerald-500 shadow-[0_0_0_2px_rgba(16,185,129,0.35)]" />
+                <span className="tabular-nums">
+                  {(report.ready2go_users_reachable ?? ingestMeta?.reachableReady2GoUsers ?? 0).toLocaleString()}{' '}
+                  Reachable via Ready2Go (approved citizen profiles in flagged counties / cities or NWPS · earthquake
+                  proximity rings)
+                </span>
               </p>
             </KpiCard>
           </div>
@@ -811,6 +860,9 @@ export default function RiskAssessment() {
                     tickLine={false}
                     axisLine={false}
                     className="capitalize"
+                    tickFormatter={(v: string) =>
+                      String(v).replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+                    }
                   />
                   <YAxis
                     stroke="#64748b"
@@ -879,7 +931,7 @@ export default function RiskAssessment() {
                     Strategic Recommendations
                   </h3>
                   <p className="text-xs text-slate-500">
-                    Prioritized action plan · review and deploy
+                    Prioritized action plan
                   </p>
                 </div>
               </div>
@@ -909,21 +961,10 @@ export default function RiskAssessment() {
                           Step {i + 1}
                         </span>
                       </div>
-                      <p
-                        className="text-sm leading-relaxed text-slate-700"
-                        dangerouslySetInnerHTML={{ __html: highlightNumbers(rec.action) }}
-                      />
+                      <p className="text-sm leading-relaxed text-slate-700">
+                        {renderFindingEmphasis(rec.action)}
+                      </p>
                     </div>
-                    {rec.deployable && (
-                      <Button
-                        size="sm"
-                        onClick={() => toast.success("Resources deployed (simulated).")}
-                        className="h-8 shrink-0 rounded-lg bg-[#33375D] px-3 text-[11px] font-bold text-white hover:bg-[#2A2E4D]"
-                      >
-                        <Rocket className="mr-1.5 h-3.5 w-3.5" />
-                        Deploy Resources
-                      </Button>
-                    )}
                   </li>
                 );
               })}

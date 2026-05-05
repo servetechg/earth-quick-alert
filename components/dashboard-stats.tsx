@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react'
 import { Card } from '@/components/ui/card'
-import { AlertTriangle, Radio, Users, Shield, Loader2 } from 'lucide-react'
+import { Loader2, AlertTriangle, Users, Radio, Shield } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export function DashboardStats() {
@@ -31,8 +31,7 @@ export function DashboardStats() {
       title: 'Active Emergencies',
       value: loading ? '...' : (statsData?.quakeCount + statsData?.weatherCount + statsData?.totalIncidents) || 0,
       unit: 'Events',
-      icon: AlertTriangle,
-      iconColor: 'fill-red-500',
+      Icon: AlertTriangle,
       color: 'text-red-500',
       bg: 'bg-red-500/10',
       border: 'border-red-500/20',
@@ -45,9 +44,8 @@ export function DashboardStats() {
       title: 'Total Community (C)',
       value: loading ? '...' : statsData?.totalUsers?.toLocaleString() || '0',
       unit: 'Downloads',
-      icon: Users,
+      Icon: Users,
       color: 'text-amber-500',
-      iconColor: 'fill-amber-500',
       bg: 'bg-amber-500/10',
       border: 'border-amber-500/20',
       details: [
@@ -58,9 +56,8 @@ export function DashboardStats() {
       title: 'Pending Access (B)',
       value: loading ? '...' : statsData?.pendingSubAdmins || 0,
       unit: 'Adm. Requests',
-      icon: Radio,
+      Icon: Radio,
       color: 'text-blue-500',
-      iconColor: 'fill-blue-500',
       bg: 'bg-blue-500/10',
       border: 'border-blue-500/20',
       details: [
@@ -71,9 +68,8 @@ export function DashboardStats() {
       title: 'Approved SubAdmins',
       value: loading ? '...' : statsData?.approvedSubAdmins || 0,
       unit: 'Admin Nodes',
-      icon: Shield,
+      Icon: Shield,
       color: 'text-emerald-500',
-      iconColor: 'fill-emerald-500',
       bg: 'bg-emerald-500/10',
       border: 'border-emerald-500/20',
       details: [
@@ -115,35 +111,7 @@ export function DashboardStats() {
               <p className="text-[9px] font-black text-slate-600 uppercase tracking-widest leading-none">Global Matrix Scan</p>
             </div>
             <div className={iconBox(stat)}>
-              {stat.icon === AlertTriangle ? (
-                <AlertTriangle
-                  size={20}
-                  className={cn(
-                    '[&>path:nth-child(1)]:fill-red-500 [&>path:nth-child(1)]:stroke-red-600 [&>path:nth-child(1)]:stroke-[1.25]',
-                    '[&>path:nth-child(2)]:fill-none [&>path:nth-child(2)]:stroke-white [&>path:nth-child(2)]:stroke-[2.5]',
-                    '[&>path:nth-child(3)]:fill-white [&>path:nth-child(3)]:stroke-white',
-                  )}
-                  fill="none"
-                  strokeWidth={2}
-                />
-              ) : stat.icon === Radio ? (
-                <Radio
-                  size={20}
-                  className="[&>circle]:fill-blue-500 [&>circle]:stroke-blue-600 [&>path]:stroke-blue-500 [&>path]:fill-none"
-                  fill="none"
-                  strokeWidth={2.5}
-                />
-              ) : stat.icon === Users ? (
-                <Users
-                  size={20}
-                  className="[&>path]:fill-amber-500 [&>circle]:fill-amber-500 [&>path]:stroke-amber-600 [&>circle]:stroke-amber-600"
-                  strokeWidth={1.75}
-                />
-              ) : stat.icon === Shield ? (
-                <Shield size={20} className="fill-emerald-500" strokeWidth={0} />
-              ) : (
-                <stat.icon size={20} className={cn(stat.color, stat.iconColor)} fill="currentColor" strokeWidth={2} />
-              )}
+              <stat.Icon className={cn('h-5 w-5 shrink-0', stat.color)} strokeWidth={2} aria-hidden />
             </div>
           </div>
 
