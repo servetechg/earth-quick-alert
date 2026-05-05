@@ -12,9 +12,18 @@ const AlertCommunicationSchema = new Schema({
     instructions: [{ type: String }],
     preparednessTip: { type: String },
     severity: { type: String, default: 'Moderate' },
+    /** Upstream feed identifier — `nws` (api.weather.gov), `usgs` (waterservices), `firms` (NASA FIRMS), `inciweb` (NWCG RSS), `manual`, or `seed`. */
+    source: {
+        type: String,
+        enum: ['nws', 'manual', 'seed', 'usgs', 'firms', 'inciweb', 'nwps', 'fema'],
+        default: 'manual',
+    },
+    externalId: { type: String, sparse: true, index: true },
 }, {
     timestamps: true,
 });
+
+AlertCommunicationSchema.index({ source: 1, externalId: 1 });
 
 if (process.env.NODE_ENV !== 'production' && models.AlertCommunication) {
     delete models.AlertCommunication;
