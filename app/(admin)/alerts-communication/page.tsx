@@ -312,7 +312,7 @@ export default function AlertsCommunicationPage() {
       <div className="max-w-[1800px] mx-auto p-6 lg:p-12 space-y-8">
         {/* Hero Header */}
         <Card className="p-8 lg:p-12 bg-white border-slate-200 rounded-3xl shadow-sm relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-1.5 h-full bg-[#6366F1]" />
+          <div className="absolute top-0 left-0 w-1.5 h-full bg-[#33375D]" />
           <div className="flex justify-between items-start gap-8">
             <div className="space-y-4 flex-1">
               <h1 className="text-3xl lg:text-4xl font-black text-slate-900 tracking-tight mb-4">Alerts & Communication</h1>
@@ -450,7 +450,7 @@ export default function AlertsCommunicationPage() {
                     onClick={() => setSelectedAlertId(alert.id)}
                     className={cn(
                       "bg-white border-slate-200 rounded-2xl p-6 hover:shadow-md transition-all relative overflow-hidden",
-                      isSelected ? "ring-2 ring-blue-500 border-transparent shadow-lg shadow-blue-500/10" : "border-slate-200"
+                      isSelected ? "ring-2 ring-[#33375D] shadow-[0_10px_30px_rgba(51,55,93,0.12  )]" : "border-slate-200"
                     )}
                   >
                     <div className="flex justify-between items-center mb-4">

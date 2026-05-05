@@ -25,17 +25,31 @@ async function connectDB() {
     }
 
     let connectionString = MONGODB_URI;
+    // try {
+    //     if (connectionString.startsWith('mongodb+srv://')) {
+    //         const url = new URL(connectionString);
+    //         if (!url.pathname || url.pathname === '/') {
+    //             url.pathname = '/ready2go';
+    //             connectionString = url.toString();
+    //         }
+    //     }
+    // } catch (err) {
+    //     console.error('Error parsing MONGODB_URI:', err);
 
-    try {
-        if (connectionString.startsWith('mongodb+srv://')) {
-            const url = new URL(connectionString);
-            if (!url.pathname || url.pathname === '/') {
-                url.pathname = '/ready2go';
-                connectionString = url.toString();
-            }
+    // Manually handle database name for multi-host URIs (URL constructor fails on them)
+    if (connectionString.includes('://')) {
+        const [protocol, rest] = connectionString.split('://');
+        const [hostsAndDb, query] = rest.split('?');
+
+        // If there is no / after the last @ or after the protocol (if no @), or if it's just a trailing /
+        const lastSlashIndex = hostsAndDb.lastIndexOf('/');
+        const hasDb = lastSlashIndex !== -1 && lastSlashIndex !== 0 && hostsAndDb.substring(lastSlashIndex + 1).length > 0;
+
+        if (!hasDb) {
+            const cleanHosts = hostsAndDb.endsWith('/') ? hostsAndDb.slice(0, -1) : hostsAndDb;
+            connectionString = `${protocol}://${cleanHosts}/ready2go${query ? '?' + query : ''}`;
+            console.log('Appended database name to connection string');
         }
-    } catch (err) {
-        console.error('Error parsing MONGODB_URI:', err);
     }
 
     if (!cached.promise) {
