@@ -1,4 +1,12 @@
 import { Alert, AlertSeverity, AlertSource, SocialMediaAlert, ResourceAlert } from '@/lib/types/api-alerts';
+import type { DashboardIngestBundle, RiskReport } from '@/lib/types/risk-assessment';
+import {
+    aggregateSeverityPressure,
+    applyDynamicExecutiveKpis,
+    deriveDynamicAiConfidence,
+    deriveDynamicOverallThreatLevel,
+    deriveMajorMinorSplit,
+} from '@/lib/services/risk-kpi-dynamic';
 
 export interface EmergencyInsights {
     status: 'All Clear' | 'Warning' | 'Emergency';
@@ -477,6 +485,218 @@ export class OpenAIService {
             earthquakes: alerts.filter(alert => alert.source === AlertSource.EARTHQUAKE_API),
             social: alerts.filter(alert => alert.source === AlertSource.SOCIAL_MEDIA),
             resources: alerts.filter(alert => alert.source === AlertSource.GAS_BUDDY || alert.source === AlertSource.HOTEL_API),
+        };
+    }
+
+    /**
+     * Dashboard A: fuse ingested USGS / NOAA / FEMA / FIRMS / InciWeb / ArcGIS summaries into the RiskReport UI shape.
+     */
+    /** Keeps `alerts_count` synced to bar chart + splits Major/Minor using feed-derived severity pressure (not a fixed 42%). */
+    private alignAlertsToDistribution(r: RiskReport, bundle: DashboardIngestBundle): RiskReport {
+        const d = r.incident_distribution ?? [];
+        const sum = d.reduce((acc, x) => acc + Math.max(0, Math.floor(Number(x.count) || 0)), 0);
+        if (sum < 1) return r;
+        const alerts_count = Math.min(500, sum);
+        const { major_incidents, minor_incidents } = deriveMajorMinorSplit(bundle, alerts_count);
+        return { ...r, alerts_count, major_incidents, minor_incidents };
+    }
+
+    async synthesizeDashboardRiskReport(bundle: DashboardIngestBundle): Promise<RiskReport> {
+        const fallbackHeuristic = this.alignAlertsToDistribution(this.heuristicDashboardRiskReport(bundle), bundle);
+        const fallback = applyDynamicExecutiveKpis(bundle, fallbackHeuristic);
+        if (!this.canUseOpenAI()) return fallback;
+
+        const narrative = bundle.narrative.slice(0, 16000);
+        const schemaHint = `Return ONE JSON object at the root with these keys exactly:
+id (string), generated_at (ISO string), overall_risk_level (one of: LOW, MODERATE, ELEVATED, HIGH, SEVERE, CRITICAL),
+ai_confidence (0-100), populations_at_risk (number estimate),
+domain_severities: { meteorological, hydrological, fire } each short label like Monitor|Elevated|High Risk|Critical,
+meteorological_findings (string array — executive briefing sentences; prefer place names over raw lat/long; earthquakes as magnitude + location + time prose),
+hydrological_findings (string array — river/gauge-centric sentences; cfs, flood stage context; no coordinate dumps unless essential),
+fire_findings (string array — named incidents, acres, containment; satellite cues as sectors—avoid bare lat/lon lists),
+recommendations_list: array of { priority: IMMEDIATE|URGENT|STANDARD, action: string, deployable: boolean },
+incident_distribution: array of { category: string, count: number } with categories flood, wildfire, earthquake (not severe_weather),
+historical_analysis: { matched_event, match_confidence 0-100, similarity_summary, past_damages[], past_procedures[], current_procedures[], future_measures[] },
+sources_count (number, successful feeds was ${bundle.successfulSources}),
+alerts_count (integer estimate of active signals),
+meteorological_summary, hydrological_risk, fire_threats, recommendations (short paragraph strings),
+major_incidents, minor_incidents (numbers for KPI breakdown).`;
+
+        const result = await this.callOpenAI<RiskReport>(
+            [
+                {
+                    role: 'system',
+                    content:
+                        'You are Ready2Go emergency intelligence. Output only valid JSON matching the user schema at the root (no wrapper keys). Ground findings in the ingested data; mark uncertainty where feeds conflict or are missing. Never invent specific incidents not supported by the summaries. Format each finding bullet as a short operations briefing clause (readable to a Duty Officer): emphasize location names, magnitudes/flows/acres/percents, and timing—not raw GPS coordinates.',
+                },
+                {
+                    role: 'user',
+                    content: `${schemaHint}\n\nSTATE=${bundle.stateCd}\nNWPS_GAUGE=${bundle.nwpsGaugeId}\nUSGS_SITE=${bundle.usgsSite ?? ''}\nINGESTED_AT=${bundle.ingestedAt}\n\nDATA:\n${narrative}`,
+                },
+            ],
+            fallback,
+        );
+
+        const merged = this.mergeRiskReport(fallback, result);
+        const aligned = this.alignAlertsToDistribution(merged, bundle);
+        return applyDynamicExecutiveKpis(bundle, aligned);
+    }
+
+    private mergeRiskReport(base: RiskReport, ai?: RiskReport | null): RiskReport {
+        if (!ai) return base;
+        return {
+            ...base,
+            ...ai,
+            domain_severities: { ...base.domain_severities, ...ai.domain_severities },
+            meteorological_findings: ai.meteorological_findings?.length ? ai.meteorological_findings : base.meteorological_findings,
+            hydrological_findings: ai.hydrological_findings?.length ? ai.hydrological_findings : base.hydrological_findings,
+            fire_findings: ai.fire_findings?.length ? ai.fire_findings : base.fire_findings,
+            recommendations_list: ai.recommendations_list?.length ? ai.recommendations_list : base.recommendations_list,
+            incident_distribution: ai.incident_distribution?.length ? ai.incident_distribution : base.incident_distribution,
+            historical_analysis: { ...base.historical_analysis, ...ai.historical_analysis },
+        };
+    }
+
+    private heuristicDashboardRiskReport(bundle: DashboardIngestBundle): RiskReport {
+        const now = new Date().toISOString();
+        /** All trimmed non-empty lines (for dynamic incident counts — not UI-cropped). */
+        const allLines = (s?: string) =>
+            (s ?? '')
+                .split(/\r?\n/)
+                .map((l) => l.trim())
+                .filter(Boolean);
+        /** Bounded lines for readability in finding cards only. */
+        const lines = (s?: string, cap = 6) => allLines(s).slice(0, cap);
+
+        const usgs = bundle.sources.find((x) => x.source === 'USGS_NWIS_IV')?.summary;
+        const nwps = bundle.sources.find((x) => x.source === 'NOAA_NWPS_GAUGE')?.summary;
+        const nws = bundle.sources.find((x) => x.source === 'NWS_FLOOD_ALERTS')?.summary;
+        const fema = bundle.sources.find((x) => x.source === 'FEMA_OPENFEMA')?.summary;
+        const firmsResult = bundle.sources.find((x) => x.source === 'NASA_FIRMS');
+        const firms = firmsResult?.summary;
+        const firmsSignalCount =
+            firmsResult?.ok && firmsResult.signalCount != null ? firmsResult.signalCount : null;
+        const inci = bundle.sources.find((x) => x.source === 'INCIWEB_RSS')?.summary;
+        const arcgis = bundle.sources.find((x) => x.source === 'ESRI_ARCGIS_WFIGS')?.summary;
+        const usgsEq = bundle.sources.find((x) => x.source === 'USGS_EARTHQUAKES')?.summary;
+
+        /** Bar chart: derive counts from merged ingest summaries (dynamic, not capped to 3). */
+        const MAX_BAR = 200;
+        const floodBarRaw = Math.max(0, allLines(usgs).length + allLines(nwps).length + allLines(fema).length);
+        const fireArcLines = allLines(arcgis).filter(
+            (l) =>
+                !/no perimeter features returned|returned no (?:perimeter|features)|query returned no|empty window or outside current aoi|unavailable\s*\([^)]*\)\s*$/i.test(
+                    l,
+                ),
+        );
+        const firmsDetectionTally =
+            firmsSignalCount != null ? firmsSignalCount : firms ? allLines(firms).length : 0;
+        const wildfireBarRaw = Math.max(0, firmsDetectionTally + allLines(inci).length + fireArcLines.length);
+        const earthquakeBarRaw = Math.max(0, allLines(usgsEq).length);
+
+        const floodBar = Math.min(MAX_BAR, floodBarRaw);
+        const wildfireBar = Math.min(MAX_BAR, wildfireBarRaw);
+        const earthquakeBar = Math.min(MAX_BAR, earthquakeBarRaw);
+
+        const hydro = [...lines(usgs, 12), ...lines(nwps, 4), ...lines(fema, 20)].slice(0, 40);
+
+        const eqBullets = allLines(usgsEq).slice(0, 40);
+        const nwsBullets = lines(nws, 24);
+        const met = [...eqBullets, ...nwsBullets].slice(0, 60);
+        if (!met.length)
+            met.push(
+                'No notable earthquake or flood/hydro NWS headlines in this pull (feeds may be quiet or filtered).',
+            );
+
+        const fire = [...lines(firms, 80), ...lines(inci, 30), ...lines(arcgis, 20)].slice(0, 100);
+        if (!fire.length) fire.push('Wildfire layer signals sparse or unavailable (check NASA MAP key / ArcGIS reachability).');
+
+        const overall = deriveDynamicOverallThreatLevel(bundle);
+        const pressure = aggregateSeverityPressure(bundle);
+        const distro: RiskReport['incident_distribution'] = [
+            { category: 'flood', count: floodBar },
+            { category: 'wildfire', count: wildfireBar },
+            { category: 'earthquake', count: earthquakeBar },
+        ];
+
+        /** KPI "Active incidents" must match the chart: sum of category bars (same threat model per run). */
+        const barSum = distro.reduce((a, x) => a + Math.max(0, x.count || 0), 0);
+        let alerts_count = Math.min(500, Math.max(0, barSum));
+        if (alerts_count < 1) {
+            alerts_count = Math.min(50, Math.max(1, bundle.totalSignals || bundle.successfulSources));
+        }
+        return {
+            id: `risk-${Date.now()}`,
+            generated_at: now,
+            overall_risk_level: overall,
+            ai_confidence: deriveDynamicAiConfidence(bundle),
+            populations_at_risk: bundle.riskExposure?.populationAffectedEstimate ?? 0,
+            domain_severities: {
+                meteorological:
+                    pressure >= 55 && (eqBullets.length || nwsBullets.length)
+                        ? 'Critical'
+                        : pressure >= 30 && nwsBullets.length
+                          ? 'Elevated'
+                          : eqBullets.length || nwsBullets.length
+                            ? 'Monitor'
+                            : 'Low',
+                hydrological:
+                    pressure >= 70 && floodBarRaw > 2
+                        ? 'Critical'
+                        : floodBarRaw > 8 || (pressure >= 38 && floodBarRaw > 1)
+                          ? 'Elevated'
+                          : floodBarRaw > 1
+                            ? 'Monitor'
+                            : 'Low',
+                fire:
+                    firmsDetectionTally > 400 || fireArcLines.length > 6
+                        ? 'Critical'
+                        : firmsDetectionTally > 120 || wildfireBarRaw > 25
+                          ? 'High Risk'
+                          : wildfireBarRaw > 4
+                            ? 'Elevated'
+                            : 'Monitor',
+            },
+            meteorological_findings: met,
+            hydrological_findings: hydro.length ? hydro : ['Hydrological ingest incomplete — verify USGS/NWPS/FEMA connectivity.'],
+            fire_findings: fire,
+            recommendations_list: [
+                {
+                    priority: 'URGENT',
+                    action: 'Cross-check FIRMS hot spots with InciWeb / ArcGIS perimeters before resource dispatch.',
+                    deployable: false,
+                },
+                {
+                    priority: 'STANDARD',
+                    action: 'Monitor USGS gauge trends and NWPS forecast stages for the configured basin.',
+                    deployable: false,
+                },
+                {
+                    priority: 'IMMEDIATE',
+                    action: 'If NWS Flood Warnings intersect licensed zones, trigger Virtual EOC pre-activation review.',
+                    deployable: true,
+                },
+            ],
+            incident_distribution: distro,
+            historical_analysis: {
+                matched_event: 'Regional flood / fire season baseline',
+                match_confidence: 62,
+                similarity_summary:
+                    'Heuristic mode: enable OPENAI_API_KEY for narrative fusion; ingest counts reflect live feeds where reachable.',
+                past_damages: ['Historical impacts vary by jurisdiction — review FEMA declarations list.'],
+                past_procedures: ['Evacuation messaging', 'Staging outside threatened zones'],
+                current_procedures: ['Multi-feed verification', 'GIS perimeter confirmation'],
+                future_measures: ['Vegetation management', 'Resilient communications redundancy'],
+            },
+            sources_count: bundle.successfulSources,
+            alerts_count,
+            meteorological_summary: met.join(' '),
+            hydrological_risk: hydro.join(' '),
+            fire_threats: fire.join(' '),
+            recommendations: 'Blend redundant feeds; escalate when NWS warnings and hydrology agree.',
+            /** Major/minor finalized in `alignAlertsToDistribution` from severity pressure. */
+            major_incidents: 0,
+            minor_incidents: 0,
         };
     }
 }

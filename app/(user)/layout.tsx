@@ -87,7 +87,7 @@ export default function UserLayout({
     }
 
     return (
-        <div className="flex h-screen bg-background text-foreground">
+        <div className="flex h-screen min-h-0 bg-background text-foreground">
             {!isVirtualEOC && <UserSidebar />}
             <div className="flex-1 flex flex-col overflow-hidden">
                 {!isVirtualEOC && <Header userName={userName} onLogout={handleLogout} />}

@@ -51,7 +51,7 @@ export default function AdminLayout({
     }
 
     return (
-        <div className="flex h-screen bg-background text-foreground">
+        <div className="flex h-screen min-h-0 bg-background text-foreground">
             <Sidebar />
             <div className="flex-1 flex flex-col overflow-hidden">
                 <Header userName={userName || "Admin User"} onLogout={handleLogout} />

@@ -23,11 +23,13 @@ import {
   Wrench,
   CloudRain,
   RefreshCw,
+  Sparkles,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import Image from 'next/image'
 import logo from '../public/logo.png'
 import { Button } from '@/components/ui/button'
+import { ScrollArea } from '@/components/ui/scroll-area'
 
 export const menuItems = [
   { icon: LayoutDashboard, label: 'Dashboard', href: '/admin-dashboard' },
@@ -77,7 +79,8 @@ export function Sidebar() {
       { icon: FileText, label: 'Preparedness Information', href: '/preparedness-information' },
       { icon: Building2, label: 'Licenses', href: '/admin/licenses' },
       { icon: Shield, label: 'Sub-Admins', href: '/admin/sub-admins' },
-      { icon: Users, label: 'Responder and Leader Approval', href: '/admin/users' }
+      { icon: Users, label: 'Responder and Leader Approval', href: '/admin/users' },
+      { icon: Sparkles, label: 'AI Risk Assessment', href: '/ai-risk-assessment' },
     ]
     : isEOCRole
       ? eocMenuItems
@@ -90,14 +93,14 @@ export function Sidebar() {
           ...menuItems,
         ]
 
-  const filteredBottomItems = isSuperAdminRole 
+  const filteredBottomItems = isSuperAdminRole
     ? bottomItems.filter(item => item.label === 'Log out')
     : bottomItems;
 
   return (
-    <div className="hidden md:flex w-72 bg-[#33375D] text-white flex-col h-full border-r border-slate-700/50">
+    <div className="hidden md:flex min-h-0 w-72 shrink-0 flex-col bg-[#33375D] text-white h-full border-r border-slate-700/50">
       {/* Logo Section */}
-      <Link href="/" className="p-8 flex flex-col items-center hover:bg-white/5 transition-colors">
+      <Link href="/" className="p-8 flex flex-col items-center shrink-0 hover:bg-white/5 transition-colors">
         <Image
           src={logo}
           alt="Ready2Go Logo"
@@ -107,32 +110,41 @@ export function Sidebar() {
         />
       </Link>
 
-      {/* Main Navigation */}
-      <nav className="flex-1 overflow-y-auto p-4 space-y-1">
-        {adminMenuItems.map((item) => {
-          const Icon = item.icon
-          const isActive = pathname === item.href
+      {/* Main Navigation — Radix ScrollArea avoids OS scrollbars (Windows classic) */}
+      <nav className="flex min-h-0 flex-1 flex-col" aria-label="Main navigation">
+        <ScrollArea
+          type="hover"
+          className="min-h-0 flex-1"
+          scrollBarClassName="w-2 border-l-0 bg-transparent p-0.5"
+          scrollThumbClassName="bg-white/25 hover:bg-[#FFD75E]/90"
+        >
+          <div className="space-y-1 p-4 pr-2">
+            {adminMenuItems.map((item) => {
+              const Icon = item.icon
+              const isActive = pathname === item.href
 
-          return (
-            <Link
-              key={item.label}
-              href={item.href}
-              className={cn(
-                'w-full flex items-center gap-3 px-5 py-3 rounded-xl text-left transition-all duration-200 group',
-                isActive
-                  ? 'bg-[#FFD75E] text-[#33375D] shadow-lg shadow-yellow-500/20'
-                  : 'text-slate-200 hover:bg-white/10 hover:text-white'
-              )}
-            >
-              <Icon className={cn("w-5 h-5 flex-shrink-0 transition-colors", isActive ? "text-[#33375D]" : "text-slate-400 group-hover:text-white")} />
-              <span className="text-[15px] font-bold tracking-tight">{item.label}</span>
-            </Link>
-          )
-        })}
+              return (
+                <Link
+                  key={item.label}
+                  href={item.href}
+                  className={cn(
+                    'w-full flex items-center gap-3 px-5 py-3 rounded-xl text-left transition-all duration-200 group',
+                    isActive
+                      ? 'bg-[#FFD75E] text-[#33375D] shadow-lg shadow-yellow-500/20'
+                      : 'text-slate-200 hover:bg-white/10 hover:text-white'
+                  )}
+                >
+                  <Icon className={cn("w-5 h-5 flex-shrink-0 transition-colors", isActive ? "text-[#33375D]" : "text-slate-400 group-hover:text-white")} />
+                  <span className="text-[15px] font-bold tracking-tight">{item.label}</span>
+                </Link>
+              )
+            })}
+          </div>
+        </ScrollArea>
       </nav>
 
       {/* Bottom Navigation */}
-      <div className="p-4 mb-4">
+      <div className="shrink-0 p-4 mb-4">
         <div className="bg-[#44496B] rounded-2xl p-4 space-y-1 shadow-inner">
           {filteredBottomItems.map((item) => {
             const Icon = item.icon

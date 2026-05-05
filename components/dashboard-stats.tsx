@@ -2,8 +2,7 @@
 
 import React, { useEffect, useState } from 'react'
 import { Card } from '@/components/ui/card'
-import { AlertTriangle, Radio, Users, Settings, Activity, Zap, Shield, Target, Loader2 } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
+import { Loader2, AlertTriangle, Users, Radio, Shield } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export function DashboardStats() {
@@ -32,7 +31,7 @@ export function DashboardStats() {
       title: 'Active Emergencies',
       value: loading ? '...' : (statsData?.quakeCount + statsData?.weatherCount + statsData?.totalIncidents) || 0,
       unit: 'Events',
-      icon: AlertTriangle,
+      Icon: AlertTriangle,
       color: 'text-red-500',
       bg: 'bg-red-500/10',
       border: 'border-red-500/20',
@@ -45,7 +44,7 @@ export function DashboardStats() {
       title: 'Total Community (C)',
       value: loading ? '...' : statsData?.totalUsers?.toLocaleString() || '0',
       unit: 'Downloads',
-      icon: Users,
+      Icon: Users,
       color: 'text-amber-500',
       bg: 'bg-amber-500/10',
       border: 'border-amber-500/20',
@@ -57,7 +56,7 @@ export function DashboardStats() {
       title: 'Pending Access (B)',
       value: loading ? '...' : statsData?.pendingSubAdmins || 0,
       unit: 'Adm. Requests',
-      icon: Radio,
+      Icon: Radio,
       color: 'text-blue-500',
       bg: 'bg-blue-500/10',
       border: 'border-blue-500/20',
@@ -69,7 +68,7 @@ export function DashboardStats() {
       title: 'Approved SubAdmins',
       value: loading ? '...' : statsData?.approvedSubAdmins || 0,
       unit: 'Admin Nodes',
-      icon: Shield,
+      Icon: Shield,
       color: 'text-emerald-500',
       bg: 'bg-emerald-500/10',
       border: 'border-emerald-500/20',
@@ -80,11 +79,17 @@ export function DashboardStats() {
     }
   ]
 
+  const iconBox = (stat: (typeof stats)[number]) =>
+    cn(
+      'w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-2xl transition-all group-hover:scale-110',
+      stat.bg,
+    )
+
   if (loading) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {[1, 2, 3, 4].map((i) => (
-          <Card key={i} className="bg-white border-slate-100 rounded-[32px] p-8 shadow-xl shadow-slate-200/50 flex flex-col items-center justify-center h-48">
+          <Card key={i} className="bg-white border border-slate-200 border-l-4 border-l-[#33375D] rounded-[32px] p-8 shadow-sm flex flex-col items-center justify-center h-48">
             <Loader2 className="w-8 h-8 animate-spin text-slate-200" />
           </Card>
         ))}
@@ -95,18 +100,18 @@ export function DashboardStats() {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
       {stats.map((stat, i) => (
-        <Card key={i} className="bg-white border-slate-100 rounded-[32px] p-8 shadow-xl shadow-slate-200/50 hover:bg-slate-50/50 transition-all group relative overflow-hidden">
-          <div className="absolute top-0 right-0 p-8 opacity-[0.03] group-hover:opacity-[0.07] transition-opacity">
+        <Card key={i} className="bg-white border border-slate-200 border-l-4 border-l-[#33375D] rounded-[32px] p-8 shadow-sm hover:bg-slate-50/50 transition-all group relative overflow-hidden">
+          {/* <div className="absolute top-0 right-0 p-8 opacity-[0.03] group-hover:opacity-[0.07] transition-opacity">
             <stat.icon size={80} />
-          </div>
+          </div> */}
 
           <div className="flex justify-between items-start mb-6">
             <div className="space-y-1">
               <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">{stat.title}</h3>
               <p className="text-[9px] font-black text-slate-600 uppercase tracking-widest leading-none">Global Matrix Scan</p>
             </div>
-            <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-2xl transition-all group-hover:scale-110", stat.bg, stat.color)}>
-              <stat.icon size={20} />
+            <div className={iconBox(stat)}>
+              <stat.Icon className={cn('h-5 w-5 shrink-0', stat.color)} strokeWidth={2} aria-hidden />
             </div>
           </div>
 

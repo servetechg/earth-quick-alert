@@ -151,7 +151,7 @@ export function SetupWizard({
                     <div className={`flex items-center justify-center w-6 h-6 rounded-full border-2 ${step >= 1 ? 'border-yellow-400 bg-yellow-400 text-slate-900' : 'border-slate-500 bg-slate-800 text-slate-500'} shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10`}>
                       1
                     </div>
-                    <div className="w-[calc(100%-2.5rem)] md:w-[calc(50%-2.5rem)] text-sm font-semibold p-2">
+                    <div className="text-white w-[calc(100%-2.5rem)] md:w-[calc(50%-2.5rem)] text-sm font-semibold p-2">
                         Geographic Zone
                     </div>
                   </div>
@@ -160,7 +160,7 @@ export function SetupWizard({
                     <div className={`flex items-center justify-center w-6 h-6 rounded-full border-2 ${step >= 2 ? 'border-yellow-400 bg-yellow-400 text-slate-900' : 'border-slate-500 bg-slate-800 text-slate-500'} shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10`}>
                       2
                     </div>
-                    <div className="w-[calc(100%-2.5rem)] md:w-[calc(50%-2.5rem)] text-sm font-semibold p-2">
+                    <div className="text-white w-[calc(100%-2.5rem)] md:w-[calc(50%-2.5rem)] text-sm font-semibold p-2">
                         EOC Triggers
                     </div>
                   </div>
@@ -169,7 +169,7 @@ export function SetupWizard({
                     <div className={`flex items-center justify-center w-6 h-6 rounded-full border-2 ${step >= 3 ? 'border-yellow-400 bg-yellow-400 text-slate-900' : 'border-slate-500 bg-slate-800 text-slate-500'} shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10`}>
                       3
                     </div>
-                    <div className="w-[calc(100%-2.5rem)] md:w-[calc(50%-2.5rem)] text-sm font-semibold p-2">
+                    <div className="text-white w-[calc(100%-2.5rem)] md:w-[calc(50%-2.5rem)] text-sm font-semibold p-2">
                         Radar Polling
                     </div>
                   </div>
