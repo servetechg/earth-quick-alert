@@ -21,10 +21,14 @@ import {
     Calendar,
     ArrowUpRight,
     Users,
-    Trash2
+    Trash2,
+    User,
+    X,
 } from 'lucide-react'
 import { ProvisionLicenseModal } from '@/components/modals/provision-license-modal'
+import { GrantLicenseModal } from '@/components/modals/grant-license-modal'
 import { cn } from "@/lib/utils"
+import { toast } from 'sonner'
 
 interface License {
     _id: string;
@@ -43,12 +47,31 @@ interface License {
     createdAt: string;
 }
 
+/** Users who requested a license (not yet provisioned) — same source as super-admin dashboard list */
+interface LicenseRequestUser {
+    _id: string
+    name: string
+    email: string
+    role?: string
+    createdAt: string
+    requestedOrgName?: string
+    city?: string
+    country?: string
+}
+
+type LicenseTableRow =
+    | { kind: 'pending'; user: LicenseRequestUser }
+    | { kind: 'license'; lic: License }
+
 export default function LicenseManagement() {
     const [licenses, setLicenses] = useState<License[]>([])
+    const [licenseRequests, setLicenseRequests] = useState<LicenseRequestUser[]>([])
     const [isLoading, setIsLoading] = useState(true)
     const [deletingId, setDeletingId] = useState<string | null>(null)
     const [searchQuery, setSearchQuery] = useState('')
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+    const [grantModalUser, setGrantModalUser] = useState<LicenseRequestUser | null>(null)
+    const [isGrantModalOpen, setIsGrantModalOpen] = useState(false)
 
     const fetchLicenses = useCallback(async () => {
         try {
@@ -59,14 +82,35 @@ export default function LicenseManagement() {
             }
         } catch (error) {
             console.error('Error fetching licenses:', error)
-        } finally {
-            setIsLoading(false)
         }
     }, [])
 
+    const fetchLicenseRequests = useCallback(async () => {
+        try {
+            const res = await fetch('/api/admin/users?requestedLicense=true')
+            const data = await res.json()
+            if (res.ok) {
+                setLicenseRequests(data.users || [])
+            } else {
+                toast.error(data.error || 'Failed to load license requests')
+            }
+        } catch {
+            toast.error('Failed to load license requests')
+        }
+    }, [])
+
+    const refreshAll = useCallback(async () => {
+        setIsLoading(true)
+        try {
+            await Promise.all([fetchLicenses(), fetchLicenseRequests()])
+        } finally {
+            setIsLoading(false)
+        }
+    }, [fetchLicenses, fetchLicenseRequests])
+
     useEffect(() => {
-        fetchLicenses()
-    }, [fetchLicenses])
+        refreshAll()
+    }, [refreshAll])
 
     const handleDeleteLicense = async (licenseId: string) => {
         if (!confirm('Are you sure you want to remove this organization and all its settings?')) return
@@ -77,7 +121,7 @@ export default function LicenseManagement() {
                 method: 'DELETE'
             })
             if (res.ok) {
-                fetchLicenses()
+                refreshAll()
             } else {
                 const data = await res.json()
                 alert(data.error || 'Failed to remove license')
@@ -90,23 +134,72 @@ export default function LicenseManagement() {
         }
     }
 
-    const filteredLicenses = licenses.filter(lic =>
-        lic.organizationName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        lic.assignedSubAdminId?.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        lic.assignedSubAdminId?.name.toLowerCase().includes(searchQuery.toLowerCase())
-    )
+    const tableRows: LicenseTableRow[] = [
+        ...licenseRequests.map((user) => ({ kind: 'pending' as const, user })),
+        ...licenses.map((lic) => ({ kind: 'license' as const, lic })),
+    ]
+
+    const q = searchQuery.toLowerCase().trim()
+    const filteredRows = tableRows.filter((row) => {
+        if (!q) return true
+        if (row.kind === 'license') {
+            const lic = row.lic
+            return (
+                lic.organizationName.toLowerCase().includes(q) ||
+                (lic.assignedSubAdminId?.email || '').toLowerCase().includes(q) ||
+                (lic.assignedSubAdminId?.name || '').toLowerCase().includes(q)
+            )
+        }
+        const u = row.user
+        const org = (u.requestedOrgName || '').toLowerCase()
+        return (
+            org.includes(q) ||
+            u.name.toLowerCase().includes(q) ||
+            u.email.toLowerCase().includes(q) ||
+            (u.city || '').toLowerCase().includes(q) ||
+            (u.country || '').toLowerCase().includes(q)
+        )
+    })
 
     const stats = {
-        total: licenses.length,
-        active: licenses.filter(l => l.status === 'active').length,
-        pending: licenses.filter(l => l.status !== 'active').length
+        total: licenses.length + licenseRequests.length,
+        active: licenses.filter((l) => l.status === 'active').length,
+        pending: licenses.filter((l) => l.status !== 'active').length + licenseRequests.length,
+    }
+
+    const openGrant = (user: LicenseRequestUser) => {
+        setGrantModalUser(user)
+        setIsGrantModalOpen(true)
+    }
+
+    const handleRejectRequest = async (userId: string) => {
+        try {
+            const res = await fetch('/api/admin/users', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    userId,
+                    accountStatus: 'rejected',
+                    requestedLicense: false,
+                }),
+            })
+            if (res.ok) {
+                toast.success('Request rejected')
+                refreshAll()
+            } else {
+                const data = await res.json()
+                toast.error(data.error || 'Failed to reject')
+            }
+        } catch {
+            toast.error('Error rejecting request')
+        }
     }
 
     if (isLoading) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-slate-50">
                 <div className="flex flex-col items-center gap-4">
-                    <Loader2 className="w-10 h-10 text-blue-600 animate-spin" />
+                    <Loader2 className="w-10 h-10 animate-spin text-[#34375D]" />
                     <p className="text-slate-500 font-bold animate-pulse">Loading licenses...</p>
                 </div>
             </div>
@@ -184,7 +277,7 @@ export default function LicenseManagement() {
 
                 {/* License Table/Grid */}
                 <div className="grid grid-cols-1 gap-4">
-                    {filteredLicenses.length === 0 ? (
+                    {filteredRows.length === 0 ? (
                         <Card className="p-20 border-dashed border-2 border-slate-200 rounded-[40px] flex flex-col items-center justify-center text-center space-y-6">
                             <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center border border-slate-100 italic font-black text-slate-200 text-4xl">?</div>
                             <div className="space-y-2">
@@ -206,58 +299,115 @@ export default function LicenseManagement() {
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-50">
-                                        {filteredLicenses.map((lic) => (
-                                            <tr key={lic._id} className="group hover:bg-blue-50/30 transition-colors">
-                                                <td className="px-8 py-6">
-                                                    <div className="flex items-center gap-4">
-                                                        <div className="w-12 h-12 rounded-2xl bg-slate-50 text-slate-400 flex items-center justify-center group-hover:bg-white group-hover:text-blue-600 group-hover:shadow-md transition-all border border-slate-100">
-                                                            <Building2 size={24} />
+                                        {filteredRows.map((row) =>
+                                            row.kind === 'pending' ? (
+                                                <tr key={`req-${row.user._id}`} className="group hover:bg-amber-50/20 transition-colors bg-amber-50/10">
+                                                    <td className="px-8 py-6">
+                                                        <div className="flex items-center gap-4">
+                                                            <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center border border-amber-100">
+                                                                <User size={22} />
+                                                            </div>
+                                                            <div>
+                                                                <p className="font-black text-slate-900 uppercase tracking-tight">
+                                                                    {row.user.requestedOrgName?.trim() || 'License request'}
+                                                                </p>
+                                                                <p className="text-[10px] font-bold text-slate-400 tracking-widest">
+                                                                    Applicant · ID {row.user._id.slice(-8).toUpperCase()}
+                                                                </p>
+                                                            </div>
                                                         </div>
-                                                        <div>
-                                                            <p className="font-black text-slate-900 uppercase tracking-tight">{lic.organizationName}</p>
-                                                            <p className="text-[10px] font-bold text-slate-400 tracking-widest">Code: {lic._id.slice(-8).toUpperCase()}</p>
+                                                    </td>
+                                                    <td className="px-8 py-6">
+                                                        <div className="flex flex-col gap-0.5">
+                                                            <span className="text-sm font-black text-slate-700">{row.user.name}</span>
+                                                            <span className="text-[10px] font-bold text-slate-400">{row.user.email}</span>
                                                         </div>
-                                                    </div>
-                                                </td>
-                                                <td className="px-8 py-6">
-                                                    <div className="flex flex-col gap-0.5">
-                                                        <span className="text-sm font-black text-slate-700">{lic.assignedSubAdminId?.name || 'UNASSIGNED'}</span>
-                                                        <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1">
-                                                            {lic.assignedSubAdminId?.email || 'N/A'}
+                                                    </td>
+                                                    <td className="px-8 py-6">
+                                                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border shadow-sm bg-slate-100 text-slate-600 border-slate-200">
+                                                            <div className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-pulse" />
+                                                            pending
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-8 py-6">
+                                                        <span className="text-xs font-bold italic text-slate-400">
+                                                            {new Date(row.user.createdAt).toLocaleDateString()}
                                                         </span>
-                                                    </div>
-                                                </td>
-                                                <td className="px-8 py-6">
-                                                    <div className={cn(
-                                                        "inline-flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border shadow-sm",
-                                                        lic.status === 'active'
-                                                            ? "bg-emerald-50 text-emerald-600 border-emerald-100"
-                                                            : "bg-amber-50 text-amber-600 border-amber-100"
-                                                    )}>
-                                                        <div className={cn("w-1.5 h-1.5 rounded-full animate-pulse", lic.status === 'active' ? "bg-emerald-500" : "bg-amber-500")} />
-                                                        {lic.status}
-                                                    </div>
-                                                </td>
-                                                <td className="px-8 py-6">
-                                                    <div className="flex flex-col text-slate-400">
-                                                        <span className="text-xs font-bold italic">{new Date(lic.createdAt).toLocaleDateString()}</span>
-                                                    </div>
-                                                </td>
-                                                <td className="px-8 py-6 text-right">
-                                                    {lic.status === 'active' && (
-                                                        <Button
-                                                            variant="ghost"
-                                                            onClick={() => handleDeleteLicense(lic._id)}
-                                                            disabled={deletingId === lic._id}
-                                                            className="h-10 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest text-rose-600 hover:bg-rose-600 hover:text-white transition-all flex gap-2 ml-auto"
-                                                        >
-                                                            {deletingId === lic._id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
-                                                            Remove
-                                                        </Button>
-                                                    )}
-                                                </td>
-                                            </tr>
-                                        ))}
+                                                    </td>
+                                                    <td className="px-8 py-6 text-right">
+                                                        <div className="flex items-center justify-end gap-2">
+                                                            <Button
+                                                                type="button"
+                                                                onClick={() => openGrant(row.user)}
+                                                                className="h-10 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest bg-blue-600 hover:bg-blue-700 text-white"
+                                                            >
+                                                                Approve
+                                                            </Button>
+                                                            <Button
+                                                                type="button"
+                                                                variant="ghost"
+                                                                onClick={() => handleRejectRequest(row.user._id)}
+                                                                className="h-10 w-10 p-0 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                                                                title="Reject request"
+                                                            >
+                                                                <X size={18} />
+                                                            </Button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ) : (
+                                                <tr key={row.lic._id} className="group hover:bg-blue-50/30 transition-colors">
+                                                    <td className="px-8 py-6">
+                                                        <div className="flex items-center gap-4">
+                                                            <div className="w-12 h-12 rounded-2xl bg-slate-50 text-slate-400 flex items-center justify-center group-hover:bg-white group-hover:text-blue-600 group-hover:shadow-md transition-all border border-slate-100">
+                                                                <Building2 size={24} />
+                                                            </div>
+                                                            <div>
+                                                                <p className="font-black text-slate-900 uppercase tracking-tight">{row.lic.organizationName}</p>
+                                                                <p className="text-[10px] font-bold text-slate-400 tracking-widest">Code: {row.lic._id.slice(-8).toUpperCase()}</p>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-8 py-6">
+                                                        <div className="flex flex-col gap-0.5">
+                                                            <span className="text-sm font-black text-slate-700">{row.lic.assignedSubAdminId?.name || 'UNASSIGNED'}</span>
+                                                            <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1">
+                                                                {row.lic.assignedSubAdminId?.email || 'N/A'}
+                                                            </span>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-8 py-6">
+                                                        <div className={cn(
+                                                            "inline-flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border shadow-sm",
+                                                            row.lic.status === 'active'
+                                                                ? "bg-emerald-50 text-emerald-600 border-emerald-100"
+                                                                : "bg-amber-50 text-amber-600 border-amber-100"
+                                                        )}>
+                                                            <div className={cn("w-1.5 h-1.5 rounded-full animate-pulse", row.lic.status === 'active' ? "bg-emerald-500" : "bg-amber-500")} />
+                                                            {row.lic.status}
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-8 py-6">
+                                                        <div className="flex flex-col text-slate-400">
+                                                            <span className="text-xs font-bold italic">{new Date(row.lic.createdAt).toLocaleDateString()}</span>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-8 py-6 text-right">
+                                                        {row.lic.status === 'active' && (
+                                                            <Button
+                                                                variant="ghost"
+                                                                onClick={() => handleDeleteLicense(row.lic._id)}
+                                                                disabled={deletingId === row.lic._id}
+                                                                className="h-10 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest text-rose-600 hover:bg-rose-600 hover:text-white transition-all flex gap-2 ml-auto"
+                                                            >
+                                                                {deletingId === row.lic._id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                                                                Remove
+                                                            </Button>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            )
+                                        )}
                                     </tbody>
                                 </table>
                             </div>
@@ -270,8 +420,20 @@ export default function LicenseManagement() {
             <ProvisionLicenseModal 
                 isOpen={isCreateModalOpen}
                 onClose={() => setIsCreateModalOpen(false)}
-                onSuccess={fetchLicenses}
+                onSuccess={refreshAll}
             />
+
+            {grantModalUser && (
+                <GrantLicenseModal
+                    user={grantModalUser}
+                    isOpen={isGrantModalOpen}
+                    onClose={() => {
+                        setIsGrantModalOpen(false)
+                        setGrantModalUser(null)
+                    }}
+                    onSuccess={refreshAll}
+                />
+            )}
         </main>
     )
 }

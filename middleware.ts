@@ -64,6 +64,20 @@ export function middleware(request: NextRequest) {
             return NextResponse.redirect(new URL('/admin-dashboard', request.url))
         }
 
+        // 2b. AI Risk Assessment — super-admin only (not in sub-admin / admin / other sidebars)
+        if (pathname.startsWith('/ai-risk-assessment')) {
+            if (isEOCRole) {
+                return NextResponse.redirect(new URL('/virtual-eoc', request.url))
+            }
+            if (userRole !== 'super-admin') {
+                const dest =
+                    userRole === 'admin' || userRole === 'sub-admin' || userRole === 'observer' || userRole === 'responder' || userRole === 'manager'
+                        ? '/admin-dashboard'
+                        : '/user-dashboard'
+                return NextResponse.redirect(new URL(dest, request.url))
+            }
+        }
+
         // 3. Allow admin and sub-admin to access their respective management pages if they are in adminRoutes
         const restrictedForSubAdmin = pathname.startsWith('/admin/licenses') || pathname.startsWith('/admin/sub-admins')
         if (restrictedForSubAdmin && (userRole !== 'super-admin' && userRole !== 'admin' && userRole !== 'sub-admin')) {
