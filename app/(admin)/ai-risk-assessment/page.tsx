@@ -253,7 +253,7 @@ function FindingsCard({
   return (
     <Card className="flex h-full flex-col rounded-2xl border border-slate-200/90 bg-white p-6 shadow-md shadow-slate-200/40">
       <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 items-start gap-3">
+        <div className="flex min-w-0 items-center gap-3">
           <div
             className={`flex shrink-0 items-center justify-center ${tone === "red" ? "" : "h-10 w-10"} ${toneWrap}`}
           >
@@ -655,7 +655,7 @@ export default function RiskAssessment() {
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10.5);
     doc.setTextColor(40, 45, 60);
-    report.recommendations_list.forEach((r) => {
+    (report.recommendations_list ?? []).forEach((r) => {
       const lines = doc.splitTextToSize(`[${r.priority}] ${r.action}`, contentW);
       lines.forEach((line: string) => {
         ensure(14);
@@ -697,7 +697,7 @@ export default function RiskAssessment() {
             </div>
             <p className="max-w-3xl text-sm leading-relaxed text-slate-500">
               Multi-source intelligence aggregator. Synthesizes USGS water + earthquake feeds,
-              NOAA (NWS / NWPS), NASA FIRMS, FEMA, Esri wildfire layers, and InciWeb (when reachable).
+              NOAA (NWS / NWPS), NASA FIRMS, FEMA, Esri wildfire layers, and InciWeb.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
@@ -758,23 +758,6 @@ export default function RiskAssessment() {
 
       {report && (
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-8">
-          {ingestMeta && (
-            <p className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 text-xs text-slate-600">
-              <span className="font-bold text-slate-700">Upstream feeds:</span>{" "}
-              {ingestMeta.successfulSources}/{ingestMeta.sources.length || 8} succeeded.
-              {ingestMeta.sources.some((s) => !s.ok) && (
-                <span className="text-amber-700">
-                  {" "}
-                  Check:{" "}
-                  {ingestMeta.sources
-                    .filter((s) => !s.ok)
-                    .map((s) => s.source)
-                    .join(", ")}
-                  .
-                </span>
-              )}
-            </p>
-          )}
           {/* KPI Row */}
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <KpiCard label="Overall Threat Level" icon={ShieldAlert}>
@@ -842,7 +825,7 @@ export default function RiskAssessment() {
                   Incident Distribution
                 </h3>
                 <p className="text-xs text-slate-500">
-                  Active threats grouped by category
+                  Deduped event counts by hazard family (from this ingest — same keys as Alerts & Communication where sources overlap)
                 </p>
               </div>
               <Badge variant="outline" className="text-[10px] font-bold uppercase bg-slate-50 text-slate-600 border-slate-200">
@@ -936,12 +919,12 @@ export default function RiskAssessment() {
                 </div>
               </div>
               <Badge variant="outline" className="text-[10px] font-bold uppercase bg-slate-50 text-slate-600 border-slate-200">
-                {report.recommendations_list.length} actions
+                {(report.recommendations_list ?? []).length} actions
               </Badge>
             </div>
 
             <ol className="space-y-3">
-              {report.recommendations_list.map((rec, i) => {
+              {(report.recommendations_list ?? []).map((rec, i) => {
                 const meta = priorityMeta(rec.priority);
                 const Icon = meta.icon;
                 return (
@@ -972,7 +955,9 @@ export default function RiskAssessment() {
           </Card>
 
           <p className="text-center text-[11px] text-slate-400">
-            Last assessment generated {new Date(report.generated_at).toLocaleString()} · {report.sources_count} signals · {report.alerts_count} incidents
+            Last assessment generated {new Date(report.generated_at).toLocaleString()} · {report.sources_count}{" "}
+            ingest sources succeeded · {report.alerts_count} deduped incident
+            {report.alerts_count === 1 ? "" : "s"} in chart categories
           </p>
         </div>
       )}
