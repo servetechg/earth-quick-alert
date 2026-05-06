@@ -120,6 +120,17 @@ const NWS_NATIONAL_ALERTS = [
   { id: 'special_marine_warning', name: 'Special Marine Warning', severity: 'High', category: 'Other', icon: <AlertTriangle className="text-indigo-600" size={16} /> },
 ];
 
+const SOURCE_BADGE_STYLES: Record<string, { label: string; className: string }> = {
+  nws: { label: 'NWS', className: 'border-emerald-300 bg-emerald-50 text-emerald-700' },
+  usgs: { label: 'USGS', className: 'border-amber-300 bg-amber-50 text-amber-700' },
+  firms: { label: 'FIRMS', className: 'border-orange-300 bg-orange-50 text-orange-700' },
+  inciweb: { label: 'InciWeb', className: 'border-red-300 bg-red-50 text-red-700' },
+  nwps: { label: 'NWPS', className: 'border-sky-300 bg-sky-50 text-sky-700' },
+  fema: { label: 'FEMA', className: 'border-violet-300 bg-violet-50 text-violet-700' },
+  manual: { label: 'Manual', className: 'border-slate-300 bg-slate-50 text-slate-700' },
+  seed: { label: 'Seed', className: 'border-zinc-300 bg-zinc-50 text-zinc-700' },
+}
+
 export default function AlertsCommunicationPage() {
   const [notificationPrefs, setNotificationPrefs] = useState<Record<string, boolean>>({
     push: true,
@@ -161,16 +172,14 @@ export default function AlertsCommunicationPage() {
         }))
         setAlerts(formattedAlerts)
 
-        if (formattedAlerts.length > 0 && !selectedAlertId) {
-          setSelectedAlertId(formattedAlerts[0].id)
-        }
+        setSelectedAlertId(prev => prev ?? formattedAlerts[0]?.id ?? null)
       }
     } catch (err) {
       console.error('Failed to fetch emergency alerts', err)
     } finally {
       setLoading(false)
     }
-  }, [selectedAlertId])
+  }, [])
 
 
   useEffect(() => {
@@ -431,6 +440,11 @@ export default function AlertsCommunicationPage() {
               alerts.filter(alert => !filterCategory || alert.name === filterCategory).map((alert) => {
                 const isWarning = alert.type === 'Warning';
                 const isSelected = selectedAlertId === alert.id;
+                const sourceKey = String(alert.source || 'manual').toLowerCase()
+                const sourceMeta = SOURCE_BADGE_STYLES[sourceKey] ?? {
+                  label: sourceKey.toUpperCase(),
+                  className: 'border-slate-300 bg-slate-50 text-slate-700'
+                }
 
                 const badgeColor = isWarning ? 'bg-red-50 text-red-600 border-red-100' : 'bg-yellow-50 text-amber-600 border-amber-100';
 
@@ -455,10 +469,18 @@ export default function AlertsCommunicationPage() {
                   >
                     <div className="flex justify-between items-center mb-4">
                       <div className="flex items-center gap-2">
-                        <span className={cn("px-3 py-1 rounded-md text-[9px] font-black uppercase border", badgeColor)}>
+                        <span className={cn("px-3 py-1 rounded-md text-[11px] font-bold uppercase border", badgeColor)}>
                           {alert.type}
                         </span>
                         {icon}
+                        <span
+                          className={cn(
+                            "px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wider border",
+                            sourceMeta.className
+                          )}
+                        >
+                          Source: {sourceMeta.label}
+                        </span>
                       </div>
                       <span className="text-slate-400 text-[11px] font-bold">
                         Issued {alert.issuedAt}
