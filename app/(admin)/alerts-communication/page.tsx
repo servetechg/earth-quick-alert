@@ -48,7 +48,6 @@ import {
   Search as SearchIcon
 } from 'lucide-react'
 import { Switch } from '@/components/ui/switch'
-import { AlertSeverity, AlertSource } from '@/lib/types/api-alerts'
 import { cn } from '@/lib/utils'
 import Image from 'next/image'
 import { toast } from 'sonner'
@@ -167,9 +166,9 @@ export default function AlertsCommunicationPage() {
         const formattedAlerts = data.map((item: any) => ({
           ...item,
           id: item._id,
-          severity: item.severity === 'Extreme' ? AlertSeverity.EXTREME : item.severity === 'High' ? AlertSeverity.SEVERE : AlertSeverity.MODERATE,
           affectedAreas: [item.location]
         }))
+        console.log(formattedAlerts, 'formattedAlerts')
         setAlerts(formattedAlerts)
 
         setSelectedAlertId(prev => prev ?? formattedAlerts[0]?.id ?? null)
@@ -438,7 +437,6 @@ export default function AlertsCommunicationPage() {
               </div>
             ) : (
               alerts.filter(alert => !filterCategory || alert.name === filterCategory).map((alert) => {
-                const isWarning = alert.type === 'Warning';
                 const isSelected = selectedAlertId === alert.id;
                 const sourceKey = String(alert.source || 'manual').toLowerCase()
                 const sourceMeta = SOURCE_BADGE_STYLES[sourceKey] ?? {
@@ -446,14 +444,22 @@ export default function AlertsCommunicationPage() {
                   className: 'border-slate-300 bg-slate-50 text-slate-700'
                 }
 
-                const badgeColor = isWarning ? 'bg-red-50 text-red-600 border-red-100' : 'bg-yellow-50 text-amber-600 border-amber-100';
+                const sevNorm = String(alert.severity ?? '').trim().toLowerCase()
+                const isHighLike = sevNorm === 'high' || sevNorm === 'severe' || sevNorm === 'extreme'
+                const isModerateLike = sevNorm === 'moderate' || sevNorm === 'medium'
 
-                let icon = <AlertTriangle className="w-5 h-5 text-red-500" />;
-                if (alert.iconType === 'lightning') icon = <Zap className="w-5 h-5 text-orange-500" />;
-                if (alert.iconType === 'cloud') icon = <CloudRain className="w-5 h-5 text-amber-500" />;
+                const badgeColor = isHighLike
+                  ? 'bg-red-50 text-red-600 border-red-100'
+                  : isModerateLike
+                    ? 'bg-yellow-50 text-amber-600 border-amber-100'
+                    : 'bg-slate-50 text-slate-600 border-slate-200'
+
+                const iconAccent = isHighLike ? 'text-red-500' : isModerateLike ? 'text-amber-500' : 'text-slate-500'
+                let icon = <AlertTriangle className={cn('w-5 h-5', iconAccent)} />;
+                if (alert.iconType === 'lightning') icon = <Zap className={cn('w-5 h-5', iconAccent)} />;
+                if (alert.iconType === 'cloud') icon = <CloudRain className={cn('w-5 h-5', iconAccent)} />;
 
                 const isTakeAction = alert.status === 'Take Action';
-                const isAlertSent = alert.status === 'Get Prepared';
 
                 const buttonColor = isTakeAction ? 'bg-[#EF4444] hover:bg-red-600' : 'bg-[#22C55E] cursor-default';
                 const buttonText = isTakeAction ? 'Take Action' : 'Alert Sent';
@@ -470,7 +476,7 @@ export default function AlertsCommunicationPage() {
                     <div className="flex justify-between items-center mb-4">
                       <div className="flex items-center gap-2">
                         <span className={cn("px-3 py-1 rounded-md text-[11px] font-bold uppercase border", badgeColor)}>
-                          {alert.type}
+                          {alert.severity}
                         </span>
                         {icon}
                         <span
