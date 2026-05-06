@@ -1,5 +1,12 @@
 import type { DashboardIngestBundle, IngestSourceResult } from '@/lib/types/risk-assessment';
 import { computeRiskExposureSnapshot } from '@/lib/services/risk-exposure-service';
+import { weatherAPI } from '@/lib/services/weather-api';
+import { getNwpsGauge } from '@/lib/services/flood-service';
+import { summarizeNwpsGauge } from '@/lib/services/nwps-reach-mapper';
+import {
+  DEFAULT_NWPS_GAUGE_LIDS_NATIONWIDE,
+  DEFAULT_USGS_SITES_NATIONWIDE,
+} from '@/lib/constants/nationwide-alert-feed-defaults';
 
 const USGS_BASE = 'https://waterservices.usgs.gov/nwis';
 const NWPS_BASE = 'https://api.water.noaa.gov/nwps/v1';
@@ -20,6 +27,24 @@ const USER_AGENT =
 /** Optional browser-like UA for RSS endpoints that block generic clients (403). */
 const RSS_BROWSER_UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
+
+/** True when ingest uses Alerts & Communication–style nationwide NWS + sampled gauges (not single-state AOI). */
+function isNationwideIngestState(stateCd: string): boolean {
+  const s = stateCd.toLowerCase();
+  return s === 'us' || s === 'usa' || s === 'all' || s === 'national';
+}
+
+function resolveNationwideNwpsLids(): string[] {
+  const raw = process.env.NWPS_GAUGE_LIDS?.trim();
+  if (raw) return raw.split(',').map((x) => x.trim()).filter(Boolean);
+  return [...DEFAULT_NWPS_GAUGE_LIDS_NATIONWIDE];
+}
+
+function resolveNationwideUsgsSitesCsv(): string {
+  const raw = process.env.RISK_USGS_SITES?.trim() || process.env.USGS_SITES?.trim();
+  if (raw) return raw.split(',').map((s) => s.trim()).filter(Boolean).join(',');
+  return [...DEFAULT_USGS_SITES_NATIONWIDE].join(',');
+}
 
 /** Used by AI risk fusion and Alerts pipelines for consistent flood/hydro coverage. */
 export function isFloodRelatedEvent(event?: string): boolean {
@@ -233,7 +258,7 @@ async function ingestNwpsGauge(lid: string): Promise<IngestSourceResult> {
   }
 }
 
-/** M2.5+ worldwide last day; prefer events in or near the selected U.S. state / CONUS. */
+/** M2.5+ worldwide last day; US-wide ranking when {@link isNationwideIngestState}; else prioritize state mentioned in place. */
 async function ingestUsgsEarthquakes(stateCd: string): Promise<IngestSourceResult> {
   try {
     const res = await fetchWithTimeout(USGS_EQ_FEED_DAY, {
@@ -246,20 +271,24 @@ async function ingestUsgsEarthquakes(stateCd: string): Promise<IngestSourceResul
     if (!res.ok) return { ok: false, source: 'USGS_EARTHQUAKES', error: `HTTP ${res.status}` };
     const geo = (await res.json()) as { features?: any[] };
     const feats = geo?.features ?? [];
-    const stateToken = new RegExp(
-      `\\b${stateCd.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`,
-      'i',
-    );
     const inRoughUs = (lon: number, lat: number) =>
       lon >= -170 && lon <= -60 && lat >= 15 && lat <= 72;
     const ranked = feats
       .map((f) => ({ f, p: f?.properties ?? {}, c: f?.geometry?.coordinates as number[] }))
       .filter(({ c, p }) => Array.isArray(c) && c.length >= 2 && p?.mag != null)
       .sort((a, b) => (Number(b.p.mag) || 0) - (Number(a.p.mag) || 0));
-    /** Prefer U.S.-area events; boost rows that mention the selected state in `place`. */
     const usBox = ranked.filter(({ c }) => inRoughUs(c[0], c[1]));
-    const stateMatch = usBox.filter(({ p }) => stateToken.test(String(p.place ?? '')));
-    const pick = (stateMatch.length ? stateMatch : usBox.length ? usBox : ranked).slice(0, 15);
+    const nationwide = isNationwideIngestState(stateCd);
+    const stateToken = new RegExp(
+      `\\b${stateCd.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`,
+      'i',
+    );
+    /** Prefer U.S.-area events; boost rows that mention the selected state in `place` (state mode only). */
+    const stateMatch = nationwide ? [] : usBox.filter(({ p }) => stateToken.test(String(p.place ?? '')));
+    const cap = nationwide ? 25 : 15;
+    const pick = nationwide
+      ? usBox.slice(0, cap)
+      : (stateMatch.length ? stateMatch : usBox.length ? usBox : ranked).slice(0, cap);
     const lines = pick.map(({ p }) => {
       const t = p.time
         ? new Date(p.time).toLocaleString('en-US', {
@@ -332,6 +361,74 @@ async function ingestNwsFloodAlerts(stateCd: string): Promise<IngestSourceResult
   } catch (e: any) {
     return { ok: false, source: 'NWS_FLOOD_ALERTS', error: e?.message ?? 'NWS alerts fetch failed' };
   }
+}
+
+const NWS_FLOOD_SUMMARY_CAP = 48;
+
+/** Nationwide paginated NWS active alerts, flood/hydro events only — aligned with Alerts & Communication NWS breadth. */
+async function ingestNwsFloodAlertsNationwide(): Promise<IngestSourceResult> {
+  try {
+    const raw = await weatherAPI.fetchActiveNwsRawFeaturesNationwide();
+    const floodFeats = raw.filter((f) => {
+      const ev = (f as { properties?: { event?: string } })?.properties?.event;
+      return isFloodRelatedEvent(ev);
+    });
+    const json = { type: 'FeatureCollection' as const, features: floodFeats };
+    const lines: string[] = [];
+    if (Array.isArray(floodFeats)) {
+      for (const f of floodFeats) {
+        const p = (f as { properties?: Record<string, string | undefined> }).properties;
+        if (!p) continue;
+        lines.push(
+          `${p.event ?? 'Hydrologic alert'} (${p.areaDesc ?? 'United States'}) — ${(
+            p.headline ??
+            p.description?.slice(0, 180) ??
+            'Details in NWS dissemination'
+          ).trim()}`,
+        );
+        if (lines.length >= NWS_FLOOD_SUMMARY_CAP) break;
+      }
+    }
+    return {
+      ok: true,
+      source: 'NWS_FLOOD_ALERTS',
+      data: json,
+      summary:
+        lines.length > 0
+          ? lines.join('\n')
+          : 'No flood/hydro-related products in nationwide NWS active set for this sweep.',
+    };
+  } catch (e: any) {
+    return { ok: false, source: 'NWS_FLOOD_ALERTS', error: e?.message ?? 'NWS nationwide fetch failed' };
+  }
+}
+
+/** Same NWPS gauge sample as multi-source AlertCommunication sync (env `NWPS_GAUGE_LIDS` or defaults). */
+async function ingestNwpsGaugesNationwide(): Promise<IngestSourceResult> {
+  const lids = resolveNationwideNwpsLids();
+  const results = await Promise.all(
+    lids.map(async (lid) => {
+      try {
+        const raw = (await getNwpsGauge(lid)) as Record<string, unknown>;
+        const sm = summarizeNwpsGauge(lid, raw);
+        const line =
+          sm != null ? `${sm.placeLabel} — ${sm.detail}` : `NWPS ${lid}: gauge data received.`;
+        return { ok: true as const, lid, data: raw, line };
+      } catch {
+        return { ok: false as const, lid, line: `NWPS ${lid}: unavailable` };
+      }
+    }),
+  );
+  const gauges = results.filter((r) => r.ok).map((r) => ({ lid: r.lid, data: r.data }));
+  const summaryLines = results.map((r) => r.line);
+  const ok = gauges.length > 0;
+  return {
+    ok,
+    source: 'NOAA_NWPS_GAUGE',
+    data: { nwpsNationwide: true as const, gauges },
+    summary: ok ? summaryLines.join('\n') : 'No NWPS gauges returned data in nationwide sample.',
+    error: ok ? undefined : 'All NWPS gauge fetches failed',
+  };
 }
 
 async function ingestFemaFloods(): Promise<IngestSourceResult> {
@@ -592,18 +689,27 @@ async function ingestArcgisPerimeters(): Promise<IngestSourceResult> {
 }
 
 export async function runDashboardIngest(options: {
-  stateCd: string;
-  nwpsGaugeId: string;
+  stateCd?: string;
+  nwpsGaugeId?: string;
   usgsSite?: string;
+  /**
+   * When true (default): nationwide NWS flood/hydro sweep, sampled USGS IV sites, NWPS gauge list (env/defaults),
+   * US-wide earthquake ranking — comparable footprint to Alerts & Communication live feeds.
+   * When false: single-state NWS `area`, one USGS site, one NWPS gauge.
+   */
+  nationwide?: boolean;
 }): Promise<DashboardIngestBundle> {
-  const stateCd = (options.stateCd || 'ca').toLowerCase();
+  const nationwide = options.nationwide !== false;
   const nwpsGaugeId = options.nwpsGaugeId || 'SACC1';
   const usgsSite = options.usgsSite || '11447650';
+  const stateCd = nationwide ? 'us' : (options.stateCd || 'ca').toLowerCase();
 
   const [usgs, nwps, nws, fema, firms, inci, arcgis, eq] = await Promise.all([
-    ingestUsgs({ sites: usgsSite, period: 'P1D' }),
-    ingestNwpsGauge(nwpsGaugeId),
-    ingestNwsFloodAlerts(stateCd),
+    nationwide
+      ? ingestUsgs({ sites: resolveNationwideUsgsSitesCsv(), period: 'P1D' })
+      : ingestUsgs({ sites: usgsSite, period: 'P1D' }),
+    nationwide ? ingestNwpsGaugesNationwide() : ingestNwpsGauge(nwpsGaugeId),
+    nationwide ? ingestNwsFloodAlertsNationwide() : ingestNwsFloodAlerts(stateCd),
     ingestFemaFloods(),
     ingestNasaFirms(),
     ingestInciwebWildfire(),
@@ -614,10 +720,18 @@ export async function runDashboardIngest(options: {
   const sources = [usgs, nwps, nws, fema, firms, inci, arcgis, eq];
   const successfulSources = sources.filter((s) => s.ok).length;
 
+  const usgsHead = nationwide
+    ? `USGS instantaneous values — nationwide site sample (${resolveNationwideUsgsSitesCsv().split(',').length} stations)`
+    : `USGS (instantaneous, site ${usgsSite})`;
+  const nwpsHead = nationwide
+    ? `NOAA NWPS — nationwide gauge sample (${resolveNationwideNwpsLids().length} LIDs)`
+    : `NOAA NWPS gauge ${nwpsGaugeId}`;
+  const nwsHead = nationwide ? 'NWS flood/hydro (nationwide active, filtered)' : 'NWS flood/hydro (state area, filtered)';
+
   const narrativeParts = [
-    `=== USGS (instantaneous, site ${usgsSite}) ===\n${usgs.summary ?? usgs.error}`,
-    `=== NOAA NWPS gauge ${nwpsGaugeId} ===\n${nwps.summary ?? nwps.error}`,
-    `=== NWS Active Flood Warnings ===\n${nws.summary ?? nws.error}`,
+    `=== ${usgsHead} ===\n${usgs.summary ?? usgs.error}`,
+    `=== ${nwpsHead} ===\n${nwps.summary ?? nwps.error}`,
+    `=== ${nwsHead} ===\n${nws.summary ?? nws.error}`,
     `=== FEMA Flood declarations (recent) ===\n${fema.summary ?? fema.error}`,
     `=== NASA FIRMS VIIRS (USA, 1d) ===\n${firms.summary ?? firms.error}`,
     `=== InciWeb wildfire RSS ===\n${inci.summary ?? inci.error}`,
@@ -648,8 +762,9 @@ export async function runDashboardIngest(options: {
 
   return {
     stateCd,
-    nwpsGaugeId,
-    usgsSite,
+    nwpsGaugeId: nationwide ? resolveNationwideNwpsLids()[0] ?? nwpsGaugeId : nwpsGaugeId,
+    usgsSite: nationwide ? undefined : usgsSite,
+    ingestScope: nationwide ? 'nationwide' : 'state',
     ingestedAt: new Date().toISOString(),
     sources,
     narrative: narrative + exposureNarrative,

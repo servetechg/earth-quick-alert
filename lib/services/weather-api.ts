@@ -132,6 +132,47 @@ export class WeatherAPIService {
         }
     }
 
+    /**
+     * Raw GeoJSON features from nationwide paginated `GET /alerts/active?status=actual`.
+     * Used by AI risk ingest for flood/hydro filtering (parity with Alerts & Communication NWS scope).
+     */
+    async fetchActiveNwsRawFeaturesNationwide(): Promise<unknown[]> {
+        try {
+            const maxPages = Math.min(
+                500,
+                Math.max(1, parseInt(process.env.NWS_ALERTS_MAX_PAGES ?? '100', 10))
+            );
+            let nextUrl: string | null = `${this.nwsBaseURL}/alerts/active?status=actual`;
+            const features: unknown[] = [];
+            let pages = 0;
+
+            while (nextUrl && pages < maxPages) {
+                pages += 1;
+                const response = await fetch(nextUrl, {
+                    method: 'GET',
+                    headers: this.nwsRequestHeaders(),
+                });
+                if (!response.ok) {
+                    throw new Error(`NWS API error: ${response.status} ${response.statusText}`);
+                }
+                const data = await response.json();
+                const chunk = Array.isArray(data.features) ? data.features : [];
+                features.push(...chunk);
+                const pagination = data.pagination as { next?: string } | undefined;
+                const next = pagination?.next;
+                nextUrl =
+                    typeof next === 'string' && (next.startsWith('http://') || next.startsWith('https://'))
+                        ? next
+                        : null;
+            }
+
+            return features;
+        } catch (error) {
+            console.error('[weather-api] fetchActiveNwsRawFeaturesNationwide', error);
+            return [];
+        }
+    }
+
     private nwsRequestHeaders(): HeadersInit {
         return {
             Accept: 'application/geo+json',

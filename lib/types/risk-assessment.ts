@@ -93,6 +93,8 @@ export interface DashboardIngestBundle {
   stateCd: string;
   nwpsGaugeId: string;
   usgsSite?: string;
+  /** Nationwide vs single-state AOI (AI ingest); drives NWS/USGS/NWPS scope. */
+  ingestScope?: 'nationwide' | 'state';
   /** ISO timestamp when ingest ran */
   ingestedAt: string;
   sources: IngestSourceResult[];

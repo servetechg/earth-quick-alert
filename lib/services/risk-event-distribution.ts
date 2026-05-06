@@ -88,14 +88,22 @@ function collectFirmsRecords(
     return { records: list.slice(0, FIRMS_CARD_CAP), csvFallbackCount: 0 };
 }
 
+function isNationwideEqState(stateCd: string): boolean {
+    const s = stateCd.toLowerCase();
+    return s === 'us' || s === 'usa' || s === 'all' || s === 'national';
+}
+
 function pickEarthquakeFeatures(feats: unknown[], stateCd: string): unknown[] {
-    const stateToken = new RegExp(`\\b${stateCd.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
     const inRoughUs = (lon: number, lat: number) => lon >= -170 && lon <= -60 && lat >= 15 && lat <= 72;
     const ranked = feats
         .map((f) => ({ f, p: (f as { properties?: Record<string, unknown> })?.properties ?? {}, c: (f as { geometry?: { coordinates?: number[] } })?.geometry?.coordinates as number[] }))
         .filter(({ c, p }) => Array.isArray(c) && c.length >= 2 && p?.mag != null)
         .sort((a, b) => (Number(b.p.mag) || 0) - (Number(a.p.mag) || 0));
     const usBox = ranked.filter(({ c }) => inRoughUs(c[0]!, c[1]!));
+    if (isNationwideEqState(stateCd)) {
+        return usBox.slice(0, 25).map(({ f }) => f);
+    }
+    const stateToken = new RegExp(`\\b${stateCd.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
     const stateMatch = usBox.filter(({ p }) => stateToken.test(String(p.place ?? '')));
     const pick = (stateMatch.length ? stateMatch : usBox.length ? usBox : ranked).slice(0, 15);
     return pick.map(({ f }) => f);
