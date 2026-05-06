@@ -144,8 +144,18 @@ export async function computeRiskExposureSnapshot(
 
   const hints: CountyPopulationHint[] = [];
   if (nwpsSrc?.ok && nwpsSrc.data && typeof nwpsSrc.data === 'object') {
-    const h = nwpsCountyHint(nwpsSrc.data as Record<string, unknown>);
-    if (h) hints.push(h);
+    const d = nwpsSrc.data as Record<string, unknown>;
+    if (d.nwpsNationwide === true && Array.isArray(d.gauges)) {
+      for (const g of d.gauges as { data?: Record<string, unknown> }[]) {
+        if (g.data && typeof g.data === 'object') {
+          const h = nwpsCountyHint(g.data);
+          if (h) hints.push(h);
+        }
+      }
+    } else {
+      const h = nwpsCountyHint(d);
+      if (h) hints.push(h);
+    }
   }
   const nwsData = (nwsSrc?.data ?? null) as { features?: unknown[] } | null;
   if (nwsData?.features) hints.push(...collectNwsFloodCountyHints(nwsData.features));
@@ -154,15 +164,28 @@ export async function computeRiskExposureSnapshot(
 
   const centroidsPre: RiskExposureSnapshot['centroids'] = [];
   if (nwpsSrc?.ok && nwpsSrc.data && typeof nwpsSrc.data === 'object') {
-    const c = nwpsCentroid(nwpsSrc.data as Record<string, unknown>);
-    if (c) centroidsPre.push({ lat: c.lat, lon: c.lon, radiusKm: NWPS_BUFFER_KM, label: 'NWPS station buffer' });
+    const d = nwpsSrc.data as Record<string, unknown>;
+    if (d.nwpsNationwide === true && Array.isArray(d.gauges)) {
+      for (const g of d.gauges as { data?: Record<string, unknown> }[]) {
+        if (g.data && typeof g.data === 'object') {
+          const c = nwpsCentroid(g.data);
+          if (c) centroidsPre.push({ lat: c.lat, lon: c.lon, radiusKm: NWPS_BUFFER_KM, label: 'NWPS station buffer' });
+        }
+      }
+    } else {
+      const c = nwpsCentroid(d);
+      if (c) centroidsPre.push({ lat: c.lat, lon: c.lon, radiusKm: NWPS_BUFFER_KM, label: 'NWPS station buffer' });
+    }
   }
   const eqCentroids = earthquakeHints(eqSrc?.data).centroids.slice(0, 10);
   for (const ec of eqCentroids)
     centroidsPre.push({ lat: ec.lat, lon: ec.lon, radiusKm: EQ_BUFFER_KM, label: ec.label });
 
   const countyMatchHints = unique.map(({ stateAbbr, countyStem }) => ({ stateAbbr, countyStem }));
-  const censusVintageLabel = `US Census ACS ${ACS_YEAR_DEFAULT} (5-year) county / parish totals (B01003); dashboard state ${dashboardStateCd.toUpperCase()} context`;
+  const censusVintageLabel =
+    dashboardStateCd.toLowerCase() === 'us'
+      ? `US Census ACS ${ACS_YEAR_DEFAULT} (5-year) county / parish totals (B01003); nationwide ingest context`
+      : `US Census ACS ${ACS_YEAR_DEFAULT} (5-year) county / parish totals (B01003); dashboard state ${dashboardStateCd.toUpperCase()} context`;
 
   if (!unique.length && !centroidsPre.length) return null;
   if (!unique.length) {

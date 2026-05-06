@@ -458,11 +458,8 @@ export default function RiskAssessment() {
       const res = await fetch("/api/risk-assessment/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          stateCd: "ca",
-          nwpsGaugeId: "SACC1",
-          usgsSite: "11447650",
-        }),
+        /** Default nationwide ingest — pass `{ nationwide: false, stateCd: "ca", nwpsGaugeId, usgsSite }` for single-state AOI. */
+        body: JSON.stringify({}),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -696,8 +693,7 @@ export default function RiskAssessment() {
               </h1>
             </div>
             <p className="max-w-3xl text-sm leading-relaxed text-slate-500">
-              Multi-source intelligence aggregator. Synthesizes USGS water + earthquake feeds,
-              NOAA (NWS / NWPS), NASA FIRMS, FEMA, Esri wildfire layers, and InciWeb.
+            Multi-source intelligence aggregator. Synthesizes USGS, NOAA, NASA FIRMS, FEMA and InciWeb signals into a structured situational report.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">

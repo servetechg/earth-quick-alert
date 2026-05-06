@@ -40,7 +40,11 @@ function matchConfidence(report: RiskReport, archetype: HazardArchetype, bundle:
     return Math.min(96, Math.round(base));
 }
 
-const ST = (state: string) => state.toUpperCase();
+const ST = (state: string) => {
+    const s = state.toLowerCase().trim();
+    if (s === 'us' || s === 'usa' || s === 'all' || s === 'national') return 'U.S. (nationwide)';
+    return state.toUpperCase();
+};
 
 function copyForFlood(state: string): HistoricalAnalysis {
     const s = ST(state);

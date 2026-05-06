@@ -543,7 +543,7 @@ major_incidents, minor_incidents (numbers for KPI breakdown).`;
                 },
                 {
                     role: 'user',
-                    content: `${schemaHint}\n\nSTATE=${bundle.stateCd}\nNWPS_GAUGE=${bundle.nwpsGaugeId}\nUSGS_SITE=${bundle.usgsSite ?? ''}\nINGESTED_AT=${bundle.ingestedAt}\n\nDATA:\n${narrative}`,
+                    content: `${schemaHint}\n\nINGEST_SCOPE=${bundle.ingestScope ?? 'nationwide'}\nCONTEXT_STATE_OR_US=${bundle.stateCd}\nNWPS_PRIMARY_OR_SAMPLE_LID=${bundle.nwpsGaugeId}\nUSGS_SITE_OR_EMPTY_FOR_SAMPLE=${bundle.usgsSite ?? ''}\nINGESTED_AT=${bundle.ingestedAt}\n\nDATA:\n${narrative}`,
                 },
             ],
             fallback,

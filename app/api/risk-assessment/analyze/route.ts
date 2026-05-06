@@ -24,19 +24,31 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        let body: { stateCd?: string; nwpsGaugeId?: string; usgsSite?: string } = {};
+        let body: { stateCd?: string; nwpsGaugeId?: string; usgsSite?: string; nationwide?: boolean } = {};
         try {
             body = await req.json();
         } catch {
             /* empty body */
         }
 
-        const stateCd = typeof body.stateCd === 'string' && body.stateCd.length === 2 ? body.stateCd.toLowerCase() : 'ca';
+        /** Default true — NWS / sampled USGS-NWPS parity with Alerts & Communication. Set `nationwide:false` + 2-letter `stateCd` for legacy single-state AOI. */
+        const useNationwide = body.nationwide !== false;
+        const stateCd =
+            useNationwide
+                ? undefined
+                : typeof body.stateCd === 'string' && body.stateCd.length === 2
+                  ? body.stateCd.toLowerCase()
+                  : 'ca';
         const nwpsGaugeId =
             typeof body.nwpsGaugeId === 'string' && body.nwpsGaugeId.length > 0 ? body.nwpsGaugeId : 'SACC1';
         const usgsSite = typeof body.usgsSite === 'string' && body.usgsSite.length > 0 ? body.usgsSite : undefined;
 
-        const bundle = await runDashboardIngest({ stateCd, nwpsGaugeId, usgsSite });
+        const bundle = await runDashboardIngest({
+            ...(stateCd != null ? { stateCd } : {}),
+            nwpsGaugeId,
+            usgsSite,
+            nationwide: useNationwide,
+        });
         const reachable = await countReady2GoReachableUsers(bundle.riskExposure ?? undefined);
         let report = await openaiService.synthesizeDashboardRiskReport(bundle);
 
@@ -58,6 +70,7 @@ export async function POST(req: Request) {
                 totalSignals: bundle.totalSignals,
                 ingestedAt: bundle.ingestedAt,
                 stateCd: bundle.stateCd,
+                ingestScope: bundle.ingestScope ?? 'nationwide',
                 nwpsGaugeId: bundle.nwpsGaugeId,
                 usgsSite: bundle.usgsSite,
                 populationsAtRiskAcsEstimate: bundle.riskExposure?.populationAffectedEstimate ?? null,
