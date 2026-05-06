@@ -1,5 +1,12 @@
 import { Alert, AlertSeverity, AlertSource, SocialMediaAlert, ResourceAlert } from '@/lib/types/api-alerts';
-import type { DashboardIngestBundle, RiskReport } from '@/lib/types/risk-assessment';
+import type { DashboardIngestBundle, RecommendationItem, RiskReport } from '@/lib/types/risk-assessment';
+
+function normalizeRecommendationPriority(p: string | undefined): RecommendationItem['priority'] {
+    const u = String(p ?? 'STANDARD').toUpperCase().trim();
+    if (u === 'IMMEDIATE' || u.startsWith('IMMEDIATE')) return 'IMMEDIATE';
+    if (u === 'URGENT' || u === 'URGENCY' || u.startsWith('URGENT')) return 'URGENT';
+    return 'STANDARD';
+}
 import {
     aggregateSeverityPressure,
     applyDynamicExecutiveKpis,
@@ -7,6 +14,8 @@ import {
     deriveDynamicOverallThreatLevel,
     deriveMajorMinorSplit,
 } from '@/lib/services/risk-kpi-dynamic';
+import { deriveEventBasedIncidentDistribution } from '@/lib/services/risk-event-distribution';
+import { applyHistoricalContextToReport } from '@/lib/services/risk-historical-context';
 
 export interface EmergencyInsights {
     status: 'All Clear' | 'Warning' | 'Emergency';
@@ -503,7 +512,10 @@ export class OpenAIService {
 
     async synthesizeDashboardRiskReport(bundle: DashboardIngestBundle): Promise<RiskReport> {
         const fallbackHeuristic = this.alignAlertsToDistribution(this.heuristicDashboardRiskReport(bundle), bundle);
-        const fallback = applyDynamicExecutiveKpis(bundle, fallbackHeuristic);
+        const fallback = applyHistoricalContextToReport(
+            bundle,
+            applyDynamicExecutiveKpis(bundle, fallbackHeuristic),
+        );
         if (!this.canUseOpenAI()) return fallback;
 
         const narrative = bundle.narrative.slice(0, 16000);
@@ -514,11 +526,11 @@ domain_severities: { meteorological, hydrological, fire } each short label like 
 meteorological_findings (string array — executive briefing sentences; prefer place names over raw lat/long; earthquakes as magnitude + location + time prose),
 hydrological_findings (string array — river/gauge-centric sentences; cfs, flood stage context; no coordinate dumps unless essential),
 fire_findings (string array — named incidents, acres, containment; satellite cues as sectors—avoid bare lat/lon lists),
-recommendations_list: array of { priority: IMMEDIATE|URGENT|STANDARD, action: string, deployable: boolean },
-incident_distribution: array of { category: string, count: number } with categories flood, wildfire, earthquake (not severe_weather),
+recommendations_list: array of { priority: IMMEDIATE|URGENT|STANDARD exactly (never URGENCY or other synonyms), action: string, deployable: boolean },
+incident_distribution: optional — server recomputes unique event counts per category from ingest (you may omit),
 historical_analysis: { matched_event, match_confidence 0-100, similarity_summary, past_damages[], past_procedures[], current_procedures[], future_measures[] },
 sources_count (number, successful feeds was ${bundle.successfulSources}),
-alerts_count (integer estimate of active signals),
+alerts_count: optional — server sets from incident_distribution,
 meteorological_summary, hydrological_risk, fire_threats, recommendations (short paragraph strings),
 major_incidents, minor_incidents (numbers for KPI breakdown).`;
 
@@ -539,7 +551,7 @@ major_incidents, minor_incidents (numbers for KPI breakdown).`;
 
         const merged = this.mergeRiskReport(fallback, result);
         const aligned = this.alignAlertsToDistribution(merged, bundle);
-        return applyDynamicExecutiveKpis(bundle, aligned);
+        return applyHistoricalContextToReport(bundle, applyDynamicExecutiveKpis(bundle, aligned));
     }
 
     private mergeRiskReport(base: RiskReport, ai?: RiskReport | null): RiskReport {
@@ -551,8 +563,11 @@ major_incidents, minor_incidents (numbers for KPI breakdown).`;
             meteorological_findings: ai.meteorological_findings?.length ? ai.meteorological_findings : base.meteorological_findings,
             hydrological_findings: ai.hydrological_findings?.length ? ai.hydrological_findings : base.hydrological_findings,
             fire_findings: ai.fire_findings?.length ? ai.fire_findings : base.fire_findings,
-            recommendations_list: ai.recommendations_list?.length ? ai.recommendations_list : base.recommendations_list,
-            incident_distribution: ai.incident_distribution?.length ? ai.incident_distribution : base.incident_distribution,
+            recommendations_list: (ai.recommendations_list?.length ? ai.recommendations_list : base.recommendations_list).map(
+                (rec) => ({ ...rec, priority: normalizeRecommendationPriority(rec.priority) }),
+            ),
+            /** Deterministic unique-event counts from ingest (same basis as AlertCommunication normalizers). */
+            incident_distribution: base.incident_distribution,
             historical_analysis: { ...base.historical_analysis, ...ai.historical_analysis },
         };
     }
@@ -580,9 +595,8 @@ major_incidents, minor_incidents (numbers for KPI breakdown).`;
         const arcgis = bundle.sources.find((x) => x.source === 'ESRI_ARCGIS_WFIGS')?.summary;
         const usgsEq = bundle.sources.find((x) => x.source === 'USGS_EARTHQUAKES')?.summary;
 
-        /** Bar chart: derive counts from merged ingest summaries (dynamic, not capped to 3). */
-        const MAX_BAR = 200;
-        const floodBarRaw = Math.max(0, allLines(usgs).length + allLines(nwps).length + allLines(fema).length);
+        /** Domain card heuristics (line density), separate from bar chart event counts. */
+        const floodLineSignals = Math.max(0, allLines(usgs).length + allLines(nwps).length + allLines(fema).length);
         const fireArcLines = allLines(arcgis).filter(
             (l) =>
                 !/no perimeter features returned|returned no (?:perimeter|features)|query returned no|empty window or outside current aoi|unavailable\s*\([^)]*\)\s*$/i.test(
@@ -591,12 +605,10 @@ major_incidents, minor_incidents (numbers for KPI breakdown).`;
         );
         const firmsDetectionTally =
             firmsSignalCount != null ? firmsSignalCount : firms ? allLines(firms).length : 0;
-        const wildfireBarRaw = Math.max(0, firmsDetectionTally + allLines(inci).length + fireArcLines.length);
-        const earthquakeBarRaw = Math.max(0, allLines(usgsEq).length);
+        const wildfireLineSignals = Math.max(0, firmsDetectionTally + allLines(inci).length + fireArcLines.length);
 
-        const floodBar = Math.min(MAX_BAR, floodBarRaw);
-        const wildfireBar = Math.min(MAX_BAR, wildfireBarRaw);
-        const earthquakeBar = Math.min(MAX_BAR, earthquakeBarRaw);
+        /** Bar chart + Active incidents: deduped normalized events (aligned with Alerts & Communication logic). */
+        const distro: RiskReport['incident_distribution'] = deriveEventBasedIncidentDistribution(bundle);
 
         const hydro = [...lines(usgs, 12), ...lines(nwps, 4), ...lines(fema, 20)].slice(0, 40);
 
@@ -613,18 +625,10 @@ major_incidents, minor_incidents (numbers for KPI breakdown).`;
 
         const overall = deriveDynamicOverallThreatLevel(bundle);
         const pressure = aggregateSeverityPressure(bundle);
-        const distro: RiskReport['incident_distribution'] = [
-            { category: 'flood', count: floodBar },
-            { category: 'wildfire', count: wildfireBar },
-            { category: 'earthquake', count: earthquakeBar },
-        ];
 
-        /** KPI "Active incidents" must match the chart: sum of category bars (same threat model per run). */
+        /** KPI "Active incidents" = sum of deduped event counts (0 when no normalized events). */
         const barSum = distro.reduce((a, x) => a + Math.max(0, x.count || 0), 0);
-        let alerts_count = Math.min(500, Math.max(0, barSum));
-        if (alerts_count < 1) {
-            alerts_count = Math.min(50, Math.max(1, bundle.totalSignals || bundle.successfulSources));
-        }
+        const alerts_count = Math.min(500, barSum);
         return {
             id: `risk-${Date.now()}`,
             generated_at: now,
@@ -641,19 +645,19 @@ major_incidents, minor_incidents (numbers for KPI breakdown).`;
                             ? 'Monitor'
                             : 'Low',
                 hydrological:
-                    pressure >= 70 && floodBarRaw > 2
+                    pressure >= 70 && floodLineSignals > 2
                         ? 'Critical'
-                        : floodBarRaw > 8 || (pressure >= 38 && floodBarRaw > 1)
+                        : floodLineSignals > 8 || (pressure >= 38 && floodLineSignals > 1)
                           ? 'Elevated'
-                          : floodBarRaw > 1
+                          : floodLineSignals > 1
                             ? 'Monitor'
                             : 'Low',
                 fire:
                     firmsDetectionTally > 400 || fireArcLines.length > 6
                         ? 'Critical'
-                        : firmsDetectionTally > 120 || wildfireBarRaw > 25
+                        : firmsDetectionTally > 120 || wildfireLineSignals > 25
                           ? 'High Risk'
-                          : wildfireBarRaw > 4
+                          : wildfireLineSignals > 4
                             ? 'Elevated'
                             : 'Monitor',
             },
@@ -678,16 +682,8 @@ major_incidents, minor_incidents (numbers for KPI breakdown).`;
                 },
             ],
             incident_distribution: distro,
-            historical_analysis: {
-                matched_event: 'Regional flood / fire season baseline',
-                match_confidence: 62,
-                similarity_summary:
-                    'Heuristic mode: enable OPENAI_API_KEY for narrative fusion; ingest counts reflect live feeds where reachable.',
-                past_damages: ['Historical impacts vary by jurisdiction — review FEMA declarations list.'],
-                past_procedures: ['Evacuation messaging', 'Staging outside threatened zones'],
-                current_procedures: ['Multi-feed verification', 'GIS perimeter confirmation'],
-                future_measures: ['Vegetation management', 'Resilient communications redundancy'],
-            },
+            /** Filled after KPI alignment via {@link applyHistoricalContextToReport}. */
+            historical_analysis: {},
             sources_count: bundle.successfulSources,
             alerts_count,
             meteorological_summary: met.join(' '),

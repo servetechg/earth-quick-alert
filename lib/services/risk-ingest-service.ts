@@ -21,7 +21,8 @@ const USER_AGENT =
 const RSS_BROWSER_UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
 
-function isFloodRelatedEvent(event?: string): boolean {
+/** Used by AI risk fusion and Alerts pipelines for consistent flood/hydro coverage. */
+export function isFloodRelatedEvent(event?: string): boolean {
   const e = (event ?? '').toLowerCase();
   return (
     e.includes('flood') ||
