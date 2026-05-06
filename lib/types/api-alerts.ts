@@ -44,6 +44,10 @@ export interface WeatherAlert extends BaseAlert {
      * NWS UGC zone codes when available.
      */
     zones?: string[];
+    /**
+     * NWS CAP call-to-action text (`properties.instruction`), when provided separately from the body.
+     */
+    instruction?: string;
     weatherType: 'thunderstorm' | 'tornado' | 'hurricane' | 'flood' | 'snow' | 'heat' | 'cold' | 'wind' | 'rain' | 'fog' | 'other';
     temperature?: number;
     windSpeed?: number;
