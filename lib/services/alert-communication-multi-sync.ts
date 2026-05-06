@@ -30,6 +30,7 @@ import {
     DEFAULT_USGS_SITES_NATIONWIDE,
 } from '@/lib/constants/nationwide-alert-feed-defaults';
 import AlertCommunication from '@/models/AlertCommunication';
+import { buildNwsInstructionBullets } from '@/lib/services/alert-communication-nws-sync';
 
 type Source = 'usgs' | 'firms' | 'inciweb' | 'nwps' | 'fema';
 
@@ -244,6 +245,7 @@ async function upsertAndPrune(source: Source, docs: MappedDoc[]): Promise<SyncSt
                         expiresAt: d.expiresAt,
                         description: d.description,
                         severity: d.severity,
+                        instructions: buildNwsInstructionBullets(undefined, d.description, d.name),
                     },
                     $setOnInsert: {
                         status: d.status,

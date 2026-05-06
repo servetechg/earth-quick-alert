@@ -2,8 +2,8 @@ import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongodb';
 import AlertCommunication from '@/models/AlertCommunication';
 import { alertCommunicationFeedFilter } from '@/lib/constants/alert-communication-feed';
-import { syncNwsAlertsNow } from '@/lib/services/alert-communication-nws-sync';
-import { syncAllSourcesNow } from '@/lib/services/alert-communication-multi-sync';
+import { syncNwsAlertsNow, syncNwsAlertsIfStale } from '@/lib/services/alert-communication-nws-sync';
+import { syncAllSourcesNow, syncAllSourcesIfStale } from '@/lib/services/alert-communication-multi-sync';
 
 type MultiReport = Awaited<ReturnType<typeof syncAllSourcesNow>>;
 
@@ -29,11 +29,25 @@ async function syncAllLiveFeedsNow(): Promise<{
     return { nws, multi };
 }
 
+/** Throttled upstream refresh (see `NWS_SYNC_MIN_INTERVAL_MS`, `MULTI_ALERT_SYNC_MIN_INTERVAL_MS`). */
+async function syncLiveFeedsIfStale(): Promise<void> {
+    await Promise.all([syncNwsAlertsIfStale(), syncAllSourcesIfStale()]);
+}
+
 export async function GET() {
     try {
         await dbConnect();
-        await syncAllLiveFeedsNow();
         const feedFilter = alertCommunicationFeedFilter();
+        /**
+         * If the live-ingested feed is empty (fresh DB, manual delete, etc.), always pull upstream.
+         * Stale-only sync would skip and leave `[]` until the throttle window expires or POST runs.
+         */
+        const hasLiveRows = !!(await AlertCommunication.findOne(feedFilter).select('_id').lean());
+        if (!hasLiveRows) {
+            await syncAllLiveFeedsNow();
+        } else {
+            await syncLiveFeedsIfStale();
+        }
         /** Live feeds only (NWS + USGS + FIRMS + InciWeb). Set `ALERTS_COMMUNICATION_INCLUDE_MANUAL=true` to show manual/seed rows. */
         const data = await AlertCommunication.find(feedFilter).sort({ createdAt: -1 }).lean();
         return NextResponse.json(data);
