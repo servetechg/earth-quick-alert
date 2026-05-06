@@ -208,7 +208,7 @@ export default function SignupPage() {
 
       {/* Right Side: Signup Form */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-4 sm:p-8 lg:p-12 relative">
-        <div className="w-full max-w-md">
+        <div className="w-full max-w-lg">
           {/* Mobile Logo (Visible on Mobile) */}
           <div className="lg:hidden text-center mb-10 flex flex-col items-center">
             <Image
@@ -231,7 +231,7 @@ export default function SignupPage() {
                 <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">
                   Full Name
                 </label>
-                <div className="relative group">
+                <div className="relative group mt-1">
                   <div className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#33375D] transition-colors">
                     <User size={18} />
                   </div>
@@ -240,7 +240,7 @@ export default function SignupPage() {
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="John Doe"
-                    className="w-full pl-16 pr-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-[#33375D]/5 focus:border-[#33375D] transition-all font-bold text-[#33375D]"
+                    className="w-full font-semibold pl-16 pr-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-[#33375D]/5 focus:border-[#33375D] transition-all text-[#33375D]"
                     required
                   />
                 </div>
@@ -250,7 +250,7 @@ export default function SignupPage() {
                 <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">
                   Email Address
                 </label>
-                <div className="relative group">
+                <div className="relative group mt-1">
                   <div className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#33375D] transition-colors">
                     <Mail size={18} />
                   </div>
@@ -259,7 +259,7 @@ export default function SignupPage() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="name@company.com"
-                    className="w-full pl-16 pr-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-[#33375D]/5 focus:border-[#33375D] transition-all font-bold text-[#33375D]"
+                    className="w-full font-semibold pl-16 pr-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-[#33375D]/5 focus:border-[#33375D] transition-all text-[#33375D]"
                     required
                   />
                 </div>
@@ -269,7 +269,7 @@ export default function SignupPage() {
                 <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">
                   Select Your Role
                 </label>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-4 mt-1">
                   <button
                     type="button"
                     onClick={() => setRole('user')}
@@ -313,7 +313,7 @@ export default function SignupPage() {
                       <input
                         type="text"
                         placeholder="Search for your city or zip code..."
-                        className="w-full px-5 py-4 bg-white border border-slate-200 shadow-sm rounded-2xl focus:outline-none focus:ring-4 focus:ring-[#33375D]/5 focus:border-[#33375D] transition-all font-bold text-[#33375D] placeholder:text-slate-300"
+                        className="w-full px-5 py-4 bg-white border border-slate-200 shadow-sm rounded-2xl focus:outline-none focus:ring-4 focus:ring-[#33375D]/5 focus:border-[#33375D] transition-all text-[#33375D] placeholder:text-slate-300"
                       />
                     </Autocomplete>
 
@@ -357,7 +357,7 @@ export default function SignupPage() {
                       value={country}
                       onChange={(e) => setCountry(e.target.value)}
                       placeholder="USA"
-                      className="w-full px-5 py-3 bg-white border border-slate-100 rounded-xl focus:outline-none focus:border-[#33375D] transition-all font-bold text-[#33375D] shadow-sm"
+                      className="w-full px-5 py-3 bg-white border border-slate-100 rounded-xl focus:outline-none focus:border-[#33375D] transition-all text-[#33375D] shadow-sm text-sm"
                       required
                     />
                   </div>
@@ -368,7 +368,7 @@ export default function SignupPage() {
                       value={state}
                       onChange={(e) => setState(e.target.value)}
                       placeholder="Arkansas"
-                      className="w-full px-5 py-3 bg-white border border-slate-100 rounded-xl focus:outline-none focus:border-[#33375D] transition-all font-bold text-[#33375D] shadow-sm"
+                      className="w-full px-5 py-3 bg-white border border-slate-100 rounded-xl focus:outline-none focus:border-[#33375D] transition-all text-[#33375D] shadow-sm text-sm"
                       required
                     />
                   </div>
@@ -382,7 +382,7 @@ export default function SignupPage() {
                       value={city}
                       onChange={(e) => setCity(e.target.value)}
                       placeholder="Little Rock"
-                      className="w-full px-5 py-3 bg-white border border-slate-100 rounded-xl focus:outline-none focus:border-[#33375D] transition-all font-bold text-[#33375D] shadow-sm"
+                      className="w-full px-5 py-3 bg-white border border-slate-100 rounded-xl focus:outline-none focus:border-[#33375D] transition-all text-[#33375D] shadow-sm text-sm"
                       required
                     />
                   </div>
@@ -393,7 +393,7 @@ export default function SignupPage() {
                       value={zipcode}
                       onChange={(e) => setZipcode(e.target.value)}
                       placeholder="72201"
-                      className="w-full px-5 py-3 bg-white border border-slate-100 rounded-xl focus:outline-none focus:border-[#33375D] transition-all font-bold text-[#33375D] shadow-sm"
+                      className="w-full px-5 py-3 bg-white border border-slate-100 rounded-xl focus:outline-none focus:border-[#33375D] transition-all text-[#33375D] shadow-sm text-sm"
                       required
                     />
                   </div>
@@ -404,7 +404,7 @@ export default function SignupPage() {
                 <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">
                   Password
                 </label>
-                <div className="relative group">
+                <div className="relative group mt-1">
                   <div className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#33375D] transition-colors">
                     <Lock size={18} />
                   </div>
@@ -413,7 +413,7 @@ export default function SignupPage() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Min. 6 characters"
-                    className="w-full pl-16 pr-16 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-[#33375D]/5 focus:border-[#33375D] transition-all font-bold text-[#33375D]"
+                    className="w-full pl-16 pr-16 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-[#33375D]/5 focus:border-[#33375D] transition-all text-[#33375D]"
                     required
                   />
                   <button

@@ -35,11 +35,12 @@ export default function LandingPage() {
     if (!isLoaded) {
         return (
             <div className="fixed inset-0 bg-slate-900 flex flex-col items-center justify-center z-[100] overflow-hidden">
-                <div className="relative">
-                    <div className="w-24 h-24 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin mb-8" />
-                    <div className="absolute inset-0 flex items-center justify-center">
-                        <Activity className="w-8 h-8 text-blue-500 animate-pulse" />
-                    </div>
+                <div className="relative mb-8 flex h-24 w-24 shrink-0 items-center justify-center">
+                    <div
+                        aria-hidden
+                        className="absolute inset-0 rounded-full border-4 border-blue-500/20 border-t-blue-500 animate-spin"
+                    />
+                    <Activity className="relative z-10 block h-8 w-8 shrink-0 text-blue-500 animate-pulse" />
                 </div>
                 <h1 className="text-4xl font-black text-white tracking-tighter animate-pulse">
                     Ready<span className="text-blue-500">2</span>Go
