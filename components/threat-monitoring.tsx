@@ -5,110 +5,141 @@ import { Card } from '@/components/ui/card'
 import { CheckCircle2, Loader2, AlertCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Skeleton } from '@/components/ui/skeleton'
+import type { RiskReport } from '@/lib/types/risk-assessment'
 
-interface ThreatAssessment {
-    relevance: 'High' | 'Medium' | 'Low';
-    severity: string;
-    affectedAreas: string;
-    confidence: number;
-    summary: string;
+/** UI row derived from the same `RiskReport` as AI Risk Assessment (`/api/risk-assessment/analyze`). */
+interface ThreatPanelRow {
+    relevance: 'High' | 'Medium' | 'Low'
+    severity: string
+    affectedAreas: string
+    confidence: number
 }
 
 interface ThreatMonitoringProps {
-    lat?: number;
-    lon?: number;
-    locationName?: string;
+    lat?: number
+    lon?: number
+    locationName?: string
 }
 
-export function ThreatMonitoring({ lat, lon, locationName }: ThreatMonitoringProps) {
-    const [loading, setLoading] = useState(true);
-    const [assessment, setAssessment] = useState<ThreatAssessment | null>(null);
-    const [error, setError] = useState<string | null>(null);
+function overallLevelToRelevance(level: string): 'High' | 'Medium' | 'Low' {
+    const u = (level || '').toUpperCase()
+    if (u === 'CRITICAL' || u === 'SEVERE' || u === 'HIGH') return 'High'
+    if (u === 'ELEVATED' || u === 'MODERATE') return 'Medium'
+    return 'Low'
+}
+
+function reportToPanelRow(report: RiskReport, locationLabel: string): ThreatPanelRow {
+    const distro = report.incident_distribution?.filter((d) => d.count > 0) ?? []
+    let affectedAreas: string
+    if (distro.length > 0) {
+        affectedAreas = distro
+            .slice(0, 5)
+            .map((d) => `${d.category} (${d.count})`)
+            .join(' · ')
+    } else {
+        affectedAreas =
+            locationLabel === 'USA'
+                ? 'National scope'
+                : locationLabel && locationLabel !== 'Current Location'
+                  ? locationLabel
+                  : 'Regional scope'
+    }
+    const pop = report.populations_at_risk
+    if (typeof pop === 'number' && pop > 0) {
+        affectedAreas += ` · est. ${pop.toLocaleString()} pop. at risk`
+    }
+
+    return {
+        relevance: overallLevelToRelevance(report.overall_risk_level),
+        severity: (report.overall_risk_level || 'NOMINAL').toUpperCase(),
+        affectedAreas,
+        confidence: typeof report.ai_confidence === 'number' ? report.ai_confidence : 0,
+    }
+}
+
+export function ThreatMonitoring({ locationName }: ThreatMonitoringProps) {
+    const [loading, setLoading] = useState(true)
+    const [row, setRow] = useState<ThreatPanelRow | null>(null)
+    const [error, setError] = useState<string | null>(null)
+
+    const label = locationName || 'Current Location'
 
     useEffect(() => {
-        async function fetchAssessment(targetLat?: number, targetLon?: number) {
-            setLoading(true);
-            setError(null);
+        let cancelled = false
+
+        async function fetchDashboardAssessment() {
+            setLoading(true)
+            setError(null)
             try {
-                let url = `/api/threats/assessment?locationName=${encodeURIComponent(locationName || 'Current Location')}`;
+                const response = await fetch('/api/risk-assessment/analyze', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin',
+                    /** Matches AI Risk Assessment page: nationwide dashboard ingest when body is empty. */
+                    body: JSON.stringify({}),
+                })
+                const json = await response.json().catch(() => ({}))
 
-                // Only append lat/lon if we are NOT in USA National mode
-                if (locationName !== 'USA') {
-                    if (targetLat && targetLon) {
-                        url += `&lat=${targetLat}&lon=${targetLon}`;
-                    } else {
-                        // Local fallback to LA if no coordinates provided and not USA
-                        url += `&lat=34.0522&lon=-118.2437`;
-                    }
+                if (!response.ok) {
+                    const msg =
+                        response.status === 401
+                            ? 'Sign in required'
+                            : (json?.error || json?.message || `Request failed (${response.status})`)
+                    throw new Error(typeof msg === 'string' ? msg : 'Failed to load assessment')
                 }
-
-                const response = await fetch(url);
-                const json = await response.json();
-
-                if (json.success) {
-                    setAssessment(json.data.assessment);
-                } else {
-                    setError('Failed to load live data');
+                if (!json?.report) {
+                    throw new Error('Invalid response: missing report')
+                }
+                if (!cancelled) {
+                    setRow(reportToPanelRow(json.report as RiskReport, label))
                 }
             } catch (err) {
-                console.error('Error fetching threat assessment:', err);
-                setError('Service temporarily unavailable');
+                console.error('Threat monitoring — risk assessment:', err)
+                if (!cancelled) {
+                    setError(err instanceof Error ? err.message : 'Service temporarily unavailable')
+                }
             } finally {
-                setLoading(false);
+                if (!cancelled) setLoading(false)
             }
         }
 
-        // Selection Logic
-        if (locationName === 'USA') {
-            // National Mode: No coordinates needed
-            fetchAssessment();
-        } else if (lat && lon) {
-            // Admin Specific Mode
-            fetchAssessment(lat, lon);
-        } else if (navigator.geolocation) {
-            // Personal fallback mode
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    fetchAssessment(position.coords.latitude, position.coords.longitude);
-                },
-                () => {
-                    fetchAssessment(); // Final fallback
-                }
-            );
-        } else {
-            fetchAssessment();
+        fetchDashboardAssessment()
+        return () => {
+            cancelled = true
         }
-    }, [lat, lon, locationName])
+    }, [label])
 
     const liveInputs = [
-        "NWS Severe Weather Alerts",
-        "News Incident Reports",
-        "Government Emergency Declarations",
-        "Social Media Signals",
-        "Citizen Submitted Reports"
+        'NWS flood & hydro alerts',
+        'NOAA NWPS gauges · USGS hydrology',
+        'USGS earthquake feed',
+        'NASA FIRMS thermal activity',
+        'FEMA OpenFEMA declarations',
     ]
 
     return (
         <Card className="bg-white border-slate-200 rounded-3xl p-8 shadow-sm space-y-8 min-h-[600px] flex flex-col">
-            {/* Header */}
             <div>
                 <h2 className="text-xl font-black text-slate-900 tracking-tight">Threat Detection & Monitoring</h2>
             </div>
 
-            {/* Live Inputs Section */}
             <div className="space-y-4">
                 <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight">Live Inputs</h3>
                 <div className="space-y-3">
                     {liveInputs.map((input, index) => (
                         <div key={index} className="flex items-center gap-3">
-                            <CheckCircle2 className={cn("shrink-0", loading ? "text-slate-200 animate-pulse" : "text-emerald-500")} size={18} />
-                            <span className={cn("text-sm font-bold", loading ? "text-slate-300" : "text-slate-600")}>{input}</span>
+                            <CheckCircle2
+                                className={cn('shrink-0', loading ? 'text-slate-200 animate-pulse' : 'text-emerald-500')}
+                                size={18}
+                            />
+                            <span className={cn('text-sm font-bold', loading ? 'text-slate-300' : 'text-slate-600')}>
+                                {input}
+                            </span>
                         </div>
                     ))}
                 </div>
             </div>
 
-            {/* AI Assessment Section */}
             <div className="space-y-6 pt-6 border-t border-slate-100 flex-1">
                 <div className="flex items-center justify-between">
                     <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight">AI Assessment</h3>
@@ -123,46 +154,66 @@ export function ThreatMonitoring({ lat, lon, locationName }: ThreatMonitoringPro
                 ) : (
                     <div className="grid grid-cols-1 gap-6">
                         <div className="space-y-1">
-                            <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Geo-relevance</p>
-                            {loading ? <Skeleton className="h-6 w-16 bg-slate-50" /> : (
-                                <p className={cn("text-lg font-black",
-                                    assessment?.relevance === 'High' ? 'text-rose-600' :
-                                        assessment?.relevance === 'Medium' ? 'text-amber-600' : 'text-emerald-600'
-                                )}>
-                                    {assessment?.relevance || 'Low'}
+                            <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest">
+                                Geo-relevance
+                            </p>
+                            {loading ? (
+                                <Skeleton className="h-6 w-16 bg-slate-50" />
+                            ) : (
+                                <p
+                                    className={cn(
+                                        'text-lg font-black',
+                                        row?.relevance === 'High'
+                                            ? 'text-rose-600'
+                                            : row?.relevance === 'Medium'
+                                              ? 'text-amber-600'
+                                              : 'text-emerald-600',
+                                    )}
+                                >
+                                    {row?.relevance || 'Low'}
                                 </p>
                             )}
                         </div>
 
                         <div className="space-y-1">
-                            <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Severity Level</p>
-                            {loading ? <Skeleton className="h-6 w-40 bg-slate-50" /> : (
-                                <p className="text-lg font-black text-blue-500 uppercase">
-                                    {assessment?.severity || 'NOMINAL'}
-                                </p>
+                            <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest">
+                                Severity Level
+                            </p>
+                            {loading ? (
+                                <Skeleton className="h-6 w-40 bg-slate-50" />
+                            ) : (
+                                <p className="text-lg font-black text-blue-500 uppercase">{row?.severity || 'NOMINAL'}</p>
                             )}
                         </div>
 
                         <div className="space-y-1">
-                            <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Affected Areas</p>
-                            {loading ? <Skeleton className="h-6 w-32 bg-slate-50" /> : (
-                                <p className="text-lg font-black text-slate-900 uppercase tracking-tighter">
-                                    {assessment?.affectedAreas || 'None'}
+                            <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest">
+                                Affected Areas
+                            </p>
+                            {loading ? (
+                                <Skeleton className="h-6 w-32 bg-slate-50" />
+                            ) : (
+                                <p className="text-sm font-bold text-slate-900 uppercase tracking-tight leading-snug">
+                                    {row?.affectedAreas || 'None'}
                                 </p>
                             )}
                         </div>
 
                         <div className="space-y-3">
                             <div className="flex justify-between items-center">
-                                <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Confidence Score</p>
-                                {loading ? <Skeleton className="h-6 w-12 bg-slate-50" /> : (
-                                    <p className="text-lg font-black text-emerald-500">{assessment?.confidence || 0}%</p>
+                                <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest">
+                                    Confidence Score
+                                </p>
+                                {loading ? (
+                                    <Skeleton className="h-6 w-12 bg-slate-50" />
+                                ) : (
+                                    <p className="text-lg font-black text-emerald-500">{row?.confidence ?? 0}%</p>
                                 )}
                             </div>
                             <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
                                 <div
                                     className="bg-emerald-500 h-full rounded-full transition-all duration-1000"
-                                    style={{ width: `${loading ? 0 : (assessment?.confidence || 0)}%` }}
+                                    style={{ width: `${loading ? 0 : (row?.confidence ?? 0)}%` }}
                                 />
                             </div>
                         </div>
