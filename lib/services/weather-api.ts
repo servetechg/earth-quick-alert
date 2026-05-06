@@ -205,12 +205,18 @@ export class WeatherAPIService {
 
         const { lat, lon } = this.coordsFromNwsFeature(feature, pointFallback);
 
+        const instruction =
+            typeof props.instruction === 'string' && props.instruction.trim()
+                ? props.instruction.trim()
+                : undefined;
+
         return {
             id: props.id || feature.id || `nws-${Date.now()}`,
             source: AlertSource.WEATHER_API,
             severity,
             title: props.headline || event,
             description: descriptionParts.join('\n\n') || 'Official weather alert from National Weather Service.',
+            instruction,
             timestamp: props.sent || props.effective || new Date().toISOString(),
             expiresAt: props.expires || props.ends || undefined,
             event,

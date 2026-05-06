@@ -30,6 +30,7 @@ import {
     DEFAULT_USGS_SITES_NATIONWIDE,
 } from '@/lib/constants/nationwide-alert-feed-defaults';
 import AlertCommunication from '@/models/AlertCommunication';
+import { buildNwsInstructionBullets } from '@/lib/services/alert-communication-nws-sync';
 
 type Source = 'usgs' | 'firms' | 'inciweb' | 'nwps' | 'fema';
 
@@ -149,7 +150,7 @@ function mapUSGS(series: USGSTimeSeries): MappedDoc | null {
         type: alertLevelToType(event.alert_level),
         iconType: eventTypeToIcon(event.event_type),
         location: usgsSiteName(series),
-        issuedAt: formatIssued(event.ingested_at),
+        issuedAt: formatIssued(event.valid_at || event.ingested_at),
         expiresAt: 'See alert text',
         status: 'Take Action',
         description: event.description,
@@ -180,7 +181,7 @@ function mapFIRMS(record: FIRMSRecord): MappedDoc | null {
         type: alertLevelToType(event.alert_level),
         iconType: eventTypeToIcon(event.event_type),
         location: `Hotspot near ${coordString(event.geo_coordinates.lat, event.geo_coordinates.lon)}`,
-        issuedAt: formatIssued(event.ingested_at),
+        issuedAt: formatIssued(event.valid_at || event.ingested_at),
         expiresAt: formatExpires(event.valid_at),
         status: 'Take Action',
         description: event.description,
@@ -213,7 +214,7 @@ function mapInciWeb(incident: InciWebIncident): MappedDoc | null {
         type: alertLevelToType(event.alert_level),
         iconType: eventTypeToIcon(event.event_type),
         location: inciWebLocation(incident),
-        issuedAt: formatIssued(event.ingested_at),
+        issuedAt: formatIssued(event.valid_at || event.ingested_at),
         expiresAt: formatExpires(event.valid_at),
         status: 'Take Action',
         description: event.description,
@@ -244,6 +245,7 @@ async function upsertAndPrune(source: Source, docs: MappedDoc[]): Promise<SyncSt
                         expiresAt: d.expiresAt,
                         description: d.description,
                         severity: d.severity,
+                        instructions: buildNwsInstructionBullets(undefined, d.description, d.name),
                     },
                     $setOnInsert: {
                         status: d.status,

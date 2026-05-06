@@ -95,7 +95,7 @@ export default function LoginPage() {
 
       {/* Right Side: Login Form */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-4 sm:p-8 lg:p-12 relative">
-        <div className="w-full max-w-md">
+        <div className="w-full max-w-lg">
           {/* Mobile Logo (Visible on Mobile) */}
           <div className="lg:hidden text-center mb-10 flex flex-col items-center">
             <Image
@@ -122,7 +122,7 @@ export default function LoginPage() {
                 <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">
                   Email Address
                 </label>
-                <div className="relative group">
+                <div className="relative group mt-1">
                   <div className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#33375D] transition-colors">
                     <Mail size={18} />
                   </div>
@@ -131,14 +131,14 @@ export default function LoginPage() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="name@example.com"
-                    className="w-full pl-16 pr-6 py-5 bg-slate-50 border border-slate-200 rounded-3xl focus:outline-none focus:ring-4 focus:ring-[#33375D]/5 focus:border-[#33375D] transition-all font-bold text-[#33375D] placeholder:text-slate-300"
+                    className="w-full pl-16 pr-6 py-5 font-semibold bg-slate-50 border border-slate-200 rounded-3xl focus:outline-none focus:ring-4 focus:ring-[#33375D]/5 focus:border-[#33375D] transition-all text-[#33375D] placeholder:text-slate-300"
                     required
                   />
                 </div>
               </div>
 
               <div className="space-y-3">
-                <div className="flex justify-between items-center ml-1">
+                <div className="flex justify-between items-center ml-1 mb-1">
                   <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
                     Password
                   </label>
@@ -153,7 +153,7 @@ export default function LoginPage() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••••••"
-                    className="w-full pl-16 pr-16 py-5 bg-slate-50 border border-slate-200 rounded-3xl focus:outline-none focus:ring-4 focus:ring-[#33375D]/5 focus:border-[#33375D] transition-all font-bold text-[#33375D] placeholder:text-slate-300"
+                    className="w-full pl-16 pr-16 py-5 font-semibold bg-slate-50 border border-slate-200 rounded-3xl focus:outline-none focus:ring-4 focus:ring-[#33375D]/5 focus:border-[#33375D] transition-all text-[#33375D] placeholder:text-slate-300"
                     required
                   />
                   <button
