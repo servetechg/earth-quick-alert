@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { Bell, Search, LogOut, Menu, X, Users, User, Settings, ChevronDown } from 'lucide-react'
 import { menuItems } from '@/components/sidebar'
 import { menuItems as userMenuItems } from '@/components/user-sidebar'
@@ -17,6 +17,7 @@ interface HeaderProps {
 export function Header({ userName = 'Admin User', onLogout }: HeaderProps) {
   const [showDropdown, setShowDropdown] = useState(false)
   const [showSidebar, setShowSidebar] = useState(false)
+  const [localUserTick, setLocalUserTick] = useState(0)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -29,10 +30,30 @@ export function Header({ userName = 'Admin User', onLogout }: HeaderProps) {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  const displayName = userName || (typeof window !== 'undefined' ? localStorage.getItem('userName') : '') || 'User'
-  const userEmail = typeof window !== 'undefined' ? localStorage.getItem('userEmail') : ''
+  useEffect(() => {
+    const sync = () => setLocalUserTick((n) => n + 1)
+    window.addEventListener('earthquick:userProfileUpdated', sync)
+    return () => window.removeEventListener('earthquick:userProfileUpdated', sync)
+  }, [])
+
+  const displayName = useMemo(
+    () => userName || (typeof window !== 'undefined' ? localStorage.getItem('userName') : '') || 'User',
+    [userName, localUserTick]
+  )
+  const userEmail = useMemo(
+    () => (typeof window !== 'undefined' ? localStorage.getItem('userEmail') : ''),
+    [localUserTick]
+  )
   const userRole = typeof window !== 'undefined' ? localStorage.getItem('userRole') : ''
   const isUserSafe = typeof window !== 'undefined' ? localStorage.getItem('isSafe') !== 'false' : true
+
+  const avatarSrc = useMemo(() => {
+    const pic = typeof window !== 'undefined' ? localStorage.getItem('userProfilePic')?.trim() : ''
+    return (
+      pic ||
+      'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?q=80&w=100&auto=format&fit=crop'
+    )
+  }, [localUserTick])
 
   return (
     <header className="border-b border-slate-100 bg-white px-4 md:px-8 py-3 flex items-center justify-between gap-8 h-16 sticky top-0 z-50">
@@ -70,7 +91,7 @@ export function Header({ userName = 'Admin User', onLogout }: HeaderProps) {
             className="flex items-center gap-3 hover:bg-slate-50 py-1.5 px-3 rounded-xl transition-all group"
           >
             <Avatar className="w-9 h-9 border border-slate-200 transition-all group-hover:border-indigo-100">
-              <AvatarImage src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?q=80&w=100&auto=format&fit=crop" className="rounded-full overflow-hidden object-cover" />
+              <AvatarImage src={avatarSrc} className="rounded-full overflow-hidden object-cover" />
               <AvatarFallback className="rounded-full flex items-center justify-center bg-slate-100 text-[10px] font-bold">{displayName.slice(0, 2).toUpperCase()}</AvatarFallback>
             </Avatar>
             <div className="text-left hidden sm:block">

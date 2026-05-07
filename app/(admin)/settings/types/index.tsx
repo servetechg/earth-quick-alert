@@ -9,7 +9,6 @@ export interface SettingsTabItem {
 export interface ProfileSettings {
   name: string
   email: string
-  role: string
   phone: string
   /** Image URL (e.g. Cloudinary `secure_url`). */
   profilePic: string

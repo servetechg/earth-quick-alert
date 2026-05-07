@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from '@/hooks/use-toast'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
@@ -21,6 +22,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
 import {
   Bell,
+  Info,
   Radio,
   Save,
   Shield,
@@ -48,26 +50,9 @@ const TAB_ICON_MAP: Record<SettingsTabItem['icon'], ComponentType<{ className?: 
   shield: Shield,
 }
 
-function formatRoleLabel(role: string): string {
-  if (!role) return ''
-  const map: Record<string, string> = {
-    'super-admin': 'Super Admin',
-    'sub-admin': 'Sub Admin',
-    admin: 'Admin',
-    observer: 'Observer',
-    responder: 'Responder',
-    manager: 'Manager',
-    user: 'User',
-    'eoc-manager': 'EOC Manager',
-    'eoc-observer': 'EOC Observer',
-  }
-  return map[role] ?? role.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
-}
-
 const INITIAL_PROFILE: ProfileSettings = {
   name: '',
   email: '',
-  role: '',
   phone: '',
   profilePic: '',
   profilePicPublicId: '',
@@ -98,7 +83,6 @@ const PROFILE_FIELDS: Array<{
 }> = [
   { id: 'name', label: 'Full Name', type: 'text' },
   { id: 'email', label: 'Email', type: 'email' },
-  { id: 'role', label: 'Role', type: 'text' },
   { id: 'phone', label: 'Phone', type: 'text' },
 ]
 
@@ -145,7 +129,6 @@ export default function AdminSettingsPage() {
           setProfile({
             name: u.name ?? '',
             email: u.email ?? '',
-            role: formatRoleLabel(String(u.role ?? '')),
             phone: u.phoneNumber ?? '',
             profilePic: u.profilePic ?? '',
             profilePicPublicId: u.profilePicPublicId ?? '',
@@ -264,7 +247,6 @@ export default function AdminSettingsPage() {
           name: data.user.name ?? prev.name,
           email: data.user.email ?? prev.email,
           phone: data.user.phoneNumber ?? prev.phone,
-          role: formatRoleLabel(String(data.user.role ?? '')),
           profilePic: data.user.profilePic ?? prev.profilePic,
           profilePicPublicId: data.user.profilePicPublicId ?? prev.profilePicPublicId,
         }))
@@ -293,15 +275,33 @@ export default function AdminSettingsPage() {
   }
 
   return (
-    <main className="p-8 space-y-10 max-w-[1800px] mx-auto">
-      <div>
-        <h1 className="text-3xl font-bold text-foreground">Settings</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Manage your account, alert preferences, and system configuration.
-        </p>
-      </div>
+    <main className="min-h-screen bg-slate-50/50 pb-20">
+      <div className="px-6 lg:px-12 pt-8 space-y-8 max-w-[1800px] mx-auto">
+        <Card className="p-8 border-slate-200 rounded-2xl shadow-sm relative overflow-hidden bg-white">
+          <div className="absolute top-0 left-0 w-1.5 h-full bg-[#33375D]" aria-hidden />
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <h1 className="text-3xl font-black text-slate-900 tracking-tight mb-2">Settings</h1>
+              <p className="text-slate-500 font-medium">
+                Manage your account, alert preferences, and system configuration.
+              </p>
+            </div>
+          </div>
+        </Card>
 
-      <Tabs defaultValue="profile" className="space-y-6">
+        <div className="bg-[#EEF2FF] border border-[#6366F1]/10 p-3 rounded-xl flex items-center gap-3 text-[#4338CA]">
+          <div className="w-7 h-7 shrink-0 rounded-full bg-red-500 flex items-center justify-center text-white shadow-sm">
+            <Info className="h-3.5 w-3.5" aria-hidden />
+          </div>
+          <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-1 text-[12px] font-bold min-w-0">
+            <span className="text-[#3730A3]">Account & preferences:</span>
+            <span className="font-medium text-[#4338CA]/80">
+              Changes apply to your signed-in session; profile photo uploads to secure cloud storage—use Save on each tab when you edit.
+            </span>
+          </div>
+        </div>
+
+        <Tabs defaultValue="profile" className="space-y-6">
         <TabsList className="bg-card shadow-card h-auto p-1.5 rounded-2xl flex-wrap">
           {SETTINGS_TABS.map((tab) => {
             const Icon = TAB_ICON_MAP[tab.icon]
@@ -367,9 +367,7 @@ export default function AdminSettingsPage() {
                     id={field.id}
                     type={field.type}
                     value={profile[field.id]}
-                    readOnly={field.id === 'role'}
-                    disabled={field.id === 'role' || profileLoading}
-                    className={field.id === 'role' ? 'bg-muted' : undefined}
+                    disabled={profileLoading}
                     onChange={(event) =>
                       setProfile((prev) => ({ ...prev, [field.id]: event.target.value }))
                     }
@@ -562,6 +560,7 @@ export default function AdminSettingsPage() {
           </SettingsSectionCard>
         </TabsContent>
       </Tabs>
+      </div>
     </main>
   )
 }
