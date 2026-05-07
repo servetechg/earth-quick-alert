@@ -95,6 +95,10 @@ const UserSchema = new Schema({
         type: String,
         default: '',
     },
+    profilePic: {
+        type: String,
+        default: '',
+    },
     notificationPreferences: {
         push: { type: Boolean, default: true },
         sms: { type: Boolean, default: true },

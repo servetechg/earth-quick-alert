@@ -11,6 +11,10 @@ export interface ProfileSettings {
   email: string
   role: string
   phone: string
+  /** Image URL (e.g. Cloudinary `secure_url`). */
+  profilePic: string
+  /** Cloudinary `public_id` for delete/replace. */
+  profilePicPublicId: string
 }
 
 export interface NotificationSettings {
