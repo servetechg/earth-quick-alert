@@ -103,6 +103,9 @@ const UserSchema = new Schema({
         push: { type: Boolean, default: true },
         sms: { type: Boolean, default: true },
         email: { type: Boolean, default: true },
+        majorAlerts: { type: Boolean, default: true },
+        minorAlerts: { type: Boolean, default: true },
+        aiReports: { type: Boolean, default: true },
     },
     country: {
         type: String,

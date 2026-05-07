@@ -8,6 +8,7 @@ interface SettingsToggleRowProps {
   checked: boolean
   onCheckedChange: (checked: boolean) => void
   switchClassName?: string
+  disabled?: boolean
 }
 
 export function SettingsToggleRow({
@@ -16,6 +17,7 @@ export function SettingsToggleRow({
   checked,
   onCheckedChange,
   switchClassName,
+  disabled,
 }: SettingsToggleRowProps) {
   return (
     <div className="flex items-center justify-between rounded-xl border border-border/60 bg-card/50 px-4 py-3">
@@ -26,6 +28,7 @@ export function SettingsToggleRow({
       <Switch
         checked={checked}
         onCheckedChange={onCheckedChange}
+        disabled={disabled}
         className={cn('data-[state=checked]:bg-[#33375D]', switchClassName)}
       />
     </div>
