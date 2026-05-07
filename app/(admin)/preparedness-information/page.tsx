@@ -1,83 +1,349 @@
-'use client'
+'use client';
 
-import React from 'react'
-import { Card } from '@/components/ui/card'
+import { useEffect, useMemo, useState } from 'react';
+import { Card } from '@/components/ui/card';
 import {
-  MapPin,
-  Globe,
-  Flame,
-  User,
-  ShieldCheck,
   CheckCircle2,
-  Activity
-} from 'lucide-react'
-import { cn } from '@/lib/utils'
+  Flame,
+  Globe,
+  Loader2,
+  MapPin,
+  ShieldCheck,
+  User,
+} from 'lucide-react';
+import { toast } from 'sonner';
+import { TaskSectionCard } from '@/components/preparedness/task-section-card';
+import type {
+  PreparednessApiGroup,
+  PreparednessApiRole,
+  PreparednessUiSection,
+} from '@/lib/preparedness-tasks/client-types';
+import {
+  getPreparednessCategoryLabel,
+  sortPreparednessCategories,
+} from '@/lib/preparedness-tasks/category-labels';
 
-const SECTIONS = [
-  { category: 'individual_evacuation', title: 'Individual Evacuation', Icon: MapPin, colorClass: 'text-orange-600', bgClass: 'bg-orange-50' },
-  { category: 'community_evacuation', title: 'Community Evacuation', Icon: Globe, colorClass: 'text-blue-600', bgClass: 'bg-blue-50' },
-  { category: 'shelter_in_place', title: 'General Shelter-in-Place', Icon: MapPin, colorClass: 'text-blue-600', bgClass: 'bg-blue-50' },
-  { category: 'active_shooter', title: 'Active Shooter Preparedness', Icon: Flame, colorClass: 'text-red-600', bgClass: 'bg-red-50' },
-  { category: 'pets_household', title: 'Planning for Household Pets', Icon: User, colorClass: 'text-purple-600', bgClass: 'bg-purple-50' },
-  { category: 'pets_large', title: 'Planning for Large Animals', Icon: Globe, colorClass: 'text-emerald-600', bgClass: 'bg-emerald-50' },
-  { category: 'identity_theft', title: 'Identity Theft Protection', Icon: ShieldCheck, colorClass: 'text-purple-600', bgClass: 'bg-purple-50' },
-  { category: 'choking_first_aid', title: 'Choking First Aid', Icon: CheckCircle2, colorClass: 'text-rose-600', bgClass: 'bg-rose-50' },
-] as const
+type EditableRole = Extract<PreparednessApiRole, 'super-admin' | 'sub-admin'>;
+
+function getCategoryIcon(category: string) {
+  const normalized = category.toLowerCase().replace(/[\s-]+/g, '_');
+
+  switch (normalized) {
+    case 'individual_evacuation':
+      return <MapPin className="w-4 h-4" />;
+    case 'community_evacuation':
+      return <Globe className="w-4 h-4" />;
+    case 'shelter_in_place':
+      return <MapPin className="w-4 h-4" />;
+    case 'active_shooter':
+      return <Flame className="w-4 h-4" />;
+    case 'pets_household':
+      return <User className="w-4 h-4" />;
+    case 'pets_large':
+      return <Globe className="w-4 h-4" />;
+    case 'identity_theft':
+      return <ShieldCheck className="w-4 h-4" />;
+    case 'choking_first_aid':
+      return <CheckCircle2 className="w-4 h-4" />;
+    default:
+      if (normalized.includes('shooter')) return <Flame className="w-4 h-4" />;
+      if (normalized.includes('community')) return <Globe className="w-4 h-4" />;
+      if (normalized.includes('shelter')) return <MapPin className="w-4 h-4" />;
+      if (normalized.includes('pet') || normalized.includes('household')) return <User className="w-4 h-4" />;
+      if (normalized.includes('identity') || normalized.includes('theft'))
+        return <ShieldCheck className="w-4 h-4" />;
+      if (normalized.includes('choking') || normalized.includes('aid'))
+        return <CheckCircle2 className="w-4 h-4" />;
+      return <MapPin className="w-4 h-4" />;
+  }
+}
+
+function makeTempId() {
+  return `tmp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function toUiSections(groups: PreparednessApiGroup[]): PreparednessUiSection[] {
+  return sortPreparednessCategories(groups).map((group) => ({
+    preparednessId: group._id,
+    category: group.category,
+    label: getPreparednessCategoryLabel(group.category),
+    tasks: group.tasks.map((task) => ({
+      id: task._id,
+      title: task.title,
+      persisted: true,
+    })),
+  }));
+}
+
+async function requestJson(url: string, init?: RequestInit) {
+  const response = await fetch(url, init);
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok || payload?.success === false) {
+    throw new Error(payload?.error || `Request failed (${response.status})`);
+  }
+  return payload;
+}
 
 export default function PreparednessInformationPage() {
+  const [role, setRole] = useState<EditableRole | null>(null);
+  const [sections, setSections] = useState<PreparednessUiSection[]>([]);
+  const [initialSections, setInitialSections] = useState<PreparednessUiSection[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [savingBySection, setSavingBySection] = useState<Record<string, boolean>>({});
+  const [sendingBySection, setSendingBySection] = useState<Record<string, boolean>>({});
+
+  const initialBySectionId = useMemo(() => {
+    return new Map(initialSections.map((section) => [section.preparednessId, section]));
+  }, [initialSections]);
+
+  const initialTitleById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const section of initialSections) {
+      for (const task of section.tasks) {
+        if (task.persisted) map.set(task.id, task.title.trim());
+      }
+    }
+    return map;
+  }, [initialSections]);
+
+  const loadPreparedness = async () => {
+    setIsLoading(true);
+    try {
+      const payload = await requestJson('/api/preparedness-with-tasks', { cache: 'no-store' });
+      const apiRole = payload?.role as PreparednessApiRole;
+      if (apiRole !== 'super-admin' && apiRole !== 'sub-admin') {
+        throw new Error('Only super-admin and sub-admin can access this editor.');
+      }
+
+      const nextSections = toUiSections(payload.data ?? []);
+
+      setRole(apiRole);
+      setSections(nextSections);
+      setInitialSections(nextSections);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to load preparedness data.';
+      toast.error(message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadPreparedness();
+  }, []);
+
+  const updateTaskTitle = (sectionId: string, taskId: string, title: string) => {
+    setSections((prev) =>
+      prev.map((section) =>
+        section.preparednessId !== sectionId
+          ? section
+          : {
+              ...section,
+              tasks: section.tasks.map((task) => (task.id === taskId ? { ...task, title } : task)),
+            }
+      )
+    );
+  };
+
+  const addTask = (sectionId: string, title: string) => {
+    const cleanedTitle = title.trim();
+    if (!cleanedTitle) return;
+    setSections((prev) =>
+      prev.map((section) =>
+        section.preparednessId !== sectionId
+          ? section
+          : {
+              ...section,
+              tasks: [...section.tasks, { id: makeTempId(), title: cleanedTitle, persisted: false }],
+            }
+      )
+    );
+  };
+
+  const deleteTask = (sectionId: string, taskId: string) => {
+    setSections((prev) =>
+      prev.map((section) => {
+        if (section.preparednessId !== sectionId) return section;
+        return { ...section, tasks: section.tasks.filter((row) => row.id !== taskId) };
+      })
+    );
+  };
+
+  const isSectionDirty = (section: PreparednessUiSection) => {
+    const initial = initialBySectionId.get(section.preparednessId);
+    if (!initial) return false;
+
+    const initialTaskIds = new Set(initial.tasks.map((task) => task.id));
+    const currentTaskIds = new Set(section.tasks.map((task) => task.id));
+    if (initialTaskIds.size !== currentTaskIds.size) return true;
+    for (const id of initialTaskIds) if (!currentTaskIds.has(id)) return true;
+
+    const initialTitleMap = new Map(initial.tasks.map((task) => [task.id, task.title.trim()]));
+    for (const task of section.tasks) {
+      if (!task.persisted) return true;
+      const initialTitle = initialTitleMap.get(task.id);
+      if (initialTitle !== task.title.trim()) return true;
+    }
+    return false;
+  };
+
+  const handleSaveSection = async (sectionId: string) => {
+    if (!role) return;
+    const baseUrl =
+      role === 'super-admin' ? '/api/admin/preparedness-tasks' : '/api/subadmin/preparedness-tasks';
+    const section = sections.find((row) => row.preparednessId === sectionId);
+    const initial = initialBySectionId.get(sectionId);
+    if (!section || !initial) return;
+
+    const creates: Array<{ preparednessId: string; title: string }> = [];
+    const updates: Array<{ taskId: string; title: string }> = [];
+
+    for (const task of section.tasks) {
+      const title = task.title.trim();
+      if (!title) continue;
+      if (!task.persisted) {
+        creates.push({ preparednessId: section.preparednessId, title });
+        continue;
+      }
+      const originalTitle = initialTitleById.get(task.id);
+      if (originalTitle !== undefined && originalTitle !== title) {
+        updates.push({ taskId: task.id, title });
+      }
+    }
+
+    const currentTaskIdSet = new Set(section.tasks.map((task) => task.id));
+    const deleteIds = initial.tasks.filter((task) => !currentTaskIdSet.has(task.id)).map((task) => task.id);
+
+    if (creates.length === 0 && updates.length === 0 && deleteIds.length === 0) {
+      toast.info(`No changes to save for ${section.label}.`);
+      return;
+    }
+
+    setSavingBySection((prev) => ({ ...prev, [sectionId]: true }));
+    try {
+      if (creates.length > 0) {
+        await requestJson(baseUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ items: creates }),
+        });
+      }
+
+      if (updates.length > 0) {
+        await requestJson(baseUrl, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ updates }),
+        });
+      }
+
+      if (deleteIds.length > 0) {
+        await requestJson(baseUrl, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ taskIds: deleteIds }),
+        });
+      }
+
+      await loadPreparedness();
+      toast.success(`Saved ${section.label}.`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to save changes.';
+      toast.error(message);
+    } finally {
+      setSavingBySection((prev) => ({ ...prev, [sectionId]: false }));
+    }
+  };
+
+  const handleSendSection = async (sectionId: string) => {
+    if (!role) return;
+    const section = sections.find((row) => row.preparednessId === sectionId);
+    if (!section) return;
+    if (isSectionDirty(section)) {
+      toast.error(`Save ${section.label} changes before sending.`);
+      return;
+    }
+
+    const taskIds = section.tasks.filter((task) => task.persisted && task.title.trim()).map((task) => task.id);
+
+    if (taskIds.length === 0) {
+      toast.error(`No saved tasks available to send for ${section.label}.`);
+      return;
+    }
+
+    const sendUrl =
+      role === 'super-admin'
+        ? '/api/admin/preparedness-tasks/send'
+        : '/api/subadmin/preparedness-tasks/send';
+
+    setSendingBySection((prev) => ({ ...prev, [sectionId]: true }));
+    try {
+      await requestJson(sendUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskIds }),
+      });
+      toast.success(
+        role === 'super-admin' ? `${section.label} sent to sub-admins.` : `${section.label} sent to users.`
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to send tasks.';
+      toast.error(message);
+    } finally {
+      setSendingBySection((prev) => ({ ...prev, [sectionId]: false }));
+    }
+  };
+
   return (
     <main className="min-h-screen bg-slate-50/50 pb-20">
       <div className="px-6 lg:px-12 pt-8 space-y-8 max-w-[1800px] mx-auto">
-        <Card className="p-8 border-slate-200 rounded-2xl shadow-sm relative overflow-hidden bg-white group transition-all hover:shadow-md">
-          <div className="absolute top-0 left-0 w-1.5 h-full bg-[#33375D] transition-colors" />
+        <Card className="p-8 border-slate-200 rounded-2xl shadow-sm relative overflow-hidden bg-white">
+          <div className="absolute top-0 left-0 w-1.5 h-full bg-[#33375D]" />
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
               <h1 className="text-3xl font-black text-slate-900 tracking-tight mb-2">Preparedness Information</h1>
               <p className="text-slate-500 font-medium">
-                Preparedness areas (boxes) are defined in the database by category and order. Detailed tasks are managed via the admin task workflows.
+                Edit preparedness tasks by category and dispatch them through role-based workflows.
               </p>
             </div>
-            <div className="flex items-center gap-2 text-xs font-bold text-slate-400 bg-slate-50 px-4 py-2 rounded-xl border border-slate-100">
-              <Activity size={14} className="text-emerald-500" />
-              Reference sections
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-500/10 border border-red-200 text-[11px] font-bold text-red-700">
+              <ShieldCheck className="w-4 h-4" />
+              {role === 'super-admin' ? 'Super Admin Mode' : role === 'sub-admin' ? 'Sub Admin Mode' : 'Loading...'}
             </div>
           </div>
         </Card>
 
-        <div className="bg-gradient-to-r from-red-700 to-rose-600 rounded-3xl p-10 text-white relative overflow-hidden shadow-2xl shadow-red-900/20 group">
-          <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-20 -mt-20 blur-3xl transition-all group-hover:bg-white/20" />
-          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-            <div>
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-500/30 border border-red-400/30 text-[10px] font-black uppercase tracking-widest mb-4">
-                <ShieldCheck size={12} /> Critical Guidance
-              </div>
-              <h2 className="text-3xl font-black tracking-tight mb-3">Community Preparedness Guide</h2>
-              <p className="text-red-50/90 font-medium max-w-2xl leading-relaxed">
-                Review these protocol areas with your organization. Checklist content previously stored here has been removed from the preparedness guide model in favor of structured tasks.
-              </p>
-            </div>
+        {isLoading ? (
+          <div className="py-20 flex justify-center">
+            <Loader2 className="w-8 h-8 text-slate-500 animate-spin" />
           </div>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {SECTIONS.map((config) => (
-            <Card
-              key={config.category}
-              className="p-8 border-slate-200 rounded-2xl bg-white shadow-sm flex flex-col hover:shadow-md transition-shadow"
-            >
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xl font-black text-slate-900 tracking-tight">{config.title}</h3>
-                <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center', config.bgClass, config.colorClass)}>
-                  <config.Icon size={20} />
-                </div>
-              </div>
-              <p className="text-sm text-slate-600 leading-relaxed">
-                Category key: <span className="font-mono text-xs bg-slate-100 px-2 py-0.5 rounded">{config.category}</span>
-              </p>
-            </Card>
-          ))}
-        </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {sections.map((section) => (
+                <TaskSectionCard
+                  key={section.preparednessId}
+                  title={section.label}
+                  category={section.category}
+                  tasks={section.tasks}
+                  headerIcon={getCategoryIcon(section.category)}
+                  showActions
+                  isDirty={isSectionDirty(section)}
+                  isSaving={Boolean(savingBySection[section.preparednessId])}
+                  isSending={Boolean(sendingBySection[section.preparednessId])}
+                  saveLabel="Save Changes"
+                  sendLabel={role === 'super-admin' ? 'Send to Sub Admin' : 'Send to Users'}
+                  onAddTask={(title) => addTask(section.preparednessId, title)}
+                  onTaskChange={(taskId, title) => updateTaskTitle(section.preparednessId, taskId, title)}
+                  onTaskDelete={(taskId) => deleteTask(section.preparednessId, taskId)}
+                  onSave={() => handleSaveSection(section.preparednessId)}
+                  onSend={() => handleSendSection(section.preparednessId)}
+                />
+              ))}
+            </div>
+          </>
+        )}
       </div>
     </main>
-  )
+  );
 }
