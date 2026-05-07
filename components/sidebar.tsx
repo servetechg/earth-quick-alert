@@ -94,8 +94,11 @@ export function Sidebar() {
         ]
 
   const filteredBottomItems = isSuperAdminRole
-    ? bottomItems.filter(item => item.label === 'Log out')
-    : bottomItems;
+    ? [
+      { icon: Settings, label: 'Settings', href: '/settings' },
+      { icon: LogOut, label: 'Log out', href: '#' },
+    ]
+    : bottomItems
 
   return (
     <div className="hidden md:flex min-h-0 w-72 shrink-0 flex-col bg-[#33375D] text-white h-full border-r border-slate-700/50">

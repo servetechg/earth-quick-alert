@@ -25,10 +25,41 @@ import { GoogleMap } from '@/components/google-map'
 import { cn } from '@/lib/utils'
 import { ShieldCheck, Truck, Siren, Building2, MapPin } from 'lucide-react'
 import { geocodeAddress, calculateDistance } from '@/lib/services/mock-map-service'
+import { Switch } from '@/components/ui/switch'
 
 interface GISMapProps {
   selectedLocation?: string
 }
+
+const HOSPITALS = [
+  { name: 'Cedars-Sinai Medical Center', city: 'Los Angeles, CA', lat: 34.0759, lng: -118.3805 },
+  { name: 'Mass General Hospital', city: 'Boston, MA', lat: 42.3631, lng: -71.0686 },
+  { name: 'Mount Sinai Hospital', city: 'New York, NY', lat: 40.79, lng: -73.9525 },
+  { name: 'Northwestern Memorial', city: 'Chicago, IL', lat: 41.8947, lng: -87.6217 },
+  { name: 'Houston Methodist', city: 'Houston, TX', lat: 29.71, lng: -95.3987 },
+  { name: 'Cleveland Clinic', city: 'Cleveland, OH', lat: 41.5036, lng: -81.6206 },
+  { name: 'Mayo Clinic', city: 'Rochester, MN', lat: 44.0225, lng: -92.4669 },
+  { name: 'Johns Hopkins Hospital', city: 'Baltimore, MD', lat: 39.297, lng: -76.5929 },
+  { name: 'UCSF Medical Center', city: 'San Francisco, CA', lat: 37.7639, lng: -122.4581 },
+  { name: 'Emory University Hospital', city: 'Atlanta, GA', lat: 33.792, lng: -84.322 },
+  { name: 'Banner - University Medical', city: 'Phoenix, AZ', lat: 33.4754, lng: -112.0712 },
+  { name: 'Jackson Memorial', city: 'Miami, FL', lat: 25.79, lng: -80.212 },
+]
+
+const PHARMACIES = [
+  { name: 'CVS Pharmacy #1024', city: 'Seattle, WA', lat: 47.6062, lng: -122.3321 },
+  { name: 'Walgreens #5582', city: 'Denver, CO', lat: 39.7392, lng: -104.9903 },
+  { name: 'Rite Aid Downtown', city: 'Portland, OR', lat: 45.5152, lng: -122.6784 },
+  { name: 'CVS Pharmacy #770', city: 'Dallas, TX', lat: 32.7767, lng: -96.797 },
+  { name: 'Walgreens Midtown', city: 'Nashville, TN', lat: 36.1627, lng: -86.7816 },
+  { name: 'CVS Pharmacy #2210', city: 'Philadelphia, PA', lat: 39.9526, lng: -75.1652 },
+  { name: 'Walgreens #1188', city: 'Las Vegas, NV', lat: 36.1699, lng: -115.1398 },
+  { name: 'Rite Aid Capitol', city: 'Sacramento, CA', lat: 38.5816, lng: -121.4944 },
+  { name: 'CVS Pharmacy #4401', city: 'Charlotte, NC', lat: 35.2271, lng: -80.8431 },
+  { name: 'Walgreens #889', city: 'Indianapolis, IN', lat: 39.7684, lng: -86.1581 },
+  { name: 'CVS Pharmacy #9087', city: 'Salt Lake City, UT', lat: 40.7608, lng: -111.891 },
+  { name: 'Walgreens #3321', city: 'St. Louis, MO', lat: 38.627, lng: -90.1994 },
+]
 
 export function GISMap({ selectedLocation = 'All' }: GISMapProps) {
   const [activeEmergencies, setActiveEmergencies] = useState<any[]>([])
@@ -41,6 +72,9 @@ export function GISMap({ selectedLocation = 'All' }: GISMapProps) {
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number }>({ lat: 37.0902, lng: -95.7129 }) // Center of USA
   const [mapZoom, setMapZoom] = useState(4)
   const [activeTab, setActiveTab] = useState<'Citizens' | 'Responders' | 'Leaders' | 'Infrastructure'>('Citizens')
+  const [showHeatmap, setShowHeatmap] = useState(true)
+  const [showHospitals, setShowHospitals] = useState(true)
+  const [showPharmacies, setShowPharmacies] = useState(true)
 
   useEffect(() => {
     async function fetchData() {
@@ -334,6 +368,65 @@ export function GISMap({ selectedLocation = 'All' }: GISMapProps) {
     return currentFiltered
   }, [activeTab, impactedUsers, responders, subAdmins, dynamicInfra, selectedLocation])
 
+  const hospitalMarkers = useMemo(
+    () =>
+      HOSPITALS.map((h) => ({
+        id: `hospital-${h.name}`,
+        position: { lat: h.lat, lng: h.lng },
+        title: h.name,
+        type: 'infrastructure' as const,
+        status: 'Hospital · Shelter',
+        description: h.city,
+        icon: 'hospital',
+        color: '#EF4444',
+        location: h.city,
+      })),
+    [],
+  )
+
+  const pharmacyMarkers = useMemo(
+    () =>
+      PHARMACIES.map((p) => ({
+        id: `pharmacy-${p.name}`,
+        position: { lat: p.lat, lng: p.lng },
+        title: p.name,
+        type: 'infrastructure' as const,
+        status: 'Pharmacy · Supply',
+        description: p.city,
+        icon: 'pharmacy',
+        color: '#10B981',
+        location: p.city,
+      })),
+    [],
+  )
+
+  const heatPoints = useMemo(() => {
+    const base = [...impactedUsers, ...responders, ...dynamicInfra]
+      .filter((m: any) => m?.position && Number.isFinite(m.position.lat) && Number.isFinite(m.position.lng))
+      .map((m: any, i: number) => ({
+        lat: m.position.lat,
+        lng: m.position.lng,
+        weight:
+          m.type === 'incident'
+            ? 0.95
+            : m.isSafe === false
+              ? 0.85
+              : m.type === 'infrastructure'
+                ? 0.55
+                : 0.45 + ((i % 4) * 0.08),
+      }))
+    // Keep count close to the reference panel value.
+    return base.slice(0, 24)
+  }, [impactedUsers, responders, dynamicInfra])
+
+  const mapMarkers = useMemo(() => {
+    const overlays = [
+      ...(showHospitals ? hospitalMarkers : []),
+      ...(showPharmacies ? pharmacyMarkers : []),
+    ]
+    return [...overlays, ...markers]
+  }, [showHospitals, showPharmacies, hospitalMarkers, pharmacyMarkers, markers])
+
   return (
     <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm h-[700px] flex flex-col">
       <div className="p-4 sm:p-6 border-b border-slate-100 flex items-center justify-between gap-4">
@@ -360,7 +453,66 @@ export function GISMap({ selectedLocation = 'All' }: GISMapProps) {
       </div>
 
       <div className="flex-1 relative">
-        <GoogleMap markers={markers} zoom={mapZoom} center={mapCenter} />
+        <GoogleMap markers={mapMarkers} zoom={mapZoom} center={mapCenter} heatPoints={heatPoints} showHeatmap={showHeatmap} />
+        <div className="absolute right-4 top-4 z-40 w-64 rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-xl backdrop-blur-sm">
+          <div className="mb-3 border-b border-slate-100 pb-2">
+            <h4 className="text-xs font-black uppercase tracking-widest text-slate-700">Map Layers</h4>
+          </div>
+          <div className="space-y-3">
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Shelters</p>
+            <div className="flex items-center justify-between gap-2">
+              <label
+                htmlFor="hospital-layer"
+                className="flex flex-1 cursor-pointer items-center gap-2 text-xs font-bold text-slate-700"
+              >
+                <span className="text-red-500">🏥</span>
+                Hospitals
+                <span className="ml-auto rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-black text-slate-500">
+                  {hospitalMarkers.length}
+                </span>
+              </label>
+              <Switch id="hospital-layer" checked={showHospitals} onCheckedChange={setShowHospitals} />
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <label
+                htmlFor="pharmacy-layer"
+                className="flex flex-1 cursor-pointer items-center gap-2 text-xs font-bold text-slate-700"
+              >
+                <span className="text-emerald-500">💊</span>
+                Pharmacies
+                <span className="ml-auto rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-black text-slate-500">
+                  {pharmacyMarkers.length}
+                </span>
+              </label>
+              <Switch id="pharmacy-layer" checked={showPharmacies} onCheckedChange={setShowPharmacies} />
+            </div>
+            <div className="my-2 h-px bg-slate-100" />
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Risk Overlays</p>
+            <div className="flex items-center justify-between gap-2">
+              <label
+                htmlFor="incident-heatmap"
+                className="flex flex-1 cursor-pointer items-center gap-2 text-xs font-bold text-slate-700"
+              >
+                <span className="text-amber-500">🔥</span>
+                Incident Heatmap
+                <span className="ml-auto rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-black text-slate-500">
+                  {heatPoints.length}
+                </span>
+              </label>
+              <Switch id="incident-heatmap" checked={showHeatmap} onCheckedChange={setShowHeatmap} />
+            </div>
+            {showHeatmap && (
+              <div className="space-y-1.5 border-t border-slate-100 pt-3">
+                <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Intensity</p>
+                <div className="h-2 w-full rounded-full bg-gradient-to-r from-blue-500 via-yellow-400 via-orange-500 to-red-700" />
+                <div className="flex justify-between text-[9px] font-bold text-slate-400">
+                  <span>Low</span>
+                  <span>Critical</span>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
         {isSearchingInfra && (
           <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-md px-4 py-2 rounded-2xl shadow-2xl border border-slate-100 flex items-center gap-2 z-50 animate-in fade-in slide-in-from-top-2 duration-300">
             <Loader2 className="w-4 h-4 text-blue-600 animate-spin" />

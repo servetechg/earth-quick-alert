@@ -7,61 +7,29 @@ export const dynamic = 'force-dynamic';
 export async function GET() {
     try {
         await connectDB();
-        let guides = await PreparednessGuide.find({});
+        let guides = await PreparednessGuide.find({}).sort({ order: 1, category: 1 });
 
-        // If no guides exist, seed with default data
         if (guides.length === 0) {
             const defaultGuides = [
-                {
-                    category: 'individual_evacuation',
-                    title: 'Individual Evacuation',
-                    items: []
-                },
-                {
-                    category: 'community_evacuation',
-                    title: 'Community Evacuation',
-                    items: []
-                },
-                {
-                    category: 'shelter_in_place',
-                    title: 'General Shelter-in-Place',
-                    items: []
-                },
-                {
-                    category: 'active_shooter',
-                    title: 'Active Shooter Preparedness',
-                    items: []
-                },
-                {
-                    category: 'pets_household',
-                    title: 'Planning for Household Pets',
-                    items: []
-                },
-                {
-                    category: 'pets_large',
-                    title: 'Planning for Large Animals',
-                    items: []
-                },
-                {
-                    category: 'identity_theft',
-                    title: 'Identity Theft Protection',
-                    items: []
-                },
-                {
-                    category: 'choking_first_aid',
-                    title: 'Choking First Aid',
-                    items: []
-                }
+                { category: 'individual_evacuation', order: 1 },
+                { category: 'community_evacuation', order: 2 },
+                { category: 'shelter_in_place', order: 3 },
+                { category: 'active_shooter', order: 4 },
+                { category: 'pets_household', order: 5 },
+                { category: 'pets_large', order: 6 },
+                { category: 'identity_theft', order: 7 },
+                { category: 'choking_first_aid', order: 8 },
             ];
 
             await PreparednessGuide.insertMany(defaultGuides);
-            guides = await PreparednessGuide.find({});
+            guides = await PreparednessGuide.find({}).sort({ order: 1, category: 1 });
         }
 
         return NextResponse.json(guides);
-    } catch (error: any) {
+    } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
         console.error('Error fetching preparedness guides:', error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        return NextResponse.json({ error: message }, { status: 500 });
     }
 }
 
@@ -69,17 +37,22 @@ export async function POST(request: Request) {
     try {
         await connectDB();
         const body = await request.json();
-        const { category, title, items } = body;
+        const { category, order } = body;
+
+        if (!category || typeof category !== 'string') {
+            return NextResponse.json({ error: 'category is required' }, { status: 400 });
+        }
 
         const guide = await PreparednessGuide.findOneAndUpdate(
             { category },
-            { title, items },
+            { category, ...(typeof order === 'number' ? { order } : {}) },
             { new: true, upsert: true }
         );
 
         return NextResponse.json(guide);
-    } catch (error: any) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+    } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        return NextResponse.json({ error: message }, { status: 500 });
     }
 }
 
@@ -95,7 +68,8 @@ export async function DELETE(request: Request) {
 
         await PreparednessGuide.deleteOne({ category });
         return NextResponse.json({ message: 'Guide deleted successfully' });
-    } catch (error: any) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+    } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        return NextResponse.json({ error: message }, { status: 500 });
     }
 }
