@@ -29,30 +29,10 @@ function overallLevelToRelevance(level: string): 'High' | 'Medium' | 'Low' {
 }
 
 function reportToPanelRow(report: RiskReport, locationLabel: string): ThreatPanelRow {
-    const distro = report.incident_distribution?.filter((d) => d.count > 0) ?? []
-    let affectedAreas: string
-    if (distro.length > 0) {
-        affectedAreas = distro
-            .slice(0, 5)
-            .map((d) => `${d.category} (${d.count})`)
-            .join(' · ')
-    } else {
-        affectedAreas =
-            locationLabel === 'USA'
-                ? 'National scope'
-                : locationLabel && locationLabel !== 'Current Location'
-                  ? locationLabel
-                  : 'Regional scope'
-    }
-    const pop = report.populations_at_risk
-    if (typeof pop === 'number' && pop > 0) {
-        affectedAreas += ` · est. ${pop.toLocaleString()} pop. at risk`
-    }
-
     return {
         relevance: overallLevelToRelevance(report.overall_risk_level),
         severity: (report.overall_risk_level || 'NOMINAL').toUpperCase(),
-        affectedAreas,
+        affectedAreas: locationLabel,
         confidence: typeof report.ai_confidence === 'number' ? report.ai_confidence : 0,
     }
 }
@@ -61,8 +41,64 @@ export function ThreatMonitoring({ locationName }: ThreatMonitoringProps) {
     const [loading, setLoading] = useState(true)
     const [row, setRow] = useState<ThreatPanelRow | null>(null)
     const [error, setError] = useState<string | null>(null)
+    const [affectedAreaLabel, setAffectedAreaLabel] = useState('Regional scope')
 
     const label = locationName || 'Current Location'
+
+    useEffect(() => {
+        let cancelled = false
+
+        async function resolveAffectedArea() {
+            const roleFromStorage =
+                typeof window !== 'undefined' ? (localStorage.getItem('userRole') || '').toLowerCase() : ''
+            const cityFromStorage =
+                typeof window !== 'undefined' ? (localStorage.getItem('userCity') || '').trim() : ''
+            const countryFromStorage =
+                typeof window !== 'undefined' ? (localStorage.getItem('userCountry') || '').trim() : ''
+
+            // Use localStorage first (set at login) for immediate rendering.
+            if (roleFromStorage === 'super-admin' && countryFromStorage) {
+                if (!cancelled) setAffectedAreaLabel(countryFromStorage)
+                return
+            }
+            if (roleFromStorage === 'sub-admin' && cityFromStorage) {
+                if (!cancelled) setAffectedAreaLabel(cityFromStorage)
+                return
+            }
+
+            // Fallback to server truth if storage is stale/missing.
+            try {
+                const profileRes = await fetch('/api/user/profile', { credentials: 'same-origin' })
+                if (profileRes.ok) {
+                    const profile = await profileRes.json().catch(() => ({}))
+                    const role = String(profile?.user?.role || '').toLowerCase()
+                    const city = String(profile?.user?.city || '').trim()
+                    const country = String(profile?.user?.country || '').trim()
+                    if (role === 'super-admin' && country) {
+                        if (!cancelled) setAffectedAreaLabel(country)
+                        return
+                    }
+                    if (role === 'sub-admin' && city) {
+                        if (!cancelled) setAffectedAreaLabel(city)
+                        return
+                    }
+                }
+            } catch {
+                // Continue to generic fallback.
+            }
+
+            try {
+                if (!cancelled) setAffectedAreaLabel(label === 'USA' ? 'USA' : label !== 'Current Location' ? label : 'Regional scope')
+            } catch {
+                if (!cancelled) setAffectedAreaLabel('Regional scope')
+            }
+        }
+
+        resolveAffectedArea()
+        return () => {
+            cancelled = true
+        }
+    }, [label])
 
     useEffect(() => {
         let cancelled = false
@@ -90,9 +126,7 @@ export function ThreatMonitoring({ locationName }: ThreatMonitoringProps) {
                 if (!json?.report) {
                     throw new Error('Invalid response: missing report')
                 }
-                if (!cancelled) {
-                    setRow(reportToPanelRow(json.report as RiskReport, label))
-                }
+                if (!cancelled) setRow(reportToPanelRow(json.report as RiskReport, affectedAreaLabel))
             } catch (err) {
                 console.error('Threat monitoring — risk assessment:', err)
                 if (!cancelled) {
@@ -107,7 +141,7 @@ export function ThreatMonitoring({ locationName }: ThreatMonitoringProps) {
         return () => {
             cancelled = true
         }
-    }, [label])
+    }, [affectedAreaLabel, label])
 
     const liveInputs = [
         'NWS flood & hydro alerts',
