@@ -30,7 +30,7 @@ export default function EditProfilePage() {
 
         try {
             const response = await fetch('/api/user/profile', {
-                method: 'POST',
+                method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name, email, location }),
             })
