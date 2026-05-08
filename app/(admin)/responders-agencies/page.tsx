@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import { Card } from '@/components/ui/card'
 import { AdminPageHeader } from '@/components/admin-page-header'
+import { AdminPageShell } from '@/components/admin-page-shell'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
@@ -54,8 +55,7 @@ export default function RespondersAgenciesPage() {
     const [loading, setLoading] = useState(false)
 
     return (
-        <div className="flex-1 overflow-auto bg-[#F8FAFC]">
-            <main className="p-6 md:p-10 space-y-8 max-w-[1800px] mx-auto">
+        <AdminPageShell>
 
                 <AdminPageHeader
                     title="Responders & Agencies"
@@ -277,7 +277,6 @@ export default function RespondersAgenciesPage() {
                     </Button>
                 </div>
 
-            </main>
-        </div>
+        </AdminPageShell>
     )
 }

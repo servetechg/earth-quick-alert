@@ -38,6 +38,7 @@ import { GrantLicenseModal } from "@/components/modals/grant-license-modal"
 import { AddUserModal } from "@/components/modals/add-user-modal"
 import { cn } from "@/lib/utils"
 import { AdminPageHeader } from '@/components/admin-page-header'
+import { AdminPageShell } from '@/components/admin-page-shell'
 
 interface IUser {
     _id: string;
@@ -191,7 +192,7 @@ export default function AdminUsersPage() {
     if (!mounted) return null;
 
     if (loading && users.length === 0) return (
-        <div className="flex items-center justify-center min-h-screen bg-[#F8FAFC]">
+        <div className="flex items-center justify-center min-h-screen bg-slate-50/50">
             <div className="flex flex-col items-center gap-4">
                 <RefreshCw className="w-12 h-12 text-[#33375D] animate-spin" />
                 <p className="text-[#33375D] font-black uppercase tracking-widest text-xs">Accessing Personnel Matrix...</p>
@@ -200,8 +201,8 @@ export default function AdminUsersPage() {
     )
 
     return (
-        <div className="flex-1 overflow-auto bg-[#F8FAFC]">
-            <main className="p-6 md:p-10 space-y-8 max-w-[1600px] mx-auto">
+        <>
+            <AdminPageShell>
 
                 <AdminPageHeader
                     title="Responders & Agencies"
@@ -230,7 +231,7 @@ export default function AdminUsersPage() {
                                                     : "bg-white hover:bg-slate-50 border border-slate-100 shadow-sm hover:shadow-xl"
                                             )}
                                         >
-                                            <div className="p-8">
+                                            <div >
                                                 <div className="flex items-start justify-between mb-6">
                                                     <div className={cn(
                                                         "w-12 h-12 rounded-2xl flex items-center justify-center transition-transform duration-500 group-hover:scale-110",
@@ -528,10 +529,7 @@ export default function AdminUsersPage() {
                     </div>
                 )}
 
-            </main>
-
-            {/* Fab Section */}
-
+            </AdminPageShell>
 
             {/* Modal Logic */}
             {selectedUser && (
@@ -550,6 +548,6 @@ export default function AdminUsersPage() {
                 onClose={() => setIsAddUserModalOpen(false)}
                 onSuccess={() => fetchUsers(selectedOrgId)}
             />
-        </div>
+        </>
     )
 }

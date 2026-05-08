@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { Card } from '@/components/ui/card'
 import { AdminPageHeader } from '@/components/admin-page-header'
+import { AdminPageShell } from '@/components/admin-page-shell'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -323,8 +324,7 @@ export default function AlertsCommunicationPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#F8FAFC]">
-      <div className="px-6 lg:px-12 pt-8 space-y-8 max-w-[1600px] mx-auto">
+    <AdminPageShell>
         <AdminPageHeader
           title="Alerts & Communication"
           titleUppercase={false}
@@ -747,8 +747,7 @@ export default function AlertsCommunicationPage() {
             )}
           </DialogContent>
         </Dialog>
-      </div>
-    </main>
+    </AdminPageShell>
   );
 }
 

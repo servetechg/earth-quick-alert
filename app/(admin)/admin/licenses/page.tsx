@@ -29,6 +29,7 @@ import { ProvisionLicenseModal } from '@/components/modals/provision-license-mod
 import { GrantLicenseModal } from '@/components/modals/grant-license-modal'
 import { cn } from "@/lib/utils"
 import { AdminPageHeader } from '@/components/admin-page-header'
+import { AdminPageShell } from '@/components/admin-page-shell'
 import { toast } from 'sonner'
 
 interface License {
@@ -208,8 +209,7 @@ export default function LicenseManagement() {
     }
 
     return (
-        <main className="min-h-screen bg-slate-50/50 pb-20">
-            <div className="px-6 lg:px-12 pt-8 space-y-8 max-w-[1600px] mx-auto">
+        <AdminPageShell>
 
                 <AdminPageHeader
                     title="Manage Licenses"
@@ -217,7 +217,7 @@ export default function LicenseManagement() {
                     actions={
                         <Button
                             onClick={() => setIsCreateModalOpen(true)}
-                            className="flex h-12 gap-2 rounded-xl bg-slate-900 px-6 text-xs font-bold uppercase tracking-wider text-white shadow-lg transition-all hover:bg-slate-800 active:scale-95"
+                            className="flex h-12 gap-2 rounded-xl bg-[#33375D] px-6 text-xs font-bold uppercase tracking-wider text-white shadow-lg transition-all hover:bg-[#2B2F50] active:scale-95"
                         >
                             <Plus size={18} />
                             New License
@@ -410,7 +410,6 @@ export default function LicenseManagement() {
                         </div>
                     )}
                 </div>
-            </div>
 
             <ProvisionLicenseModal 
                 isOpen={isCreateModalOpen}
@@ -429,6 +428,6 @@ export default function LicenseManagement() {
                     onSuccess={refreshAll}
                 />
             )}
-        </main>
+        </AdminPageShell>
     )
 }

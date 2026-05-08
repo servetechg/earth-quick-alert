@@ -13,6 +13,7 @@ import { PreparednessTasks } from '@/components/preparedness-tasks'
 import { FirstResponderTools } from '@/components/first-responder-tools'
 import { SetupWizard } from '@/components/setup-wizard'
 import { Shield, Activity, Radio, Command, Terminal, Cpu } from 'lucide-react'
+import { AdminPageShell } from '@/components/admin-page-shell'
 
 export default function Dashboard() {
   const [showSendAlertModal, setShowSendAlertModal] = useState(false)
@@ -72,8 +73,8 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="flex-1 overflow-auto bg-slate-50 selection:bg-[#33375D]/15">
-      <main className="p-10 space-y-12 max-w-[1800px] mx-auto relative">
+    <>
+    <AdminPageShell className="selection:bg-[#33375D]/15" innerClassName="relative space-y-12">
         {/* Decorative elements */}
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[300px] bg-[#33375D]/10 blur-[120px] rounded-full pointer-events-none" />
 
@@ -171,10 +172,10 @@ export default function Dashboard() {
             Official Operational Monitoring Platform • Security Level 4 • All Session Activities Are Logged Under Readiness Resilience Protocol v4.0.01
           </p>
         </div>
-      </main>
+    </AdminPageShell>
 
       <SendCommunityAlertModal isOpen={showSendAlertModal} onClose={() => setShowSendAlertModal(false)} />
       <ActiveEmergencyEventsModal isOpen={showEventsModal} onClose={() => setShowEventsModal(false)} />
-    </div>
+    </>
   )
 }
