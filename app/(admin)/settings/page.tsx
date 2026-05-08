@@ -131,8 +131,6 @@ function AdminSettingsPageContent() {
   const [notificationsLoading, setNotificationsLoading] = useState(true)
   const [notificationsSaving, setNotificationsSaving] = useState(false)
   const [notifications, setNotifications] = useState<NotificationSettings>(INITIAL_NOTIFICATIONS)
-  const [notificationsLoading, setNotificationsLoading] = useState(true)
-  const [notificationsSaving, setNotificationsSaving] = useState(false)
   const [dispatch, setDispatch] = useState<DispatchSettings>(INITIAL_DISPATCH)
   const [isTwoFactorEnabled, setIsTwoFactorEnabled] = useState(false)
   const [isSessionTimeoutEnabled, setIsSessionTimeoutEnabled] = useState(true)
@@ -564,6 +562,39 @@ function AdminSettingsPageContent() {
     }
   }
 
+  const handleSaveNotifications = async () => {
+    setNotificationsSaving(true)
+    try {
+      const res = await fetch('/api/user/notification-preferences', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ notificationPreferences: notifications }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to save notification preferences')
+      }
+      if (data.data?.notificationPreferences) {
+        setNotifications(
+          normalizeNotificationPreferences(data.data.notificationPreferences as Record<string, unknown>),
+        )
+      }
+      toast({
+        title: 'Preferences saved',
+        description: 'Your notification preferences were updated.',
+      })
+    } catch (e: unknown) {
+      toast({
+        variant: 'destructive',
+        title: 'Save failed',
+        description: e instanceof Error ? e.message : 'Could not save preferences.',
+      })
+    } finally {
+      setNotificationsSaving(false)
+    }
+  }
+
   const activeSettingsTab = tabFromSearchParam(searchParams?.get('tab') ?? null)
 
   const handleSettingsTabChange = (next: string) => {
@@ -906,7 +937,8 @@ function AdminSettingsPageContent() {
         </TabsContent>
       </Tabs>
 
-      <ActivityLogDialog open={activityLogOpen} onOpenChange={setActivityLogOpen} />
+        <ActivityLogDialog open={activityLogOpen} onOpenChange={setActivityLogOpen} />
+      </div>
     </main>
   )
 }
