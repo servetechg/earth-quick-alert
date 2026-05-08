@@ -34,6 +34,8 @@ import {
 } from './data/settings-data'
 import { SettingsSectionCard } from './_components/settings-section-card'
 import { SettingsToggleRow } from './_components/settings-toggle-row'
+import { ActivityLogDialog } from './_components/activity-log-dialog'
+import { SECURITY_PREFS_UPDATED_EVENT } from '@/components/session-idle-watcher'
 import type {
   DispatchSettings,
   NotificationSettings,
@@ -103,6 +105,28 @@ const PROFILE_FIELDS: Array<{
 ]
 
 const PRIMARY_BUTTON_CLASSNAME = 'bg-[#33375D] text-white hover:bg-[#2B2F50]'
+const MIN_NEW_PASSWORD_LEN = 6
+
+async function parseApiJson(res: Response): Promise<Record<string, unknown>> {
+  try {
+    const text = await res.text()
+    if (!text.trim()) return {}
+    const parsed: unknown = JSON.parse(text)
+    return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : {}
+  } catch {
+    return {}
+  }
+}
+
+function apiErrorDescription(data: Record<string, unknown>, fallback: string): string {
+  const err = data.error
+  if (typeof err === 'string' && err.trim()) return err.trim()
+  const msg = data.message
+  if (typeof msg === 'string' && msg.trim()) return msg.trim()
+  return fallback
+}
 
 const PROFILE_PIC_MAX_BYTES = 2 * 1024 * 1024
 
@@ -118,16 +142,79 @@ export default function AdminSettingsPage() {
   const [notificationsLoading, setNotificationsLoading] = useState(true)
   const [notificationsSaving, setNotificationsSaving] = useState(false)
   const [dispatch, setDispatch] = useState<DispatchSettings>(INITIAL_DISPATCH)
-  const [isTwoFactorEnabled, setIsTwoFactorEnabled] = useState(true)
+  const [isTwoFactorEnabled, setIsTwoFactorEnabled] = useState(false)
   const [isSessionTimeoutEnabled, setIsSessionTimeoutEnabled] = useState(true)
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [isDispatchSaving, setIsDispatchSaving] = useState(false)
+  const [isSecuritySaving, setIsSecuritySaving] = useState(false)
+  const [activityLogOpen, setActivityLogOpen] = useState(false)
 
   useEffect(() => {
-    const role = localStorage.getItem('userRole')
-    if (role !== 'super-admin') {
-      router.replace('/super-admin-dashboard')
-      return
+    let cancelled = false
+
+    const bootstrap = async () => {
+      const role = localStorage.getItem('userRole')
+      if (role !== 'super-admin') {
+        router.replace('/super-admin-dashboard')
+        return
+      }
+
+      if (!cancelled) setIsAuthorized(true)
+
+      const [dispatchResult, securityResult] = await Promise.allSettled([
+        fetch('/api/admin/dispatch-settings', { credentials: 'same-origin' }),
+        fetch('/api/user/security', { credentials: 'same-origin' }),
+      ])
+
+      if (dispatchResult.status === 'fulfilled') {
+        try {
+          const res = dispatchResult.value
+          const payload = await res.json().catch(() => ({}))
+          if (!res.ok || !payload?.success || !payload?.data) {
+            throw new Error(payload?.error || 'Failed to load dispatch settings')
+          }
+          if (!cancelled) {
+            setDispatch({
+              autoDispatchMajor: Boolean(payload.data.autoDispatchMajor),
+              autoEscalateMinutes: String(
+                payload.data.autoEscalateMinutes ?? INITIAL_DISPATCH.autoEscalateMinutes,
+              ),
+              defaultChannel: String(payload.data.defaultChannel ?? INITIAL_DISPATCH.defaultChannel),
+              region: String(payload.data.region ?? INITIAL_DISPATCH.region),
+              messageTemplate: String(
+                payload.data.messageTemplate ?? INITIAL_DISPATCH.messageTemplate,
+              ),
+            })
+          }
+        } catch (error: any) {
+          if (!cancelled) {
+            toast({
+              title: 'Dispatch settings',
+              description: error?.message || 'Failed to load dispatch settings.',
+            })
+          }
+        }
+      }
+
+      if (securityResult.status === 'fulfilled') {
+        try {
+          const res = securityResult.value
+          const payload = await res.json().catch(() => ({}))
+          if (res.ok && payload?.success && payload?.data && !cancelled) {
+            setIsTwoFactorEnabled(Boolean(payload.data.twoFactorEnabled))
+            setIsSessionTimeoutEnabled(payload.data.sessionTimeoutEnabled !== false)
+          }
+        } catch {
+          /* ignore */
+        }
+      }
     }
-    setIsAuthorized(true)
+
+    bootstrap()
+    return () => {
+      cancelled = true
+    }
   }, [router])
 
   useEffect(() => {
@@ -221,7 +308,173 @@ export default function AdminSettingsPage() {
       .join('')
   }, [profile.name])
 
-  const handleSave = (section: string) => {
+  const handleSave = async (section: string) => {
+    if (section === 'Dispatch') {
+      try {
+        setIsDispatchSaving(true)
+        const res = await fetch('/api/admin/dispatch-settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify(dispatch),
+        })
+        const payload = await res.json().catch(() => ({}))
+        if (!res.ok || !payload?.success || !payload?.data) {
+          throw new Error(payload?.error || 'Failed to save dispatch settings')
+        }
+        setDispatch({
+          autoDispatchMajor: Boolean(payload.data.autoDispatchMajor),
+          autoEscalateMinutes: String(payload.data.autoEscalateMinutes ?? dispatch.autoEscalateMinutes),
+          defaultChannel: String(payload.data.defaultChannel ?? dispatch.defaultChannel),
+          region: String(payload.data.region ?? dispatch.region),
+          messageTemplate: String(payload.data.messageTemplate ?? dispatch.messageTemplate),
+        })
+        toast({
+          title: 'Save configuration',
+          description: 'Dispatch configuration was saved successfully.',
+        })
+      } catch (error: any) {
+        toast({
+          variant: 'destructive',
+          title: 'Save configuration failed',
+          description: error?.message || 'Unable to save dispatch settings.',
+        })
+      } finally {
+        setIsDispatchSaving(false)
+      }
+      return
+    }
+
+    if (section === 'Security') {
+      const c = currentPassword.trim()
+      const n = newPassword.trim()
+      const anyPwd = Boolean(c || n)
+
+      if (anyPwd) {
+        if (!c || !n) {
+          toast({
+            variant: 'destructive',
+            title: 'Missing password fields',
+            description: 'Enter both your current password and a new password to change it.',
+          })
+          return
+        }
+        if (n.length < MIN_NEW_PASSWORD_LEN) {
+          toast({
+            variant: 'destructive',
+            title: 'Password too short',
+            description: `New password must be at least ${MIN_NEW_PASSWORD_LEN} characters.`,
+          })
+          return
+        }
+        if (c === n) {
+          toast({
+            variant: 'destructive',
+            title: 'New password rejected',
+            description: 'New password must be different from your current password.',
+          })
+          return
+        }
+      }
+
+      try {
+        setIsSecuritySaving(true)
+        if (anyPwd) {
+          const pwdRes = await fetch('/api/user/change-password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ currentPassword: c, newPassword: n }),
+          })
+          const pwdData = await parseApiJson(pwdRes)
+          if (!pwdRes.ok) {
+            const fallback =
+              pwdRes.status >= 500
+                ? 'We could not update your password. Please try again in a moment.'
+                : 'Could not update your password.'
+            const message = apiErrorDescription(pwdData, fallback)
+            toast({
+              variant: 'destructive',
+              title: message,
+            })
+            return
+          }
+        }
+
+        const secRes = await fetch('/api/user/security', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({
+            twoFactorEnabled: isTwoFactorEnabled,
+            sessionTimeoutEnabled: isSessionTimeoutEnabled,
+          }),
+        })
+        const secData = await parseApiJson(secRes)
+        const secPayloadData = secData.data
+        const secOk =
+          secRes.ok &&
+          secData.success === true &&
+          typeof secPayloadData === 'object' &&
+          secPayloadData !== null &&
+          !Array.isArray(secPayloadData)
+
+        if (!secOk) {
+          const fallback =
+            secRes.status >= 500
+              ? 'We could not save your security preferences. Please try again.'
+              : secRes.status === 401
+                ? 'Your session has expired. Sign in again to save security settings.'
+                : 'Could not save security preferences.'
+          const description = apiErrorDescription(secData, fallback)
+          toast({
+            variant: 'destructive',
+            title:
+              secRes.status === 401
+                ? 'Sign in required'
+                : secRes.status >= 500
+                  ? 'Server error'
+                  : 'Could not save preferences',
+            description,
+          })
+          return
+        }
+
+        const data = secPayloadData as {
+          twoFactorEnabled?: unknown
+          sessionTimeoutEnabled?: unknown
+        }
+        setIsTwoFactorEnabled(Boolean(data.twoFactorEnabled))
+        setIsSessionTimeoutEnabled(data.sessionTimeoutEnabled !== false)
+        if (anyPwd) {
+          setCurrentPassword('')
+          setNewPassword('')
+        }
+
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new Event(SECURITY_PREFS_UPDATED_EVENT))
+        }
+
+        toast({
+          title: 'Security updated',
+          description: anyPwd
+            ? 'Password and security preferences were saved.'
+            : 'Security preferences were saved.',
+        })
+      } catch (error: unknown) {
+        const msg =
+          error instanceof Error ? error.message : 'Unable to save security settings. Check your connection and try again.'
+        toast({
+          variant: 'destructive',
+          title: 'Something went wrong',
+          description: msg,
+        })
+      } finally {
+        setIsSecuritySaving(false)
+      }
+      return
+    }
+
     toast({
       title: 'Settings saved',
       description: `${section} settings have been updated.`,
@@ -600,9 +853,13 @@ export default function AdminSettingsPage() {
             </div>
 
             <div className="flex justify-end">
-              <Button onClick={() => handleSave('Dispatch')} className={`gap-2 ${PRIMARY_BUTTON_CLASSNAME}`}>
+              <Button
+                onClick={() => handleSave('Dispatch')}
+                disabled={isDispatchSaving}
+                className={`gap-2 ${PRIMARY_BUTTON_CLASSNAME}`}
+              >
                 <Save className="h-4 w-4" />
-                Save Configuration
+                {isDispatchSaving ? 'Saving...' : 'Save Configuration'}
               </Button>
             </div>
           </SettingsSectionCard>
@@ -617,11 +874,25 @@ export default function AdminSettingsPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="current-password">Current Password</Label>
-                <Input id="current-password" type="password" placeholder="••••••••" />
+                <Input
+                  id="current-password"
+                  type="password"
+                  autoComplete="current-password"
+                  placeholder="••••••••"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="new-password">New Password</Label>
-                <Input id="new-password" type="password" placeholder="••••••••" />
+                <Input
+                  id="new-password"
+                  type="password"
+                  autoComplete="new-password"
+                  placeholder="••••••••"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                />
               </div>
             </div>
 
@@ -652,15 +923,24 @@ export default function AdminSettingsPage() {
             />
 
             <div className="flex justify-end gap-3">
-              <Button variant="outline">View Activity Log</Button>
-              <Button onClick={() => handleSave('Security')} className={`gap-2 ${PRIMARY_BUTTON_CLASSNAME}`}>
+              <Button type="button" variant="outline" onClick={() => setActivityLogOpen(true)}>
+                View Activity Log
+              </Button>
+              <Button
+                type="button"
+                onClick={() => handleSave('Security')}
+                disabled={isSecuritySaving}
+                className={`gap-2 ${PRIMARY_BUTTON_CLASSNAME}`}
+              >
                 <Save className="h-4 w-4" />
-                Update Security
+                {isSecuritySaving ? 'Saving...' : 'Update Security'}
               </Button>
             </div>
           </SettingsSectionCard>
         </TabsContent>
       </Tabs>
+
+      <ActivityLogDialog open={activityLogOpen} onOpenChange={setActivityLogOpen} />
     </main>
   )
 }

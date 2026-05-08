@@ -5,6 +5,7 @@ import bcrypt from 'bcryptjs';
 import { encrypt } from '@/lib/auth';
 import { cookies } from 'next/headers';
 import SystemStatus from '@/models/SystemStatus';
+import { recordActivity, ACTIVITY_ACTIONS } from '@/lib/activity-log';
 
 export async function POST(req: NextRequest) {
     console.log('Login API request received at', new Date().toISOString());
@@ -107,6 +108,13 @@ export async function POST(req: NextRequest) {
             secure: process.env.NODE_ENV === 'production',
             sameSite: 'lax',
             path: '/',
+        });
+
+        void recordActivity({
+            userId: user._id.toString(),
+            action: ACTIVITY_ACTIONS.LOGIN,
+            label: `Signed in as ${user.role || 'user'}`,
+            meta: { email: user.email },
         });
 
         return response;

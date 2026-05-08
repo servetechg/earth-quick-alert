@@ -46,3 +46,8 @@ export interface DispatchSelectOption {
   value: string
   label: string
 }
+
+export interface SecuritySettings {
+  twoFactorEnabled: boolean
+  sessionTimeoutEnabled: boolean
+}

@@ -4,6 +4,7 @@ import User from '@/models/User';
 import { cookies } from 'next/headers';
 import { decrypt } from '@/lib/auth';
 import { getCloudinary } from '@/lib/cloudinary';
+import { recordActivity, ACTIVITY_ACTIONS } from '@/lib/activity-log';
 
 type SessionUser = { id: string };
 
@@ -191,6 +192,13 @@ export async function PUT(req: Request) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
+    void recordActivity({
+      userId: auth.userId,
+      action: ACTIVITY_ACTIONS.PROFILE_UPDATE,
+      label: 'Profile updated',
+      meta: { fields: Object.keys(updates) },
+    });
+
     return NextResponse.json({
       success: true,
       user: jsonUser(updatedUser),
@@ -281,6 +289,13 @@ export async function POST(req: Request) {
     if (!updatedUser) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
+
+    void recordActivity({
+      userId: auth.userId,
+      action: ACTIVITY_ACTIONS.PROFILE_UPDATE,
+      label: 'Profile updated',
+      meta: { via: 'POST' },
+    });
 
     return NextResponse.json({
       success: true,
