@@ -57,6 +57,74 @@ export function isFloodRelatedEvent(event?: string): boolean {
   );
 }
 
+/**
+ * Buckets active NWS `properties.event` strings for AI Risk Assessment incident_distribution.
+ * Flood/hydro and fire-weather alerts are omitted — they roll up elsewhere (flood, wildfire feeds).
+ * Priority: tornado → convective/tropical storm → hazardous (winter/extreme temps/wind/smoke…) → coastal/surf → marine.
+ */
+export function classifyNwsIncidentDistributionBucket(
+  event?: string,
+): 'tornado' | 'storm' | 'hazardous' | 'coastal_surf' | 'marine' | null {
+  const e = (event ?? '').trim().toLowerCase();
+  if (!e) return null;
+  if (isFloodRelatedEvent(event)) return null;
+  if (/\bred flag\b|\bfire weather\b|\bwildfire\b/.test(e)) return null;
+
+  if (e.includes('tornado')) return 'tornado';
+
+  if (
+    e.includes('severe thunderstorm') ||
+    e.includes('thunderstorm') ||
+    e.includes('hurricane') ||
+    e.includes('tropical storm') ||
+    e.includes('tropical depression') ||
+    e.includes('tropical cyclone') ||
+    e.includes('typhoon') ||
+    e.includes('hail') ||
+    (e.includes('squall') && !e.includes('snow'))
+  ) {
+    return 'storm';
+  }
+
+  if (
+    /\bblizzard\b|\bwinter storm\b|\bice storm\b|\bfreezing rain\b|\bice jam\b|\bsnow squall\b|\bavalanche\b|\bextreme cold\b|\bcold weather\b|\bwind chill\b|\bfreeze\b|\bfrost\b|\bhard freeze\b|\bextreme heat\b|\bexcessive heat\b|\bheat advisory\b|\bdense fog\b|\bfreezing fog\b|\bdense smoke\b|\bair stagnation\b|\bblowing dust\b|\bdust storm\b|\bstorm surge\b|\bgeomagnetic\b|\bsolar radiation storm\b|\bradiological\b/.test(e) ||
+    (e.includes('snow') &&
+      (e.includes('warning') || e.includes('watch') || e.includes('advisory'))) ||
+    (e.includes('wind') &&
+      (e.includes('high') || e.includes('extreme') || e.includes('damaging')))
+  ) {
+    return 'hazardous';
+  }
+
+  // Beach / nearshore surf hazards (distinct from inland flood wording).
+  if (
+    /\brip current\b|\bhigh surf\b|\bbeach hazards\b|\bsneaker wave\b|\bheavy surf\b|\brough surf\b|\bcoastal erosion\b|\bcoastal hazards?\b|\bking tide\b/.test(e)
+  ) {
+    return 'coastal_surf';
+  }
+
+  // Offshore / port / tsunami / routine marine thresholds (after convective + winter exclusions).
+  const isWinterStormProduct = /\bwinter storm\b|\bice storm\b/.test(e);
+  if (
+    /\btsunami\b|\bgale watch\b|\bgale warning\b|\blakeshore gale\b|\bmarine weather statement\b|\bspecial marine warning\b|\bsmall craft\b|\bheavy freezing spray\b|\brough bar\b|\bhazardous seas watch\b|\bhazardous seas warning\b|\bheavy seas\b|\brough seas\b|\bfreezing spray warning\b|\bfreezing spray watch\b/.test(e) ||
+    /\bfreezing spray advisory\b|\bmarine debris\b|\bmaritime\b/.test(e) ||
+    (/\bmarine\b/.test(e) &&
+      !/\bmarine thunderstorm\b/.test(e) &&
+      !e.includes('thunderstorm')) ||
+    (/\bstorm warning\b|\bstorm watch\b/.test(e) &&
+      !isWinterStormProduct &&
+      !e.includes('tropical storm') &&
+      !e.includes('severe thunderstorm') &&
+      !e.includes('thunderstorm') &&
+      !e.includes('snow') &&
+      !e.includes('blizzard'))
+  ) {
+    return 'marine';
+  }
+
+  return null;
+}
+
 /** Plain-language basin / corridor for FIRMS hotspots (no reverse geocode; good enough for executive bullets). */
 function describeSatelliteSector(lat: number, lon: number): string {
   if (lon >= -180 && lon <= -130 && lat >= 51 && lat <= 72) return 'Alaska vicinity';
@@ -365,15 +433,18 @@ async function ingestNwsFloodAlerts(stateCd: string): Promise<IngestSourceResult
 
 const NWS_FLOOD_SUMMARY_CAP = 48;
 
-/** Nationwide paginated NWS active alerts, flood/hydro events only — aligned with Alerts & Communication NWS breadth. */
+/**
+ * Nationwide paginated NWS active alerts (`data` holds the full Feature list for dashboards).
+ * `summary` text remains flood/hydro-focused for LLM ingest — same as Alerts & Communication NWS breadth.
+ */
 async function ingestNwsFloodAlertsNationwide(): Promise<IngestSourceResult> {
   try {
     const raw = await weatherAPI.fetchActiveNwsRawFeaturesNationwide();
+    const fullJson = { type: 'FeatureCollection' as const, features: raw };
     const floodFeats = raw.filter((f) => {
       const ev = (f as { properties?: { event?: string } })?.properties?.event;
       return isFloodRelatedEvent(ev);
     });
-    const json = { type: 'FeatureCollection' as const, features: floodFeats };
     const lines: string[] = [];
     if (Array.isArray(floodFeats)) {
       for (const f of floodFeats) {
@@ -392,7 +463,7 @@ async function ingestNwsFloodAlertsNationwide(): Promise<IngestSourceResult> {
     return {
       ok: true,
       source: 'NWS_FLOOD_ALERTS',
-      data: json,
+      data: fullJson,
       summary:
         lines.length > 0
           ? lines.join('\n')
