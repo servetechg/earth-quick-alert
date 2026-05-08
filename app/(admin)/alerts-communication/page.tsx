@@ -140,6 +140,7 @@ export default function AlertsCommunicationPage() {
   const [alerts, setAlerts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedAlertId, setSelectedAlertId] = useState<string | null>(null)
+  const [expandedLocations, setExpandedLocations] = useState<Record<string, boolean>>({})
 
 
   // Unified Channel Selection States
@@ -166,7 +167,9 @@ export default function AlertsCommunicationPage() {
         const formattedAlerts = data.map((item: any) => ({
           ...item,
           id: item._id,
-          affectedAreas: [item.location]
+          affectedAreas: Array.isArray(item.locations) && item.locations.length > 0
+            ? item.locations
+            : [item.locationSummary ?? item.location]
         }))
         console.log(formattedAlerts, 'formattedAlerts')
         setAlerts(formattedAlerts)
@@ -275,6 +278,9 @@ export default function AlertsCommunicationPage() {
 
   const selectedAlert = alerts.find(a => a.id === selectedAlertId)
 
+  const displayLocation = (alert: any) =>
+    (alert?.locationSummary ?? alert?.location ?? '').toString()
+
   // AI Alert State
   const [alertMessage, setAlertMessage] = useState('')
   const [isGeneratingAI, setIsGeneratingAI] = useState(false)
@@ -352,7 +358,7 @@ export default function AlertsCommunicationPage() {
               <span className="text-[#3730A3]">Real-time monitoring:</span>
               <span className="font-medium text-[#4338CA]/80">
                 {alerts.length > 0
-                  ? `Signals are live: Most recent alert detected in ${alerts[0].affectedAreas[0]}.`
+                  ? `Signals are live: Most recent alert detected in ${displayLocation(alerts[0])}.`
                   : "Polling the National Weather Service every minute for the latest alerts."
                 }
               </span>
@@ -463,6 +469,8 @@ export default function AlertsCommunicationPage() {
 
                 const buttonColor = isTakeAction ? 'bg-[#EF4444] hover:bg-red-600' : 'bg-[#22C55E] cursor-default';
                 const buttonText = isTakeAction ? 'Take Action' : 'Alert Sent';
+                const isLocExpanded = !!expandedLocations[alert.id]
+                const hasManyLocations = Array.isArray(alert.locations) && alert.locations.length > 1
 
                 return (
                   <Card
@@ -495,7 +503,26 @@ export default function AlertsCommunicationPage() {
 
                     <div className="space-y-0.5 mb-4">
                       <h2 className="text-[22px] font-black text-slate-900 tracking-tight leading-tight">{alert.name}</h2>
-                      <p className="text-slate-500 text-[13px] font-bold">{alert.location}</p>
+                      <div className="text-slate-500 text-[13px] font-bold">
+                        <p className="inline">{displayLocation(alert)}</p>
+                        {hasManyLocations && (
+                          <button
+                            className="ml-2 text-[11px] font-black uppercase tracking-wider text-indigo-600 hover:text-indigo-700"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setExpandedLocations((prev) => ({ ...prev, [alert.id]: !prev[alert.id] }))
+                            }}
+                            type="button"
+                          >
+                            {isLocExpanded ? 'Hide' : `View all (${alert.locationCount ?? alert.locations.length})`}
+                          </button>
+                        )}
+                        {hasManyLocations && isLocExpanded && (
+                          <div className="mt-2 text-[12px] font-bold text-slate-500">
+                            {alert.locations.join(', ')}
+                          </div>
+                        )}
+                      </div>
                     </div>
 
                     <div className="flex items-center justify-between pt-4 border-t border-slate-50">
@@ -647,7 +674,7 @@ export default function AlertsCommunicationPage() {
                     </DialogDescription>
                   </div>
                   <div className="flex items-center gap-3 text-[10px] font-bold text-white/90">
-                    <p>{currentActionAlert.location}</p>
+                    <p>{displayLocation(currentActionAlert)}</p>
                     <div className="w-1 h-1 rounded-full bg-white/40 shrink-0" />
                     <p className="shrink-0">Issued {currentActionAlert.issuedAt}</p>
                     <div className="w-1 h-1 rounded-full bg-white/40 shrink-0" />
