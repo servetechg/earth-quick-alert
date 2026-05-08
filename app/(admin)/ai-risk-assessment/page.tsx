@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState, Fragment, type ElementType, type ReactNode } from "react";
+import { AdminPageShell } from "@/components/admin-page-shell";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -681,7 +682,7 @@ export default function RiskAssessment() {
   };
 
   return (
-    <div className="px-6 lg:px-12 pt-8 space-y-8 max-w-[1600px] mx-auto">
+    <AdminPageShell>
       {/* Header */}
       <Card className="rounded-2xl border-l-4 border-l-[#33375D] bg-white p-7 shadow-xl shadow-slate-200/50">
         <div className="flex flex-wrap items-start justify-between gap-4">
@@ -957,6 +958,6 @@ export default function RiskAssessment() {
           </p>
         </div>
       )}
-    </div>
+    </AdminPageShell>
   );
 }

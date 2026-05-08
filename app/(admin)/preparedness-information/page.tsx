@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { AdminPageHeader } from '@/components/admin-page-header';
+import { AdminPageShell } from '@/components/admin-page-shell';
 import {
   CheckCircle2,
   Flame,
@@ -295,8 +296,7 @@ export default function PreparednessInformationPage() {
   };
 
   return (
-    <main className="min-h-screen bg-slate-50/50 pb-20">
-      <div className="px-6 lg:px-12 pt-8 space-y-8 max-w-[1800px] mx-auto">
+    <AdminPageShell>
         <AdminPageHeader
           title="Preparedness Information"
           titleUppercase={false}
@@ -339,7 +339,6 @@ export default function PreparednessInformationPage() {
             </div>
           </>
         )}
-      </div>
-    </main>
+    </AdminPageShell>
   );
 }
