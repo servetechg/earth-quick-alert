@@ -116,7 +116,7 @@ export default function UserAlertsPage() {
         <header className="mb-12 flex flex-col sm:flex-row sm:items-center justify-between gap-6">
           <div>
             <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-100">
+              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#33375D] shadow-lg shadow-[#33375D]/20">
                 <ShieldAlert className="w-6 h-6 text-white" />
               </div>
               <h1 className="text-3xl font-black tracking-tight text-slate-900 uppercase">Status & Alerts</h1>
@@ -127,7 +127,7 @@ export default function UserAlertsPage() {
             onClick={() => refresh()}
             className="bg-white text-slate-900 border border-slate-200 hover:bg-slate-50 rounded-2xl h-12 px-6 font-bold uppercase tracking-widest text-[10px] shadow-sm gap-2"
           >
-            {myAlertsLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+            {myAlertsLoading ? <RefreshCw className="h-4 w-4 animate-spin text-[#33375D]" /> : <RefreshCw className="h-4 w-4" />}
             Refresh
           </Button>
         </header>
@@ -145,7 +145,7 @@ export default function UserAlertsPage() {
             <div className="space-y-4">
               {myAlertsLoading ? (
                 <div className="p-16 text-center bg-white rounded-[2.5rem] border-2 border-dashed border-slate-100">
-                  <Loader2 className="w-8 h-8 text-blue-500 animate-spin mx-auto mb-4" />
+                  <Loader2 className="mx-auto mb-4 h-8 w-8 animate-spin text-[#33375D]" />
                   <p className="font-bold text-xs text-slate-400 uppercase tracking-widest">Scanning your area...</p>
                 </div>
               ) : myAlerts.length === 0 ? (

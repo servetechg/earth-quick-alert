@@ -115,7 +115,7 @@ export default function PreparednessPage() {
 
         {isLoading ? (
           <div className="py-20 flex justify-center">
-            <Loader2 className="w-8 h-8 text-slate-500 animate-spin" />
+            <Loader2 className="h-8 w-8 animate-spin text-[#33375D]" />
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">

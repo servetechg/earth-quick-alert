@@ -410,7 +410,7 @@ export function ProvisionLicenseModal({ isOpen, onClose, onSuccess }: ProvisionL
             >
               {loading ? (
                 <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin text-white" />
                   Processing...
                 </>
               ) : (

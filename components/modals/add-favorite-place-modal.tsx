@@ -117,7 +117,7 @@ export function AddFavoritePlaceModal({ isOpen, onClose, onSuccess }: AddFavorit
                                         className={cn(
                                             "w-12 h-12 rounded-xl flex items-center justify-center border transition-all",
                                             selectedIcon === opt.id
-                                                ? "bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-100 scale-110"
+                                                ? "scale-110 border-[#33375D] bg-[#33375D] text-white shadow-lg shadow-[#33375D]/20"
                                                 : "bg-slate-50 border-slate-100 text-slate-400 hover:border-blue-200 hover:text-blue-500"
                                         )}
                                     >
@@ -153,7 +153,7 @@ export function AddFavoritePlaceModal({ isOpen, onClose, onSuccess }: AddFavorit
                             disabled={submitting}
                             className="flex-[2] bg-slate-900 hover:bg-slate-800 text-white h-14 rounded-2xl font-black uppercase tracking-widest shadow-xl transition-all active:scale-95"
                         >
-                            {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Save Location'}
+                            {submitting ? <Loader2 className="h-5 w-5 animate-spin text-white" /> : 'Save Location'}
                         </Button>
                     </div>
                 </form>

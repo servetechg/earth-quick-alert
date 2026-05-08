@@ -227,7 +227,7 @@ export function SendCommunityAlertModal({ isOpen, onClose, initialData }: SendCo
             disabled={isSending}
             className="flex-[1.5] h-18 h-16 rounded-[24px] bg-red-600 hover:bg-red-700 text-white font-black uppercase tracking-[0.3em] text-[11px] shadow-2xl shadow-red-600/20 transition-all hover:scale-[1.02] active:scale-[0.98] gap-4"
           >
-            {isSending ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Send size={20} /> Initiate Dispatch</>}
+            {isSending ? <Loader2 className="h-5 w-5 animate-spin text-white" /> : <><Send size={20} /> Initiate Dispatch</>}
           </Button>
         </div>
       </div>

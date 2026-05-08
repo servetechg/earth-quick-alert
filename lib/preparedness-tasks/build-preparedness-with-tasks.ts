@@ -12,6 +12,8 @@ export type SimpleTask = {
     title: string;
     createdBy: string;
     isActive: boolean;
+    createdAt: string;
+    updatedAt: string;
 };
 
 export type SimplePreparednessWithTasks = {
@@ -19,6 +21,12 @@ export type SimplePreparednessWithTasks = {
     category: string;
     tasks: SimpleTask[];
 };
+
+function leanDateToIso(d: unknown): string {
+    if (d == null) return '';
+    const date = d instanceof Date ? d : new Date(d as string | number);
+    return Number.isNaN(date.getTime()) ? '' : date.toISOString();
+}
 
 function groupByPreparednessId<T extends { preparednessId: unknown }>(rows: T[]): Map<string, T[]> {
     const map = new Map<string, T[]>();
@@ -29,6 +37,18 @@ function groupByPreparednessId<T extends { preparednessId: unknown }>(rows: T[])
         map.set(pid, list);
     }
     return map;
+}
+
+/** Oldest `createdAt` first (matches ISO strings from the API). */
+function sortTasksByCreatedAtAsc(tasks: SimpleTask[]): SimpleTask[] {
+    return [...tasks].sort((a, b) => {
+        const ta = Date.parse(a.createdAt);
+        const tb = Date.parse(b.createdAt);
+        const na = Number.isNaN(ta) ? Infinity : ta;
+        const nb = Number.isNaN(tb) ? Infinity : tb;
+        if (na !== nb) return na - nb;
+        return a._id.localeCompare(b._id);
+    });
 }
 
 export async function buildPreparednessWithTasks(params: {
@@ -54,7 +74,7 @@ export async function buildPreparednessWithTasks(params: {
         if (!params.includeInactive) {
             taskFilter.isActive = true;
         }
-        const raw = await Task.find(taskFilter).sort({ updatedAt: -1 }).lean();
+        const raw = await Task.find(taskFilter).sort({ createdAt: 1 }).lean();
         const grouped = groupByPreparednessId(raw as unknown as { preparednessId: mongoose.Types.ObjectId }[]);
         for (const [pid, list] of grouped) {
             tasksByPrep.set(
@@ -65,12 +85,16 @@ export async function buildPreparednessWithTasks(params: {
                         title: string;
                         createdBy: string;
                         isActive: boolean;
+                        createdAt?: Date;
+                        updatedAt?: Date;
                     };
                     return {
                         _id: doc._id.toString(),
                         title: doc.title,
                         createdBy: doc.createdBy,
                         isActive: doc.isActive,
+                        createdAt: leanDateToIso(doc.createdAt),
+                        updatedAt: leanDateToIso(doc.updatedAt),
                     };
                 })
             );
@@ -81,7 +105,7 @@ export async function buildPreparednessWithTasks(params: {
             isDeletedBySubAdmin: false,
             isActive: true,
         };
-        const raw = await SubAdminTask.find(taskFilter).sort({ updatedAt: -1 }).lean();
+        const raw = await SubAdminTask.find(taskFilter).sort({ createdAt: 1 }).lean();
         const grouped = groupByPreparednessId(raw as unknown as { preparednessId: mongoose.Types.ObjectId }[]);
         for (const [pid, list] of grouped) {
             tasksByPrep.set(
@@ -92,29 +116,40 @@ export async function buildPreparednessWithTasks(params: {
                         title: string;
                         createdBy: string;
                         isActive: boolean;
+                        createdAt?: Date;
+                        updatedAt?: Date;
                     };
                     return {
                         _id: doc._id.toString(),
                         title: doc.title,
                         createdBy: doc.createdBy,
                         isActive: doc.isActive,
+                        createdAt: leanDateToIso(doc.createdAt),
+                        updatedAt: leanDateToIso(doc.updatedAt),
                     };
                 })
             );
         }
     } else {
-        const raw = await UserTask.find({ userId: userOid }).sort({ sentAt: -1 }).lean();
+        const raw = await UserTask.find({ userId: userOid }).sort({ sentAt: 1 }).lean();
         const grouped = groupByPreparednessId(raw as unknown as { preparednessId: mongoose.Types.ObjectId }[]);
         for (const [pid, list] of grouped) {
             tasksByPrep.set(
                 pid,
                 list.map((t) => {
-                    const doc = t as unknown as { _id: mongoose.Types.ObjectId; title: string };
+                    const doc = t as unknown as {
+                        _id: mongoose.Types.ObjectId;
+                        title: string;
+                        sentAt?: Date;
+                    };
+                    const sent = leanDateToIso(doc.sentAt);
                     return {
                         _id: doc._id.toString(),
                         title: doc.title,
                         createdBy: 'user',
                         isActive: true,
+                        createdAt: sent,
+                        updatedAt: sent,
                     };
                 })
             );
@@ -128,7 +163,7 @@ export async function buildPreparednessWithTasks(params: {
         return {
             _id: idStr,
             category: g.category,
-            tasks: tasksByPrep.get(idStr) ?? [],
+            tasks: sortTasksByCreatedAtAsc(tasksByPrep.get(idStr) ?? []),
         };
     });
 }

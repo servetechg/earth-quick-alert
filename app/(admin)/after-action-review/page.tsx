@@ -65,7 +65,7 @@ export default function AfterActionReviewPage() {
             <div className="flex items-center justify-center h-[calc(100vh-64px)] bg-[#0A0B10]">
                 <div className="flex flex-col items-center gap-6">
                     <div className="relative">
-                        <Loader2 className="w-16 h-16 animate-spin text-blue-500" />
+                        <Loader2 className="w-16 h-16 animate-spin text-[#33375D]" />
                         <div className="absolute inset-0 flex items-center justify-center text-[10px] font-black text-blue-400">AI</div>
                     </div>
                     <p className="font-black text-xs uppercase tracking-[0.4em] text-slate-500 animate-pulse">Synchronizing Mission Metadata...</p>
@@ -99,7 +99,7 @@ export default function AfterActionReviewPage() {
             <div className="relative flex flex-col lg:flex-row lg:items-end justify-between gap-8 pb-8 border-b border-white/5">
                 <div className="space-y-6">
                     <div className="flex items-center gap-4">
-                        <div className="px-4 py-1.5 bg-blue-600 rounded-full text-[10px] font-black text-white uppercase tracking-widest shadow-2xl shadow-blue-600/30">
+                        <div className="rounded-full bg-[#33375D] px-4 py-1.5 font-black text-[10px] uppercase tracking-widest text-white shadow-2xl shadow-[#33375D]/30">
                             Official Record
                         </div>
                         <div className="flex items-center gap-2 text-slate-500 text-[10px] font-black uppercase tracking-widest">
@@ -124,7 +124,7 @@ export default function AfterActionReviewPage() {
                     </Button>
                     <Button
                         onClick={() => toast.success('Downloading Strategic AAR Payload (PDF/Excel)...')}
-                        className="h-14 px-8 rounded-2xl bg-blue-600 hover:bg-blue-700 h-16 text-white font-black uppercase tracking-[0.2em] text-[10px] shadow-2xl shadow-blue-600/20 gap-3"
+                        className="h-14 h-16 gap-3 rounded-2xl bg-[#33375D] px-8 font-black text-[10px] uppercase tracking-[0.2em] text-white shadow-2xl shadow-[#33375D]/25 hover:bg-[#2B2F50]"
                     >
                         <Download size={16} /> Export Intelligence
                     </Button>

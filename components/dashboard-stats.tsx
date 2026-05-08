@@ -57,9 +57,9 @@ export function DashboardStats() {
       value: loading ? '...' : statsData?.pendingSubAdmins || 0,
       unit: 'Adm. Requests',
       Icon: Radio,
-      color: 'text-blue-500',
-      bg: 'bg-blue-500/10',
-      border: 'border-blue-500/20',
+      color: 'text-[#33375D]',
+      bg: 'bg-[#33375D]/10',
+      border: 'border-[#33375D]/20',
       details: [
         { label: 'Auth Pipeline', sub: 'Ready for Review', active: !!statsData?.pendingSubAdmins }
       ]
@@ -90,7 +90,7 @@ export function DashboardStats() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {[1, 2, 3, 4].map((i) => (
           <Card key={i} className="bg-white border border-slate-200 border-l-4 border-l-[#33375D] rounded-[32px] p-8 shadow-sm flex flex-col items-center justify-center h-48">
-            <Loader2 className="w-8 h-8 animate-spin text-slate-200" />
+            <Loader2 className="h-8 w-8 animate-spin text-[#33375D]/40" />
           </Card>
         ))}
       </div>
@@ -100,7 +100,7 @@ export function DashboardStats() {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
       {stats.map((stat, i) => (
-        <Card key={i} className="bg-white border border-slate-200 border-l-4 border-l-[#33375D] rounded-[32px] p-8 shadow-sm hover:bg-slate-50/50 transition-all group relative overflow-hidden">
+        <Card key={i} className="bg-white border border-slate-200 border-l-4 border-l-[#33375D] rounded-lg p-8 shadow-sm transition-all group relative overflow-hidden">
           {/* <div className="absolute top-0 right-0 p-8 opacity-[0.03] group-hover:opacity-[0.07] transition-opacity">
             <stat.icon size={80} />
           </div> */}
@@ -124,7 +124,7 @@ export function DashboardStats() {
             {stat.details.map((detail, j) => (
               <div key={j} className="flex items-center justify-between group/detail">
                 <div className="flex items-center gap-3">
-                  {detail.active && <div className={cn("w-1.5 h-1.5 rounded-full animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.5)]", stat.color === 'text-red-500' ? 'bg-red-500' : 'bg-blue-500')} />}
+                  {detail.active && <div className={cn("w-1.5 h-1.5 rounded-full animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.5)]", stat.color === 'text-red-500' ? 'bg-red-500' : 'bg-[#33375D]')} />}
                   <span className="text-[11px] font-bold text-slate-700 uppercase tracking-tight group-hover/detail:text-slate-900 transition-colors">{detail.label}</span>
                 </div>
                 <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest italic">{detail.sub}</span>

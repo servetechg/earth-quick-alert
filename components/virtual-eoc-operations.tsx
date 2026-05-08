@@ -50,7 +50,7 @@ export function VirtualEOCOperations() {
 
             <div className="relative z-10 flex items-center justify-between mb-10">
                 <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-2xl">
+                    <div className="w-12 h-12 bg-[#33375D] rounded-2xl flex items-center justify-center text-white shadow-2xl">
                         <ShieldCheck size={24} />
                     </div>
                     <div>
@@ -98,7 +98,7 @@ export function VirtualEOCOperations() {
                 <div className="space-y-6">
                     <div className="flex items-center justify-between px-2">
                         <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] flex items-center gap-3">
-                            <Target size={14} className="text-blue-500" /> Mission Log
+                            <Target size={14} className="text-[#33375D]" /> Mission Log
                         </h4>
                         <span className="text-[8px] font-black text-emerald-600 uppercase italic">98% COMPLIANCE</span>
                     </div>

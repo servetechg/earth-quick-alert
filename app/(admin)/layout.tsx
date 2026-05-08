@@ -14,15 +14,17 @@ export default function AdminLayout({
     const router = useRouter()
     const [isLoading, setIsLoading] = useState(true)
     const [userName, setUserName] = useState('')
+    const [userRole, setUserRole] = useState('')
 
     useEffect(() => {
-        const userRole = localStorage.getItem('userRole')
+        const role = localStorage.getItem('userRole') || ''
         const storedName = localStorage.getItem('userName')
-        const isAuthorized = userRole === 'admin' || userRole === 'super-admin' || userRole === 'sub-admin' || userRole === 'observer' || userRole === 'responder' || userRole === 'manager' || userRole === 'eoc-manager' || userRole === 'eoc-observer'
+        const isAuthorized = role === 'admin' || role === 'super-admin' || role === 'sub-admin' || role === 'observer' || role === 'responder' || role === 'manager' || role === 'eoc-manager' || role === 'eoc-observer'
         
         if (!isAuthorized) {
             router.push('/login')
         } else {
+            setUserRole(role)
             if (storedName) setUserName(storedName)
             setIsLoading(false)
         }
@@ -61,7 +63,11 @@ export default function AdminLayout({
             <SessionIdleWatcher />
             <Sidebar />
             <div className="flex-1 flex flex-col overflow-hidden">
-                <Header userName={userName || "Admin User"} onLogout={handleLogout} />
+                <Header
+                    userName={userName || 'Admin User'}
+                    onLogout={handleLogout}
+                    hideSearch={userRole === 'super-admin'}
+                />
                 <div className="flex-1 overflow-auto">
                     {children}
                 </div>

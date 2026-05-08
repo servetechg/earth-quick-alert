@@ -96,7 +96,7 @@ export function CommunicationsCenter({
               </Button>
               <Button
                 onClick={() => setIsSafetyGuideModalOpen(true)}
-                className="bg-blue-500 hover:bg-blue-600 text-white font-bold text-xs h-10 rounded-lg flex items-center justify-center gap-2"
+                className="bg-[#33375D] hover:bg-[#2B2F50] text-white font-bold text-xs h-10 rounded-lg flex items-center justify-center gap-2"
               >
                 <FileText className="w-4 h-4" />
                 Safety Guide

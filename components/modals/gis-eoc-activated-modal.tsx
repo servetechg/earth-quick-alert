@@ -99,7 +99,7 @@ export function GISEOCActivatedModal({ isOpen, onClose }: GISEOCActivatedModalPr
                 className={cn(
                   "px-4 py-2 rounded-lg font-bold text-[11px] transition-all",
                   activeLayer === layer
-                    ? "bg-blue-600 text-white shadow-md shadow-blue-600/10"
+                    ? "bg-[#33375D] text-white shadow-md shadow-[#33375D]/20"
                     : "bg-slate-50 text-slate-500 hover:bg-slate-100"
                 )}
               >
@@ -170,7 +170,7 @@ export function GISEOCActivatedModal({ isOpen, onClose }: GISEOCActivatedModalPr
                       </Button>
                       <Button
                         onClick={() => handleVerify(report.id)}
-                        className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-[12px] h-10 px-6 rounded-xl shadow-lg shadow-blue-200 transition-all active:scale-95"
+                        className="h-10 rounded-xl bg-[#33375D] px-6 font-bold text-[12px] text-white shadow-lg shadow-[#33375D]/25 transition-all hover:bg-[#2B2F50] active:scale-95"
                       >
                         Verify
                       </Button>

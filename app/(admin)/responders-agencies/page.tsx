@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { Card } from '@/components/ui/card'
+import { AdminPageHeader } from '@/components/admin-page-header'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
@@ -56,11 +57,11 @@ export default function RespondersAgenciesPage() {
         <div className="flex-1 overflow-auto bg-[#F8FAFC]">
             <main className="p-6 md:p-10 space-y-8 max-w-[1800px] mx-auto">
 
-                {/* Info Card Header */}
-                <div className="bg-white border-l-4 border-l-[#33375D] rounded-xl p-8 shadow-sm border border-slate-200">
-                    <h1 className="text-3xl font-black text-slate-900 tracking-tight mb-2">Responders & Agencies</h1>
-                    <p className="text-slate-500 font-medium">Manage administrative access, essential personnel, and responder actions for active and planned incidents.</p>
-                </div>
+                <AdminPageHeader
+                    title="Responders & Agencies"
+                    titleUppercase={false}
+                    description="Manage administrative access, essential personnel, and responder actions for active and planned incidents."
+                />
 
                 {/* Administrative Users & Decision Makers Section */}
                 <Card className="border-slate-200 shadow-sm rounded-2xl overflow-hidden">
@@ -166,7 +167,7 @@ export default function RespondersAgenciesPage() {
                                         </td>
                                         <td className="px-6 py-5 text-right">
                                             <div className="flex justify-end gap-2">
-                                                <Button variant="outline" size="sm" className="h-8 px-4 bg-[#3B82F6] text-white hover:bg-blue-600 border-none rounded-lg text-xs font-bold shadow-none active:scale-95 transition-all">
+                                                <Button variant="outline" size="sm" className="h-8 rounded-lg border-none bg-[#33375D] px-4 text-xs font-bold text-white shadow-none transition-all hover:bg-[#2B2F50] active:scale-95">
                                                     View
                                                 </Button>
                                                 <Button variant="outline" size="sm" className="h-8 px-4 bg-slate-100 text-slate-600 hover:bg-slate-200 border-none rounded-lg text-xs font-bold shadow-none active:scale-95 transition-all">

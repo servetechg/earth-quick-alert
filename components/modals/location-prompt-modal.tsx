@@ -134,7 +134,7 @@ export function LocationPromptModal({ isOpen, onSave }: LocationPromptModalProps
                         <div className="relative" ref={containerRef}>
                             <div className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 z-10 pointer-events-none">
                                 {suggestionsLoading
-                                    ? <Loader2 size={18} className="animate-spin text-blue-400" />
+                                    ? <Loader2 size={18} className="animate-spin text-[#33375D]" />
                                     : <Navigation size={18} />
                                 }
                             </div>

@@ -65,7 +65,7 @@ export default function MyLocationsPage() {
       <div className="max-w-4xl mx-auto px-6 py-12">
         <header className="mb-12">
           <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-100">
+            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#33375D] shadow-lg shadow-[#33375D]/20">
               <MapIcon className="w-6 h-6 text-white" />
             </div>
             <h1 className="text-3xl font-black tracking-tight text-slate-900 uppercase">My Locations</h1>
@@ -89,7 +89,7 @@ export default function MyLocationsPage() {
               </div>
 
               <div className="flex flex-col md:flex-row md:items-center gap-10 relative z-10">
-                <div className="w-24 h-24 bg-blue-600 rounded-[2rem] flex items-center justify-center flex-shrink-0 shadow-xl shadow-blue-50">
+                <div className="flex h-24 w-24 flex-shrink-0 items-center justify-center rounded-[2rem] bg-[#33375D] shadow-xl shadow-[#33375D]/20">
                   <User className="w-12 h-12 text-white" />
                 </div>
 
@@ -136,7 +136,7 @@ export default function MyLocationsPage() {
             <div className="grid gap-6">
               {safetyLoading ? (
                 <div className="p-24 text-center">
-                  <Loader2 className="w-12 h-12 text-blue-500 animate-spin mx-auto" />
+                  <Loader2 className="mx-auto h-12 w-12 animate-spin text-[#33375D]" />
                 </div>
               ) : familyMembers.length === 0 ? (
                 <Card className="p-20 text-center bg-white border-2 border-dashed border-slate-100 rounded-[2.5rem]">
@@ -148,7 +148,7 @@ export default function MyLocationsPage() {
                 familyMembers.map((member) => (
                   <Card key={member._id} className="p-6 border-none shadow-lg shadow-slate-100 bg-white hover:shadow-xl transition-all duration-300 rounded-3xl group">
                     <div className="flex items-center gap-6">
-                      <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center flex-shrink-0 text-xl font-black text-slate-400 uppercase shadow-sm group-hover:bg-blue-600 group-hover:text-white transition-colors duration-300">
+                      <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-2xl bg-slate-50 text-xl font-black uppercase text-slate-400 shadow-sm transition-colors duration-300 group-hover:bg-[#33375D] group-hover:text-white">
                         {member.name.charAt(0)}
                       </div>
 
@@ -171,8 +171,8 @@ export default function MyLocationsPage() {
                               onSelect={(name: string) => setEditValue(name)}
                             />
                             <div className="flex gap-2 shrink-0">
-                              <Button size="icon" onClick={() => handleSave(member._id)} className="bg-blue-600 hover:bg-blue-700 rounded-xl shadow-lg shadow-blue-50 h-12 w-12 transition-all hover:scale-110">
-                                {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-5 h-5" />}
+                              <Button size="icon" onClick={() => handleSave(member._id)} className="h-12 w-12 rounded-xl bg-[#33375D] shadow-lg shadow-[#33375D]/20 transition-all hover:scale-110 hover:bg-[#2B2F50]">
+                                {isSaving ? <Loader2 className="h-4 w-4 animate-spin text-white" /> : <Check className="h-5 w-5" />}
                               </Button>
                               <Button size="icon" variant="ghost" onClick={() => setEditingId(null)} className="rounded-xl text-slate-400 hover:text-red-500 hover:bg-red-50 h-12 w-12 transition-all">
                                 <X className="w-5 h-5" />

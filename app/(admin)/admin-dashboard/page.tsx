@@ -52,8 +52,8 @@ export default function Dashboard() {
     return (
       <div className="flex-1 flex items-center justify-center bg-slate-50 min-h-screen">
         <div className="flex flex-col items-center gap-4">
-          <Cpu className="w-12 h-12 text-blue-600 animate-spin" />
-          <div className="text-blue-600 font-black text-xs uppercase tracking-[0.5em] animate-pulse">Initializing Command Terminal...</div>
+          <Cpu className="w-12 h-12 text-[#33375D] animate-spin" />
+          <div className="text-[#33375D] font-black text-xs uppercase tracking-[0.5em] animate-pulse">Initializing Command Terminal...</div>
         </div>
       </div>
     )
@@ -72,16 +72,16 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="flex-1 overflow-auto bg-slate-50 selection:bg-blue-600/10">
+    <div className="flex-1 overflow-auto bg-slate-50 selection:bg-[#33375D]/15">
       <main className="p-10 space-y-12 max-w-[1800px] mx-auto relative">
         {/* Decorative elements */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[300px] bg-blue-600/10 blur-[120px] rounded-full pointer-events-none" />
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[300px] bg-[#33375D]/10 blur-[120px] rounded-full pointer-events-none" />
 
         {/* Dashboard Header */}
         <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-8 pb-10 border-b border-slate-200">
           <div className="space-y-4">
             <div className="flex items-center gap-6">
-              <div className="w-16 h-16 bg-blue-600 rounded-[28px] flex items-center justify-center shadow-2xl shadow-blue-600/20 group hover:scale-110 transition-transform cursor-pointer">
+              <div className="w-16 h-16 bg-[#33375D] rounded-[28px] flex items-center justify-center shadow-2xl shadow-[#33375D]/25 group hover:scale-110 transition-transform cursor-pointer">
                 <Command size={32} className="text-white group-hover:rotate-90 transition-transform duration-500" />
               </div>
               <div className="space-y-1">
@@ -89,8 +89,8 @@ export default function Dashboard() {
                 <div className="flex items-center gap-4">
                   <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.3em]">Operational Node Alpha-9</p>
                   <div className="h-1 w-1 rounded-full bg-slate-700" />
-                  <div className="text-blue-500 text-[10px] font-black uppercase tracking-[0.3em] flex items-center gap-2">
-                    <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+                  <div className="text-[#33375D] text-[10px] font-black uppercase tracking-[0.3em] flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-[#33375D] animate-pulse" />
                     Live System Link
                   </div>
                 </div>
@@ -108,7 +108,7 @@ export default function Dashboard() {
         {/* Tactical Alert Grid */}
         <section className="space-y-8 relative z-10">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-1 bg-blue-600 rounded-full shadow-[0_0_10px_rgba(37,99,235,0.5)]" />
+            <div className="w-12 h-1 bg-[#33375D] rounded-full shadow-[0_0_10px_rgba(51,55,93,0.45)]" />
             <h2 className="text-[12px] font-black text-slate-500 uppercase tracking-[0.4em]">Tactical Alert Matrix</h2>
           </div>
           <DashboardStats />
@@ -119,9 +119,9 @@ export default function Dashboard() {
           <div className="lg:col-span-8 space-y-6">
             <div className="flex items-center justify-between px-2">
               <div className="flex items-center gap-4">
-                <div className="w-10 h-1 bg-blue-500 rounded-full" />
+                <div className="w-10 h-1 bg-[#33375D] rounded-full" />
                 <h2 className="text-[11px] font-black text-slate-500 uppercase tracking-[0.4em] flex items-center gap-3">
-                  <Radio size={14} className="text-blue-500" /> GIS Strategic Map
+                  <Radio size={14} className="text-[#33375D]" /> GIS Strategic Map
                 </h2>
               </div>
               <span className="text-[9px] font-black text-slate-700 uppercase tracking-widest italic">Live Multi-Vector Overlay</span>
@@ -166,7 +166,7 @@ export default function Dashboard() {
 
         {/* Footer Info */}
         <div className="pt-20 pb-10 flex flex-col items-center justify-center gap-4 opacity-30 group">
-          <Terminal size={24} className="text-slate-500 group-hover:text-blue-500 transition-colors" />
+          <Terminal size={24} className="text-slate-500 group-hover:text-[#33375D] transition-colors" />
           <p className="text-[9px] font-black text-slate-600 uppercase tracking-[0.5em] text-center max-w-[600px] leading-relaxed">
             Official Operational Monitoring Platform • Security Level 4 • All Session Activities Are Logged Under Readiness Resilience Protocol v4.0.01
           </p>

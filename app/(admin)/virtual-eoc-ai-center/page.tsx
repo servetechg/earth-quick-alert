@@ -35,7 +35,7 @@ const LeafletMap = dynamic(() => import('@/components/leaflet-map'), {
     loading: () => (
         <div className="w-full h-full bg-slate-50 flex items-center justify-center">
             <div className="flex flex-col items-center gap-4">
-                <Loader2 className="w-10 h-10 animate-spin text-blue-600" />
+                <Loader2 className="w-10 h-10 animate-spin text-[#33375D]" />
                 <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em]">Initializing Global Positioning System...</p>
             </div>
         </div>
@@ -92,15 +92,15 @@ export default function VirtualEOCAICenterPage() {
         return (
             <div className="flex items-center justify-center h-[80vh] bg-slate-50">
                 <div className="flex flex-col items-center gap-4 text-slate-400">
-                    <Loader2 className="w-12 h-12 animate-spin text-blue-600" />
-                    <p className="font-black text-xs uppercase tracking-[0.2em]">Synchronizing Live EOC Data...</p>
+                    <Loader2 className="w-12 h-12 animate-spin text-[#33375D]" />
+                    <p className="font-black text-xs uppercase tracking-[0.2em] text-[#33375D]">Synchronizing Live EOC Data...</p>
                 </div>
             </div>
         )
     }
 
     return (
-        <main className="h-screen w-full relative overflow-hidden bg-slate-50 selection:bg-blue-600/10">
+        <main className="h-screen w-full relative overflow-hidden bg-slate-50 selection:bg-[#33375D]/15">
             {/* Background Map Layer */}
             <div className="absolute inset-0 z-0">
                 <LeafletMap
@@ -117,7 +117,7 @@ export default function VirtualEOCAICenterPage() {
                 <div className="flex items-center gap-4 pointer-events-auto">
                     <div className="bg-white/80 backdrop-blur-xl border border-slate-200 rounded-2xl px-6 py-4 flex items-center gap-6 shadow-xl">
                         <div className="flex flex-col">
-                            <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest leading-none mb-1">Operational Hub</span>
+                            <span className="text-[10px] font-black text-[#33375D] uppercase tracking-widest leading-none mb-1">Operational Hub</span>
                             <span className="text-lg font-black text-slate-900 uppercase tracking-tight">Virtual EOC AI Center</span>
                         </div>
                         <div className="h-8 w-px bg-slate-200" />
@@ -140,7 +140,7 @@ export default function VirtualEOCAICenterPage() {
                              <Target size={14} /> Center Office
                         </Button>
                     </div>
-                    <Button className="h-12 px-6 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-2xl shadow-blue-600/20">
+                    <Button className="h-12 rounded-2xl bg-[#33375D] px-6 font-black text-[10px] uppercase tracking-widest text-white shadow-2xl shadow-[#33375D]/25 hover:bg-[#2B2F50]">
                         Initiate Broadcast
                     </Button>
                 </div>
@@ -149,16 +149,16 @@ export default function VirtualEOCAICenterPage() {
             {/* Left Sidebar: AI Intelligence & Live Feed */}
             <aside className="absolute left-6 top-32 bottom-6 w-[400px] z-20 flex flex-col gap-6 pointer-events-none">
                 {/* AI Incident Commander */}
-                <Card className="pointer-events-auto bg-white/80 backdrop-blur-2xl border border-slate-200 rounded-[32px] p-8 shadow-xl flex flex-col relative overflow-hidden group hover:border-blue-500/30 transition-all duration-500 shadow-slate-200/50">
-                    <div className="absolute top-0 right-0 -mr-12 -mt-12 w-48 h-48 bg-blue-600/10 rounded-full blur-3xl group-hover:bg-blue-600/20 transition-all" />
+                <Card className="pointer-events-auto bg-white/80 backdrop-blur-2xl border border-slate-200 rounded-[32px] p-8 shadow-xl flex flex-col relative overflow-hidden group shadow-slate-200/50 transition-all duration-500 hover:border-[#33375D]/25">
+                    <div className="absolute top-0 right-0 -mr-12 -mt-12 h-48 w-48 rounded-full bg-[#33375D]/10 blur-3xl transition-all group-hover:bg-[#33375D]/18" />
                     
                     <div className="flex items-center gap-3 mb-8">
-                        <div className="w-12 h-12 bg-blue-500/20 rounded-2xl flex items-center justify-center text-blue-400">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#33375D]/15 text-[#33375D]">
                             <Sparkles size={24} className="animate-pulse" />
                         </div>
                         <div>
                             <h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter">AI Commander</h3>
-                            <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Real-Time Strategic Analysis</p>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-[#33375D]">Real-Time Strategic Analysis</p>
                         </div>
                     </div>
 
@@ -170,13 +170,13 @@ export default function VirtualEOCAICenterPage() {
                                         "px-2 py-0.5 rounded-lg text-[8px] font-black uppercase tracking-widest",
                                         item.type === 'critical' ? "bg-red-500/20 text-red-500" :
                                         item.type === 'warning' ? "bg-amber-500/20 text-amber-500" :
-                                        "bg-blue-500/20 text-blue-500"
+                                        "bg-[#33375D]/15 text-[#33375D]"
                                     )}>
                                         {item.type}
                                     </span>
                                     <span className="text-[8px] font-bold text-slate-500">{item.time}</span>
                                 </div>
-                                <h4 className="text-xs font-black text-slate-900 uppercase tracking-tight group-hover/item:text-blue-600 transition-colors uppercase">{item.title}</h4>
+                                <h4 className="text-xs font-black uppercase tracking-tight text-slate-900 transition-colors group-hover/item:text-[#33375D]">{item.title}</h4>
                                 <p className="text-[10px] font-medium text-slate-500 leading-relaxed italic">{item.detail}</p>
                             </div>
                         ))}
@@ -227,7 +227,7 @@ export default function VirtualEOCAICenterPage() {
                              <div key={report.id} className="p-4 rounded-2xl bg-slate-50 border border-slate-100 hover:bg-slate-100 transition-all group">
                                 <div className="flex items-center justify-between mb-2">
                                      <div className="flex items-center gap-2">
-                                          <div className="w-1.5 h-1.5 rounded-full bg-blue-600" />
+                                          <div className="h-1.5 w-1.5 rounded-full bg-[#33375D]" />
                                           <span className="text-[9px] font-black text-slate-900 uppercase tracking-widest">{report.type}</span>
                                      </div>
                                      <span className="text-[8px] font-bold text-slate-500">{report.timestamp}</span>
@@ -246,7 +246,7 @@ export default function VirtualEOCAICenterPage() {
                     </div>
 
                     <div className="mt-8 pt-6 border-t border-slate-100">
-                        <Button className="w-full h-12 bg-blue-600/10 hover:bg-blue-600/20 text-blue-600 rounded-xl text-[10px] font-black uppercase tracking-widest border border-blue-600/20 gap-2 transition-all">
+                        <Button className="h-12 w-full gap-2 rounded-xl border border-[#33375D]/20 bg-[#33375D]/10 font-black text-[10px] uppercase tracking-widest text-[#33375D] transition-all hover:bg-[#33375D]/18">
                              <MapPin size={14} /> Map Verified Zones
                         </Button>
                     </div>
@@ -256,7 +256,7 @@ export default function VirtualEOCAICenterPage() {
                  <div className="pointer-events-auto grid grid-cols-1 gap-4">
                     <div className="bg-white/80 backdrop-blur-2xl border border-slate-200 rounded-3xl p-6 shadow-xl shadow-slate-200/50 flex items-center justify-between pointer-events-auto">
                          <div className="flex items-center gap-4">
-                             <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-blue-500/20">
+                             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#33375D] text-white shadow-xl shadow-[#33375D]/25">
                                  <Users size={24} />
                              </div>
                              <div>
@@ -286,7 +286,7 @@ export default function VirtualEOCAICenterPage() {
                         </div>
                         <div className="h-6 w-px bg-slate-200" />
                         <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-500">
+                            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#33375D]/10 text-[#33375D]">
                                 <Activity size={16} />
                             </div>
                             <div className="flex flex-col">
@@ -297,7 +297,7 @@ export default function VirtualEOCAICenterPage() {
                     </div>
 
                     <div className="flex items-center gap-3 bg-slate-50 p-1 rounded-2xl border border-slate-200">
-                        <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white cursor-pointer hover:bg-blue-700 transition-colors">
+                        <div className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl bg-[#33375D] text-white shadow-[#33375D]/20 transition-colors hover:bg-[#2B2F50]">
                             <Search size={18} />
                         </div>
                         <p className="px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest pr-20">Command Search Filter...</p>

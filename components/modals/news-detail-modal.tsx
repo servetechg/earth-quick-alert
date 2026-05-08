@@ -133,7 +133,7 @@ export function NewsDetailModal({ isOpen, onClose, newsItem }: NewsDetailModalPr
                         </Button>
                         <Button
                             onClick={onClose}
-                            className="h-14 px-10 bg-blue-600 hover:bg-blue-700 text-white font-black uppercase text-[10px] tracking-widest rounded-2xl shadow-2xl shadow-blue-600/20 transition-all active:scale-95 flex items-center gap-3"
+                            className="flex h-14 items-center gap-3 rounded-2xl bg-[#33375D] px-10 font-black text-[10px] uppercase tracking-widest text-white shadow-2xl shadow-[#33375D]/25 transition-all hover:bg-[#2B2F50] active:scale-95"
                         >
                             Close Briefing <ArrowUpRight size={16} />
                         </Button>

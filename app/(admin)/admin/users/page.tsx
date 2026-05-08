@@ -37,6 +37,7 @@ import { toast } from "sonner"
 import { GrantLicenseModal } from "@/components/modals/grant-license-modal"
 import { AddUserModal } from "@/components/modals/add-user-modal"
 import { cn } from "@/lib/utils"
+import { AdminPageHeader } from '@/components/admin-page-header'
 
 interface IUser {
     _id: string;
@@ -202,11 +203,10 @@ export default function AdminUsersPage() {
         <div className="flex-1 overflow-auto bg-[#F8FAFC]">
             <main className="p-6 md:p-10 space-y-8 max-w-[1600px] mx-auto">
 
-                {/* Header Section */}
-                <div className="bg-white border-l-4 border-l-[#33375D] rounded-xl p-8 shadow-sm border border-slate-200">
-                    <h1 className="text-3xl font-black text-slate-900 tracking-tight mb-2 uppercase">Responders & Agencies</h1>
-                    <p className="text-slate-500 font-medium tracking-tight">System configuration for operational personnel, decision makers, and agency partners.</p>
-                </div>
+                <AdminPageHeader
+                    title="Responders & Agencies"
+                    description="System configuration for operational personnel, decision makers, and agency partners."
+                />
 
                 {viewMode === 'overview' ? (
                     <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700">

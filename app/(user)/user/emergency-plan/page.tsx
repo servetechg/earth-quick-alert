@@ -141,7 +141,7 @@ export default function EmergencyPlanPage() {
   if (isLoading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-slate-50">
-        <Loader2 className="w-12 h-12 text-blue-600 animate-spin" />
+        <Loader2 className="w-12 h-12 animate-spin text-[#33375D]" />
         <p className="font-bold text-slate-400">Loading Protocol Data...</p>
       </div>
     )
@@ -150,8 +150,8 @@ export default function EmergencyPlanPage() {
   return (
     <main className="min-h-screen bg-slate-50/50 pb-24 relative">
       {isSaving && (
-        <div className="fixed top-24 right-6 z-50 bg-white shadow-2xl border-none px-4 py-2 rounded-full flex items-center gap-2 text-[10px] font-black uppercase text-blue-600 animate-in fade-in slide-in-from-right duration-300">
-          <Loader2 className="w-3 h-3 animate-spin" />
+        <div className="fixed top-24 right-6 z-50 flex items-center gap-2 rounded-full border-none bg-white px-4 py-2 text-[10px] font-black uppercase text-[#33375D] shadow-2xl animate-in fade-in slide-in-from-right duration-300">
+          <Loader2 className="h-3 w-3 shrink-0 animate-spin text-[#33375D]" />
           Synchronizing Nexus...
         </div>
       )}
@@ -253,7 +253,7 @@ export default function EmergencyPlanPage() {
                     id={`supply-${i}`}
                     checked={supply.checked}
                     onCheckedChange={() => toggleSupply(i)}
-                    className="w-5 h-5 rounded-md border-slate-300 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+                    className="h-5 w-5 rounded-md border-slate-300 data-[state=checked]:border-[#33375D] data-[state=checked]:bg-[#33375D]"
                   />
                   <Label
                     htmlFor={`supply-${i}`}
@@ -431,7 +431,7 @@ export default function EmergencyPlanPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button onClick={handleAddContact} className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-xl shadow-blue-50 uppercase tracking-tight">Establish Protocol</Button>
+            <Button onClick={handleAddContact} className="h-12 w-full rounded-xl bg-[#33375D] font-bold uppercase tracking-tight text-white shadow-xl shadow-[#33375D]/15 hover:bg-[#2B2F50]">Establish Protocol</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -455,7 +455,7 @@ export default function EmergencyPlanPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button onClick={handleAddSupply} className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-xl shadow-blue-50 uppercase tracking-tight">Register Item</Button>
+            <Button onClick={handleAddSupply} className="h-12 w-full rounded-xl bg-[#33375D] font-bold uppercase tracking-tight text-white shadow-xl shadow-[#33375D]/15 hover:bg-[#2B2F50]">Register Item</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

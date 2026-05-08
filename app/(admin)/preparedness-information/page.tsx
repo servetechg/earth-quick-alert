@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Card } from '@/components/ui/card';
+import { AdminPageHeader } from '@/components/admin-page-header';
 import {
   CheckCircle2,
   Flame,
@@ -62,7 +62,7 @@ function makeTempId() {
   return `tmp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function toUiSections(groups: PreparednessApiGroup[]): PreparednessUiSection[] {
+function toUiSections(groups: PreparednessApiGroup[], editorRole: EditableRole): PreparednessUiSection[] {
   return sortPreparednessCategories(groups).map((group) => ({
     preparednessId: group._id,
     category: group.category,
@@ -71,6 +71,9 @@ function toUiSections(groups: PreparednessApiGroup[]): PreparednessUiSection[] {
       id: task._id,
       title: task.title,
       persisted: true,
+      ...(editorRole === 'sub-admin'
+        ? { createdBy: task.createdBy, updatedAt: task.updatedAt }
+        : {}),
     })),
   }));
 }
@@ -106,8 +109,9 @@ export default function PreparednessInformationPage() {
     return map;
   }, [initialSections]);
 
-  const loadPreparedness = async () => {
-    setIsLoading(true);
+  const loadPreparedness = async (options?: { silent?: boolean }) => {
+    const silent = Boolean(options?.silent);
+    if (!silent) setIsLoading(true);
     try {
       const payload = await requestJson('/api/preparedness-with-tasks', { cache: 'no-store' });
       const apiRole = payload?.role as PreparednessApiRole;
@@ -115,16 +119,15 @@ export default function PreparednessInformationPage() {
         throw new Error('Only super-admin and sub-admin can access this editor.');
       }
 
-      const nextSections = toUiSections(payload.data ?? []);
-
       setRole(apiRole);
+      const nextSections = toUiSections(payload.data ?? [], apiRole);
       setSections(nextSections);
       setInitialSections(nextSections);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to load preparedness data.';
       toast.error(message);
     } finally {
-      setIsLoading(false);
+      if (!silent) setIsLoading(false);
     }
   };
 
@@ -245,7 +248,7 @@ export default function PreparednessInformationPage() {
         });
       }
 
-      await loadPreparedness();
+      await loadPreparedness({ silent: true });
       toast.success(`Saved ${section.label}.`);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to save changes.';
@@ -297,25 +300,21 @@ export default function PreparednessInformationPage() {
   return (
     <main className="min-h-screen bg-slate-50/50 pb-20">
       <div className="px-6 lg:px-12 pt-8 space-y-8 max-w-[1800px] mx-auto">
-        <Card className="p-8 border-slate-200 rounded-2xl shadow-sm relative overflow-hidden bg-white">
-          <div className="absolute top-0 left-0 w-1.5 h-full bg-[#33375D]" />
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div>
-              <h1 className="text-3xl font-black text-slate-900 tracking-tight mb-2">Preparedness Information</h1>
-              <p className="text-slate-500 font-medium">
-                Edit preparedness tasks by category and dispatch them through role-based workflows.
-              </p>
-            </div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-500/10 border border-red-200 text-[11px] font-bold text-red-700">
-              <ShieldCheck className="w-4 h-4" />
+        <AdminPageHeader
+          title="Preparedness Information"
+          titleUppercase={false}
+          description="Edit preparedness tasks by category and dispatch them through role-based workflows."
+          actions={
+            <div className="inline-flex items-center gap-2 rounded-full border border-red-200 bg-red-500/10 px-3 py-1 text-[11px] font-bold text-red-700">
+              <ShieldCheck className="h-4 w-4" />
               {role === 'super-admin' ? 'Super Admin Mode' : role === 'sub-admin' ? 'Sub Admin Mode' : 'Loading...'}
             </div>
-          </div>
-        </Card>
+          }
+        />
 
         {isLoading ? (
           <div className="py-20 flex justify-center">
-            <Loader2 className="w-8 h-8 text-slate-500 animate-spin" />
+            <Loader2 className="h-8 w-8 animate-spin text-[#33375D]" />
           </div>
         ) : (
           <>
@@ -327,6 +326,7 @@ export default function PreparednessInformationPage() {
                   category={section.category}
                   tasks={section.tasks}
                   headerIcon={getCategoryIcon(section.category)}
+                  showSuperAdminTaskMeta={role === 'sub-admin'}
                   showActions
                   isDirty={isSectionDirty(section)}
                   isSaving={Boolean(savingBySection[section.preparednessId])}

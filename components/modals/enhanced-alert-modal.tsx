@@ -99,7 +99,7 @@ export function EnhancedAlertModal({ isOpen, onClose }: EnhancedAlertModalProps)
         {/* Header */}
         <div className="flex items-center justify-between p-8 border-b border-slate-100 bg-slate-50/50">
           <div className="flex items-center gap-6">
-            <div className="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-200">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#33375D] shadow-lg shadow-[#33375D]/25">
               <Zap className="text-white w-7 h-7 fill-white" />
             </div>
             <div>
@@ -123,7 +123,7 @@ export function EnhancedAlertModal({ isOpen, onClose }: EnhancedAlertModalProps)
                   onClick={() => setStep(s)}
                   className={cn(
                     "flex-1 h-1.5 rounded-full transition-all duration-500",
-                    step >= s ? "bg-blue-600" : "bg-slate-100"
+                    step >= s ? "bg-[#33375D]" : "bg-slate-100"
                   )}
                 />
             ))}
@@ -210,13 +210,13 @@ export function EnhancedAlertModal({ isOpen, onClose }: EnhancedAlertModalProps)
                 <div className="flex items-center gap-4 bg-slate-50 p-2 rounded-2xl border border-slate-100">
                     <button 
                         onClick={() => setTargetMode('broadcast')}
-                        className={cn("flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all", targetMode === 'broadcast' ? "bg-blue-600 text-white shadow-lg" : "text-slate-500 hover:bg-white")}
+                        className={cn("flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all", targetMode === 'broadcast' ? "bg-[#33375D] text-white shadow-lg" : "text-slate-500 hover:bg-white")}
                     >
                         Regional Broadcast
                     </button>
                     <button 
                         onClick={() => setTargetMode('targeted')}
-                        className={cn("flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all", targetMode === 'targeted' ? "bg-blue-600 text-white shadow-lg" : "text-slate-500 hover:bg-white")}
+                        className={cn("flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all", targetMode === 'targeted' ? "bg-[#33375D] text-white shadow-lg" : "text-slate-500 hover:bg-white")}
                     >
                         Targeted Selection
                     </button>
@@ -249,7 +249,7 @@ export function EnhancedAlertModal({ isOpen, onClose }: EnhancedAlertModalProps)
                                 disabled={searchingUsers}
                                 className="md:col-span-4 h-14 bg-slate-900 rounded-2xl font-black uppercase tracking-widest text-[10px]"
                             >
-                                {searchingUsers ? <Loader2 className="animate-spin" /> : <Search className="mr-2" size={14} />}
+                                {searchingUsers ? <Loader2 className="animate-spin text-[#33375D]" /> : <Search className="mr-2" size={14} />}
                                 Fetch Residents
                             </Button>
                         </div>
@@ -317,7 +317,7 @@ export function EnhancedAlertModal({ isOpen, onClose }: EnhancedAlertModalProps)
                                     onChange={(e) => setManualEmail(e.target.value)}
                                     className="h-12 rounded-xl bg-white border-slate-200 text-xs font-bold"
                                 />
-                                <Button onClick={handleAddEmail} className="h-12 bg-blue-600 rounded-xl px-6 font-black uppercase tracking-widest text-[9px] flex items-center gap-2">
+                                <Button onClick={handleAddEmail} className="flex h-12 items-center gap-2 rounded-xl bg-[#33375D] px-6 font-black uppercase tracking-widest text-[9px] text-white hover:bg-[#2B2F50]">
                                     <Plus size={14} /> Add
                                 </Button>
                             </div>
@@ -379,7 +379,7 @@ export function EnhancedAlertModal({ isOpen, onClose }: EnhancedAlertModalProps)
                     disabled={isSending}
                     className="h-14 px-12 rounded-2xl bg-red-600 hover:bg-red-700 text-white font-black uppercase tracking-[0.2em] text-[11px] shadow-2xl shadow-red-600/20 gap-3"
                 >
-                    {isSending ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Send size={18} /> Execute Multi-Channel Dispatch</>}
+                    {isSending ? <Loader2 className="h-5 w-5 animate-spin text-white" /> : <><Send size={18} /> Execute Multi-Channel Dispatch</>}
                 </Button>
             )}
           </div>

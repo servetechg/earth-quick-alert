@@ -360,7 +360,7 @@ export function ActivityLogDialog({ open, onOpenChange }: ActivityLogDialogProps
         <ScrollArea className="max-h-[min(70vh,420px)] px-6 py-4">
           {loading ? (
             <div className="flex items-center justify-center gap-2 py-12 text-muted-foreground">
-              <Loader2 className="h-5 w-5 animate-spin" />
+              <Loader2 className="h-5 w-5 animate-spin text-[#33375D]" />
               <span>Loading…</span>
             </div>
           ) : error ? (

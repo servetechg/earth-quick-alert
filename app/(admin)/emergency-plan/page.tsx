@@ -78,7 +78,7 @@ export default function EmergencyPlanPage() {
       <div className="flex items-center justify-center h-[calc(100vh-64px)] bg-[#0A0B10]">
         <div className="flex flex-col items-center gap-6">
           <div className="relative">
-              <Loader2 className="w-16 h-16 animate-spin text-blue-500" />
+              <Loader2 className="w-16 h-16 animate-spin text-[#33375D]" />
               <div className="absolute inset-0 flex items-center justify-center text-[10px] font-black text-blue-400">PLAN</div>
           </div>
           <p className="font-black text-xs uppercase tracking-[0.4em] text-slate-500 animate-pulse">Synchronizing Planning Database...</p>
@@ -103,7 +103,7 @@ export default function EmergencyPlanPage() {
       <div className="relative flex flex-col lg:flex-row lg:items-end justify-between gap-8 pb-8 border-b border-white/5">
         <div className="space-y-4">
             <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-2xl shadow-blue-600/20">
+                <div className="w-12 h-12 bg-[#33375D] rounded-2xl flex items-center justify-center text-white shadow-2xl shadow-blue-600/20">
                     <Folder size={24} />
                 </div>
                 <div>
@@ -122,7 +122,7 @@ export default function EmergencyPlanPage() {
             </Button>
             <Button 
                 onClick={() => toast.success('Initializing New Continuity Framework...')}
-                className="h-14 px-8 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-black uppercase tracking-widest text-[10px] shadow-2xl shadow-blue-600/20 gap-3"
+                className="h-14 gap-3 rounded-2xl bg-[#33375D] px-8 font-black text-[10px] uppercase tracking-widest text-white shadow-2xl shadow-[#33375D]/25 hover:bg-[#2B2F50]"
             >
                  <Plus size={16} /> New Continuity Plan
             </Button>

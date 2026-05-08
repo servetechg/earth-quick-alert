@@ -117,7 +117,7 @@ export function AddFamilyMemberModal({ isOpen, onClose }: AddFamilyMemberModalPr
                         <Button
                             type="submit"
                             disabled={isProcessing}
-                            className="w-full h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-black uppercase tracking-widest shadow-lg shadow-blue-200 transition-all active:scale-[0.98] disabled:opacity-50"
+                            className="h-14 w-full rounded-2xl bg-[#33375D] font-black uppercase tracking-widest text-white shadow-lg shadow-[#33375D]/25 transition-all hover:bg-[#2B2F50] active:scale-[0.98] disabled:opacity-50"
                         >
                             {isProcessing ? 'Adding...' : 'Add to Safety Hub'}
                         </Button>

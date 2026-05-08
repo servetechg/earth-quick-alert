@@ -51,14 +51,14 @@ export default function CenterPage() {
   return (
     <main className="min-h-screen bg-[#0A0B10] p-8 lg:p-12 space-y-12 overflow-hidden relative">
       {/* Background Glows */}
-      <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-blue-600/5 rounded-full blur-[150px] pointer-events-none" />
+      <div className="pointer-events-none absolute top-0 right-0 h-[600px] w-[600px] rounded-full bg-[#33375D]/5 blur-[150px]" />
       <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-indigo-600/5 rounded-full blur-[120px] pointer-events-none" />
 
       {/* Header Section */}
       <div className="relative flex flex-col lg:flex-row lg:items-end justify-between gap-8 pb-8 border-b border-white/5">
         <div className="space-y-4">
             <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-2xl shadow-blue-600/20">
+                <div className="w-12 h-12 bg-[#33375D] rounded-2xl flex items-center justify-center text-white shadow-2xl shadow-[#33375D]/25">
                     <Crosshair size={24} />
                 </div>
                 <div>
@@ -76,7 +76,7 @@ export default function CenterPage() {
                     <Badge className="bg-emerald-600/20 text-emerald-500 border-none text-[8px] uppercase font-black">Online</Badge>
                 </div>
             </div>
-            <Button className="h-14 px-8 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-black uppercase tracking-widest text-[10px] shadow-2xl shadow-blue-600/20 gap-3">
+            <Button className="h-14 gap-3 rounded-2xl bg-[#33375D] px-8 font-black text-[10px] uppercase tracking-widest text-white shadow-2xl shadow-[#33375D]/25 hover:bg-[#2B2F50]">
                  <Plus size={16} /> Dispatch Order
             </Button>
         </div>
@@ -160,11 +160,11 @@ export default function CenterPage() {
                                     {[1,2,3].map(i => (
                                         <div key={i} className="w-8 h-8 rounded-full border-2 border-[#0A0B10] bg-slate-800 flex items-center justify-center text-[8px] font-black">U{i}</div>
                                     ))}
-                                    <div className="w-8 h-8 rounded-full border-2 border-[#0A0B10] bg-blue-600 flex items-center justify-center text-[8px] font-black text-white">+4</div>
+                                    <div className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-[#0A0B10] bg-[#33375D] text-[8px] font-black text-white">+4</div>
                                 </div>
                                 <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Active Units</span>
                             </div>
-                            <Button className="h-10 px-6 rounded-xl bg-white/5 border border-white/10 text-white text-[9px] font-black uppercase tracking-widest hover:bg-blue-600 transition-all">
+                            <Button className="h-10 rounded-xl border border-white/10 bg-white/5 px-6 font-black text-[9px] uppercase tracking-widest text-white transition-all hover:bg-[#33375D]">
                                 Open Terminal
                             </Button>
                         </div>
@@ -185,7 +185,7 @@ export default function CenterPage() {
                 <div className="absolute inset-0 bg-gradient-to-t from-[#0A0B10] via-transparent to-transparent" />
                 
                 <div className="absolute top-8 left-8 z-10 space-y-3">
-                    <Badge className="bg-blue-600 text-white border-none py-1.5 px-4 font-black text-[10px] uppercase tracking-[0.2em] rounded-full shadow-2xl">
+                    <Badge className="rounded-full border-none bg-[#33375D] px-4 py-1.5 font-black text-[10px] uppercase tracking-[0.2em] text-white shadow-2xl">
                         AERIAL FEED: L6-ACTIVE
                     </Badge>
                     <div className="flex items-center gap-3 py-2 px-4 bg-[#0A0B10]/80 backdrop-blur-md rounded-2xl border border-white/5">
@@ -198,10 +198,10 @@ export default function CenterPage() {
                      <div className="p-6 bg-white/[0.03] backdrop-blur-xl rounded-[32px] border border-white/10 space-y-4">
                         <div className="flex items-center justify-between">
                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.1em]">Signal Optimization</p>
-                            <span className="text-xs font-black text-blue-400">94.2%</span>
+                            <span className="text-xs font-black text-[#8B92C9]">94.2%</span>
                         </div>
                         <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
-                            <div className="h-full bg-blue-600 rounded-full" style={{ width: '94%' }} />
+                            <div className="h-full rounded-full bg-[#33375D]" style={{ width: '94%' }} />
                         </div>
                      </div>
                 </div>

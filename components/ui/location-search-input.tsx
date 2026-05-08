@@ -103,7 +103,7 @@ export function LocationSearchInput({
                     className={`w-full pl-10 pr-10 py-2 text-sm font-bold border-2 border-slate-100 rounded-2xl focus:border-blue-500 focus:outline-none transition-all bg-white ${inputClassName}`}
                 />
                 {isLoading && (
-                    <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-500 animate-spin" />
+                    <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-[#33375D]" />
                 )}
             </div>
 

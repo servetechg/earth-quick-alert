@@ -174,7 +174,7 @@ export default function AreWeSafePage() {
     if (safetyLoading) {
         return (
             <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-slate-50">
-                <Loader2 className="w-12 h-12 text-blue-600 animate-spin" />
+                <Loader2 className="w-12 h-12 animate-spin text-[#33375D]" />
                 <p className="font-bold text-slate-400">Synchronizing Safety Nexus...</p>
             </div>
         )
@@ -186,7 +186,7 @@ export default function AreWeSafePage() {
                 <header className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
                     <div>
                         <div className="flex items-center gap-3 mb-2">
-                            <div className="w-10 h-10 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-100">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#33375D] shadow-lg shadow-[#33375D]/20">
                                 <Shield className="w-6 h-6 text-white" />
                             </div>
                             <h1 className="text-3xl font-black text-slate-900 tracking-tight">Are We Safe?</h1>
@@ -195,7 +195,7 @@ export default function AreWeSafePage() {
                     </div>
                     <Button
                         onClick={() => setIsAddModalOpen(true)}
-                        className="bg-blue-600 hover:bg-blue-700 text-white rounded-2xl px-8 h-12 font-bold shadow-lg shadow-blue-100 transition-all hover:-translate-y-0.5"
+                        className="h-12 rounded-2xl bg-[#33375D] px-8 font-bold text-white shadow-lg shadow-[#33375D]/20 transition-all hover:-translate-y-0.5 hover:bg-[#2B2F50]"
                     >
                         <PlusCircle className="w-5 h-5 mr-2" />
                         Add Member
@@ -236,7 +236,7 @@ export default function AreWeSafePage() {
                                             isDanger ? 'bg-red-600 ring-4 ring-red-100 shadow-red-200' : 'bg-red-500 hover:bg-red-600'
                                         )}
                                     >
-                                        {isUpdatingStatus ? <Loader2 className="w-6 h-6 animate-spin mr-3" /> : <UserX className="w-6 h-6 mr-3" />}
+                                        {isUpdatingStatus ? <Loader2 className="mr-3 h-6 w-6 animate-spin text-white" /> : <UserX className="mr-3 h-6 w-6" />}
                                         I NEED HELP
                                     </Button>
                                 </div>
@@ -289,7 +289,7 @@ export default function AreWeSafePage() {
                                 <div className="flex items-center gap-5 relative z-10">
                                     <div className={cn(
                                         "w-16 h-16 rounded-2xl flex items-center justify-center text-xl font-black shadow-lg relative shrink-0",
-                                        isSafe ? "bg-blue-600 text-white shadow-blue-100" : "bg-red-600 text-white shadow-red-100"
+                                        isSafe ? "bg-[#33375D] text-white shadow-[#33375D]/20" : "bg-red-600 text-white shadow-red-100"
                                     )}>
                                         Me
                                     </div>
@@ -390,7 +390,7 @@ export default function AreWeSafePage() {
                                                         <MapPin className="w-3 h-3 text-blue-500" />
                                                         Current Coordinates
                                                     </p>
-                                                    <Button variant="ghost" size="icon" className="h-6 w-6 rounded-lg text-slate-300 hover:text-blue-600 hover:bg-blue-50" onClick={() => {
+                                                    <Button variant="ghost" size="icon" className="h-6 w-6 rounded-lg text-slate-300 hover:bg-[#33375D]/10 hover:text-[#33375D]" onClick={() => {
                                                         setEditingMemberId(member._id)
                                                         setTempLocation(member.location || '')
                                                     }}>
@@ -408,7 +408,7 @@ export default function AreWeSafePage() {
                                                             onSelect={(name) => setTempLocation(name)}
                                                         />
                                                         <div className="flex gap-2">
-                                                            <Button size="sm" className="flex-1 h-8 rounded-lg bg-blue-600 font-black text-[9px] uppercase tracking-widest" onClick={() => {
+                                                            <Button size="sm" className="h-8 flex-1 rounded-lg bg-[#33375D] font-black text-[9px] uppercase tracking-widest text-white hover:bg-[#2B2F50]" onClick={() => {
                                                                 updateFamilyMemberLocation(member._id, tempLocation)
                                                                 setEditingMemberId(null)
                                                             }}>Confirm</Button>

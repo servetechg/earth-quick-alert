@@ -8,6 +8,7 @@ import { NOTIFICATION_PREFERENCES_DEFAULTS, normalizeNotificationPreferences } f
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { AdminPageHeader } from '@/components/admin-page-header'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
@@ -39,6 +40,7 @@ import { SettingsSectionCard } from './_components/settings-section-card'
 import { SettingsToggleRow } from './_components/settings-toggle-row'
 import { ActivityLogDialog } from './_components/activity-log-dialog'
 import { SECURITY_PREFS_UPDATED_EVENT } from '@/components/session-idle-watcher'
+import { syncClientUserProfileFromServer } from '@/lib/sync-client-user-profile'
 import type {
   DispatchSettings,
   NotificationSettings,
@@ -227,6 +229,11 @@ function AdminSettingsPageContent() {
             phone: u.phoneNumber ?? '',
             profilePic: u.profilePic ?? '',
             profilePicPublicId: u.profilePicPublicId ?? '',
+          })
+          syncClientUserProfileFromServer({
+            name: u.name,
+            email: u.email,
+            profilePic: u.profilePic ?? '',
           })
         }
       } catch (e: any) {
@@ -538,14 +545,26 @@ function AdminSettingsPageContent() {
         throw new Error(data.error || 'Failed to update profile')
       }
       if (data.user) {
+        const u = data.user as {
+          name?: string
+          email?: string
+          phoneNumber?: string
+          profilePic?: string
+          profilePicPublicId?: string
+        }
         setProfile((prev) => ({
           ...prev,
-          name: data.user.name ?? prev.name,
-          email: data.user.email ?? prev.email,
-          phone: data.user.phoneNumber ?? prev.phone,
-          profilePic: data.user.profilePic ?? prev.profilePic,
-          profilePicPublicId: data.user.profilePicPublicId ?? prev.profilePicPublicId,
+          name: u.name ?? prev.name,
+          email: u.email ?? prev.email,
+          phone: u.phoneNumber ?? prev.phone,
+          profilePic: u.profilePic ?? prev.profilePic,
+          profilePicPublicId: u.profilePicPublicId ?? prev.profilePicPublicId,
         }))
+        syncClientUserProfileFromServer({
+          name: u.name,
+          email: u.email,
+          profilePic: u.profilePic ?? '',
+        })
       }
       toast({
         title: 'Profile saved',
@@ -620,17 +639,11 @@ function AdminSettingsPageContent() {
   return (
     <main className="min-h-screen bg-slate-50/50 pb-20">
       <div className="px-6 lg:px-12 pt-8 space-y-8 max-w-[1800px] mx-auto">
-        <Card className="p-8 border-slate-200 rounded-2xl shadow-sm relative overflow-hidden bg-white">
-          <div className="absolute top-0 left-0 w-1.5 h-full bg-[#33375D]" aria-hidden />
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div>
-              <h1 className="text-3xl font-black text-slate-900 tracking-tight mb-2">Settings</h1>
-              <p className="text-slate-500 font-medium">
-                Manage your account, alert preferences, and system configuration.
-              </p>
-            </div>
-          </div>
-        </Card>
+        <AdminPageHeader
+          title="Settings"
+          titleUppercase={false}
+          description="Manage your account, alert preferences, and system configuration."
+        />
 
         <div className="bg-[#EEF2FF] border border-[#6366F1]/10 p-3 rounded-xl flex items-center gap-3 text-[#4338CA]">
           <div className="w-7 h-7 shrink-0 rounded-full bg-red-500 flex items-center justify-center text-white shadow-sm">
