@@ -15,6 +15,12 @@ function jsonError(message: string, status: number) {
 
 type SendPair = { taskId: string; userId: string; description?: string };
 
+type SubAdminTaskSendDoc = {
+    _id: mongoose.Types.ObjectId;
+    preparednessId: mongoose.Types.ObjectId;
+    title: string;
+};
+
 export async function POST(req: NextRequest) {
     try {
         const gate = await requireSubAdmin();
@@ -90,7 +96,12 @@ export async function POST(req: NextRequest) {
             isDeletedBySubAdmin: false,
         }).lean();
 
-        const taskMap = new Map(subTasks.map((t) => [String((t as { _id: unknown })._id), t]));
+        const taskMap = new Map<string, SubAdminTaskSendDoc>(
+            subTasks.map((t) => {
+                const doc = t as unknown as SubAdminTaskSendDoc;
+                return [doc._id.toString(), doc];
+            })
+        );
         if (taskMap.size !== taskIdSet.length) return jsonError('One or more tasks are invalid or not owned by you', 400);
 
         const userIdSet = [...new Set(pairs.map((p) => p.userId))];
@@ -112,12 +123,12 @@ export async function POST(req: NextRequest) {
             if (!st) continue;
             try {
                 await UserTask.findOneAndUpdate(
-                    { userId: new mongoose.Types.ObjectId(p.userId), taskId: (st as { _id: mongoose.Types.ObjectId })._id },
+                    { userId: new mongoose.Types.ObjectId(p.userId), taskId: st._id },
                     {
                         $set: {
                             subAdminId: subAdminOid,
-                            preparednessId: (st as { preparednessId: mongoose.Types.ObjectId }).preparednessId,
-                            title: (st as { title: string }).title,
+                            preparednessId: st.preparednessId,
+                            title: st.title,
                             description: p.description ?? '',
                             sentAt: new Date(),
                         },

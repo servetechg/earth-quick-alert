@@ -5,6 +5,12 @@ import mongoose from 'mongoose';
 import PreparednessGuide from '@/models/PreparednessGuide';
 import Task from '@/models/Task';
 import SubAdminTask from '@/models/SubAdminTask';
+import {
+    syncDownstreamFromSuperAdminTaskTitle,
+    syncDownstreamFromSuperAdminTasksDeleted,
+    syncUserTasksTitleFromSubAdminTask,
+    removeUserTasksForSubAdminTasks,
+} from '@/lib/preparedness-tasks/cascade-task-updates';
 import { isValidObjectId } from '@/lib/preparedness-tasks/object-id';
 
 export const dynamic = 'force-dynamic';
@@ -156,7 +162,10 @@ export async function PUT(req: NextRequest) {
                     { new: true }
                 ).lean();
                 if (!updated) results.push({ taskId, ok: false, error: 'Task not found or inactive' });
-                else results.push({ taskId, ok: true });
+                else {
+                    await syncDownstreamFromSuperAdminTaskTitle(taskId, title);
+                    results.push({ taskId, ok: true });
+                }
             }
             return NextResponse.json({ success: true, role, results });
         }
@@ -177,7 +186,10 @@ export async function PUT(req: NextRequest) {
                 { new: true }
             ).lean();
             if (!updated) results.push({ id, ok: false, error: 'Task not found or not editable' });
-            else results.push({ id, ok: true });
+            else {
+                await syncUserTasksTitleFromSubAdminTask(id, title);
+                results.push({ id, ok: true });
+            }
         }
         return NextResponse.json({ success: true, role, results });
     } catch (e) {
@@ -205,6 +217,7 @@ export async function DELETE(req: NextRequest) {
 
         if (role === 'super-admin') {
             const res = await Task.updateMany({ _id: { $in: ids } }, { $set: { isActive: false } });
+            await syncDownstreamFromSuperAdminTasksDeleted(ids.map((id) => new mongoose.Types.ObjectId(id as string)));
             return NextResponse.json({ success: true, role, matched: res.matchedCount, modified: res.modifiedCount });
         }
 
@@ -213,6 +226,7 @@ export async function DELETE(req: NextRequest) {
             { _id: { $in: ids }, subAdminId: subAdminOid },
             { $set: { isDeletedBySubAdmin: true } }
         );
+        await removeUserTasksForSubAdminTasks(ids.map((id) => new mongoose.Types.ObjectId(id as string)));
         return NextResponse.json({ success: true, role, matched: res.matchedCount, modified: res.modifiedCount });
     } catch (e) {
         console.error('DELETE /api/preparedness-tasks:', e);

@@ -16,16 +16,10 @@ export interface ProfileSettings {
   profilePicPublicId: string
 }
 
-export interface NotificationSettings {
-  majorAlerts: boolean
-  minorAlerts: boolean
-  aiReports: boolean
-  emailDigest: boolean
-  smsAlerts: boolean
-  pushAlerts: boolean
-}
+import type { NotificationPreferencesDTO } from '@/lib/notification-preferences/types'
 
-export type NotificationSettingsKey = keyof NotificationSettings
+export type NotificationSettings = NotificationPreferencesDTO
+export type NotificationSettingsKey = keyof NotificationPreferencesDTO
 
 export interface NotificationPreferenceItem {
   key: NotificationSettingsKey

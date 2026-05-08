@@ -1,9 +1,10 @@
 'use client'
 
 import type { ComponentType } from 'react'
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { toast } from '@/hooks/use-toast'
+import { NOTIFICATION_PREFERENCES_DEFAULTS, normalizeNotificationPreferences } from '@/lib/notification-preferences/defaults'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -41,6 +42,7 @@ import type {
   NotificationSettings,
   ProfileSettings,
   SettingsTabItem,
+  SettingsTabKey,
 } from './types'
 
 const TAB_ICON_MAP: Record<SettingsTabItem['icon'], ComponentType<{ className?: string }>> = {
@@ -58,14 +60,7 @@ const INITIAL_PROFILE: ProfileSettings = {
   profilePicPublicId: '',
 }
 
-const INITIAL_NOTIFICATIONS: NotificationSettings = {
-  majorAlerts: true,
-  minorAlerts: true,
-  aiReports: true,
-  emailDigest: false,
-  smsAlerts: true,
-  pushAlerts: true,
-}
+const INITIAL_NOTIFICATIONS: NotificationSettings = { ...NOTIFICATION_PREFERENCES_DEFAULTS }
 
 const INITIAL_DISPATCH: DispatchSettings = {
   autoDispatchMajor: true,
@@ -90,14 +85,27 @@ const PRIMARY_BUTTON_CLASSNAME = 'bg-[#33375D] text-white hover:bg-[#2B2F50]'
 
 const PROFILE_PIC_MAX_BYTES = 2 * 1024 * 1024
 
-export default function AdminSettingsPage() {
+function isSettingsTabKey(v: string): v is SettingsTabKey {
+  return SETTINGS_TABS.some((t) => t.key === v)
+}
+
+function tabFromSearchParam(raw: string | null): SettingsTabKey {
+  if (raw && isSettingsTabKey(raw)) return raw
+  return 'profile'
+}
+
+function AdminSettingsPageContent() {
   const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
   const photoInputRef = useRef<HTMLInputElement>(null)
   const [isAuthorized, setIsAuthorized] = useState(false)
   const [profileLoading, setProfileLoading] = useState(true)
   const [profileSaving, setProfileSaving] = useState(false)
   const [photoUploading, setPhotoUploading] = useState(false)
   const [profile, setProfile] = useState<ProfileSettings>(INITIAL_PROFILE)
+  const [notificationsLoading, setNotificationsLoading] = useState(true)
+  const [notificationsSaving, setNotificationsSaving] = useState(false)
   const [notifications, setNotifications] = useState<NotificationSettings>(INITIAL_NOTIFICATIONS)
   const [dispatch, setDispatch] = useState<DispatchSettings>(INITIAL_DISPATCH)
   const [isTwoFactorEnabled, setIsTwoFactorEnabled] = useState(true)
@@ -152,6 +160,41 @@ export default function AdminSettingsPage() {
     }
   }, [isAuthorized])
 
+  useEffect(() => {
+    if (!isAuthorized) return
+
+    let cancelled = false
+    ;(async () => {
+      setNotificationsLoading(true)
+      try {
+        const res = await fetch('/api/user/notification-preferences', { credentials: 'same-origin' })
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) {
+          throw new Error(data.error || 'Failed to load notification preferences')
+        }
+        if (!cancelled && data.success && data.data?.notificationPreferences) {
+          setNotifications(
+            normalizeNotificationPreferences(data.data.notificationPreferences as Record<string, unknown>)
+          )
+        }
+      } catch (e: unknown) {
+        if (!cancelled) {
+          toast({
+            variant: 'destructive',
+            title: 'Could not load notifications',
+            description: e instanceof Error ? e.message : 'Try again later.',
+          })
+        }
+      } finally {
+        if (!cancelled) setNotificationsLoading(false)
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [isAuthorized])
+
   const initials = useMemo(() => {
     return profile.name
       .split(' ')
@@ -160,6 +203,39 @@ export default function AdminSettingsPage() {
       .map((word) => word[0]?.toUpperCase() ?? '')
       .join('')
   }, [profile.name])
+
+  const handleSaveNotifications = async () => {
+    setNotificationsSaving(true)
+    try {
+      const res = await fetch('/api/user/notification-preferences', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ notificationPreferences: notifications }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to save notification preferences')
+      }
+      if (data.success && data.data?.notificationPreferences) {
+        setNotifications(
+          normalizeNotificationPreferences(data.data.notificationPreferences as Record<string, unknown>)
+        )
+      }
+      toast({
+        title: 'Preferences saved',
+        description: 'Your notification settings have been updated.',
+      })
+    } catch (e: unknown) {
+      toast({
+        variant: 'destructive',
+        title: 'Save failed',
+        description: e instanceof Error ? e.message : 'Could not save preferences.',
+      })
+    } finally {
+      setNotificationsSaving(false)
+    }
+  }
 
   const handleSave = (section: string) => {
     toast({
@@ -266,6 +342,20 @@ export default function AdminSettingsPage() {
     }
   }
 
+  const activeSettingsTab = tabFromSearchParam(searchParams?.get('tab') ?? null)
+
+  const handleSettingsTabChange = (next: string) => {
+    if (!isSettingsTabKey(next)) return
+    const basePath = pathname ?? '/settings'
+    if (next === 'profile') {
+      router.replace(basePath, { scroll: false })
+      return
+    }
+    const q = new URLSearchParams(searchParams?.toString() ?? '')
+    q.set('tab', next)
+    router.replace(`${basePath}?${q.toString()}`, { scroll: false })
+  }
+
   if (!isAuthorized) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -301,7 +391,7 @@ export default function AdminSettingsPage() {
           </div>
         </div>
 
-        <Tabs defaultValue="profile" className="space-y-6">
+        <Tabs value={activeSettingsTab} onValueChange={handleSettingsTabChange} className="space-y-6">
         <TabsList className="bg-card shadow-card h-auto p-1.5 rounded-2xl flex-wrap">
           {SETTINGS_TABS.map((tab) => {
             const Icon = TAB_ICON_MAP[tab.icon]
@@ -392,15 +482,19 @@ export default function AdminSettingsPage() {
         <TabsContent value="notifications">
           <SettingsSectionCard
             title="Notification Preferences"
-            description="Choose what alerts you receive and how."
+            description="Choose what alerts you receive and how they are delivered."
             icon={<Bell className="h-5 w-5 text-primary" />}
           >
+            {notificationsLoading && (
+              <p className="text-sm text-muted-foreground">Loading preferences…</p>
+            )}
             {NOTIFICATION_PREFERENCES.map((item) => (
               <SettingsToggleRow
                 key={item.key}
                 label={item.label}
                 description={item.description}
                 checked={notifications[item.key]}
+                disabled={notificationsLoading}
                 onCheckedChange={(checked) =>
                   setNotifications((prev) => ({ ...prev, [item.key]: checked }))
                 }
@@ -408,9 +502,13 @@ export default function AdminSettingsPage() {
             ))}
 
             <div className="flex justify-end">
-              <Button onClick={() => handleSave('Notification')} className={`gap-2 ${PRIMARY_BUTTON_CLASSNAME}`}>
+              <Button
+                onClick={handleSaveNotifications}
+                disabled={notificationsLoading || notificationsSaving}
+                className={`gap-2 ${PRIMARY_BUTTON_CLASSNAME}`}
+              >
                 <Save className="h-4 w-4" />
-                Save Preferences
+                {notificationsSaving ? 'Saving…' : 'Save Preferences'}
               </Button>
             </div>
           </SettingsSectionCard>
@@ -562,5 +660,19 @@ export default function AdminSettingsPage() {
       </Tabs>
       </div>
     </main>
+  )
+}
+
+export default function AdminSettingsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-slate-50/50">
+          <div className="h-10 w-10 animate-spin rounded-full border-4 border-[#33375D] border-t-transparent" />
+        </div>
+      }
+    >
+      <AdminSettingsPageContent />
+    </Suspense>
   )
 }
