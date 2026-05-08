@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { openaiService } from '@/lib/services/openai-service';
+import { getSession } from '@/lib/auth';
+import { recordActivity, ACTIVITY_ACTIONS } from '@/lib/activity-log';
 
 export async function POST(req: Request) {
   try {
@@ -10,6 +12,20 @@ export async function POST(req: Request) {
     }
 
     const message = await openaiService.generateAlertLanguage(alertType, context);
+
+    try {
+      const session = await getSession();
+      if (session?.user?.id) {
+        void recordActivity({
+          userId: session.user.id,
+          action: ACTIVITY_ACTIONS.AI_ALERT_MESSAGE,
+          label: `AI alert message drafted (${String(alertType)})`,
+          meta: { alertType: String(alertType) },
+        });
+      }
+    } catch {
+      /* ignore */
+    }
 
     return NextResponse.json({ message });
   } catch (error) {

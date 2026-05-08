@@ -2,29 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import connectDB from '@/lib/mongodb';
 import User from '@/models/User';
 import { getSession } from '@/lib/auth';
-import type { NotificationPreferencesGetData } from '@/lib/notification-preferences/types';
-import {
-    mergeNotificationPreferencesPatch,
-    normalizeNotificationPreferences,
-} from '@/lib/notification-preferences/defaults';
-
-function jsonFail(message: string, status: number) {
-    return NextResponse.json({ success: false, error: message }, { status });
-}
-
-function buildPayload(
-    user: Record<string, unknown> | null
-): NotificationPreferencesGetData | null {
-    if (!user) return null;
-    const prefs = normalizeNotificationPreferences(
-        user.notificationPreferences as Record<string, unknown> | undefined
-    );
-    return {
-        phoneNumber: typeof user.phoneNumber === 'string' ? user.phoneNumber : '',
-        email: typeof user.email === 'string' ? user.email : '',
-        notificationPreferences: prefs,
-    };
-}
+import { recordActivity, ACTIVITY_ACTIONS } from '@/lib/activity-log';
 
 /** Stored on User — only push / sms / email plus alert-type toggles. */
 type StoredNotificationPrefs = {
@@ -239,20 +217,28 @@ export async function POST(req: NextRequest) {
             setFlat[`notificationPreferences.${k}`] = nextPrefs[k];
         }
 
-        const updated = await User.findByIdAndUpdate(session.user.id, { $set: setFlat }, { new: true, runValidators: true })
-            .select('notificationPreferences phoneNumber email')
-            .lean<Record<string, unknown>>();
+    void recordActivity({
+      userId: session.user.id,
+      action: ACTIVITY_ACTIONS.NOTIFICATION_PREFS_UPDATE,
+      label: 'Notification preferences updated',
+      meta: {
+        preferences: serializeNotificationPreferences(raw),
+      },
+    });
 
-        if (!updated) {
-            return jsonFail('User not found', 404);
-        }
-
-        const data = buildPayload(updated);
-        if (!data) return jsonFail('User not found', 404);
-
-        return NextResponse.json({ success: true, data });
-    } catch (error) {
-        console.error('Error saving notification preferences:', error);
-        return jsonFail('Failed to save notification preferences', 500);
-    }
+    return NextResponse.json({
+      success: true,
+      data: {
+        phoneNumber: (updated as { phoneNumber?: string }).phoneNumber || '',
+        email: (updated as { email?: string }).email || '',
+        notificationPreferences: serializeNotificationPreferences(raw),
+      },
+    });
+  } catch (error) {
+    console.error('Error saving notification preferences:', error);
+    return NextResponse.json(
+      { success: false, error: 'Failed to save notification preferences' },
+      { status: 500 }
+    );
+  }
 }
