@@ -115,6 +115,8 @@ export default function AdminSettingsPage() {
   const [photoUploading, setPhotoUploading] = useState(false)
   const [profile, setProfile] = useState<ProfileSettings>(INITIAL_PROFILE)
   const [notifications, setNotifications] = useState<NotificationSettings>(INITIAL_NOTIFICATIONS)
+  const [notificationsLoading, setNotificationsLoading] = useState(true)
+  const [notificationsSaving, setNotificationsSaving] = useState(false)
   const [dispatch, setDispatch] = useState<DispatchSettings>(INITIAL_DISPATCH)
   const [isTwoFactorEnabled, setIsTwoFactorEnabled] = useState(true)
   const [isSessionTimeoutEnabled, setIsSessionTimeoutEnabled] = useState(true)
@@ -161,6 +163,47 @@ export default function AdminSettingsPage() {
         }
       } finally {
         if (!cancelled) setProfileLoading(false)
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [isAuthorized])
+
+  useEffect(() => {
+    if (!isAuthorized) return
+
+    let cancelled = false
+    ;(async () => {
+      setNotificationsLoading(true)
+      try {
+        const res = await fetch('/api/user/notification-preferences', { credentials: 'same-origin' })
+        const json = await res.json().catch(() => ({}))
+        if (!res.ok) {
+          throw new Error(json.error || 'Failed to load notification preferences')
+        }
+        const np = json.data?.notificationPreferences
+        if (!cancelled && np) {
+          setNotifications({
+            majorAlerts: np.majorAlerts !== false,
+            minorAlerts: np.minorAlerts !== false,
+            aiReports: np.aiReports !== false,
+            emailDigest: np.emailDigest === true,
+            smsAlerts: np.smsAlerts !== false,
+            pushAlerts: np.pushAlerts !== false,
+          })
+        }
+      } catch (e: any) {
+        if (!cancelled) {
+          toast({
+            variant: 'destructive',
+            title: 'Could not load notifications',
+            description: e?.message || 'Try refreshing the page.',
+          })
+        }
+      } finally {
+        if (!cancelled) setNotificationsLoading(false)
       }
     })()
 
@@ -284,6 +327,54 @@ export default function AdminSettingsPage() {
     }
   }
 
+  const handleSaveNotifications = async () => {
+    setNotificationsSaving(true)
+    try {
+      const res = await fetch('/api/user/notification-preferences', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({
+          notificationPreferences: {
+            majorAlerts: notifications.majorAlerts,
+            minorAlerts: notifications.minorAlerts,
+            aiReports: notifications.aiReports,
+            emailDigest: notifications.emailDigest,
+            smsAlerts: notifications.smsAlerts,
+            pushAlerts: notifications.pushAlerts,
+          },
+        }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        throw new Error(json.error || 'Failed to save notification preferences')
+      }
+      const np = json.data?.notificationPreferences
+      if (np) {
+        setNotifications({
+          majorAlerts: np.majorAlerts !== false,
+          minorAlerts: np.minorAlerts !== false,
+          aiReports: np.aiReports !== false,
+          emailDigest: np.emailDigest === true,
+          smsAlerts: np.smsAlerts !== false,
+          pushAlerts: np.pushAlerts !== false,
+        })
+      }
+      toast({
+        title: 'Preferences saved',
+        description: 'Your notification settings have been updated.',
+      })
+    } catch (e: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Save failed',
+        description: e?.message || 'Could not save notification preferences.',
+      })
+    } finally {
+      setNotificationsSaving(false)
+    }
+  }
+
   if (!isAuthorized) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -397,12 +488,16 @@ export default function AdminSettingsPage() {
             description="Choose what alerts you receive and how."
             icon={<Bell className="h-5 w-5 text-primary" />}
           >
+            {notificationsLoading && (
+              <p className="text-sm text-muted-foreground">Loading notification preferences…</p>
+            )}
             {NOTIFICATION_PREFERENCES.map((item) => (
               <SettingsToggleRow
                 key={item.key}
                 label={item.label}
                 description={item.description}
                 checked={notifications[item.key]}
+                disabled={notificationsLoading}
                 onCheckedChange={(checked) =>
                   setNotifications((prev) => ({ ...prev, [item.key]: checked }))
                 }
@@ -410,9 +505,13 @@ export default function AdminSettingsPage() {
             ))}
 
             <div className="flex justify-end">
-              <Button onClick={() => handleSave('Notification')} className={`gap-2 ${PRIMARY_BUTTON_CLASSNAME}`}>
+              <Button
+                onClick={handleSaveNotifications}
+                disabled={notificationsLoading || notificationsSaving}
+                className={`gap-2 ${PRIMARY_BUTTON_CLASSNAME}`}
+              >
                 <Save className="h-4 w-4" />
-                Save Preferences
+                {notificationsSaving ? 'Saving…' : 'Save Preferences'}
               </Button>
             </div>
           </SettingsSectionCard>
