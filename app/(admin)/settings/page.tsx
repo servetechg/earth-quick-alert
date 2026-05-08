@@ -107,6 +107,8 @@ function AdminSettingsPageContent() {
   const [notificationsLoading, setNotificationsLoading] = useState(true)
   const [notificationsSaving, setNotificationsSaving] = useState(false)
   const [notifications, setNotifications] = useState<NotificationSettings>(INITIAL_NOTIFICATIONS)
+  const [notificationsLoading, setNotificationsLoading] = useState(true)
+  const [notificationsSaving, setNotificationsSaving] = useState(false)
   const [dispatch, setDispatch] = useState<DispatchSettings>(INITIAL_DISPATCH)
   const [isTwoFactorEnabled, setIsTwoFactorEnabled] = useState(true)
   const [isSessionTimeoutEnabled, setIsSessionTimeoutEnabled] = useState(true)
