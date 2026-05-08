@@ -42,6 +42,21 @@ export const NOTIFICATION_PREFERENCES: NotificationPreferenceItem[] = [
     label: 'Browser Push Notifications',
     description: 'Real-time push alerts in your browser.',
   },
+  {
+    key: 'push',
+    label: 'Push delivery enabled',
+    description: 'Turn off to stop sending notifications via push when other rules allow.',
+  },
+  {
+    key: 'sms',
+    label: 'SMS delivery enabled',
+    description: 'Turn off to stop SMS for your account.',
+  },
+  {
+    key: 'email',
+    label: 'Email delivery enabled',
+    description: 'Turn off to stop email notifications for your account.',
+  },
 ]
 
 export const DISPATCH_CHANNEL_OPTIONS: DispatchSelectOption[] = [

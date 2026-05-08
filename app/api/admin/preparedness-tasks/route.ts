@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import connectDB from '@/lib/mongodb';
 import PreparednessGuide from '@/models/PreparednessGuide';
 import Task from '@/models/Task';
+import { syncDownstreamFromSuperAdminTaskTitle, syncDownstreamFromSuperAdminTasksDeleted } from '@/lib/preparedness-tasks/cascade-task-updates';
 import { requireSuperAdmin } from '@/lib/preparedness-tasks/auth';
 import { isValidObjectId } from '@/lib/preparedness-tasks/object-id';
 import mongoose from 'mongoose';
@@ -159,7 +160,10 @@ export async function PUT(req: NextRequest) {
             ).lean();
 
             if (!updated) results.push({ taskId, ok: false, error: 'Task not found or inactive' });
-            else results.push({ taskId, ok: true });
+            else {
+                await syncDownstreamFromSuperAdminTaskTitle(taskId, title);
+                results.push({ taskId, ok: true });
+            }
         }
 
         return NextResponse.json({ success: true, results });
@@ -188,6 +192,7 @@ export async function DELETE(req: NextRequest) {
         await connectDB();
 
         const res = await Task.updateMany({ _id: { $in: ids } }, { $set: { isActive: false } });
+        await syncDownstreamFromSuperAdminTasksDeleted(ids.map((id) => new mongoose.Types.ObjectId(id as string)));
         return NextResponse.json({ success: true, matched: res.matchedCount, modified: res.modifiedCount });
     } catch (e) {
         console.error('DELETE /api/admin/preparedness-tasks (batch):', e);

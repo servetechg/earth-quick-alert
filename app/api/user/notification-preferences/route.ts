@@ -114,12 +114,29 @@ function serializeNotificationPreferences(np: NotificationPrefsDoc | null | unde
 }
 
 export async function GET() {
-  try {
-    await connectDB();
-    const session = await getSession();
+    try {
+        await connectDB();
+        const session = await getSession();
 
-    if (!session?.user?.id) {
-      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+        if (!session?.user?.id) {
+            return jsonFail('Unauthorized', 401);
+        }
+
+        const user = await User.findById(session.user.id)
+            .select('notificationPreferences phoneNumber email')
+            .lean<Record<string, unknown>>();
+
+        if (!user) {
+            return jsonFail('User not found', 404);
+        }
+
+        const data = buildPayload(user);
+        if (!data) return jsonFail('User not found', 404);
+
+        return NextResponse.json({ success: true, data });
+    } catch (error) {
+        console.error('Error fetching notification preferences:', error);
+        return jsonFail('Failed to fetch notification preferences', 500);
     }
 
     const user = await User.findById(session.user.id)
@@ -150,53 +167,55 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  try {
-    await connectDB();
-    const session = await getSession();
+    try {
+        await connectDB();
+        const session = await getSession();
 
-    if (!session?.user?.id) {
-      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
-    }
+        if (!session?.user?.id) {
+            return jsonFail('Unauthorized', 401);
+        }
 
-    const body = await req.json();
-    const rawPrefs = body.notificationPreferences;
-    const prefsIncoming: Record<string, unknown> =
-      rawPrefs && typeof rawPrefs === 'object' && !Array.isArray(rawPrefs)
-        ? (rawPrefs as Record<string, unknown>)
-        : {};
-    const phoneNumber =
-      typeof body.phoneNumber === 'string' ? body.phoneNumber.trim() : undefined;
+        const body = await req.json().catch(() => null);
+        if (!body || typeof body !== 'object') {
+            return jsonFail('Invalid JSON body', 400);
+        }
 
-    const existing = await User.findById(session.user.id)
-      .select('notificationPreferences phoneNumber')
-      .lean();
+        const existing = await User.findById(session.user.id).select('notificationPreferences').lean<{
+            notificationPreferences?: Record<string, unknown>;
+        }>();
 
-    if (!existing) {
-      return NextResponse.json({ success: false, error: 'User not found' }, { status: 404 });
-    }
+        if (!existing) {
+            return jsonFail('User not found', 404);
+        }
 
-    const prevNP =
-      (existing as { notificationPreferences?: NotificationPrefsDoc }).notificationPreferences ||
-      {};
+        const currentPrefs = normalizeNotificationPreferences(existing.notificationPreferences);
+        const rawPatch = body.notificationPreferences;
+        const patch: Record<string, unknown> =
+            rawPatch && typeof rawPatch === 'object' ? (rawPatch as Record<string, unknown>) : {};
 
-    const finalNP = mergeNotificationPreferences(prevNP, prefsIncoming);
+        const nextPrefs = mergeNotificationPreferencesPatch(currentPrefs, patch);
 
-    const updated = await User.findByIdAndUpdate(
-      session.user.id,
-      {
-        ...(phoneNumber !== undefined ? { phoneNumber } : {}),
-        notificationPreferences: finalNP,
-      },
-      { new: true, runValidators: true }
-    )
-      .select('notificationPreferences phoneNumber email')
-      .lean();
+        const phoneNumber =
+            typeof body.phoneNumber === 'string' ? body.phoneNumber.trim() : undefined;
 
-    if (!updated) {
-      return NextResponse.json({ success: false, error: 'User not found' }, { status: 404 });
-    }
-
-    const raw = (updated as { notificationPreferences?: NotificationPrefsDoc }).notificationPreferences;
+        const setFlat: Record<string, unknown> = {};
+        if (phoneNumber !== undefined) {
+            setFlat.phoneNumber = phoneNumber;
+        }
+        const keys = [
+            'push',
+            'sms',
+            'email',
+            'majorAlerts',
+            'minorAlerts',
+            'aiReports',
+            'pushAlerts',
+            'smsAlerts',
+            'emailDigest',
+        ] as const;
+        for (const k of keys) {
+            setFlat[`notificationPreferences.${k}`] = nextPrefs[k];
+        }
 
     void recordActivity({
       userId: session.user.id,

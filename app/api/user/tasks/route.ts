@@ -6,6 +6,15 @@ import { requireEndUser } from '@/lib/preparedness-tasks/auth';
 
 export const dynamic = 'force-dynamic';
 
+type LeanUserTaskRow = {
+    _id: unknown;
+    userId: unknown;
+    subAdminId: unknown;
+    preparednessId: unknown;
+    taskId: unknown;
+    [key: string]: unknown;
+};
+
 export async function GET() {
     try {
         const gate = await requireEndUser();
@@ -18,14 +27,17 @@ export async function GET() {
 
         return NextResponse.json({
             success: true,
-            data: tasks.map((t) => ({
-                ...t,
-                _id: String((t as { _id: unknown })._id),
-                userId: String((t as { userId: unknown }).userId),
-                subAdminId: String((t as { subAdminId: unknown }).subAdminId),
-                preparednessId: String((t as { preparednessId: unknown }).preparednessId),
-                taskId: String((t as { taskId: unknown }).taskId),
-            })),
+            data: tasks.map((t) => {
+                const row = t as unknown as LeanUserTaskRow;
+                return {
+                    ...row,
+                    _id: String(row._id),
+                    userId: String(row.userId),
+                    subAdminId: String(row.subAdminId),
+                    preparednessId: String(row.preparednessId),
+                    taskId: String(row.taskId),
+                };
+            }),
         });
     } catch (e) {
         console.error('GET /api/user/tasks:', e);

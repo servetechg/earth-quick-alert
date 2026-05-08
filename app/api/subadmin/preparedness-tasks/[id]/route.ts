@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import connectDB from '@/lib/mongodb';
 import mongoose from 'mongoose';
 import SubAdminTask from '@/models/SubAdminTask';
+import { removeUserTasksForSubAdminTask, syncUserTasksTitleFromSubAdminTask } from '@/lib/preparedness-tasks/cascade-task-updates';
 import { requireSubAdmin } from '@/lib/preparedness-tasks/auth';
 import { isValidObjectId } from '@/lib/preparedness-tasks/object-id';
 
@@ -10,6 +11,14 @@ export const dynamic = 'force-dynamic';
 function jsonError(message: string, status: number) {
     return NextResponse.json({ success: false, error: message }, { status });
 }
+
+type LeanSubAdminTaskRow = {
+    _id: unknown;
+    subAdminId: unknown;
+    preparednessId: unknown;
+    sourceTaskId?: unknown | null;
+    [key: string]: unknown;
+};
 
 export async function PUT(
     req: NextRequest,
@@ -38,16 +47,17 @@ export async function PUT(
 
         if (!updated) return jsonError('Task not found or not editable', 404);
 
+        await syncUserTasksTitleFromSubAdminTask(id, title);
+
+        const sat = updated as unknown as LeanSubAdminTaskRow;
         return NextResponse.json({
             success: true,
             data: {
-                ...updated,
-                _id: String((updated as { _id: unknown })._id),
-                subAdminId: String((updated as { subAdminId: unknown }).subAdminId),
-                preparednessId: String((updated as { preparednessId: unknown }).preparednessId),
-                sourceTaskId: (updated as { sourceTaskId?: unknown }).sourceTaskId
-                    ? String((updated as { sourceTaskId: unknown }).sourceTaskId)
-                    : null,
+                ...sat,
+                _id: String(sat._id),
+                subAdminId: String(sat.subAdminId),
+                preparednessId: String(sat.preparednessId),
+                sourceTaskId: sat.sourceTaskId != null ? String(sat.sourceTaskId) : null,
             },
         });
     } catch (e) {
@@ -78,6 +88,8 @@ export async function DELETE(
         ).lean();
 
         if (!updated) return jsonError('Task not found or already removed', 404);
+
+        await removeUserTasksForSubAdminTask(id);
 
         return NextResponse.json({ success: true });
     } catch (e) {

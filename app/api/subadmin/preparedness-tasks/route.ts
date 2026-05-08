@@ -3,6 +3,7 @@ import connectDB from '@/lib/mongodb';
 import mongoose from 'mongoose';
 import PreparednessGuide from '@/models/PreparednessGuide';
 import SubAdminTask from '@/models/SubAdminTask';
+import { removeUserTasksForSubAdminTasks, syncUserTasksTitleFromSubAdminTask } from '@/lib/preparedness-tasks/cascade-task-updates';
 import { requireSubAdmin } from '@/lib/preparedness-tasks/auth';
 import { isValidObjectId } from '@/lib/preparedness-tasks/object-id';
 
@@ -13,6 +14,14 @@ function jsonError(message: string, status: number) {
 }
 
 type CreateInput = { preparednessId: string; title: string };
+
+type LeanSubAdminTaskRow = {
+    _id: unknown;
+    subAdminId: unknown;
+    preparednessId: unknown;
+    sourceTaskId?: unknown | null;
+    [key: string]: unknown;
+};
 
 export async function GET(req: NextRequest) {
     try {
@@ -42,15 +51,16 @@ export async function GET(req: NextRequest) {
 
         return NextResponse.json({
             success: true,
-            data: tasks.map((t) => ({
-                ...t,
-                _id: String((t as { _id: unknown })._id),
-                subAdminId: String((t as { subAdminId: unknown }).subAdminId),
-                preparednessId: String((t as { preparednessId: unknown }).preparednessId),
-                sourceTaskId: (t as { sourceTaskId?: unknown }).sourceTaskId
-                    ? String((t as { sourceTaskId: unknown }).sourceTaskId)
-                    : null,
-            })),
+            data: tasks.map((t) => {
+                const row = t as unknown as LeanSubAdminTaskRow;
+                return {
+                    ...row,
+                    _id: String(row._id),
+                    subAdminId: String(row.subAdminId),
+                    preparednessId: String(row.preparednessId),
+                    sourceTaskId: row.sourceTaskId != null ? String(row.sourceTaskId) : null,
+                };
+            }),
         });
     } catch (e) {
         console.error('GET /api/subadmin/preparedness-tasks:', e);
@@ -160,7 +170,10 @@ export async function PUT(req: NextRequest) {
                 { new: true }
             ).lean();
             if (!updated) results.push({ id, ok: false, error: 'Task not found or not editable' });
-            else results.push({ id, ok: true });
+            else {
+                await syncUserTasksTitleFromSubAdminTask(id, title);
+                results.push({ id, ok: true });
+            }
         }
 
         return NextResponse.json({ success: true, results });
@@ -189,6 +202,8 @@ export async function DELETE(req: NextRequest) {
             { _id: { $in: ids }, subAdminId: subAdminOid },
             { $set: { isDeletedBySubAdmin: true } }
         );
+
+        await removeUserTasksForSubAdminTasks(ids.map((id) => new mongoose.Types.ObjectId(id as string)));
 
         return NextResponse.json({ success: true, matched: res.matchedCount, modified: res.modifiedCount });
     } catch (e) {
