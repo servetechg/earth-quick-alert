@@ -384,7 +384,7 @@ export function GISMap({ selectedLocation = 'All' }: GISMapProps) {
         <GoogleMap markers={markers} zoom={mapZoom} center={mapCenter} heatPoints={heatPoints} showHeatmap={showHeatmap} />
         <div className="absolute right-4 top-16 z-40 w-64 rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-xl backdrop-blur-sm sm:top-20">
           <div className="mb-3 border-b border-slate-100 pb-2">
-            <h4 className="text-xs font-black uppercase tracking-widest text-slate-700">Map Layers</h4>
+            <h4 className="text-xs font-black uppercase tracking-widest text-slate-700">Heat Map</h4>
           </div>
           <div className="space-y-3">
             <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Risk Overlays</p>

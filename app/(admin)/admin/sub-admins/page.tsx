@@ -30,6 +30,7 @@ import {
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import { AdminPageHeader } from '@/components/admin-page-header'
+import { AdminPageShell } from '@/components/admin-page-shell'
 import { AddUserModal } from "@/components/modals/add-user-modal"
 
 interface IUser {
@@ -120,8 +121,7 @@ export default function SubAdminManagementPage() {
     }
 
     return (
-        <main className="min-h-screen bg-slate-50/50 pb-20">
-            <div className="px-6 lg:px-12 pt-8 space-y-8 max-w-[1600px] mx-auto">
+        <AdminPageShell>
                 
                 <AdminPageHeader
                     title="Manage Sub-Admins"
@@ -299,13 +299,12 @@ export default function SubAdminManagementPage() {
                         </div>
                     )}
                 </div>
-            </div>
 
             <AddUserModal 
                 isOpen={isAddModalOpen} 
                 onClose={() => setIsAddModalOpen(false)} 
                 onSuccess={fetchSubAdmins} 
             />
-        </main>
+        </AdminPageShell>
     )
 }

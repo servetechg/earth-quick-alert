@@ -29,6 +29,7 @@ import { GenericEmergencyMetric } from '@/lib/types/emergency'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import { ResponderTable } from '@/components/responder-table'
+import { AdminPageShell } from '@/components/admin-page-shell'
 
 export default function SuperAdminDashboard() {
   const [activeEmergencies, setActiveEmergencies] = useState<GenericEmergencyMetric[]>([])
@@ -100,11 +101,7 @@ export default function SuperAdminDashboard() {
     : undefined
 
   return (
-    <div className="flex-1 overflow-auto bg-[#F8FAFC] selection:bg-[#33375D]/15 min-h-screen">
-      {/* Top Header */}
-
-
-      <main className="px-6 lg:px-12 pt-8 space-y-8 max-w-[1600px] mx-auto">
+    <AdminPageShell className="selection:bg-[#33375D]/15">
         {/* Title Section */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-white p-8 rounded-[32px] border border-slate-100 shadow-sm relative overflow-hidden">
           <div className="absolute top-0 right-0 w-64 h-64 bg-red-500/5 rounded-full -mr-32 -mt-32 blur-3xl" />
@@ -294,7 +291,6 @@ export default function SuperAdminDashboard() {
             Ready2Go Access Center • High Security • Stable Connection
           </p>
         </div> */}
-      </main>
-    </div>
+    </AdminPageShell>
   )
 }
