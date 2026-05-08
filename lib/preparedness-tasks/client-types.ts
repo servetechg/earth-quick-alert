@@ -5,6 +5,8 @@ export type PreparednessApiTask = {
   title: string;
   createdBy: string;
   isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type PreparednessApiGroup = {
@@ -17,6 +19,9 @@ export type PreparednessUiTask = {
   id: string;
   title: string;
   persisted: boolean;
+  /** Present for persisted tasks from API (e.g. sub-admin preparedness editor). */
+  createdBy?: string;
+  updatedAt?: string;
 };
 
 export type PreparednessUiSection = {

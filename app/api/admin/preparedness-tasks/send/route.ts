@@ -3,18 +3,19 @@ import connectDB from '@/lib/mongodb';
 import mongoose from 'mongoose';
 import PreparednessGuide from '@/models/PreparednessGuide';
 import TaskModel from '@/models/Task';
-import SubAdminTask from '@/models/SubAdminTask';
 import User from '@/models/User';
 import { requireSuperAdmin } from '@/lib/preparedness-tasks/auth';
 import { isValidObjectId } from '@/lib/preparedness-tasks/object-id';
+import {
+    type SuperAdminSourceTask,
+    upsertSubAdminTasksFromSuperAdminTasks,
+} from '@/lib/preparedness-tasks/super-admin-send-to-subadmins';
 
 export const dynamic = 'force-dynamic';
 
 function jsonError(message: string, status: number) {
     return NextResponse.json({ success: false, error: message }, { status });
 }
-
-type TaskDoc = { _id: mongoose.Types.ObjectId; preparednessId: mongoose.Types.ObjectId; title: string };
 
 export async function POST(req: NextRequest) {
     try {
@@ -46,7 +47,7 @@ export async function POST(req: NextRequest) {
             return jsonError(`Task(s) not found or inactive: ${missing.join(', ')}`, 404);
         }
 
-        const sourceTasks = sourceTasksRaw as unknown as TaskDoc[];
+        const sourceTasks = sourceTasksRaw as unknown as SuperAdminSourceTask[];
         const prepIdStrings = [...new Set(sourceTasks.map((t) => t.preparednessId.toString()))];
         const prepCount = await PreparednessGuide.countDocuments({
             _id: { $in: prepIdStrings.map((id) => new mongoose.Types.ObjectId(id)) },
@@ -76,31 +77,7 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        const tasksOut: { taskId: string; recipients: { subAdminId: string; upserted: boolean }[] }[] = [];
-
-        for (const sourceTaskDoc of sourceTasks) {
-            const recipients: { subAdminId: string; upserted: boolean }[] = [];
-            for (const sa of subAdmins) {
-                const subAdminId = sa._id as mongoose.Types.ObjectId;
-                const filter = { subAdminId, sourceTaskId: sourceTaskDoc._id };
-                const existing = await SubAdminTask.findOne(filter).lean();
-                await SubAdminTask.findOneAndUpdate(
-                    filter,
-                    {
-                        $set: {
-                            preparednessId: sourceTaskDoc.preparednessId,
-                            title: sourceTaskDoc.title,
-                            createdBy: 'super_admin',
-                            isActive: true,
-                            isDeletedBySubAdmin: false,
-                        },
-                    },
-                    { upsert: true, new: true }
-                );
-                recipients.push({ subAdminId: subAdminId.toString(), upserted: !existing });
-            }
-            tasksOut.push({ taskId: sourceTaskDoc._id.toString(), recipients });
-        }
+        const tasksOut = await upsertSubAdminTasksFromSuperAdminTasks(sourceTasks, subAdmins);
 
         return NextResponse.json({ success: true, data: { tasks: tasksOut } });
     } catch (e) {

@@ -8,6 +8,7 @@ import SubAdminTask from '@/models/SubAdminTask';
 import User from '@/models/User';
 import UserTask from '@/models/UserTask';
 import { isValidObjectId } from '@/lib/preparedness-tasks/object-id';
+import { upsertSubAdminTasksFromSuperAdminTasks } from '@/lib/preparedness-tasks/super-admin-send-to-subadmins';
 
 export const dynamic = 'force-dynamic';
 
@@ -87,31 +88,7 @@ export async function POST(req: NextRequest) {
                 }
             }
 
-            const tasksOut: { taskId: string; recipients: { subAdminId: string; upserted: boolean }[] }[] = [];
-
-            for (const sourceTaskDoc of sourceTasks) {
-                const recipients: { subAdminId: string; upserted: boolean }[] = [];
-                for (const sa of subAdmins) {
-                    const subAdminId = sa._id as mongoose.Types.ObjectId;
-                    const filter = { subAdminId, sourceTaskId: sourceTaskDoc._id };
-                    const existing = await SubAdminTask.findOne(filter).lean();
-                    await SubAdminTask.findOneAndUpdate(
-                        filter,
-                        {
-                            $set: {
-                                preparednessId: sourceTaskDoc.preparednessId,
-                                title: sourceTaskDoc.title,
-                                createdBy: 'super_admin',
-                                isActive: true,
-                                isDeletedBySubAdmin: false,
-                            },
-                        },
-                        { upsert: true, new: true }
-                    );
-                    recipients.push({ subAdminId: subAdminId.toString(), upserted: !existing });
-                }
-                tasksOut.push({ taskId: sourceTaskDoc._id.toString(), recipients });
-            }
+            const tasksOut = await upsertSubAdminTasksFromSuperAdminTasks(sourceTasks, subAdmins);
 
             return NextResponse.json({ success: true, role, data: { tasks: tasksOut } });
         }
