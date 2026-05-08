@@ -62,7 +62,7 @@ function makeTempId() {
   return `tmp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function toUiSections(groups: PreparednessApiGroup[]): PreparednessUiSection[] {
+function toUiSections(groups: PreparednessApiGroup[], editorRole: EditableRole): PreparednessUiSection[] {
   return sortPreparednessCategories(groups).map((group) => ({
     preparednessId: group._id,
     category: group.category,
@@ -71,6 +71,9 @@ function toUiSections(groups: PreparednessApiGroup[]): PreparednessUiSection[] {
       id: task._id,
       title: task.title,
       persisted: true,
+      ...(editorRole === 'sub-admin'
+        ? { createdBy: task.createdBy, updatedAt: task.updatedAt }
+        : {}),
     })),
   }));
 }
@@ -106,8 +109,9 @@ export default function PreparednessInformationPage() {
     return map;
   }, [initialSections]);
 
-  const loadPreparedness = async () => {
-    setIsLoading(true);
+  const loadPreparedness = async (options?: { silent?: boolean }) => {
+    const silent = Boolean(options?.silent);
+    if (!silent) setIsLoading(true);
     try {
       const payload = await requestJson('/api/preparedness-with-tasks', { cache: 'no-store' });
       const apiRole = payload?.role as PreparednessApiRole;
@@ -115,16 +119,15 @@ export default function PreparednessInformationPage() {
         throw new Error('Only super-admin and sub-admin can access this editor.');
       }
 
-      const nextSections = toUiSections(payload.data ?? []);
-
       setRole(apiRole);
+      const nextSections = toUiSections(payload.data ?? [], apiRole);
       setSections(nextSections);
       setInitialSections(nextSections);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to load preparedness data.';
       toast.error(message);
     } finally {
-      setIsLoading(false);
+      if (!silent) setIsLoading(false);
     }
   };
 
@@ -245,7 +248,7 @@ export default function PreparednessInformationPage() {
         });
       }
 
-      await loadPreparedness();
+      await loadPreparedness({ silent: true });
       toast.success(`Saved ${section.label}.`);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to save changes.';
@@ -327,6 +330,7 @@ export default function PreparednessInformationPage() {
                   category={section.category}
                   tasks={section.tasks}
                   headerIcon={getCategoryIcon(section.category)}
+                  showSuperAdminTaskMeta={role === 'sub-admin'}
                   showActions
                   isDirty={isSectionDirty(section)}
                   isSaving={Boolean(savingBySection[section.preparednessId])}

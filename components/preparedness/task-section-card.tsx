@@ -18,12 +18,27 @@ import { Loader2, Pencil, Plus, Save, Send, Trash2 } from 'lucide-react';
 import type { PreparednessUiTask } from '@/lib/preparedness-tasks/client-types';
 import type { ReactNode } from 'react';
 
+function formatTaskMetaDate(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+}
+
+function superAdminTaskMetaLine(task: PreparednessUiTask): string | null {
+  if (task.createdBy !== 'super_admin') return null;
+  const raw = task.updatedAt?.trim();
+  if (!raw) return null;
+  return `Created by - Super Admin | Date: ${formatTaskMetaDate(raw)}`;
+}
+
 type TaskSectionCardProps = {
   title: string;
   category: string;
   tasks: PreparednessUiTask[];
   headerIcon?: ReactNode;
   readOnly?: boolean;
+  /** Sub-admin preparedness: show provenance when the task was pushed from a super-admin template. */
+  showSuperAdminTaskMeta?: boolean;
   onTaskChange?: (taskId: string, title: string) => void;
   onTaskDelete?: (taskId: string) => void;
   onAddTask?: (title: string) => void;
@@ -43,6 +58,7 @@ export function TaskSectionCard({
   tasks,
   headerIcon,
   readOnly = false,
+  showSuperAdminTaskMeta = false,
   onTaskChange,
   onTaskDelete,
   onAddTask,
@@ -91,27 +107,38 @@ export function TaskSectionCard({
       </div>
 
       <div className="space-y-3">
-        {tasks.map((task, idx) => (
-          <div key={task.id} className="flex items-center gap-3">
-            <span className="text-slate-400 text-sm w-5">{idx + 1}.</span>
+        {tasks.map((task, idx) => {
+          const metaLine =
+            showSuperAdminTaskMeta && !readOnly ? superAdminTaskMetaLine(task) : null;
+          return (
+          <div key={task.id} className="flex items-start gap-3">
+            <span className="text-slate-400 text-sm w-5 pt-2">{idx + 1}.</span>
             {readOnly ? (
               <div className="flex-1 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2 text-sm text-slate-700">
                 {task.title}
               </div>
             ) : isEditing(task.id) ? (
-              <Input
-                value={task.title}
-                onChange={(event) => onTaskChange?.(task.id, event.target.value)}
-                className="flex-1 bg-slate-50 border-slate-100 rounded-md h-10"
-                autoFocus
-              />
+              <div className="flex-1 min-w-0 flex flex-col gap-1">
+                <Input
+                  value={task.title}
+                  onChange={(event) => onTaskChange?.(task.id, event.target.value)}
+                  className="w-full bg-slate-50 border-slate-100 rounded-md h-10"
+                  autoFocus
+                />
+                {metaLine ? (
+                  <p className="text-xs text-slate-500 px-0.5">{metaLine}</p>
+                ) : null}
+              </div>
             ) : (
-              <div className="flex-1 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                {task.title}
+              <div className="flex-1 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2 text-sm text-slate-700 min-w-0">
+                <div className="text-slate-800">{task.title}</div>
+                {metaLine ? (
+                  <p className="text-xs text-slate-500 mt-1 font-medium normal-case">{metaLine}</p>
+                ) : null}
               </div>
             )}
             {!readOnly && (
-              <>
+              <div className="flex items-center gap-0 shrink-0 pt-0.5">
                 <Button
                   onClick={() => setEditingTaskId(isEditing(task.id) ? null : task.id)}
                   variant="ghost"
@@ -131,10 +158,11 @@ export function TaskSectionCard({
                 >
                   <Trash2 className="w-4 h-4" />
                 </Button>
-              </>
+              </div>
             )}
           </div>
-        ))}
+          );
+        })}
       </div>
 
       {tasks.length === 0 && (
