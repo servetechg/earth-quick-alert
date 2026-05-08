@@ -5,31 +5,70 @@
 
 import type { DashboardIngestBundle, HistoricalAnalysis, RiskReport } from '@/lib/types/risk-assessment';
 
-type HazardArchetype = 'flood' | 'wildfire' | 'earthquake' | 'multi' | 'baseline';
+type HazardArchetype =
+    | 'flood'
+    | 'wildfire'
+    | 'earthquake'
+    | 'severe_weather'
+    | 'multi'
+    | 'baseline';
 
-function distroCounts(report: RiskReport): { flood: number; wildfire: number; earthquake: number } {
+function distroCounts(report: RiskReport): {
+    flood: number;
+    wildfire: number;
+    earthquake: number;
+    tornado: number;
+    storm: number;
+    hazardous: number;
+    coastal_surf: number;
+    marine: number;
+} {
     const d = report.incident_distribution ?? [];
     const get = (cat: string) => Math.max(0, Math.floor(d.find((x) => x.category === cat)?.count ?? 0));
     return {
         flood: get('flood'),
         wildfire: get('wildfire'),
         earthquake: get('earthquake'),
+        tornado: get('tornado'),
+        storm: get('storm'),
+        hazardous: get('hazardous'),
+        coastal_surf: get('coastal_surf'),
+        marine: get('marine'),
     };
 }
 
+function nwsSurfaceTotal(c: ReturnType<typeof distroCounts>): number {
+    return Math.max(0, c.tornado + c.storm + c.hazardous + c.coastal_surf + c.marine);
+}
+
 function pickArchetype(report: RiskReport): HazardArchetype {
-    const { flood, wildfire, earthquake } = distroCounts(report);
-    const activeCats = [flood > 0, wildfire > 0, earthquake > 0].filter(Boolean).length;
-    if (activeCats >= 2) return 'multi';
-    if (flood > 0) return 'flood';
-    if (wildfire > 0) return 'wildfire';
-    if (earthquake > 0) return 'earthquake';
+    const c = distroCounts(report);
+    const met = nwsSurfaceTotal(c);
+    const families = [
+        c.flood > 0,
+        c.wildfire > 0,
+        c.earthquake > 0,
+        met > 0,
+    ].filter(Boolean).length;
+    if (families >= 2) return 'multi';
+    if (c.flood > 0) return 'flood';
+    if (c.wildfire > 0) return 'wildfire';
+    if (c.earthquake > 0) return 'earthquake';
+    if (met > 0) return 'severe_weather';
     return 'baseline';
 }
 
 function matchConfidence(report: RiskReport, archetype: HazardArchetype, bundle: DashboardIngestBundle): number {
-    const { flood, wildfire, earthquake } = distroCounts(report);
-    const n = flood + wildfire + earthquake;
+    const c = distroCounts(report);
+    const n =
+        c.flood +
+        c.wildfire +
+        c.earthquake +
+        c.tornado +
+        c.storm +
+        c.hazardous +
+        c.coastal_surf +
+        c.marine;
     const major = report.major_incidents ?? 0;
     const feeds = bundle.successfulSources;
     if (archetype === 'baseline') {
@@ -102,6 +141,34 @@ function copyForWildfire(state: string): HistoricalAnalysis {
     };
 }
 
+function copyForSevereWeather(state: string): HistoricalAnalysis {
+    const s = ST(state);
+    return {
+        matched_event: `NOAA/NWS hazardous weather footprint — ${s} (surface warnings / watches via active alerts)`,
+        similarity_summary: `Nationwide Active Alerts show concentrated tornado / thunderstorm / winter-wind exposures and, when present, coastal surf and marine products in ${s}. Comparable periods elevate spotter activation, surf rescue posture, small-craft decisions, and multilingual push updates when warning polygons stack across metro or shoreline counties.`,
+        past_damages: [
+            'Downed utility spans, roof and signage failures, and tree-strike fatalities when warning lead times shorten in fast-moving convection.',
+            'EMS volume spikes tied to slips/falls during ice storms, heat exhaustion during excessive heat episodes, and wildfire spotting when gusts align with dryness aloft.',
+            'Regional grid stability questions when contiguous severe-wind footprints stress vegetation and conductors simultaneously.',
+        ],
+        past_procedures: [
+            'Polygon-targeted alerting with GIS overlap checks against campuses, hospitals, and industrial facilities.',
+            'Skywarn / spotter nets stood up alongside radar-centric aviation holds and intermittent ground stops.',
+            'Utility aviation pre-position for wire-down response; cooling / warming centers pre-staged for multi-day episodes.',
+        ],
+        current_procedures: [
+            'Cross-verify NWS event types versus Virtual EOC user density and roadway closure feeds.',
+            'Confirm redundant alerting paths (SMS, email, portal) ahead of plausible power blips in warned counties.',
+            'Brief logistics on evacuation timing where rotating storms or snow squalls compress decision windows.',
+        ],
+        future_measures: [
+            'Mesh mesonet investments and radar gap infill along known convective corridors.',
+            'Post-event attribution studies linking polygon accuracy to preventable injuries for exercise planning.',
+            'Expand probabilistic briefing templates coupling short-fuse warnings with preparedness checklists.',
+        ],
+    };
+}
+
 function copyForEarthquake(state: string): HistoricalAnalysis {
     const s = ST(state);
     return {
@@ -133,8 +200,8 @@ function copyForEarthquake(state: string): HistoricalAnalysis {
 function copyForMulti(state: string): HistoricalAnalysis {
     const s = ST(state);
     return {
-        matched_event: `Concurrent multi-hazard episode — ${s} (flood + fire + / or seismic signals)`,
-        similarity_summary: `Ingest shows overlapping hydrologic, wildland, and/or seismic indicators. Historically, ${s} windows like this strain unified command: competing resource claims, duplicated public messaging, and logistics friction across separated incident teams.`,
+        matched_event: `Concurrent multi-hazard episode — ${s} (hydro + wildland + seismic + / or NOAA surface hazards)`,
+        similarity_summary: `Ingest shows overlapping hydrologic, wildland, seismic, and/or NOAA surface-hazard indicators. Historically, ${s} windows like this strain unified command: competing resource claims, duplicated public messaging, and logistics friction across separated incident teams.`,
         past_damages: [
             'Compounded outage and access issues when fire smoke, road flooding, and bridge inspection holds coincide.',
             'Staffing conflicts between hydrology desks, fire operations, and earthquake situation units.',
@@ -202,9 +269,11 @@ export function buildHistoricalAnalysisFromReport(
               ? copyForWildfire(state)
               : archetype === 'earthquake'
                 ? copyForEarthquake(state)
-                : archetype === 'multi'
-                  ? copyForMulti(state)
-                  : copyForBaseline(state);
+                : archetype === 'severe_weather'
+                  ? copyForSevereWeather(state)
+                  : archetype === 'multi'
+                    ? copyForMulti(state)
+                    : copyForBaseline(state);
 
     return {
         ...body,

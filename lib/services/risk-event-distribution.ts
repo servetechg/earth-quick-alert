@@ -1,5 +1,5 @@
 /**
- * Event-based flood / wildfire / earthquake counts for AI Risk Assessment.
+ * Event-based incident counts for AI Risk Assessment (flood/hydro + NWS met buckets + coastal/marine + wildfire + earthquake).
  * Aligns dedupe keys & level filters with AlertCommunication multi-sync where the same raw data exists.
  */
 
@@ -12,7 +12,10 @@ import type { USGSTimeSeries } from '@/lib/services/flood-service';
 import { summarizeNwpsGauge } from '@/lib/services/nwps-reach-mapper';
 import type { OpenFemaDisasterRecord } from '@/lib/services/openfema-service';
 import type { FIRMSRecord } from '@/lib/services/wildfire-service';
-import { isFloodRelatedEvent } from '@/lib/services/risk-ingest-service';
+import {
+    classifyNwsIncidentDistributionBucket,
+    isFloodRelatedEvent,
+} from '@/lib/services/risk-ingest-service';
 
 const FIRMS_CARD_CAP = (() => {
     const raw = process.env.FIRMS_MAX_CARDS;
@@ -126,6 +129,11 @@ function eqFeatureId(f: unknown): string {
  */
 export function deriveEventBasedIncidentDistribution(bundle: DashboardIngestBundle): DistroPoint[] {
     const floodIds = new Set<string>();
+    const tornadoIds = new Set<string>();
+    const stormIds = new Set<string>();
+    const hazardousIds = new Set<string>();
+    const coastalSurfIds = new Set<string>();
+    const marineIds = new Set<string>();
     const wildIds = new Set<string>();
     const eqIds = new Set<string>();
 
@@ -163,8 +171,18 @@ export function deriveEventBasedIncidentDistribution(bundle: DashboardIngestBund
         if (Array.isArray(feats)) {
             for (const f of feats) {
                 const p = (f as { properties?: { event?: string } })?.properties;
-                if (!p || !isFloodRelatedEvent(p.event)) continue;
-                floodIds.add(nwsFeatureId(f as { properties?: Record<string, unknown> }));
+                if (!p) continue;
+                const fid = nwsFeatureId(f as { properties?: Record<string, unknown> });
+                if (isFloodRelatedEvent(p.event)) {
+                    floodIds.add(fid);
+                    continue;
+                }
+                const bucket = classifyNwsIncidentDistributionBucket(p.event);
+                if (bucket === 'tornado') tornadoIds.add(fid);
+                else if (bucket === 'storm') stormIds.add(fid);
+                else if (bucket === 'hazardous') hazardousIds.add(fid);
+                else if (bucket === 'coastal_surf') coastalSurfIds.add(fid);
+                else if (bucket === 'marine') marineIds.add(fid);
             }
         }
     }
@@ -247,6 +265,11 @@ export function deriveEventBasedIncidentDistribution(bundle: DashboardIngestBund
 
     return [
         { category: 'flood', count: floodIds.size },
+        { category: 'tornado', count: tornadoIds.size },
+        { category: 'storm', count: stormIds.size },
+        { category: 'hazardous', count: hazardousIds.size },
+        { category: 'coastal_surf', count: coastalSurfIds.size },
+        { category: 'marine', count: marineIds.size },
         { category: 'wildfire', count: wildIds.size },
         { category: 'earthquake', count: eqIds.size },
     ];
