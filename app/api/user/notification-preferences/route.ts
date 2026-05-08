@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import connectDB from '@/lib/mongodb';
 import User from '@/models/User';
 import { getSession } from '@/lib/auth';
+import { recordActivity, ACTIVITY_ACTIONS } from '@/lib/activity-log';
+import {
+  mergeNotificationPreferencesPatch,
+  normalizeNotificationPreferences,
+} from '@/lib/notification-preferences/defaults';
 
 /** Stored on User — only push / sms / email plus alert-type toggles. */
 type StoredNotificationPrefs = {
@@ -112,39 +117,40 @@ function serializeNotificationPreferences(np: NotificationPrefsDoc | null | unde
   };
 }
 
+function jsonFail(message: string, status: number) {
+  return NextResponse.json({ success: false, error: message }, { status });
+}
+
+function buildPayload(user: Record<string, unknown>) {
+  const raw = (user as { notificationPreferences?: NotificationPrefsDoc }).notificationPreferences;
+  return {
+    phoneNumber: (user as { phoneNumber?: string }).phoneNumber || '',
+    email: (user as { email?: string }).email || '',
+    notificationPreferences: serializeNotificationPreferences(raw),
+  };
+}
+
 export async function GET() {
   try {
     await connectDB();
     const session = await getSession();
 
     if (!session?.user?.id) {
-      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+      return jsonFail('Unauthorized', 401);
     }
 
     const user = await User.findById(session.user.id)
       .select('notificationPreferences phoneNumber email')
-      .lean();
+      .lean<Record<string, unknown>>();
 
     if (!user) {
-      return NextResponse.json({ success: false, error: 'User not found' }, { status: 404 });
+      return jsonFail('User not found', 404);
     }
 
-    const raw = (user as { notificationPreferences?: NotificationPrefsDoc }).notificationPreferences;
-
-    return NextResponse.json({
-      success: true,
-      data: {
-        phoneNumber: (user as { phoneNumber?: string }).phoneNumber || '',
-        email: (user as { email?: string }).email || '',
-        notificationPreferences: serializeNotificationPreferences(raw),
-      },
-    });
+    return NextResponse.json({ success: true, data: buildPayload(user) });
   } catch (error) {
     console.error('Error fetching notification preferences:', error);
-    return NextResponse.json(
-      { success: false, error: 'Failed to fetch notification preferences' },
-      { status: 500 }
-    );
+    return jsonFail('Failed to fetch notification preferences', 500);
   }
 }
 
@@ -154,62 +160,79 @@ export async function POST(req: NextRequest) {
     const session = await getSession();
 
     if (!session?.user?.id) {
-      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+      return jsonFail('Unauthorized', 401);
     }
 
-    const body = await req.json();
-    const rawPrefs = body.notificationPreferences;
-    const prefsIncoming: Record<string, unknown> =
-      rawPrefs && typeof rawPrefs === 'object' && !Array.isArray(rawPrefs)
-        ? (rawPrefs as Record<string, unknown>)
-        : {};
-    const phoneNumber =
-      typeof body.phoneNumber === 'string' ? body.phoneNumber.trim() : undefined;
+    const body = await req.json().catch(() => null);
+    if (!body || typeof body !== 'object') {
+      return jsonFail('Invalid JSON body', 400);
+    }
 
+    const bodyObj = body as Record<string, unknown>;
     const existing = await User.findById(session.user.id)
-      .select('notificationPreferences phoneNumber')
-      .lean();
+      .select('notificationPreferences')
+      .lean<{ notificationPreferences?: Record<string, unknown> }>();
 
     if (!existing) {
-      return NextResponse.json({ success: false, error: 'User not found' }, { status: 404 });
+      return jsonFail('User not found', 404);
     }
 
-    const prevNP =
-      (existing as { notificationPreferences?: NotificationPrefsDoc }).notificationPreferences ||
-      {};
+    const currentPrefs = normalizeNotificationPreferences(existing.notificationPreferences);
+    const rawPatch = bodyObj.notificationPreferences;
+    const patch: Record<string, unknown> =
+      rawPatch && typeof rawPatch === 'object' && !Array.isArray(rawPatch)
+        ? (rawPatch as Record<string, unknown>)
+        : {};
 
-    const finalNP = mergeNotificationPreferences(prevNP, prefsIncoming);
+    const nextPrefs = mergeNotificationPreferencesPatch(currentPrefs, patch);
 
-    const updated = await User.findByIdAndUpdate(
-      session.user.id,
-      {
-        ...(phoneNumber !== undefined ? { phoneNumber } : {}),
-        notificationPreferences: finalNP,
-      },
-      { new: true, runValidators: true }
-    )
+    const phoneNumber =
+      typeof bodyObj.phoneNumber === 'string' ? bodyObj.phoneNumber.trim() : undefined;
+
+    const setFlat: Record<string, unknown> = {};
+    if (phoneNumber !== undefined) {
+      setFlat.phoneNumber = phoneNumber;
+    }
+    const keys = [
+      'push',
+      'sms',
+      'email',
+      'majorAlerts',
+      'minorAlerts',
+      'aiReports',
+      'pushAlerts',
+      'smsAlerts',
+      'emailDigest',
+    ] as const;
+    for (const k of keys) {
+      setFlat[`notificationPreferences.${k}`] = nextPrefs[k];
+    }
+
+    const updated = await User.findByIdAndUpdate(session.user.id, { $set: setFlat }, { new: true })
       .select('notificationPreferences phoneNumber email')
-      .lean();
+      .lean<Record<string, unknown>>();
 
     if (!updated) {
-      return NextResponse.json({ success: false, error: 'User not found' }, { status: 404 });
+      return jsonFail('User not found', 404);
     }
 
-    const raw = (updated as { notificationPreferences?: NotificationPrefsDoc }).notificationPreferences;
+    const stored = (updated as { notificationPreferences?: NotificationPrefsDoc }).notificationPreferences;
+
+    void recordActivity({
+      userId: session.user.id,
+      action: ACTIVITY_ACTIONS.NOTIFICATION_PREFS_UPDATE,
+      label: 'Notification preferences updated',
+      meta: {
+        preferences: serializeNotificationPreferences(stored),
+      },
+    });
 
     return NextResponse.json({
       success: true,
-      data: {
-        phoneNumber: (updated as { phoneNumber?: string }).phoneNumber || '',
-        email: (updated as { email?: string }).email || '',
-        notificationPreferences: serializeNotificationPreferences(raw),
-      },
+      data: buildPayload(updated),
     });
   } catch (error) {
     console.error('Error saving notification preferences:', error);
-    return NextResponse.json(
-      { success: false, error: 'Failed to save notification preferences' },
-      { status: 500 }
-    );
+    return jsonFail('Failed to save notification preferences', 500);
   }
 }

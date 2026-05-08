@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import connectDB from '@/lib/mongodb';
 import Task from '@/models/Task';
+import { syncDownstreamFromSuperAdminTaskTitle, syncDownstreamFromSuperAdminTasksDeleted } from '@/lib/preparedness-tasks/cascade-task-updates';
 import { requireSuperAdmin } from '@/lib/preparedness-tasks/auth';
 import { isValidObjectId } from '@/lib/preparedness-tasks/object-id';
 
@@ -9,6 +10,8 @@ export const dynamic = 'force-dynamic';
 function jsonError(message: string, status: number) {
     return NextResponse.json({ success: false, error: message }, { status });
 }
+
+type LeanSuperTask = { _id: unknown; preparednessId: unknown; [key: string]: unknown };
 
 export async function PUT(
     req: NextRequest,
@@ -36,12 +39,15 @@ export async function PUT(
 
         if (!updated) return jsonError('Task not found or inactive', 404);
 
+        await syncDownstreamFromSuperAdminTaskTitle(taskId, title);
+
+        const task = updated as unknown as LeanSuperTask;
         return NextResponse.json({
             success: true,
             data: {
-                ...updated,
-                _id: String((updated as { _id: unknown })._id),
-                preparednessId: String((updated as { preparednessId: unknown }).preparednessId),
+                ...task,
+                _id: String(task._id),
+                preparednessId: String(task.preparednessId),
             },
         });
     } catch (e) {
@@ -71,6 +77,8 @@ export async function DELETE(
         ).lean();
 
         if (!updated) return jsonError('Task not found or already inactive', 404);
+
+        await syncDownstreamFromSuperAdminTasksDeleted([taskId]);
 
         return NextResponse.json({ success: true });
     } catch (e) {

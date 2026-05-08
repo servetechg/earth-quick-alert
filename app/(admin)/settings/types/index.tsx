@@ -9,7 +9,6 @@ export interface SettingsTabItem {
 export interface ProfileSettings {
   name: string
   email: string
-  role: string
   phone: string
   /** Image URL (e.g. Cloudinary `secure_url`). */
   profilePic: string
@@ -17,16 +16,10 @@ export interface ProfileSettings {
   profilePicPublicId: string
 }
 
-export interface NotificationSettings {
-  majorAlerts: boolean
-  minorAlerts: boolean
-  aiReports: boolean
-  emailDigest: boolean
-  smsAlerts: boolean
-  pushAlerts: boolean
-}
+import type { NotificationPreferencesDTO } from '@/lib/notification-preferences/types'
 
-export type NotificationSettingsKey = keyof NotificationSettings
+export type NotificationSettings = NotificationPreferencesDTO
+export type NotificationSettingsKey = keyof NotificationPreferencesDTO
 
 export interface NotificationPreferenceItem {
   key: NotificationSettingsKey
@@ -45,4 +38,9 @@ export interface DispatchSettings {
 export interface DispatchSelectOption {
   value: string
   label: string
+}
+
+export interface SecuritySettings {
+  twoFactorEnabled: boolean
+  sessionTimeoutEnabled: boolean
 }

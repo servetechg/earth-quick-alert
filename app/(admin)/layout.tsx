@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Sidebar } from '@/components/sidebar'
 import { Header } from '@/components/header'
+import { SessionIdleWatcher } from '@/components/session-idle-watcher'
 
 export default function AdminLayout({
     children,
@@ -36,6 +37,11 @@ export default function AdminLayout({
         localStorage.removeItem('userRole')
         localStorage.removeItem('userEmail')
         localStorage.removeItem('userName')
+        localStorage.removeItem('userCity')
+        localStorage.removeItem('userCountry')
+        localStorage.removeItem('systemMode')
+        localStorage.removeItem('isSafe')
+        localStorage.removeItem('userLocation')
         router.push('/login')
     }
 
@@ -52,6 +58,7 @@ export default function AdminLayout({
 
     return (
         <div className="flex h-screen min-h-0 bg-background text-foreground">
+            <SessionIdleWatcher />
             <Sidebar />
             <div className="flex-1 flex flex-col overflow-hidden">
                 <Header userName={userName || "Admin User"} onLogout={handleLogout} />

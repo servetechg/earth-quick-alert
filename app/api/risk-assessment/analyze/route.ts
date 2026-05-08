@@ -3,6 +3,7 @@ import { getSession } from '@/lib/auth';
 import { runDashboardIngest } from '@/lib/services/risk-ingest-service';
 import { openaiService } from '@/lib/services/openai-service';
 import { countReady2GoReachableUsers } from '@/lib/services/ready2go-reachable-users';
+import { recordActivity, ACTIVITY_ACTIONS } from '@/lib/activity-log';
 
 /** Roles allowed to run Dashboard A fusion (aligned with admin operational tooling). */
 const ALLOWED_ROLES = new Set([
@@ -62,6 +63,17 @@ export async function POST(req: Request) {
             populations_at_risk: pop,
             ready2go_users_reachable: reachable,
         };
+
+        void recordActivity({
+            userId: session.user.id,
+            action: ACTIVITY_ACTIONS.AI_RISK_REPORT,
+            label: 'AI risk assessment report generated',
+            meta: {
+                nationwide: useNationwide,
+                totalSignals: bundle.totalSignals,
+                ingestScope: bundle.ingestScope ?? 'nationwide',
+            },
+        });
 
         return NextResponse.json({
             report,

@@ -3,6 +3,7 @@ import connectDB from '@/lib/mongodb';
 import User from '@/models/User';
 import { getSession } from '@/lib/auth';
 import { notificationService } from '@/lib/services/notification-service';
+import { recordActivity, ACTIVITY_ACTIONS } from '@/lib/activity-log';
 
 export async function POST(req: NextRequest) {
     try {
@@ -27,10 +28,16 @@ export async function POST(req: NextRequest) {
         }).select('_id name email').lean();
 
         if (usersInCountry.length === 0) {
-            return NextResponse.json({ 
-                success: true, 
+            void recordActivity({
+                userId: session.user.id,
+                action: ACTIVITY_ACTIONS.ALERT_COUNTRY_BROADCAST,
+                label: `Country alert attempted (${country}) — no recipients`,
+                meta: { country, recipients: 0 },
+            });
+            return NextResponse.json({
+                success: true,
                 message: `No users found in ${country}.`,
-                count: 0 
+                count: 0,
             });
         }
 
@@ -50,6 +57,17 @@ export async function POST(req: NextRequest) {
         );
 
         await Promise.all(notificationPromises);
+
+        void recordActivity({
+            userId: session.user.id,
+            action: ACTIVITY_ACTIONS.ALERT_COUNTRY_BROADCAST,
+            label: `Country alert broadcast: ${country}`,
+            meta: {
+                country,
+                recipients: usersInCountry.length,
+                title: broadcastTitle,
+            },
+        });
 
         return NextResponse.json({ 
             success: true, 

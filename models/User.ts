@@ -99,6 +99,10 @@ const UserSchema = new Schema({
         type: String,
         default: '',
     },
+    profilePicPublicId: {
+        type: String,
+        default: '',
+    },
     notificationPreferences: {
         push: { type: Boolean, default: true },
         sms: { type: Boolean, default: true },
@@ -147,6 +151,14 @@ const UserSchema = new Schema({
     lng: {
         type: Number,
         default: null,
+    },
+    twoFactorEnabled: {
+        type: Boolean,
+        default: false,
+    },
+    sessionTimeoutEnabled: {
+        type: Boolean,
+        default: true,
     },
     createdAt: {
         type: Date,

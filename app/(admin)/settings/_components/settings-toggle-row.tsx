@@ -17,10 +17,15 @@ export function SettingsToggleRow({
   checked,
   onCheckedChange,
   switchClassName,
-  disabled,
+  disabled = false,
 }: SettingsToggleRowProps) {
   return (
-    <div className="flex items-center justify-between rounded-xl border border-border/60 bg-card/50 px-4 py-3">
+    <div
+      className={cn(
+        'flex items-center justify-between rounded-xl border border-border/60 bg-card/50 px-4 py-3',
+        disabled && 'opacity-60'
+      )}
+    >
       <div className="space-y-0.5">
         <Label className="text-sm font-semibold">{label}</Label>
         <p className="text-xs text-muted-foreground">{description}</p>
