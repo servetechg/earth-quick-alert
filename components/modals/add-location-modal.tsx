@@ -120,7 +120,7 @@ export function AddLocationModal({ isOpen, onClose, onAdd }: AddLocationModalPro
                         <Button variant="outline" onClick={onClose} className="flex-1">
                             Cancel
                         </Button>
-                        <Button onClick={handleAdd} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white">
+                        <Button onClick={handleAdd} className="flex-1 bg-[#33375D] text-white hover:bg-[#2B2F50]">
                             <MapPin className="w-4 h-4 mr-2" />
                             Add Location
                         </Button>

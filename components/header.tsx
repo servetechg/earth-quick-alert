@@ -8,13 +8,16 @@ import Link from 'next/link'
 import { Input } from '@/components/ui/input'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
+import { USER_PROFILE_UPDATED_EVENT } from '@/lib/sync-client-user-profile'
 
 interface HeaderProps {
   userName?: string
   onLogout?: () => void
+  /** When true, the top search field is hidden (e.g. super-admin layout). */
+  hideSearch?: boolean
 }
 
-export function Header({ userName = 'Admin User', onLogout }: HeaderProps) {
+export function Header({ userName = 'Admin User', onLogout, hideSearch = false }: HeaderProps) {
   const [showDropdown, setShowDropdown] = useState(false)
   const [showSidebar, setShowSidebar] = useState(false)
   const [localUserTick, setLocalUserTick] = useState(0)
@@ -32,14 +35,14 @@ export function Header({ userName = 'Admin User', onLogout }: HeaderProps) {
 
   useEffect(() => {
     const sync = () => setLocalUserTick((n) => n + 1)
-    window.addEventListener('earthquick:userProfileUpdated', sync)
-    return () => window.removeEventListener('earthquick:userProfileUpdated', sync)
+    window.addEventListener(USER_PROFILE_UPDATED_EVENT, sync)
+    return () => window.removeEventListener(USER_PROFILE_UPDATED_EVENT, sync)
   }, [])
 
-  const displayName = useMemo(
-    () => userName || (typeof window !== 'undefined' ? localStorage.getItem('userName') : '') || 'User',
-    [userName, localUserTick]
-  )
+  const displayName = useMemo(() => {
+    if (typeof window === 'undefined') return userName || 'User'
+    return localStorage.getItem('userName') || userName || 'User'
+  }, [userName, localUserTick])
   const userEmail = useMemo(
     () => (typeof window !== 'undefined' ? localStorage.getItem('userEmail') : ''),
     [localUserTick]
@@ -66,15 +69,17 @@ export function Header({ userName = 'Admin User', onLogout }: HeaderProps) {
           <Menu className="w-5 h-5" />
         </button>
 
-        <div className="flex-1 max-w-sm hidden md:block">
-          <div className="relative group">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <Input
-              placeholder="Search ....."
-              className="pl-10 bg-white border-slate-200 rounded-lg h-10 w-full focus:ring-1 focus:ring-blue-100 transition-all shadow-none text-sm"
-            />
+        {!hideSearch && (
+          <div className="flex-1 max-w-sm hidden md:block">
+            <div className="relative group">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <Input
+                placeholder="Search ....."
+                className="pl-10 bg-white border-slate-200 rounded-lg h-10 w-full focus:ring-1 focus:ring-blue-100 transition-all shadow-none text-sm"
+              />
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       <div className="flex items-center gap-2 ">
@@ -108,7 +113,7 @@ export function Header({ userName = 'Admin User', onLogout }: HeaderProps) {
               </div>
 
               <Link
-                href="/user/settings"
+                href={userRole === 'super-admin' ? '/settings' : '/user/settings'}
                 onClick={() => setShowDropdown(false)}
                 className="flex items-center gap-3 px-4 py-3 mx-2 rounded-2xl text-sm font-black text-slate-600 hover:bg-slate-50 hover:text-blue-600 transition-all"
               >

@@ -177,7 +177,7 @@ export function ThreatMonitoring({ locationName }: ThreatMonitoringProps) {
             <div className="space-y-6 pt-6 border-t border-slate-100 flex-1">
                 <div className="flex items-center justify-between">
                     <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight">AI Assessment</h3>
-                    {loading && <Loader2 className="animate-spin text-blue-500" size={16} />}
+                    {loading && <Loader2 className="animate-spin text-[#33375D]" size={16} />}
                 </div>
 
                 {error ? (
@@ -216,7 +216,7 @@ export function ThreatMonitoring({ locationName }: ThreatMonitoringProps) {
                             {loading ? (
                                 <Skeleton className="h-6 w-40 bg-slate-50" />
                             ) : (
-                                <p className="text-lg font-black text-blue-500 uppercase">{row?.severity || 'NOMINAL'}</p>
+                                <p className="text-lg font-black text-[#33375D] uppercase">{row?.severity || 'NOMINAL'}</p>
                             )}
                         </div>
 

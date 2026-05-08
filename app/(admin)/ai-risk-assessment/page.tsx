@@ -48,7 +48,7 @@ const overallTone = (level: string) => {
     case "ELEVATED":
       return "bg-yellow-500 text-white hover:bg-yellow-600";
     case "MODERATE":
-      return "bg-blue-500 text-white hover:bg-blue-600";
+      return "bg-[#33375D] text-white hover:bg-[#2B2F50]";
     default:
       return "bg-emerald-500 text-white hover:bg-emerald-600";
   }
@@ -304,7 +304,7 @@ function HistoryBulletList({
         ? "bg-amber-500"
         : accent === "success"
           ? "bg-emerald-500"
-          : "bg-blue-500";
+          : "bg-[#33375D]";
   if (!items?.length)
     return <p className="text-xs italic text-slate-400">No data available.</p>;
   const list = dedupeConsecutiveBullets(items);
@@ -681,7 +681,7 @@ export default function RiskAssessment() {
   };
 
   return (
-    <div className="p-8 space-y-10 max-w-[1800px] mx-auto">
+    <div className="px-6 lg:px-12 pt-8 space-y-8 max-w-[1600px] mx-auto">
       {/* Header */}
       <Card className="rounded-2xl border-l-4 border-l-[#33375D] bg-white p-7 shadow-xl shadow-slate-200/50">
         <div className="flex flex-wrap items-start justify-between gap-4">
@@ -704,7 +704,7 @@ export default function RiskAssessment() {
             >
               {loading ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin text-[#33375D]" />
                   Analyzing data...
                 </>
               ) : (

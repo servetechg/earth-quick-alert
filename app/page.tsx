@@ -38,7 +38,7 @@ export default function LandingPage() {
                 <div className="relative mb-8 flex h-24 w-24 shrink-0 items-center justify-center">
                     <div
                         aria-hidden
-                        className="absolute inset-0 rounded-full border-4 border-blue-500/20 border-t-blue-500 animate-spin"
+                        className="absolute inset-0 animate-spin rounded-full border-4 border-[#33375D]/20 border-t-[#33375D]"
                     />
                     <Activity className="relative z-10 block h-8 w-8 shrink-0 text-blue-500 animate-pulse" />
                 </div>
@@ -79,7 +79,7 @@ export default function LandingPage() {
                             <Button variant="ghost" className="font-bold text-sm h-10 px-6 rounded-xl hover:bg-slate-50">Log In</Button>
                         </Link>
                         <Link href="/signup">
-                            <Button className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm h-10 px-6 rounded-xl shadow-lg shadow-blue-100 transition-all hover:scale-[1.02] active:scale-[0.98]">Sign Up</Button>
+                            <Button className="h-10 rounded-xl bg-[#33375D] px-6 text-sm font-bold text-white shadow-lg shadow-[#33375D]/20 transition-all hover:scale-[1.02] hover:bg-[#2B2F50] active:scale-[0.98]">Sign Up</Button>
                         </Link>
                     </div>
                 </div>
@@ -133,7 +133,7 @@ export default function LandingPage() {
                                         <img src={`https://i.pravatar.cc/100?u=${i}`} alt="user" />
                                     </div>
                                 ))}
-                                <div className="w-10 h-10 rounded-full border-2 border-white bg-blue-600 flex items-center justify-center text-[10px] font-black text-white">+2k</div>
+                                <div className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-white bg-[#33375D] text-[10px] font-black text-white">+2k</div>
                             </div>
                             <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Joined the safety grid</p>
                         </div>
@@ -205,7 +205,7 @@ export default function LandingPage() {
                             { icon: <Shield />, title: 'Smart Guards', desc: 'AI-monitored perimeter safety.' },
                         ].map((item, i) => (
                             <div key={i} className="p-8 bg-white border border-slate-200 rounded-[32px] hover:shadow-xl transition-all duration-500 hover:-translate-y-1 group">
-                                <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-900 mb-6 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                                <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-50 text-slate-900 transition-colors group-hover:bg-[#33375D] group-hover:text-white">
                                     {item.icon}
                                 </div>
                                 <h3 className="text-lg font-black text-slate-900 mb-2 uppercase tracking-tight">{item.title}</h3>

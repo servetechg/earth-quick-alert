@@ -370,7 +370,7 @@ export function GISMap({ selectedLocation = 'All' }: GISMapProps) {
               className={cn(
                 "px-3 sm:px-6 py-1.5 sm:py-2 rounded-xl text-[10px] sm:text-[11px] font-black uppercase tracking-wider transition-all whitespace-nowrap",
                 activeTab === tab
-                  ? "bg-white text-blue-600 shadow-sm border border-slate-100"
+                  ? "bg-white text-[#33375D] shadow-sm border border-slate-100"
                   : "text-slate-400 hover:text-slate-900"
               )}
             >
@@ -404,7 +404,7 @@ export function GISMap({ selectedLocation = 'All' }: GISMapProps) {
             {showHeatmap && (
               <div className="space-y-1.5 border-t border-slate-100 pt-3">
                 <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Intensity</p>
-                <div className="h-2 w-full rounded-full bg-gradient-to-r from-blue-500 via-yellow-400 via-orange-500 to-red-700" />
+                <div className="h-2 w-full rounded-full bg-gradient-to-r from-[#33375D] via-yellow-400 via-orange-500 to-red-700" />
                 <div className="flex justify-between text-[9px] font-bold text-slate-400">
                   <span>Low</span>
                   <span>Critical</span>
@@ -415,7 +415,7 @@ export function GISMap({ selectedLocation = 'All' }: GISMapProps) {
         </div>
         {isSearchingInfra && (
           <div className="absolute right-4 top-4 bg-white/90 backdrop-blur-md px-4 py-2 rounded-2xl shadow-2xl border border-slate-100 flex items-center gap-2 z-50 animate-in fade-in slide-in-from-top-2 duration-300">
-            <Loader2 className="w-4 h-4 text-blue-600 animate-spin" />
+            <Loader2 className="w-4 h-4 text-[#33375D] animate-spin" />
             <span className="text-[10px] font-black uppercase tracking-widest text-slate-600">Locating Facilities...</span>
           </div>
         )}

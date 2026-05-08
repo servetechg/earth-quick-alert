@@ -96,7 +96,7 @@ export function LicenseRequestList() {
                     variant="ghost"
                     size="sm"
                     onClick={fetchRequests}
-                    className="text-[9px] font-black text-blue-600 uppercase tracking-widest hover:bg-blue-50"
+                    className="text-[9px] font-black text-[#33375D] uppercase tracking-widest hover:bg-[#33375D]/10"
                 >
                     Refresh List
                 </Button>
@@ -120,7 +120,7 @@ export function LicenseRequestList() {
                 requests.map((user) => (
                     <div key={user._id} className="flex items-center justify-between p-2 hover:bg-slate-50 rounded-xl transition-all group border-b border-slate-50 last:border-0 grow min-w-0">
                         <div className="flex items-center gap-2 min-w-0 flex-1">
-                            <div className="w-8 h-8 shrink-0 bg-slate-100 text-slate-400 rounded-lg flex items-center justify-center border border-slate-200 group-hover:border-blue-100 transition-colors">
+                            <div className="w-8 h-8 shrink-0 bg-slate-100 text-slate-400 rounded-lg flex items-center justify-center border border-slate-200 group-hover:border-[#33375D]/20 transition-colors">
                                 <User size={14} />
                             </div>
                             <h4 className="text-[11px] font-black text-[#33375D] uppercase truncate" title={user.name}>{user.name}</h4>
@@ -129,7 +129,7 @@ export function LicenseRequestList() {
                         <div className="flex items-center gap-1.5 shrink-0 ml-2">
                             <Button
                                 onClick={() => handleGrantClick(user)}
-                                className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg h-7 px-3 font-black text-[8px] uppercase tracking-widest active:scale-95 transition-all"
+                                className="bg-[#33375D] hover:bg-[#2B2F50] text-white rounded-lg h-7 px-3 font-black text-[8px] uppercase tracking-widest active:scale-95 transition-all"
                             >
                                 Approve
                             </Button>

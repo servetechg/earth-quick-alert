@@ -38,7 +38,7 @@ const LeafletMap = dynamic(() => import('@/components/leaflet-map'), {
     loading: () => (
         <div className="w-full h-full bg-slate-50 flex items-center justify-center">
             <div className="flex flex-col items-center gap-4">
-                <Loader2 className="w-10 h-10 animate-spin text-blue-600" />
+                <Loader2 className="w-10 h-10 animate-spin text-[#33375D]" />
                 <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em]">Synchronizing Surface Assets...</p>
             </div>
         </div>
@@ -101,7 +101,7 @@ export default function GISMappingPage() {
                             onClick={() => setViewMode('map')}
                             className={cn(
                                 "h-12 px-6 rounded-full text-[10px] font-black uppercase tracking-widest gap-2 transition-all",
-                                viewMode === 'map' ? "bg-blue-600 text-white shadow-lg shadow-blue-500/20" : "text-slate-500 hover:text-slate-900"
+                                viewMode === 'map' ? "bg-[#33375D] text-white shadow-lg shadow-[#33375D]/25" : "text-slate-500 hover:text-slate-900"
                             )}
                         >
                             <MapIcon size={14} /> Tactical View
@@ -111,7 +111,7 @@ export default function GISMappingPage() {
                             onClick={() => setViewMode('table')}
                             className={cn(
                                 "h-12 px-6 rounded-full text-[10px] font-black uppercase tracking-widest gap-2 transition-all",
-                                viewMode === 'table' ? "bg-blue-600 text-white shadow-lg shadow-blue-500/20" : "text-slate-500 hover:text-slate-900"
+                                viewMode === 'table' ? "bg-[#33375D] text-white shadow-lg shadow-[#33375D]/25" : "text-slate-500 hover:text-slate-900"
                             )}
                         >
                             <Table size={14} /> Intel Table
@@ -154,7 +154,7 @@ export default function GISMappingPage() {
                         <Button variant="ghost" className="h-12 rounded-full px-4 text-slate-400 hover:text-slate-900 transition-all">
                             <Crosshair size={18} />
                         </Button>
-                        <Button onClick={() => setIsModalOpen(true)} className="h-12 w-12 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/20 p-0">
+                        <Button onClick={() => setIsModalOpen(true)} className="h-12 w-12 rounded-full bg-[#33375D] p-0 text-white shadow-lg shadow-[#33375D]/25 hover:bg-[#2B2F50]">
                             <Plus size={20} />
                         </Button>
                     </div>
@@ -251,7 +251,7 @@ export default function GISMappingPage() {
                         <div className="absolute left-8 bottom-8 w-80 pointer-events-auto animate-in slide-in-from-left-8 duration-700">
                              <Card className="bg-white/80 backdrop-blur-xl border border-slate-200 rounded-[32px] p-6 shadow-2xl shadow-slate-900/10">
                                  <div className="flex items-center gap-3 mb-6">
-                                     <div className="w-10 h-10 bg-blue-600 rounded-2xl flex items-center justify-center text-white">
+                                     <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#33375D] text-white">
                                          <Satellite size={20} />
                                      </div>
                                      <div>
@@ -287,7 +287,7 @@ export default function GISMappingPage() {
                              <Card className="bg-white/80 backdrop-blur-xl border border-slate-200 rounded-[32px] p-6 shadow-2xl shadow-slate-900/10">
                                 <div className="flex items-center justify-between mb-6">
                                     <h3 className="text-xs font-black text-slate-900 uppercase tracking-[0.2em]">Tactical Overlay</h3>
-                                    <div className="h-1.5 w-6 bg-blue-600 rounded-full shadow-lg shadow-blue-500/20" />
+                                    <div className="h-1.5 w-6 rounded-full bg-[#33375D] shadow-lg shadow-[#33375D]/25" />
                                 </div>
                                 <div className="space-y-3">
                                      {[

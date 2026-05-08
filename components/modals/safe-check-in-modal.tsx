@@ -221,7 +221,7 @@ export function SafeCheckInModal({ isOpen, onClose }: SafeCheckInModalProps) {
                   <Button
                     type="submit"
                     disabled={isProcessing}
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-6 rounded-xl transition-all"
+                    className="w-full rounded-xl bg-[#33375D] py-6 font-black text-white transition-all hover:bg-[#2B2F50]"
                   >
                     {isProcessing ? 'ADDING...' : 'CONFIRM ADDITION'}
                   </Button>
@@ -231,7 +231,7 @@ export function SafeCheckInModal({ isOpen, onClose }: SafeCheckInModalProps) {
 
             {loading ? (
               <div className="flex flex-col items-center justify-center py-12 gap-3">
-                <div className="w-10 h-10 border-4 border-slate-200 border-t-blue-500 rounded-full animate-spin" />
+                <div className="h-10 w-10 animate-spin rounded-full border-4 border-slate-200 border-t-[#33375D]" />
                 <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Loading family data...</p>
               </div>
             ) : familyMembers.length === 0 ? (
@@ -308,7 +308,7 @@ export function SafeCheckInModal({ isOpen, onClose }: SafeCheckInModalProps) {
                         <Trash2 className="w-5 h-5" />
                       </Button>
                       {member.status === 'DANGER' && (
-                        <Button size="icon" className="rounded-xl w-10 h-10 bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-200 text-white">
+                        <Button size="icon" className="h-10 w-10 rounded-xl bg-[#33375D] text-white shadow-lg shadow-[#33375D]/25 hover:bg-[#2B2F50]">
                           <Phone className="w-5 h-5" />
                         </Button>
                       )}

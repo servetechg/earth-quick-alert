@@ -100,11 +100,11 @@ export default function SuperAdminDashboard() {
     : undefined
 
   return (
-    <div className="flex-1 overflow-auto bg-[#F8FAFC] selection:bg-blue-600/10 min-h-screen">
+    <div className="flex-1 overflow-auto bg-[#F8FAFC] selection:bg-[#33375D]/15 min-h-screen">
       {/* Top Header */}
 
 
-      <main className="p-8 space-y-10 max-w-[1800px] mx-auto">
+      <main className="px-6 lg:px-12 pt-8 space-y-8 max-w-[1600px] mx-auto">
         {/* Title Section */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-white p-8 rounded-[32px] border border-slate-100 shadow-sm relative overflow-hidden">
           <div className="absolute top-0 right-0 w-64 h-64 bg-red-500/5 rounded-full -mr-32 -mt-32 blur-3xl" />
@@ -125,7 +125,7 @@ export default function SuperAdminDashboard() {
           </div>
 
           <div className="relative z-10 w-full md:w-72">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-3 ml-2 italic text-blue-600">Filter by Sub-Admin</p>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-3 ml-2 italic text-[#33375D]">Filter by Sub-Admin</p>
             <div className="relative group">
               <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
                 <UserIcon size={16} className="text-[#DC2626] group-focus-within:animate-pulse" />
@@ -175,10 +175,10 @@ export default function SuperAdminDashboard() {
           <Card className="p-6 border border-slate-200 border-l-4 border-l-[#33375D] rounded-lg shadow-sm bg-white relative overflow-hidden group">
             <div className="flex justify-between items-start mb-4">
               <h3 className="text-slate-900 font-bold text-lg leading-tight">Alerts</h3>
-              <Radio className="text-[#3B82F6]" size={18} />
+              <Radio className="text-[#33375D]" size={18} />
             </div>
             <div className="flex items-baseline gap-3 mb-4">
-              <span className="text-5xl font-black text-[#3B82F6] tracking-tighter">
+              <span className="text-5xl font-black text-[#33375D] tracking-tighter">
                 {loading ? '00' : filteredAlerts.length.toString().padStart(2, '0')}
               </span>
               <span className="text-slate-500 font-bold text-xs uppercase tracking-widest">Alerts Sent</span>
@@ -196,7 +196,7 @@ export default function SuperAdminDashboard() {
               <h3 className="text-slate-900 font-bold text-lg leading-tight">Ready2Go Users Impacted</h3>
               <Users className="text-[#F59E0B]" size={18} />
             </div>
-            <div className="mb-4">
+            <div className="flex items-baseline gap-3 mb-4">
               <span className="text-5xl font-black text-[#F59E0B] tracking-tighter block mb-1">
                 {loading ? '00' : filteredImpacted.length.toString().padStart(2, '0')}
               </span>
@@ -258,7 +258,7 @@ export default function SuperAdminDashboard() {
                 </div>
                 <Link
                   href="/admin/licenses"
-                  className="flex items-center gap-1.5 text-[9px] font-black text-blue-600 uppercase tracking-widest hover:text-blue-700 transition-colors group bg-blue-50/50 px-3 py-1.5 rounded-lg border border-blue-100"
+                  className="flex items-center gap-1.5 text-[9px] font-black text-[#33375D] uppercase tracking-widest hover:text-[#2B2F50] transition-colors group bg-[#33375D]/8 px-3 py-1.5 rounded-lg border border-[#33375D]/15"
                 >
                   View All
                   <ArrowUpRight size={12} className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
@@ -279,7 +279,7 @@ export default function SuperAdminDashboard() {
         {/* Responders Table Section */}
         {/* <div id="responders-section" className="space-y-6 pb-20">
           <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center text-blue-600">
+            <div className="w-10 h-10 bg-[#33375D]/12 rounded-xl flex items-center justify-center text-[#33375D]">
               <HardHat size={20} />
             </div>
             <h2 className="text-xl font-black text-slate-900 uppercase tracking-tight">Field Force Command</h2>

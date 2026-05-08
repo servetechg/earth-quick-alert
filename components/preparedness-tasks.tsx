@@ -47,7 +47,7 @@ export function PreparednessTasks() {
 
             <div className="relative z-10 flex items-center justify-between mb-10">
                 <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-2xl">
+                    <div className="w-12 h-12 bg-[#33375D] rounded-2xl flex items-center justify-center text-white shadow-2xl">
                         <ClipboardCheck size={24} />
                     </div>
                     <div>

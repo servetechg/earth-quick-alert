@@ -8,22 +8,9 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Users, Mail, MapPin, ArrowLeft, Save, CheckCircle2, AlertCircle, Phone } from 'lucide-react'
 import { toast } from '@/hooks/use-toast'
+import { syncClientUserProfileFromServer } from '@/lib/sync-client-user-profile'
 
 const PROFILE_PIC_MAX_BYTES = 2 * 1024 * 1024
-
-function syncClientUserFromServer(user: {
-  name?: string
-  email?: string
-  location?: string
-  profilePic?: string
-}) {
-  if (typeof window === 'undefined') return
-  if (user.name != null) localStorage.setItem('userName', user.name)
-  if (user.email != null) localStorage.setItem('userEmail', user.email)
-  if (user.location != null) localStorage.setItem('userLocation', user.location)
-  if (user.profilePic != null) localStorage.setItem('userProfilePic', user.profilePic)
-  window.dispatchEvent(new Event('earthquick:userProfileUpdated'))
-}
 
 export default function EditProfilePage() {
   const router = useRouter()
@@ -66,7 +53,7 @@ export default function EditProfilePage() {
         setLocation(u.location ?? '')
         setProfilePic(u.profilePic ?? '')
         setProfilePicPublicId(u.profilePicPublicId ?? '')
-        syncClientUserFromServer({
+        syncClientUserProfileFromServer({
           name: u.name,
           email: u.email,
           location: u.location ?? '',
@@ -176,7 +163,7 @@ export default function EditProfilePage() {
         setLocation(u.location ?? location)
         setProfilePic(u.profilePic ?? profilePic)
         setProfilePicPublicId(u.profilePicPublicId ?? profilePicPublicId)
-        syncClientUserFromServer({
+        syncClientUserProfileFromServer({
           name: u.name,
           email: u.email,
           location: u.location ?? location,

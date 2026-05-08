@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Card } from '@/components/ui/card';
+import { AdminPageHeader } from '@/components/admin-page-header';
 import {
   CheckCircle2,
   Flame,
@@ -300,25 +300,21 @@ export default function PreparednessInformationPage() {
   return (
     <main className="min-h-screen bg-slate-50/50 pb-20">
       <div className="px-6 lg:px-12 pt-8 space-y-8 max-w-[1800px] mx-auto">
-        <Card className="p-8 border-slate-200 rounded-2xl shadow-sm relative overflow-hidden bg-white">
-          <div className="absolute top-0 left-0 w-1.5 h-full bg-[#33375D]" />
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div>
-              <h1 className="text-3xl font-black text-slate-900 tracking-tight mb-2">Preparedness Information</h1>
-              <p className="text-slate-500 font-medium">
-                Edit preparedness tasks by category and dispatch them through role-based workflows.
-              </p>
-            </div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-500/10 border border-red-200 text-[11px] font-bold text-red-700">
-              <ShieldCheck className="w-4 h-4" />
+        <AdminPageHeader
+          title="Preparedness Information"
+          titleUppercase={false}
+          description="Edit preparedness tasks by category and dispatch them through role-based workflows."
+          actions={
+            <div className="inline-flex items-center gap-2 rounded-full border border-red-200 bg-red-500/10 px-3 py-1 text-[11px] font-bold text-red-700">
+              <ShieldCheck className="h-4 w-4" />
               {role === 'super-admin' ? 'Super Admin Mode' : role === 'sub-admin' ? 'Sub Admin Mode' : 'Loading...'}
             </div>
-          </div>
-        </Card>
+          }
+        />
 
         {isLoading ? (
           <div className="py-20 flex justify-center">
-            <Loader2 className="w-8 h-8 text-slate-500 animate-spin" />
+            <Loader2 className="h-8 w-8 animate-spin text-[#33375D]" />
           </div>
         ) : (
           <>

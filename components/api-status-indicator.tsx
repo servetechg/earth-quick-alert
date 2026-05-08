@@ -133,7 +133,7 @@ export function APIStatusIndicator() {
                     onClick={checkAPIStatus}
                     disabled={checking}
                 >
-                    <RefreshCw className={`h-4 w-4 mr-2 ${checking ? 'animate-spin' : ''}`} />
+                    <RefreshCw className={`mr-2 h-4 w-4 text-[#33375D] ${checking ? 'animate-spin' : ''}`} />
                     Refresh
                 </Button>
             </div>

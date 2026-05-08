@@ -210,7 +210,7 @@ export function TaskSectionCard({
                 className="mr-2 inline-flex size-4 shrink-0 origin-center items-center justify-center motion-safe:animate-spin"
                 aria-hidden
               >
-                <Loader2 className="size-4 shrink-0" />
+                <Loader2 className="size-4 shrink-0 text-white" />
               </span>
             ) : (
               <Save className="w-4 h-4 mr-2" />
@@ -229,7 +229,7 @@ export function TaskSectionCard({
                 className="mr-2 inline-flex size-4 shrink-0 origin-center items-center justify-center motion-safe:animate-spin"
                 aria-hidden
               >
-                <Loader2 className="size-4 shrink-0" />
+                <Loader2 className="size-4 shrink-0 text-[#33375D]" />
               </span>
             ) : (
               <Send className="w-4 h-4 mr-2" />

@@ -28,6 +28,7 @@ import {
 import { ProvisionLicenseModal } from '@/components/modals/provision-license-modal'
 import { GrantLicenseModal } from '@/components/modals/grant-license-modal'
 import { cn } from "@/lib/utils"
+import { AdminPageHeader } from '@/components/admin-page-header'
 import { toast } from 'sonner'
 
 interface License {
@@ -199,7 +200,7 @@ export default function LicenseManagement() {
         return (
             <div className="min-h-screen flex items-center justify-center bg-slate-50">
                 <div className="flex flex-col items-center gap-4">
-                    <Loader2 className="w-10 h-10 animate-spin text-[#34375D]" />
+                    <Loader2 className="w-10 h-10 animate-spin text-[#33375D]" />
                     <p className="text-slate-500 font-bold animate-pulse">Loading licenses...</p>
                 </div>
             </div>
@@ -210,25 +211,19 @@ export default function LicenseManagement() {
         <main className="min-h-screen bg-slate-50/50 pb-20">
             <div className="px-6 lg:px-12 pt-8 space-y-8 max-w-[1600px] mx-auto">
 
-                {/* Main Header Card */}
-                <Card className="p-8 border-slate-200 rounded-2xl shadow-sm relative overflow-hidden bg-white group transition-all hover:shadow-md">
-                    <div className="absolute top-0 left-0 w-1.5 h-full bg-slate-900 group-hover:bg-blue-600 transition-colors" />
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
-                        <div>
-                            <h1 className="text-3xl font-black text-slate-900 tracking-tight mb-2 uppercase">Manage Licenses</h1>
-                            <p className="text-slate-500 font-medium">View and manage all organization licenses in one place.</p>
-                        </div>
-                        <div className="flex items-center gap-4">
-                            <Button
-                                onClick={() => setIsCreateModalOpen(true)}
-                                className="bg-slate-900 hover:bg-slate-800 text-white rounded-xl shadow-lg px-6 h-12 font-bold text-xs uppercase tracking-wider transition-all active:scale-95 flex gap-2"
-                            >
-                                <Plus size={18} />
-                                New License
-                            </Button>
-                        </div>
-                    </div>
-                </Card>
+                <AdminPageHeader
+                    title="Manage Licenses"
+                    description="View and manage all organization licenses in one place."
+                    actions={
+                        <Button
+                            onClick={() => setIsCreateModalOpen(true)}
+                            className="flex h-12 gap-2 rounded-xl bg-slate-900 px-6 text-xs font-bold uppercase tracking-wider text-white shadow-lg transition-all hover:bg-slate-800 active:scale-95"
+                        >
+                            <Plus size={18} />
+                            New License
+                        </Button>
+                    }
+                />
 
                 {/* Banner Gradient */}
                 <div className="bg-[#33375D] rounded-3xl p-10 text-white relative overflow-hidden shadow-2xl shadow-[#33375D]/20 group">
@@ -239,7 +234,7 @@ export default function LicenseManagement() {
                                 <ShieldCheck size={12} /> License Overview
                             </div>
                             <h2 className="text-3xl font-black tracking-tight mb-3">Organization List</h2>
-                            <p className="text-blue-50/90 font-medium max-w-2xl leading-relaxed">Manage your organizations, assign admins, and check active licenses for the entire network.</p>
+                            <p className="max-w-2xl font-medium leading-relaxed text-white/90">Manage your organizations, assign admins, and check active licenses for the entire network.</p>
                         </div>
                         <div className="grid grid-cols-3 gap-6 shrink-0">
                             {[
@@ -259,7 +254,7 @@ export default function LicenseManagement() {
 
                 {/* Search & Filters */}
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                    <div className="flex items-center gap-3 text-slate-900 border-l-4 border-blue-600 pl-4">
+                    <div className="flex items-center gap-3 border-l-4 border-l-[#33375D] pl-4 text-slate-900">
                         <h2 className="text-2xl font-black tracking-tight uppercase">License List</h2>
                     </div>
                     <div className="relative group w-full md:w-96">
@@ -339,7 +334,7 @@ export default function LicenseManagement() {
                                                             <Button
                                                                 type="button"
                                                                 onClick={() => openGrant(row.user)}
-                                                                className="h-10 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest bg-blue-600 hover:bg-blue-700 text-white"
+                                                                className="h-10 rounded-xl bg-[#33375D] px-4 font-black text-[10px] uppercase tracking-widest text-white hover:bg-[#2B2F50]"
                                                             >
                                                                 Approve
                                                             </Button>
@@ -400,7 +395,7 @@ export default function LicenseManagement() {
                                                                 disabled={deletingId === row.lic._id}
                                                                 className="h-10 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest text-rose-600 hover:bg-rose-600 hover:text-white transition-all flex gap-2 ml-auto"
                                                             >
-                                                                {deletingId === row.lic._id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                                                                {deletingId === row.lic._id ? <Loader2 size={14} className="animate-spin text-[#33375D]" /> : <Trash2 size={14} />}
                                                                 Remove
                                                             </Button>
                                                         )}

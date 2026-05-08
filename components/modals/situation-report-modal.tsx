@@ -83,7 +83,7 @@ export function SituationReportModal({ isOpen, onClose }: SituationReportModalPr
                         <Button variant="outline" className="flex-1 py-6 rounded-xl font-bold border-2 border-slate-200 hover:bg-slate-50">
                             Download PDF
                         </Button>
-                        <Button className="flex-1 py-6 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-lg shadow-blue-200 transition-all active:scale-95">
+                        <Button className="flex-1 rounded-xl bg-[#33375D] py-6 font-bold text-white shadow-lg shadow-[#33375D]/25 transition-all hover:bg-[#2B2F50] active:scale-95">
                             Distribute to Agencies
                         </Button>
                     </div>
