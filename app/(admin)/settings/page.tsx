@@ -24,6 +24,8 @@ import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
 import {
   Bell,
+  Eye,
+  EyeOff,
   Info,
   Radio,
   Save,
@@ -138,6 +140,10 @@ function AdminSettingsPageContent() {
   const [isSessionTimeoutEnabled, setIsSessionTimeoutEnabled] = useState(true)
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false)
+  const [showNewPassword, setShowNewPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [isDispatchSaving, setIsDispatchSaving] = useState(false)
   const [isSecuritySaving, setIsSecuritySaving] = useState(false)
   const [activityLogOpen, setActivityLogOpen] = useState(false)
@@ -338,14 +344,24 @@ function AdminSettingsPageContent() {
     if (section === 'Security') {
       const c = currentPassword.trim()
       const n = newPassword.trim()
-      const anyPwd = Boolean(c || n)
+      const conf = confirmPassword.trim()
+      const anyPwd = Boolean(c || n || conf)
 
       if (anyPwd) {
-        if (!c || !n) {
+        if (!c || !n || !conf) {
           toast({
             variant: 'destructive',
             title: 'Missing password fields',
-            description: 'Enter both your current password and a new password to change it.',
+            description:
+              'Enter your current password, new password, and confirm new password to change it.',
+          })
+          return
+        }
+        if (n !== conf) {
+          toast({
+            variant: 'destructive',
+            title: 'Passwords do not match',
+            description: 'New password and confirm password must match.',
           })
           return
         }
@@ -439,6 +455,10 @@ function AdminSettingsPageContent() {
         if (anyPwd) {
           setCurrentPassword('')
           setNewPassword('')
+          setConfirmPassword('')
+          setShowCurrentPassword(false)
+          setShowNewPassword(false)
+          setShowConfirmPassword(false)
         }
 
         if (typeof window !== 'undefined') {
@@ -881,28 +901,87 @@ function AdminSettingsPageContent() {
             description="Protect your account and review activity."
             icon={<Shield className="h-5 w-5 text-primary" />}
           >
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="current-password">Current Password</Label>
-                <Input
-                  id="current-password"
-                  type="password"
-                  autoComplete="current-password"
-                  placeholder="••••••••"
-                  value={currentPassword}
-                  onChange={(e) => setCurrentPassword(e.target.value)}
-                />
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="current-password">Current Password</Label>
+                  <div className="relative w-full">
+                    <Input
+                      id="current-password"
+                      type={showCurrentPassword ? 'text' : 'password'}
+                      autoComplete="current-password"
+                      placeholder="••••••••"
+                      className="w-full pr-10"
+                      value={currentPassword}
+                      onChange={(e) => setCurrentPassword(e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      className="absolute right-0 top-0 flex h-full w-10 items-center justify-center rounded-r-md text-muted-foreground hover:text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      aria-label={
+                        showCurrentPassword ? 'Hide current password' : 'Show current password'
+                      }
+                      onClick={() => setShowCurrentPassword((v) => !v)}
+                    >
+                      {showCurrentPassword ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+                <span className="hidden md:block" aria-hidden />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="new-password">New Password</Label>
-                <Input
-                  id="new-password"
-                  type="password"
-                  autoComplete="new-password"
-                  placeholder="••••••••"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                />
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="new-password">New Password</Label>
+                  <div className="relative w-full">
+                    <Input
+                      id="new-password"
+                      type={showNewPassword ? 'text' : 'password'}
+                      autoComplete="new-password"
+                      placeholder="••••••••"
+                      className="w-full pr-10"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      className="absolute right-0 top-0 flex h-full w-10 items-center justify-center rounded-r-md text-muted-foreground hover:text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      aria-label={showNewPassword ? 'Hide new password' : 'Show new password'}
+                      onClick={() => setShowNewPassword((v) => !v)}
+                    >
+                      {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="confirm-password">Confirm New Password</Label>
+                  <div className="relative w-full">
+                    <Input
+                      id="confirm-password"
+                      type={showConfirmPassword ? 'text' : 'password'}
+                      autoComplete="new-password"
+                      placeholder="••••••••"
+                      className="w-full pr-10"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      className="absolute right-0 top-0 flex h-full w-10 items-center justify-center rounded-r-md text-muted-foreground hover:text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
+                      onClick={() => setShowConfirmPassword((v) => !v)}
+                    >
+                      {showConfirmPassword ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
 
