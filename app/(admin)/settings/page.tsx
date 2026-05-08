@@ -13,13 +13,6 @@ import { AdminPageShell } from '@/components/admin-page-shell'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
@@ -33,12 +26,7 @@ import {
   Shield,
   User,
 } from 'lucide-react'
-import {
-  DISPATCH_CHANNEL_OPTIONS,
-  DISPATCH_REGION_OPTIONS,
-  NOTIFICATION_PREFERENCES,
-  SETTINGS_TABS,
-} from './data/settings-data'
+import { NOTIFICATION_PREFERENCES, SETTINGS_TABS } from './data/settings-data'
 import { SettingsSectionCard } from './_components/settings-section-card'
 import { SettingsToggleRow } from './_components/settings-toggle-row'
 import { ActivityLogDialog } from './_components/activity-log-dialog'
@@ -815,59 +803,19 @@ function AdminSettingsPageContent() {
               }
             />
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="auto-escalate">Auto-escalate after (minutes)</Label>
-                <Input
-                  id="auto-escalate"
-                  type="number"
-                  value={dispatch.autoEscalateMinutes}
-                  onChange={(event) =>
-                    setDispatch((prev) => ({
-                      ...prev,
-                      autoEscalateMinutes: event.target.value,
-                    }))
-                  }
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Default Channel</Label>
-                <Select
-                  value={dispatch.defaultChannel}
-                  onValueChange={(value) => setDispatch((prev) => ({ ...prev, defaultChannel: value }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {DISPATCH_CHANNEL_OPTIONS.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Operating Region</Label>
-                <Select
-                  value={dispatch.region}
-                  onValueChange={(value) => setDispatch((prev) => ({ ...prev, region: value }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {DISPATCH_REGION_OPTIONS.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="max-w-md space-y-2">
+              <Label htmlFor="auto-escalate">Auto-escalate after (minutes)</Label>
+              <Input
+                id="auto-escalate"
+                type="number"
+                value={dispatch.autoEscalateMinutes}
+                onChange={(event) =>
+                  setDispatch((prev) => ({
+                    ...prev,
+                    autoEscalateMinutes: event.target.value,
+                  }))
+                }
+              />
             </div>
 
             <div className="space-y-2">
