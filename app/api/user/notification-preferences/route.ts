@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import connectDB from '@/lib/mongodb';
 import User from '@/models/User';
 import { getSession } from '@/lib/auth';
+import { recordActivity, ACTIVITY_ACTIONS } from '@/lib/activity-log';
 
 /** Stored on User — only push / sms / email plus alert-type toggles. */
 type StoredNotificationPrefs = {
@@ -196,6 +197,15 @@ export async function POST(req: NextRequest) {
     }
 
     const raw = (updated as { notificationPreferences?: NotificationPrefsDoc }).notificationPreferences;
+
+    void recordActivity({
+      userId: session.user.id,
+      action: ACTIVITY_ACTIONS.NOTIFICATION_PREFS_UPDATE,
+      label: 'Notification preferences updated',
+      meta: {
+        preferences: serializeNotificationPreferences(raw),
+      },
+    });
 
     return NextResponse.json({
       success: true,
