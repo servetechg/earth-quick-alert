@@ -25,7 +25,14 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        let body: { stateCd?: string; nwpsGaugeId?: string; usgsSite?: string; nationwide?: boolean } = {};
+        let body: {
+            stateCd?: string;
+            nwpsGaugeId?: string;
+            usgsSite?: string;
+            nationwide?: boolean;
+            /** When true, append an activity-log row (use only for explicit “Generate report” from AI Risk Assessment). */
+            recordActivity?: boolean;
+        } = {};
         try {
             body = await req.json();
         } catch {
@@ -64,16 +71,18 @@ export async function POST(req: Request) {
             ready2go_users_reachable: reachable,
         };
 
-        void recordActivity({
-            userId: session.user.id,
-            action: ACTIVITY_ACTIONS.AI_RISK_REPORT,
-            label: 'AI risk assessment report generated',
-            meta: {
-                nationwide: useNationwide,
-                totalSignals: bundle.totalSignals,
-                ingestScope: bundle.ingestScope ?? 'nationwide',
-            },
-        });
+        if (body.recordActivity === true) {
+            void recordActivity({
+                userId: session.user.id,
+                action: ACTIVITY_ACTIONS.AI_RISK_REPORT,
+                label: 'AI risk assessment report generated',
+                meta: {
+                    nationwide: useNationwide,
+                    totalSignals: bundle.totalSignals,
+                    ingestScope: bundle.ingestScope ?? 'nationwide',
+                },
+            });
+        }
 
         return NextResponse.json({
             report,
