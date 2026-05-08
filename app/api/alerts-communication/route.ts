@@ -7,6 +7,31 @@ import { syncAllSourcesNow, syncAllSourcesIfStale } from '@/lib/services/alert-c
 
 type MultiReport = Awaited<ReturnType<typeof syncAllSourcesNow>>;
 
+function parseLocations(raw: unknown): string[] {
+    if (typeof raw !== 'string') return [];
+    const s = raw.trim();
+    if (!s) return [];
+
+    // NWS `areaDesc` is typically a semicolon-separated list of counties/zones.
+    if (s.includes(';')) {
+        return s
+            .split(';')
+            .map((p) => p.trim())
+            .filter(Boolean);
+    }
+
+    // Fallback: keep as a single location label (other sources use descriptive names).
+    return [s];
+}
+
+function summarizeLocations(locations: string[]): string {
+    if (locations.length === 0) return '';
+    if (locations.length === 1) return locations[0] ?? '';
+    const preview = locations.slice(0, 3).join(', ');
+    const remaining = locations.length - 3;
+    return remaining > 0 ? `${preview} (+${remaining})` : preview;
+}
+
 /** Full upstream pull (no throttle). NWS + multi-source in parallel; failures are logged and do not block the other source. */
 async function syncAllLiveFeedsNow(): Promise<{
     nws: { upserted: number; removed: number };
@@ -50,7 +75,17 @@ export async function GET() {
         }
         /** Live feeds only (NWS + USGS + FIRMS + InciWeb). Set `ALERTS_COMMUNICATION_INCLUDE_MANUAL=true` to show manual/seed rows. */
         const data = await AlertCommunication.find(feedFilter).sort({ createdAt: -1 }).lean();
-        return NextResponse.json(data);
+        const hydrated = data.map((row: any) => {
+            const locations = parseLocations(row.location);
+            const locationSummary = summarizeLocations(locations);
+            return {
+                ...row,
+                locations,
+                locationCount: locations.length,
+                locationSummary: locationSummary || (typeof row.location === 'string' ? row.location : ''),
+            };
+        });
+        return NextResponse.json(hydrated);
     } catch (error: any) {
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
