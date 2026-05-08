@@ -459,7 +459,7 @@ export default function RiskAssessment() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         /** Default nationwide ingest — pass `{ nationwide: false, stateCd: "ca", nwpsGaugeId, usgsSite }` for single-state AOI. */
-        body: JSON.stringify({}),
+        body: JSON.stringify({ recordActivity: true }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
