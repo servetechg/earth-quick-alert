@@ -202,7 +202,7 @@ export default function UserDashboard() {
         {/* Banner Section */}
         {loading ? (
           <section className="relative overflow-hidden rounded-2xl h-[160px] flex items-center justify-center bg-slate-50 border border-slate-100 shadow-sm transition-colors duration-500">
-            <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
+            <Loader2 className="w-8 h-8 animate-spin text-[#33375D]" />
           </section>
         ) : (
           <section className={cn(
@@ -297,7 +297,7 @@ export default function UserDashboard() {
               <div className="p-4 space-y-2.5">
                 {loading ? (
                   <div className="flex items-center justify-center py-6">
-                    <Loader2 className="w-6 h-6 text-blue-500 animate-spin" />
+                    <Loader2 className="w-6 h-6 animate-spin text-[#33375D]" />
                   </div>
                 ) : (
                   <>
@@ -520,7 +520,7 @@ export default function UserDashboard() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {loading ? (
                     <div className="flex items-center justify-center py-6 col-span-full">
-                      <Loader2 className="w-6 h-6 text-blue-500 animate-spin" />
+                      <Loader2 className="w-6 h-6 animate-spin text-[#33375D]" />
                     </div>
                   ) : (
                     nearbyResources.map((res) => (
@@ -590,7 +590,7 @@ export default function UserDashboard() {
               <div className="space-y-1 mb-8">
                 {loading ? (
                   <div className="flex items-center justify-center py-6">
-                    <Loader2 className="w-6 h-6 text-blue-500 animate-spin" />
+                    <Loader2 className="w-6 h-6 animate-spin text-[#33375D]" />
                   </div>
                 ) : supplyKit.length > 0 ? (
                   supplyKit.slice(0, 4).map((item) => (
@@ -618,7 +618,7 @@ export default function UserDashboard() {
                   <div className="py-8 text-center border-2 border-dashed border-gray-100 rounded-2xl bg-gray-50/50">
                     <Package className="w-8 h-8 text-gray-300 mx-auto mb-3" />
                     <p className="text-[13px] text-gray-500 font-medium mb-4">Your supply kit is empty.</p>
-                    <Link href="/user/emergency-plan?tab=kit" className="inline-flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-bold px-6 py-3 rounded-xl transition-colors uppercase tracking-widest shadow-sm">
+                    <Link href="/user/emergency-plan?tab=kit" className="inline-flex items-center justify-center rounded-xl bg-[#33375D] px-6 py-3 text-[11px] font-bold uppercase tracking-widest text-white shadow-sm transition-colors hover:bg-[#2B2F50]">
                       <Plus className="w-3.5 h-3.5 mr-1.5" /> Start Building Kit
                     </Link>
                   </div>
@@ -653,7 +653,7 @@ export default function UserDashboard() {
               <div className="space-y-4">
                 {loading ? (
                   <div className="flex items-center justify-center py-6">
-                    <Loader2 className="w-6 h-6 text-blue-500 animate-spin" />
+                    <Loader2 className="w-6 h-6 animate-spin text-[#33375D]" />
                   </div>
                 ) : (
                   tipsList.map((info) => (
@@ -731,7 +731,7 @@ export default function UserDashboard() {
           </div>
           {loading ? (
             <div className="flex items-center justify-center py-12">
-              <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
+              <Loader2 className="w-8 h-8 animate-spin text-[#33375D]" />
             </div>
           ) : filteredNews.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">

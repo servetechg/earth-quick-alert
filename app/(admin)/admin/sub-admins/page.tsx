@@ -29,6 +29,7 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
+import { AdminPageHeader } from '@/components/admin-page-header'
 import { AddUserModal } from "@/components/modals/add-user-modal"
 
 interface IUser {
@@ -111,7 +112,7 @@ export default function SubAdminManagementPage() {
         return (
             <div className="min-h-screen flex items-center justify-center bg-slate-50">
                 <div className="flex flex-col items-center gap-4">
-                    <Loader2 className="w-10 h-10 text-blue-600 animate-spin" />
+                    <Loader2 className="w-10 h-10 text-[#33375D] animate-spin" />
                     <p className="text-slate-500 font-bold animate-pulse">Loading admins...</p>
                 </div>
             </div>
@@ -122,25 +123,19 @@ export default function SubAdminManagementPage() {
         <main className="min-h-screen bg-slate-50/50 pb-20">
             <div className="px-6 lg:px-12 pt-8 space-y-8 max-w-[1600px] mx-auto">
                 
-                {/* Main Header Card */}
-                <Card className="p-8 border-slate-200 rounded-2xl shadow-sm relative overflow-hidden bg-white group transition-all hover:shadow-md">
-                    <div className="absolute top-0 left-0 w-1.5 h-full bg-slate-900 group-hover:bg-blue-600 transition-colors" />
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
-                        <div>
-                            <h1 className="text-3xl font-black text-slate-900 tracking-tight mb-2 uppercase">Manage Sub-Admins</h1>
-                            <p className="text-slate-500 font-medium">Verify and manage permissions for all local administrators.</p>
-                        </div>
-                        <div className="flex items-center gap-4">
-                            <Button 
-                                onClick={() => setIsAddModalOpen(true)}
-                                className="bg-slate-900 hover:bg-slate-800 text-white rounded-xl shadow-lg px-6 h-12 font-bold text-xs uppercase tracking-wider transition-all active:scale-95 flex gap-2"
-                            >
-                                <Plus size={18} />
-                                Add Admin
-                            </Button>
-                        </div>
-                    </div>
-                </Card>
+                <AdminPageHeader
+                    title="Manage Sub-Admins"
+                    description="Verify and manage permissions for all local administrators."
+                    actions={
+                        <Button
+                            onClick={() => setIsAddModalOpen(true)}
+                            className="flex h-12 gap-2 rounded-xl bg-slate-900 px-6 text-xs font-bold uppercase tracking-wider text-white shadow-lg transition-all hover:bg-slate-800 active:scale-95"
+                        >
+                            <Plus size={18} />
+                            Add Admin
+                        </Button>
+                    }
+                />
 
                 {/* Banner Gradient */}
                 <div className="bg-[#33375D] rounded-3xl p-10 text-white relative overflow-hidden shadow-2xl shadow-[#33375D]/20 group">
@@ -151,7 +146,7 @@ export default function SubAdminManagementPage() {
                                 <ShieldCheck size={12} /> Admin Control
                             </div>
                             <h2 className="text-3xl font-black tracking-tight mb-3">Admin Registry</h2>
-                            <p className="text-blue-50/90 font-medium max-w-2xl leading-relaxed">View and update the status of sub-administrators across all locations.</p>
+                            <p className="max-w-2xl font-medium leading-relaxed text-white/90">View and update the status of sub-administrators across all locations.</p>
                         </div>
                         <div className="grid grid-cols-3 gap-6 shrink-0">
                             {[

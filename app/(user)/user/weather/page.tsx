@@ -106,7 +106,7 @@ export default function WeatherPage() {
   if (isLoading || geolocLoading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-slate-50">
-        <Loader2 className="w-12 h-12 text-blue-600 animate-spin" />
+        <Loader2 className="h-12 w-12 animate-spin text-[#33375D]" />
         <p className="font-black italic text-slate-400 uppercase tracking-widest animate-pulse">Synchronizing Atmosphere...</p>
       </div>
     )

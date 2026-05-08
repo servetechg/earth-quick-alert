@@ -124,7 +124,7 @@ export default function ActiveShooterPage() {
                                 onClick={() => handleReportStatus('SAFE')}
                                 className="flex-1 bg-white text-green-600 font-black uppercase tracking-widest h-12 rounded-xl hover:bg-green-50 shadow-xl"
                             >
-                                {isUpdatingStatus ? <Loader2 className="w-4 h-4 animate-spin" /> : "I AM SAFE"}
+                                {isUpdatingStatus ? <Loader2 className="h-4 w-4 animate-spin text-green-600" /> : "I AM SAFE"}
                             </Button>
                             <Button
                                 disabled={isUpdatingStatus || myStatus === 'DANGER'}

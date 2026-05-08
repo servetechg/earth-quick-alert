@@ -209,7 +209,7 @@ export function GrantLicenseModal({ user, isOpen, onClose, onSuccess }: GrantLic
         <form onSubmit={handleGrant}>
           <DialogHeader className="p-8 border-b border-slate-100 bg-white">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-blue-500/20">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#33375D] text-white shadow-xl shadow-[#33375D]/25">
                 <Shield size={24} />
               </div>
               <div>
@@ -384,11 +384,11 @@ export function GrantLicenseModal({ user, isOpen, onClose, onSuccess }: GrantLic
             <Button
               type="submit"
               disabled={loading}
-              className="h-11 px-8 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black transition-all shadow-lg active:scale-[0.98] uppercase text-xs tracking-widest"
+              className="h-11 rounded-xl bg-[#33375D] px-8 font-black uppercase tracking-widest text-white shadow-lg transition-all hover:bg-[#2B2F50] active:scale-[0.98]"
             >
               {loading ? (
                 <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin text-white" />
                   Processing...
                 </>
               ) : (

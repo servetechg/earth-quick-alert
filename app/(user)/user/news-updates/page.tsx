@@ -150,7 +150,7 @@ export default function NewsPage() {
               <div className="space-y-6">
                 {socialLoading ? (
                   <div className="flex items-center gap-3 opacity-50">
-                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <RefreshCw className="h-4 w-4 animate-spin text-[#33375D]" />
                     <span className="text-[10px] font-black uppercase">Scanning Signals...</span>
                   </div>
                 ) : socialSignals.length === 0 ? (

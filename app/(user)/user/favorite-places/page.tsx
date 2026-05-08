@@ -153,7 +153,7 @@ export default function FavoritePlacesPage() {
                     {!isAdding && (
                         <Button
                             onClick={() => setIsAdding(true)}
-                            className="bg-blue-600 hover:bg-blue-700 text-white rounded-2xl px-6 h-12 font-bold shadow-lg shadow-blue-100 transition-all hover:scale-105"
+                            className="h-12 rounded-2xl bg-[#33375D] px-6 font-bold text-white shadow-lg shadow-[#33375D]/20 transition-all hover:scale-105 hover:bg-[#2B2F50]"
                         >
                             <Plus className="w-5 h-5 mr-2" />
                             Add New Place
@@ -191,7 +191,7 @@ export default function FavoritePlacesPage() {
                                                     onClick={() => setSelectedIcon(key)}
                                                     className={cn(
                                                         "w-12 h-12 rounded-xl flex items-center justify-center border transition-all",
-                                                        selectedIcon === key ? "bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-100" : "bg-slate-50 border-slate-100 text-slate-400 hover:border-blue-200 hover:text-blue-500"
+                                                        selectedIcon === key ? "border-[#33375D] bg-[#33375D] text-white shadow-lg shadow-[#33375D]/20" : "border-slate-100 bg-slate-50 text-slate-400 hover:border-[#33375D]/30 hover:text-[#33375D]"
                                                     )}
                                                 >
                                                     <Icon className="w-5 h-5" />
@@ -216,7 +216,7 @@ export default function FavoritePlacesPage() {
                                 disabled={submitting}
                                 className="w-full bg-slate-900 hover:bg-slate-800 text-white h-14 rounded-2xl font-black uppercase tracking-widest shadow-xl transition-all active:scale-95"
                             >
-                                {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Save Favorite Place'}
+                                {submitting ? <Loader2 className="h-5 w-5 animate-spin text-white" /> : 'Save Favorite Place'}
                             </Button>
                         </form>
                     </Card>
@@ -251,7 +251,7 @@ export default function FavoritePlacesPage() {
                                     </div>
                                     <div className="flex items-start justify-between relative z-10">
                                         <div className="flex items-start gap-4">
-                                            <div className="w-12 h-12 bg-blue-50 text-blue-500 rounded-2xl flex items-center justify-center shrink-0 shadow-inner group-hover:bg-blue-600 group-hover:text-white transition-colors duration-500">
+                                            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#33375D]/10 text-[#33375D] shadow-inner transition-colors duration-500 group-hover:bg-[#33375D] group-hover:text-white">
                                                 <Icon className="w-6 h-6" />
                                             </div>
                                             <div className="min-w-0">

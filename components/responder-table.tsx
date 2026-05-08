@@ -36,7 +36,7 @@ export function ResponderTable({ responders, loading }: ResponderTableProps) {
     <Card className="border border-slate-200 rounded-[32px] overflow-hidden bg-white shadow-sm h-full flex flex-col">
       <div className="p-8 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-blue-200 transition-transform hover:scale-105">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#33375D] text-white shadow-lg shadow-[#33375D]/25 transition-transform hover:scale-105">
             <Shield size={24} />
           </div>
           <div>

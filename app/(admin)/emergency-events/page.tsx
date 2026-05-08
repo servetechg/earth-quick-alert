@@ -66,7 +66,7 @@ export default function EmergencyEventsPage() {
             <div className="flex items-center justify-center h-[calc(100vh-64px)] bg-slate-50">
                 <div className="flex flex-col items-center gap-6">
                     <div className="relative">
-                        <Loader2 className="w-16 h-16 animate-spin text-blue-600" />
+                        <Loader2 className="w-16 h-16 animate-spin text-[#33375D]" />
                         <div className="absolute inset-0 flex items-center justify-center text-[10px] font-black text-blue-600">HQ</div>
                     </div>
                     <p className="font-black text-xs uppercase tracking-[0.4em] text-slate-400 animate-pulse">Synchronizing Tactical Matrix...</p>
@@ -101,12 +101,12 @@ export default function EmergencyEventsPage() {
                         onClick={handleManualSync}
                         className="h-14 px-8 rounded-2xl bg-white border border-slate-200 text-slate-400 text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 hover:text-slate-900 transition-all gap-3 shadow-sm"
                     >
-                        {isSyncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4 text-emerald-600" />}
+                        {isSyncing ? <Loader2 className="h-4 w-4 animate-spin text-[#33375D]" /> : <RefreshCw className="h-4 w-4 text-emerald-600" />}
                         Sync Database
                     </Button>
                     <Button
                         onClick={() => setShowSendAlertModal(true)}
-                        className="h-14 px-8 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-black uppercase tracking-widest text-[10px] shadow-2xl shadow-blue-600/20 gap-3"
+                        className="h-14 gap-3 rounded-2xl bg-[#33375D] px-8 font-black text-[10px] uppercase tracking-widest text-white shadow-2xl shadow-[#33375D]/25 hover:bg-[#2B2F50]"
                     >
                         <Send size={16} /> Broadcast Alert
                     </Button>
@@ -234,7 +234,7 @@ export default function EmergencyEventsPage() {
                     <Card className="p-10 bg-white border border-slate-200 rounded-[48px] shadow-xl shadow-slate-200/50 space-y-6">
                         <Button
                             onClick={() => setShowMapModal(true)}
-                            className="w-full h-18 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-[24px] shadow-xl shadow-blue-600/20 active:scale-95 transition-all text-[11px] uppercase tracking-[0.2em] gap-3"
+                            className="h-18 w-full gap-3 rounded-[24px] bg-[#33375D] font-black text-[11px] uppercase tracking-[0.2em] text-white shadow-xl shadow-[#33375D]/25 transition-all hover:bg-[#2B2F50] active:scale-95"
                         >
                             <MapPin size={18} /> Visualize Coverage
                         </Button>

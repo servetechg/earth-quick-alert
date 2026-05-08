@@ -27,15 +27,15 @@ import { cn } from '@/lib/utils'
 
 export default function SettingsPage() {
   return (
-    <main className="min-h-screen bg-slate-50 p-8 lg:p-12 space-y-12 overflow-hidden relative selection:bg-blue-600/10">
-      <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-blue-600/5 rounded-full blur-[150px] pointer-events-none" />
+    <main className="min-h-screen bg-slate-50 p-8 lg:p-12 space-y-12 overflow-hidden relative selection:bg-[#33375D]/15">
+      <div className="pointer-events-none absolute top-0 right-0 h-[600px] w-[600px] rounded-full bg-[#33375D]/5 blur-[150px]" />
       <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-purple-600/5 rounded-full blur-[150px] pointer-events-none" />
 
       {/* Header */}
       <div className="relative flex flex-col lg:flex-row lg:items-end justify-between gap-8 pb-8 border-b border-white/5">
         <div className="space-y-4">
             <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-blue-600 border border-slate-200 shadow-sm">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-slate-200 bg-white text-[#33375D] shadow-sm">
                     <Settings size={24} />
                 </div>
                 <div>
@@ -47,7 +47,7 @@ export default function SettingsPage() {
 
         <div className="flex items-center gap-4">
             <Button 
-                className="h-14 px-8 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-black uppercase tracking-widest text-[10px] shadow-lg shadow-blue-600/20 gap-3"
+                className="h-14 gap-3 rounded-2xl bg-[#33375D] px-8 font-black text-[10px] uppercase tracking-widest text-white shadow-lg shadow-[#33375D]/25 hover:bg-[#2B2F50]"
             >
                  <Save size={16} /> Save Configurations
             </Button>
@@ -72,7 +72,7 @@ export default function SettingsPage() {
                     className={cn(
                         "w-full flex items-center justify-between p-6 rounded-[24px] transition-all group",
                         item.active 
-                            ? "bg-blue-600 text-white shadow-xl shadow-blue-600/20" 
+                            ? "bg-[#33375D] text-white shadow-xl shadow-[#33375D]/25" 
                             : "bg-white border border-slate-200 text-slate-400 hover:bg-slate-50 hover:text-slate-900 shadow-sm"
                     )}
                 >
@@ -92,7 +92,7 @@ export default function SettingsPage() {
                 {/* Section 1: Core Automation */}
                 <div className="space-y-8">
                     <div className="flex items-center gap-4 px-2">
-                        <div className="w-1.5 h-6 bg-blue-600 rounded-full shadow-[0_0_10px_rgba(37,99,235,0.3)]" />
+                        <div className="h-6 w-1.5 rounded-full bg-[#33375D] shadow-[0_0_10px_rgba(51,55,93,0.35)]" />
                         <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">Automation Engine</h3>
                     </div>
 
@@ -104,7 +104,7 @@ export default function SettingsPage() {
                         ].map((setting, i) => (
                             <div key={i} className="bg-slate-50 border border-slate-100 rounded-[32px] p-8 flex items-center justify-between group hover:bg-slate-100/50 transition-all shadow-sm">
                                 <div className="flex items-center gap-6">
-                                    <div className="w-14 h-14 bg-white border border-slate-200 rounded-2xl flex items-center justify-center text-blue-600 shadow-sm">
+                                    <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-slate-200 bg-white text-[#33375D] shadow-sm">
                                         <setting.icon size={24} />
                                     </div>
                                     <div>
@@ -112,7 +112,7 @@ export default function SettingsPage() {
                                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">{setting.sub}</p>
                                     </div>
                                 </div>
-                                <Switch className="data-[state=checked]:bg-blue-600" />
+                                <Switch className="data-[state=checked]:bg-[#33375D]" />
                             </div>
                         ))}
                     </div>
@@ -147,7 +147,7 @@ export default function SettingsPage() {
                                 </div>
                                 <div className="mt-6 pt-6 border-t border-slate-200 flex items-center justify-between">
                                     <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest italic">{alert.locked ? 'Mandatory' : 'Active'}</span>
-                                    <Switch defaultChecked={alert.locked} disabled={alert.locked} className="data-[state=checked]:bg-blue-600" />
+                                    <Switch defaultChecked={alert.locked} disabled={alert.locked} className="data-[state=checked]:bg-[#33375D]" />
                                 </div>
                             </div>
                         ))}

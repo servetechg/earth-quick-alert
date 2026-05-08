@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react'
 import { Card } from '@/components/ui/card'
+import { AdminPageHeader } from '@/components/admin-page-header'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -323,28 +324,12 @@ export default function AlertsCommunicationPage() {
 
   return (
     <main className="min-h-screen bg-[#F8FAFC]">
-      <div className="max-w-[1800px] mx-auto p-6 lg:p-12 space-y-8">
-        {/* Hero Header */}
-        <Card className="p-8 lg:p-12 bg-white border-slate-200 rounded-3xl shadow-sm relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-1.5 h-full bg-[#33375D]" />
-          <div className="flex justify-between items-start gap-8">
-            <div className="space-y-4 flex-1">
-              <h1 className="text-3xl lg:text-4xl font-black text-slate-900 tracking-tight mb-4">Alerts & Communication</h1>
-              <p className="text-slate-600 font-medium text-sm lg:text-base max-w-4xl leading-relaxed">
-                Stay informed and prepared with real-time emergency alerts delivered directly from the National Weather Service.
-                This system checks for updates every minute, ensuring you receive the most current weather watches and warnings as they happen.
-              </p>
-            </div>
-            {/* <Button
-            variant="outline"
-            onClick={() => fetchDynamicAlerts()}
-            className="mt-2 border-slate-200 text-slate-600 hover:bg-slate-50 gap-2 font-bold"
-          >
-            <Clock size={16} className="text-blue-500" />
-            Check Updates
-          </Button> */}
-          </div>
-        </Card>
+      <div className="px-6 lg:px-12 pt-8 space-y-8 max-w-[1600px] mx-auto">
+        <AdminPageHeader
+          title="Alerts & Communication"
+          titleUppercase={false}
+          description="Stay informed and prepared with real-time emergency alerts delivered directly from the National Weather Service. This system checks for updates every minute, ensuring you receive the most current weather watches and warnings as they happen."
+        />
 
 
 

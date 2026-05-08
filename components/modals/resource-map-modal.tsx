@@ -122,7 +122,7 @@ export function ResourceMapModal({
 
                 <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3 sticky bottom-0 z-[500]">
                     <Button variant="outline" onClick={onClose} className="rounded-xl font-black uppercase text-[10px] tracking-widest h-10 px-6">Close Explorer</Button>
-                    <Button className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black uppercase text-[10px] tracking-widest h-10 px-6">Get Directions</Button>
+                    <Button className="h-10 rounded-xl bg-[#33375D] px-6 font-black uppercase tracking-widest text-[10px] text-white hover:bg-[#2B2F50]">Get Directions</Button>
                 </div>
             </div>
         </div>
