@@ -1,8 +1,4 @@
-import type {
-  DispatchSelectOption,
-  NotificationPreferenceItem,
-  SettingsTabItem,
-} from '../types'
+import type { NotificationPreferenceItem, SettingsTabItem } from '../types'
 
 export const SETTINGS_TABS: SettingsTabItem[] = [
   { key: 'profile', label: 'Profile', icon: 'user' },
@@ -57,18 +53,4 @@ export const NOTIFICATION_PREFERENCES: NotificationPreferenceItem[] = [
     label: 'Email delivery enabled',
     description: 'Turn off to stop email notifications for your account.',
   },
-]
-
-export const DISPATCH_CHANNEL_OPTIONS: DispatchSelectOption[] = [
-  { value: 'all', label: 'All Channels' },
-  { value: 'sms', label: 'SMS Only' },
-  { value: 'email', label: 'Email Only' },
-  { value: 'push', label: 'Push Only' },
-]
-
-export const DISPATCH_REGION_OPTIONS: DispatchSelectOption[] = [
-  { value: 'western', label: 'Western Region' },
-  { value: 'central', label: 'Central Region' },
-  { value: 'eastern', label: 'Eastern Region' },
-  { value: 'national', label: 'National' },
 ]
