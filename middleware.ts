@@ -39,6 +39,8 @@ export function middleware(request: NextRequest) {
             '/emergency-plan',
             '/preparedness-information',
             '/virtual-eoc-settings',
+            '/settings',
+            '/sub-admin-settings',
             '/admin/users',
             '/ai-risk-assessment',
         ]

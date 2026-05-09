@@ -50,6 +50,12 @@ export function Header({ userName = 'Admin User', onLogout, hideSearch = false }
   const userRole = typeof window !== 'undefined' ? localStorage.getItem('userRole') : ''
   const isUserSafe = typeof window !== 'undefined' ? localStorage.getItem('isSafe') !== 'false' : true
 
+  const editProfileHref = useMemo(() => {
+    if (userRole === 'super-admin') return '/settings?tab=profile'
+    if (userRole === 'sub-admin') return '/sub-admin-settings?tab=profile'
+    return '/user/settings'
+  }, [userRole])
+
   const avatarSrc = useMemo(() => {
     const pic = typeof window !== 'undefined' ? localStorage.getItem('userProfilePic')?.trim() : ''
     return (
@@ -113,7 +119,7 @@ export function Header({ userName = 'Admin User', onLogout, hideSearch = false }
               </div>
 
               <Link
-                href={userRole === 'super-admin' ? '/settings' : '/user/settings'}
+                href={editProfileHref}
                 onClick={() => setShowDropdown(false)}
                 className="flex items-center gap-3 px-4 py-3 mx-2 rounded-2xl text-sm font-black text-slate-600 hover:bg-slate-50 hover:text-blue-600 transition-all"
               >

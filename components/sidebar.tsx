@@ -33,10 +33,10 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 
 export const menuItems = [
   { icon: LayoutDashboard, label: 'Dashboard', href: '/admin-dashboard' },
-  { icon: AlertCircle, label: 'Emergency Events', href: '/emergency-events' },
-  { icon: Map, label: 'GIS & Mapping', href: '/gis-mapping' },
+  // { icon: AlertCircle, label: 'Emergency Events', href: '/emergency-events' },
+  // { icon: Map, label: 'GIS & Mapping', href: '/gis-mapping' },
   { icon: Bell, label: 'Alerts & Communication', href: '/alerts-communication' },
-  { icon: Brain, label: 'Virtual EOC / AI Center', href: '/virtual-eoc-ai-center' },
+  // { icon: Brain, label: 'Virtual EOC / AI Center', href: '/virtual-eoc-ai-center' },
   { icon: ClipboardList, label: 'After Action Review', href: '/after-action-review' },
   { icon: FileText, label: 'COOP/BC Plans', href: '/emergency-plan' },
   { icon: FileText, label: 'Preparedness Information', href: '/preparedness-information' },
@@ -84,21 +84,27 @@ export function Sidebar() {
     ]
     : isEOCRole
       ? eocMenuItems
-      : isOperationalAdmin
-        ? [
-          ...menuItems,
-          { icon: Users, label: 'Responder and Leader Approval', href: '/admin/users' },
-        ]
-        : [
-          ...menuItems,
-        ]
+      : userRole === 'sub-admin'
+        ? [...menuItems]
+        : isOperationalAdmin
+          ? [
+            ...menuItems,
+            { icon: Users, label: 'Responder and Leader Approval', href: '/admin/users' },
+          ]
+          : [...menuItems]
 
   const filteredBottomItems = isSuperAdminRole
     ? [
       { icon: Settings, label: 'Settings', href: '/settings' },
       { icon: LogOut, label: 'Log out', href: '#' },
     ]
-    : bottomItems
+    : userRole === 'sub-admin'
+      ? [
+          { icon: Settings, label: 'Settings', href: '/sub-admin-settings' },
+          { icon: HelpCircle, label: 'Help', href: '#' },
+          { icon: LogOut, label: 'Log out', href: '#' },
+        ]
+      : bottomItems
 
   return (
     <div className="hidden md:flex min-h-0 w-72 shrink-0 flex-col bg-[#33375D] text-white h-full border-r border-slate-700/50">
@@ -211,7 +217,7 @@ export function Sidebar() {
 
       {/* Help Modal */}
       {showHelpModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: '#34385E' }}>
+        <div className="fixed inset-0 z-[999] flex items-center justify-center" style={{ backgroundColor: '#34385E' }}>
           <div className="relative w-full h-full flex flex-col items-center justify-center text-center px-4">
             <button
               onClick={() => setShowHelpModal(false)}
@@ -233,7 +239,7 @@ export function Sidebar() {
 
             {/* Title and Description */}
             <h2 className="text-4xl font-bold text-white mb-4">Contact Us</h2>
-            <p className="text-gray-200 mb-8 max-w-lg text-lg">
+            <p className="text-gray-200 mb-8 max-w-xl text-lg">
               Have questions or want to learn more? Get in touch with our team
               <br />
               or schedule a demo.

@@ -4,6 +4,10 @@ import DispatchSettings from '@/models/DispatchSettings';
 import { getSession } from '@/lib/auth';
 import { recordActivity, ACTIVITY_ACTIONS } from '@/lib/activity-log';
 
+function canEditDispatchSettings(role: string | undefined) {
+    return role === 'super-admin' || role === 'sub-admin';
+}
+
 const DEFAULT_DISPATCH = {
     autoDispatchMajor: true,
     autoEscalateMinutes: '15',
@@ -31,7 +35,7 @@ export async function GET() {
         await connectDB();
         const session = await getSession();
 
-        if (!session || session.user.role !== 'super-admin') {
+        if (!session || !canEditDispatchSettings(session.user?.role)) {
             return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
         }
 
@@ -62,7 +66,7 @@ export async function POST(req: NextRequest) {
         await connectDB();
         const session = await getSession();
 
-        if (!session || session.user.role !== 'super-admin') {
+        if (!session || !canEditDispatchSettings(session.user?.role)) {
             return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
         }
 
