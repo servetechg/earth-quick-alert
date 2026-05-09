@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import jsPDF from 'jspdf'
 import {
     Flame,
     Layers,
@@ -40,6 +41,7 @@ type IncidentReviewDef = {
 export default function AfterActionReviewPage() {
     const [incidentData, setIncidentData] = useState<IncidentReviewDef | null>(null)
     const [isLoading, setIsLoading] = useState(true)
+    const [isExporting, setIsExporting] = useState(false)
 
     useEffect(() => {
         async function fetchReviewData() {
@@ -89,6 +91,175 @@ export default function AfterActionReviewPage() {
         ]
     }
 
+    const kpiCards = [
+        { label: 'Tactical Name', value: displayData.name, sub: 'Identity Marker', icon: Target, color: 'text-blue-500', bg: 'bg-blue-500/10' },
+        { label: 'Event Classification', value: displayData.type, sub: 'Impact Category', icon: Layers, color: 'text-orange-500', bg: 'bg-orange-500/10' },
+        { label: 'Deployment Duration', value: displayData.duration, sub: 'Mission Window', icon: Activity, color: 'text-purple-500', bg: 'bg-purple-500/10' },
+        { label: 'AI Intel Count', value: displayData.insights, sub: 'Automated Insights', icon: Sparkles, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
+    ]
+
+    const performanceIndicators = [
+        { label: 'Resource Deployment', val: '92%', status: 'optimal' },
+        { label: 'Citizen Information Latency', val: '< 2.4s', status: 'optimal' },
+        { label: 'Data Synchronization', val: '99.9%', status: 'nominal' },
+    ]
+
+    const strategicEnhancements = [
+        'Integrate Multi-Spectral Satellite Feed earlier in Type 4 events.',
+        'Optimize secondary siren protocols in Sector 4 low-lands.',
+        'Upgrade GIS impact layers for better flood prediction.',
+    ]
+
+    const downloadReportPdf = () => {
+        if (isExporting) return
+        setIsExporting(true)
+        try {
+            const doc = new jsPDF({ unit: 'pt', format: 'a4' })
+            const pageW = doc.internal.pageSize.getWidth()
+            const pageH = doc.internal.pageSize.getHeight()
+            const margin = 44
+            const contentW = pageW - margin * 2
+            let y = margin
+
+            const ensure = (h: number) => {
+                if (y + h > pageH - margin) {
+                    doc.addPage()
+                    y = margin
+                }
+            }
+
+            const writeTitle = (text: string) => {
+                ensure(30)
+                doc.setFont('helvetica', 'bold')
+                doc.setFontSize(13)
+                doc.setTextColor(35, 56, 102)
+                doc.text(text, margin, y)
+                y += 8
+                doc.setDrawColor(220, 225, 235)
+                doc.line(margin, y, pageW - margin, y)
+                y += 14
+            }
+
+            const writeWrapped = (text: string, size = 10.5, indent = 0, spacing = 13) => {
+                doc.setFont('helvetica', 'normal')
+                doc.setFontSize(size)
+                doc.setTextColor(35, 40, 55)
+                const lines = doc.splitTextToSize(text, contentW - indent)
+                lines.forEach((line: string) => {
+                    ensure(spacing)
+                    doc.text(line, margin + indent, y)
+                    y += spacing
+                })
+            }
+
+            // Header
+            doc.setFillColor(35, 56, 102)
+            doc.rect(0, 0, pageW, 72, 'F')
+            doc.setFont('helvetica', 'bold')
+            doc.setFontSize(20)
+            doc.setTextColor(255, 255, 255)
+            doc.text('After-Action Review', margin, 34)
+            doc.setFont('helvetica', 'normal')
+            doc.setFontSize(9)
+            doc.text(`Generated: ${new Date().toLocaleString()}`, margin, 52)
+            doc.text('Ready2Go Operational Intelligence', pageW - margin, 34, { align: 'right' })
+            y = 98
+
+            writeTitle('KPI Dashboard Snapshot')
+            const gap = 10
+            const kpiCardW = (contentW - gap) / 2
+            const kpiCardH = 78
+            for (let i = 0; i < kpiCards.length; i += 2) {
+                ensure(kpiCardH + 8)
+                const rowItems = [kpiCards[i], kpiCards[i + 1]].filter(Boolean)
+                rowItems.forEach((kpi, col) => {
+                    const x = margin + col * (kpiCardW + gap)
+                    doc.setFillColor(247, 249, 255)
+                    doc.setDrawColor(224, 230, 242)
+                    doc.roundedRect(x, y - 12, kpiCardW, kpiCardH, 8, 8, 'FD')
+                    doc.setFont('helvetica', 'bold')
+                    doc.setFontSize(8.5)
+                    doc.setTextColor(90, 100, 120)
+                    doc.text(String(kpi.label).toUpperCase(), x + 10, y + 2)
+                    doc.setFontSize(14)
+                    doc.setTextColor(30, 35, 52)
+                    const valueText = String(kpi.value)
+                    const wrappedValue = doc.splitTextToSize(valueText, kpiCardW - 20)
+                    doc.text(wrappedValue[0] || valueText, x + 10, y + 24)
+                    doc.setFont('helvetica', 'normal')
+                    doc.setFontSize(8)
+                    doc.setTextColor(110, 120, 140)
+                    doc.text(String(kpi.sub).toUpperCase(), x + 10, y + 46)
+                })
+                y += kpiCardH + 10
+            }
+            writeWrapped(
+                `Strategic tactical analysis of ${displayData.name}. Modern failure analysis and operational intelligence.`,
+            )
+            y += 8
+
+            writeTitle('Mission Chronology')
+            displayData.events.forEach((event: any, idx: number) => {
+                ensure(30)
+                doc.setFont('helvetica', 'bold')
+                doc.setFontSize(10)
+                doc.setTextColor(35, 56, 102)
+                doc.text(`${idx + 1}. ${event.time} · ${event.type}`, margin, y)
+                y += 13
+                writeWrapped(event.title, 11)
+                writeWrapped(event.description, 10, 12)
+                y += 6
+            })
+
+            writeTitle('Intelligence Analysis')
+            if (displayData.aiInsights?.length) {
+                displayData.aiInsights.forEach((insight: any, idx: number) => {
+                    ensure(22)
+                    doc.setFont('helvetica', 'bold')
+                    doc.setFontSize(10.5)
+                    doc.setTextColor(35, 56, 102)
+                    doc.text(`${idx + 1}. ${insight.category || 'Insight'}`, margin, y)
+                    y += 12
+                    writeWrapped(insight.description || 'No details available.', 10, 12)
+                    y += 4
+                })
+            } else {
+                writeWrapped('No AI insights found for this incident.')
+            }
+
+            writeTitle('Performance Indicators')
+            performanceIndicators.forEach((metric) =>
+                writeWrapped(`• ${metric.label}: ${metric.val} (${metric.status})`),
+            )
+            y += 6
+
+            writeTitle('Strategic Enhancements')
+            strategicEnhancements.forEach((item) => writeWrapped(`• ${item}`))
+
+            const pageCount = doc.getNumberOfPages()
+            for (let i = 1; i <= pageCount; i++) {
+                doc.setPage(i)
+                doc.setFont('helvetica', 'normal')
+                doc.setFontSize(8)
+                doc.setTextColor(140, 150, 170)
+                doc.text(
+                    `Ready2Go · After-Action Review · Page ${i} of ${pageCount}`,
+                    pageW / 2,
+                    pageH - 18,
+                    { align: 'center' },
+                )
+            }
+
+            doc.save(`Ready2Go-AAR-${new Date().toISOString().slice(0, 10)}.pdf`)
+            toast.success('After-Action Review PDF downloaded.')
+        } catch (err) {
+            console.error('AAR PDF export failed:', err)
+            toast.error('PDF export failed. Please try again.')
+        } finally {
+            setIsExporting(false)
+        }
+    }
+
     return (
         <main className="min-h-screen bg-[#0A0B10] p-8 lg:p-12 space-y-12 overflow-hidden relative">
             {/* Background Artifacts */}
@@ -123,22 +294,18 @@ export default function AfterActionReviewPage() {
                         <Share2 size={16} /> Distribute Report
                     </Button>
                     <Button
-                        onClick={() => toast.success('Downloading Strategic AAR Payload (PDF/Excel)...')}
+                        onClick={downloadReportPdf}
+                        disabled={isExporting}
                         className="h-14 h-16 gap-3 rounded-2xl bg-[#33375D] px-8 font-black text-[10px] uppercase tracking-[0.2em] text-white shadow-2xl shadow-[#33375D]/25 hover:bg-[#2B2F50]"
                     >
-                        <Download size={16} /> Export Intelligence
+                        <Download size={16} /> {isExporting ? 'Exporting...' : 'Export Intelligence'}
                     </Button>
                 </div>
             </div>
 
             {/* KPI Dashboard */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 relative z-10">
-                {[
-                    { label: 'Tactical Name', value: displayData.name, sub: 'Identity Marker', icon: Target, color: 'text-blue-500', bg: 'bg-blue-500/10' },
-                    { label: 'Event Classification', value: displayData.type, sub: 'Impact Category', icon: Layers, color: 'text-orange-500', bg: 'bg-orange-500/10' },
-                    { label: 'Deployment Duration', value: displayData.duration, sub: 'Mission Window', icon: Activity, color: 'text-purple-500', bg: 'bg-purple-500/10' },
-                    { label: 'AI Intel Count', value: displayData.insights, sub: 'Automated Insights', icon: Sparkles, color: 'text-emerald-500', bg: 'bg-emerald-500/10' }
-                ].map((kpi, i) => (
+                {kpiCards.map((kpi, i) => (
                     <Card key={i} className="p-8 bg-white/[0.02] border border-white/5 rounded-[40px] shadow-2xl group hover:bg-white/[0.04] transition-all relative overflow-hidden">
                         <div className={cn("absolute right-8 top-8 w-12 h-12 rounded-2xl flex items-center justify-center transition-all", kpi.bg, kpi.color)}>
                             <kpi.icon size={24} />
@@ -248,11 +415,7 @@ export default function AfterActionReviewPage() {
                             <div className="relative z-10 space-y-6">
                                 <h3 className="text-[10px] font-black text-emerald-400 uppercase tracking-[0.4em]">2. Performance Indicators</h3>
                                 <div className="space-y-4">
-                                    {[
-                                        { label: 'Resource Deployment', val: '92%', status: 'optimal' },
-                                        { label: 'Citizen Information Latency', val: '< 2.4s', status: 'optimal' },
-                                        { label: 'Data Synchronization', val: '99.9%', status: 'nominal' }
-                                    ].map((met, i) => (
+                                    {performanceIndicators.map((met, i) => (
                                         <div key={i} className="flex flex-col gap-2">
                                             <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest text-slate-500">
                                                 <span>{met.label}</span>
@@ -275,11 +438,7 @@ export default function AfterActionReviewPage() {
                             <div className="relative z-10 space-y-6">
                                 <h3 className="text-[10px] font-black text-orange-400 uppercase tracking-[0.4em]">3. Strategic Enhancements</h3>
                                 <ul className="space-y-4">
-                                    {[
-                                        'Integrate Multi-Spectral Satellite Feed earlier in Type 4 events.',
-                                        'Optimize secondary siren protocols in Sector 4 low-lands.',
-                                        'Upgrade GIS impact layers for better flood prediction.'
-                                    ].map((imp, i) => (
+                                    {strategicEnhancements.map((imp, i) => (
                                         <li key={i} className="flex gap-4">
                                             <div className="w-5 h-5 rounded-lg bg-orange-500/10 border border-orange-500/20 flex items-center justify-center shrink-0">
                                                 <Plus size={12} className="text-orange-500" />

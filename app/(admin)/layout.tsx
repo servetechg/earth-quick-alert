@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useLayoutEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Sidebar } from '@/components/sidebar'
 import { Header } from '@/components/header'
@@ -16,7 +16,7 @@ export default function AdminLayout({
     const [userName, setUserName] = useState('')
     const [userRole, setUserRole] = useState('')
 
-    useEffect(() => {
+    useLayoutEffect(() => {
         const role = localStorage.getItem('userRole') || ''
         const storedName = localStorage.getItem('userName')
         const isAuthorized = role === 'admin' || role === 'super-admin' || role === 'sub-admin' || role === 'observer' || role === 'responder' || role === 'manager' || role === 'eoc-manager' || role === 'eoc-observer'
@@ -66,7 +66,7 @@ export default function AdminLayout({
                 <Header
                     userName={userName || 'Admin User'}
                     onLogout={handleLogout}
-                    hideSearch={userRole === 'super-admin'}
+                    hideSearch={userRole === 'super-admin' || userRole === 'sub-admin'}
                 />
                 <div className="flex-1 overflow-auto">
                     {children}

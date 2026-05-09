@@ -68,9 +68,7 @@ export default function LoginPage() {
     <div className="min-h-screen flex bg-[#F8FAFC] selection:bg-[#33375D]/10">
       {/* Left Side: Branding (Visible on Desktop) */}
       <div className="hidden lg:flex lg:w-1/2 bg-[#33375D] flex-col items-center justify-center p-12 text-white relative overflow-hidden">
-        {/* Decorative background elements */}
-        <div className="absolute top-0 right-0 -mr-20 -mt-20 w-[600px] h-[600px] bg-white/5 rounded-full blur-[120px] animate-pulse" />
-        <div className="absolute bottom-0 left-0 -ml-20 -mb-20 w-[600px] h-[600px] bg-slate-900/20 rounded-full blur-[120px] animate-pulse delay-700" />
+
 
         <div className="relative z-10 text-center max-w-md">
           <div className="flex flex-col items-center mb-12">
