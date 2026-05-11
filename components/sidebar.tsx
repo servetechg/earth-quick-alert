@@ -107,7 +107,7 @@ export function Sidebar() {
       : bottomItems
 
   return (
-    <div className="hidden md:flex min-h-0 w-68 shrink-0 flex-col bg-[#33375D] text-white h-full border-r border-slate-700/50">
+    <div className="hidden md:flex min-h-0 w-70 shrink-0 flex-col bg-[#33375D] text-white h-full border-r border-slate-700/50">
       {/* Logo Section */}
       <Link href="/" className="p-8 flex flex-col items-center shrink-0 hover:bg-white/5 transition-colors">
         <Image
