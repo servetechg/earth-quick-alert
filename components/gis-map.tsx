@@ -19,7 +19,16 @@ import {
   Map as MapIcon,
   Maximize2,
   Settings,
-  Radar
+  Radar,
+  CloudRain,
+  Waves,
+  Home as HomeIcon,
+  PlusSquare,
+  Construction,
+  Droplets,
+  Boxes,
+  AlertOctagon,
+  X,
 } from 'lucide-react'
 import { GoogleMap } from '@/components/google-map'
 import { cn } from '@/lib/utils'
@@ -27,11 +36,42 @@ import { ShieldCheck, Truck, Siren, Building2, MapPin } from 'lucide-react'
 import { geocodeAddress, calculateDistance } from '@/lib/services/mock-map-service'
 import { Switch } from '@/components/ui/switch'
 
-interface GISMapProps {
-  selectedLocation?: string
+interface MapLayerDef {
+  id: string
+  label: string
+  Icon: React.ComponentType<React.SVGProps<SVGSVGElement> & { strokeWidth?: number }>
+  color: string
 }
 
-export function GISMap({ selectedLocation = 'All' }: GISMapProps) {
+const DEFAULT_MAP_LAYERS: MapLayerDef[] = [
+  { id: 'weather', label: 'Weather Radar', Icon: CloudRain, color: '#3B82F6' },
+  { id: 'risk', label: 'Risk Areas', Icon: AlertTriangle, color: '#0EA5E9' },
+  { id: 'flood', label: 'Flood Zones', Icon: Waves, color: '#A41E22' },
+  { id: 'shelters', label: 'Shelters', Icon: HomeIcon, color: '#16A34A' },
+  { id: 'hospitals', label: 'Hospitals', Icon: PlusSquare, color: '#22A9A1' },
+  { id: 'roads', label: 'Road Closures', Icon: Construction, color: '#DC2626' },
+  { id: 'power', label: 'Power Outages', Icon: Zap, color: '#EAB308' },
+  { id: 'water', label: 'Water Issues', Icon: Droplets, color: '#0EA5E9' },
+  { id: 'resources', label: 'Resource Sites', Icon: Boxes, color: '#16A34A' },
+  { id: 'incidents', label: 'Incident Reports', Icon: AlertOctagon, color: '#DC2626' },
+]
+
+interface GISMapProps {
+  selectedLocation?: string
+  /** Override the panel header title. Defaults to `GIS Impact Map`. */
+  title?: string
+  /** Hide the Citizens / Responders / Leaders / Infrastructure tabs. */
+  hideTabs?: boolean
+  /** Show the floating Map Layers panel on the left of the map. */
+  showLayersPanel?: boolean
+}
+
+export function GISMap({
+  selectedLocation = 'All',
+  title = 'GIS Impact Map',
+  hideTabs = false,
+  showLayersPanel = false,
+}: GISMapProps) {
   const [activeEmergencies, setActiveEmergencies] = useState<any[]>([])
   const [impactedUsers, setImpactedUsers] = useState<any[]>([])
   const [responders, setResponders] = useState<any[]>([])
@@ -43,6 +83,10 @@ export function GISMap({ selectedLocation = 'All' }: GISMapProps) {
   const [mapZoom, setMapZoom] = useState(4)
   const [activeTab, setActiveTab] = useState<'Citizens' | 'Responders' | 'Leaders' | 'Infrastructure'>('Citizens')
   const [showHeatmap, setShowHeatmap] = useState(true)
+  const [mapLayers, setMapLayers] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(DEFAULT_MAP_LAYERS.map((layer) => [layer.id, true])),
+  )
+  const [layersPanelOpen, setLayersPanelOpen] = useState(true)
 
   useEffect(() => {
     async function fetchData() {
@@ -359,29 +403,78 @@ export function GISMap({ selectedLocation = 'All' }: GISMapProps) {
     <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm h-[700px] flex flex-col">
       <div className="p-4 sm:p-6 border-b border-slate-100 flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <h2 className="text-lg sm:text-xl font-black text-slate-900 tracking-tighter uppercase shrink-0">GIS Impact Map</h2>
+          <h2 className="text-lg sm:text-xl font-black text-slate-900 tracking-tighter uppercase shrink-0">{title}</h2>
         </div>
 
-        <div className="flex bg-slate-50 p-1 rounded-2xl gap-0.5 overflow-x-auto no-scrollbar">
-          {(['Citizens', 'Responders', 'Leaders', 'Infrastructure'] as const).map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={cn(
-                "px-3 sm:px-6 py-1.5 sm:py-2 rounded-xl text-[10px] sm:text-[11px] font-black uppercase tracking-wider transition-all whitespace-nowrap",
-                activeTab === tab
-                  ? "bg-white text-[#33375D] shadow-sm border border-slate-100"
-                  : "text-slate-400 hover:text-slate-900"
-              )}
-            >
-              {tab}
-            </button>
-          ))}
-        </div>
+        {!hideTabs && (
+          <div className="flex bg-slate-50 p-1 rounded-2xl gap-0.5 overflow-x-auto no-scrollbar">
+            {(['Citizens', 'Responders', 'Leaders', 'Infrastructure'] as const).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={cn(
+                  "px-3 sm:px-6 py-1.5 sm:py-2 rounded-xl text-[10px] sm:text-[11px] font-black uppercase tracking-wider transition-all whitespace-nowrap",
+                  activeTab === tab
+                    ? "bg-white text-[#33375D] shadow-sm border border-slate-100"
+                    : "text-slate-400 hover:text-slate-900"
+                )}
+              >
+                {tab}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="flex-1 relative">
         <GoogleMap markers={markers} zoom={mapZoom} center={mapCenter} heatPoints={heatPoints} showHeatmap={showHeatmap} />
+
+        {showLayersPanel && layersPanelOpen && (
+          <div className="absolute left-4 top-16 z-40 w-[210px] rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-xl backdrop-blur-sm sm:top-20">
+            <div className="flex items-center justify-between mb-3 border-b border-slate-100 pb-2">
+              <h4 className="text-xs font-black uppercase tracking-widest text-slate-700">Map Layers</h4>
+              <button
+                onClick={() => setLayersPanelOpen(false)}
+                className="p-0.5 rounded hover:bg-slate-100 transition-colors"
+                aria-label="Close map layers"
+                type="button"
+              >
+                <X className="w-3.5 h-3.5 text-slate-500" />
+              </button>
+            </div>
+            <ul className="flex flex-col gap-2">
+              {DEFAULT_MAP_LAYERS.map((layer) => {
+                const Icon = layer.Icon
+                const checked = mapLayers[layer.id]
+                return (
+                  <li key={layer.id}>
+                    <label className="flex items-center gap-2 cursor-pointer group select-none">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={(e) =>
+                          setMapLayers((prev) => ({ ...prev, [layer.id]: e.target.checked }))
+                        }
+                        className="w-3.5 h-3.5 accent-[#33375D] cursor-pointer shrink-0"
+                      />
+                      <span
+                        className="w-5 h-5 rounded-md flex items-center justify-center shrink-0"
+                        style={{ backgroundColor: `${layer.color}1A` }}
+                        aria-hidden
+                      >
+                        <Icon className="w-3 h-3" strokeWidth={2.25} style={{ color: layer.color }} />
+                      </span>
+                      <span className="text-[11px] font-semibold text-slate-700 group-hover:text-slate-900">
+                        {layer.label}
+                      </span>
+                    </label>
+                  </li>
+                )
+              })}
+            </ul>
+          </div>
+        )}
+
         <div className="absolute right-4 top-16 z-40 w-64 rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-xl backdrop-blur-sm sm:top-20">
           <div className="mb-3 border-b border-slate-100 pb-2">
             <h4 className="text-xs font-black uppercase tracking-widest text-slate-700">Heat Map</h4>

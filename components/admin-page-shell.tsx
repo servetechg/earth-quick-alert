@@ -18,7 +18,7 @@ export function AdminPageShell({
     <main className={cn('min-h-screen bg-slate-50/50 pb-20', className)}>
       <div
         className={cn(
-          'mx-auto w-full max-w-[1800px] space-y-8 px-6 pt-8 lg:px-12',
+          'mx-auto w-full max-w-[1800px] space-y-8 px-5 pt-6 lg:px-5',
           innerClassName,
         )}
       >
