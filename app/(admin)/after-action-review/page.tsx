@@ -383,46 +383,61 @@ export default function AfterActionReviewPage() {
                     </Card>
                 </div>
 
-                {/* AI Insight Cards */}
+                {/* AI Insight Cards — typography aligned with KPI row + Mission Chronology (dark) */}
                 <div className="lg:col-span-12 space-y-8">
-                    <h2 className="text-2xl font-black text-white uppercase tracking-tight px-4">Intelligence Analysis</h2>
+                    <div className="px-4">
+                        <h2 className="text-2xl font-black text-white uppercase tracking-tight">Intelligence Analysis</h2>
+                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-1">
+                            Structured operational intelligence
+                        </p>
+                    </div>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                         {/* Tactical Summary */}
-                        <Card className="p-10 bg-gradient-to-br from-blue-600/10 to-indigo-600/10 border border-white/10 rounded-[48px] relative overflow-hidden group">
-                            <div className="absolute top-0 right-0 p-10 opacity-10 group-hover:scale-110 transition-transform">
-                                <FileText size={100} />
+                        <Card className="relative overflow-hidden rounded-[40px] border border-white/5 bg-white/[0.02] p-8 shadow-2xl transition-all group hover:bg-white/[0.04]">
+                            <div className="pointer-events-none absolute right-6 top-6 opacity-[0.07] transition-transform group-hover:scale-110">
+                                <FileText size={88} className="text-white" />
                             </div>
-                            <div className="relative z-10 space-y-6">
-                                <h3 className="text-[10px] font-black text-blue-400 uppercase tracking-[0.4em]">1. Operational Summary</h3>
-                                <p className="text-slate-200 font-black text-lg leading-relaxed lowercase first-letter:uppercase">
+                            <div className="relative z-10 space-y-5">
+                                <div>
+                                    <h3 className="mt-1 text-md font-black uppercase tracking-widest text-blue-400">
+                                        Operational summary
+                                    </h3>
+                                </div>
+                                <p className="text-[15px] font-bold leading-relaxed text-slate-300">
                                     {displayData.aiInsights[0]?.description}
                                 </p>
-                                <div className="pt-6 border-t border-white/5 flex items-center justify-between">
+                                <div className="flex items-center justify-between border-t border-white/5 pt-5">
                                     <div className="flex items-center gap-2">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                                        <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest italic">Confidence: 99.4%</span>
+                                        <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                                        <span className="text-[9px] font-black uppercase tracking-widest text-slate-500">
+                                            Confidence: 99.4%
+                                        </span>
                                     </div>
-                                    <CheckCircle size={14} className="text-blue-500" />
+                                    <CheckCircle size={14} className="shrink-0 text-blue-500" aria-hidden />
                                 </div>
                             </div>
                         </Card>
 
                         {/* Efficiency Targets */}
-                        <Card className="p-10 bg-white/[0.02] border border-white/5 rounded-[48px] relative group overflow-hidden">
-                            <div className="absolute top-0 right-0 p-10 opacity-10 group-hover:rotate-12 transition-transform">
-                                <Zap size={100} />
+                        <Card className="relative overflow-hidden rounded-[40px] border border-white/5 bg-white/[0.02] p-8 shadow-2xl transition-all group hover:bg-white/[0.04]">
+                            <div className="pointer-events-none absolute right-6 top-6 opacity-[0.07] transition-transform group-hover:rotate-6">
+                                <Zap size={88} className="text-white" />
                             </div>
-                            <div className="relative z-10 space-y-6">
-                                <h3 className="text-[10px] font-black text-emerald-400 uppercase tracking-[0.4em]">2. Performance Indicators</h3>
-                                <div className="space-y-4">
+                            <div className="relative z-10 space-y-5">
+                                <div>
+                                    <h3 className="mt-1 text-md font-black uppercase tracking-widest text-emerald-400">
+                                        Performance indicators
+                                    </h3>
+                                </div>
+                                <div className="space-y-5">
                                     {performanceIndicators.map((met, i) => (
                                         <div key={i} className="flex flex-col gap-2">
-                                            <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest text-slate-500">
-                                                <span>{met.label}</span>
-                                                <span className="text-white">{met.val}</span>
+                                            <div className="flex items-center justify-between gap-3 text-[10px] font-black uppercase tracking-widest text-slate-500">
+                                                <span className="min-w-0 truncate">{met.label}</span>
+                                                <span className="shrink-0 tabular-nums text-sm font-black text-white">{met.val}</span>
                                             </div>
-                                            <div className="h-1 bg-white/5 rounded-full overflow-hidden">
-                                                <div className="h-full bg-emerald-500 w-[90%]" />
+                                            <div className="h-1 overflow-hidden rounded-full bg-white/5">
+                                                <div className="h-full w-[90%] bg-emerald-500" />
                                             </div>
                                         </div>
                                     ))}
@@ -431,19 +446,23 @@ export default function AfterActionReviewPage() {
                         </Card>
 
                         {/* Strategic Improvements */}
-                        <Card className="p-10 bg-white/[0.02] border border-white/5 rounded-[48px] relative group overflow-hidden">
-                            <div className="absolute bottom-0 right-0 p-10 opacity-10 group-hover:-translate-y-4 transition-transform">
-                                <RotateCcw size={100} />
+                        <Card className="relative overflow-hidden rounded-[40px] border border-white/5 bg-white/[0.02] p-8 shadow-2xl transition-all group hover:bg-white/[0.04]">
+                            <div className="pointer-events-none absolute bottom-4 right-4 opacity-[0.07] transition-transform group-hover:-translate-y-1">
+                                <RotateCcw size={88} className="text-white" />
                             </div>
-                            <div className="relative z-10 space-y-6">
-                                <h3 className="text-[10px] font-black text-orange-400 uppercase tracking-[0.4em]">3. Strategic Enhancements</h3>
+                            <div className="relative z-10 space-y-5">
+                                <div>
+                                    <h3 className="mt-1 text-md font-black uppercase tracking-widest text-orange-400">
+                                        Strategic enhancements
+                                    </h3>
+                                </div>
                                 <ul className="space-y-4">
                                     {strategicEnhancements.map((imp, i) => (
-                                        <li key={i} className="flex gap-4">
-                                            <div className="w-5 h-5 rounded-lg bg-orange-500/10 border border-orange-500/20 flex items-center justify-center shrink-0">
+                                        <li key={i} className="flex gap-3">
+                                            <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-lg border border-orange-500/20 bg-orange-500/10">
                                                 <Plus size={12} className="text-orange-500" />
                                             </div>
-                                            <p className="text-[13px] font-bold text-slate-400 leading-snug">{imp}</p>
+                                            <p className="min-w-0 text-[15px] font-bold leading-relaxed text-slate-300">{imp}</p>
                                         </li>
                                     ))}
                                 </ul>

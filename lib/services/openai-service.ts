@@ -57,6 +57,55 @@ export interface OperationalSignals {
     rationale: string;
 }
 
+/** Emergency-plan attachment integrity (PDF / DOCX / CSV / XLSX). */
+export interface CoopAttachmentIntegrity {
+    status: 'In Sync' | 'Reviewing' | 'Deviation Found';
+    score: number;
+    summary: string;
+}
+
+/** Audit summary for the entire continuity-plan inventory shown on the admin emergency-plan page. */
+export interface ContinuityAuditSummary {
+    summary: string;
+    findings: string[];
+    posture: 'Resilient' | 'Steady' | 'At Risk';
+    averageScore: number;
+}
+
+export interface ContinuityAuditInput {
+    totals: {
+        plans: number;
+        attachments: number;
+        analyzed: number;
+    };
+    averageScore: number;
+    counts: {
+        coop: number;
+        bcp: number;
+        compliance: number;
+        response: number;
+    };
+    integrity: {
+        inSync: number;
+        reviewing: number;
+        deviation: number;
+        unanalyzed: number;
+    };
+    plans: Array<{
+        planId: string;
+        label: string;
+        category: 'coop' | 'bcp' | 'compliance' | 'response';
+        attachmentCount: number;
+        stepCount: number;
+        attachments: Array<{
+            fileName: string;
+            status?: string;
+            score?: number;
+            summary?: string;
+        }>;
+    }>;
+}
+
 type ChatMessage = {
     role: 'system' | 'user';
     content: string;
@@ -70,7 +119,11 @@ export class OpenAIService {
         return Boolean(this.apiKey);
     }
 
-    private async callOpenAI<T>(messages: ChatMessage[], fallback: T): Promise<T> {
+    private async callOpenAI<T>(
+        messages: ChatMessage[],
+        fallback: T,
+        options?: { max_tokens?: number }
+    ): Promise<T> {
         if (!this.canUseOpenAI()) return fallback;
 
         try {
@@ -84,6 +137,7 @@ export class OpenAIService {
                     model: this.model,
                     messages,
                     response_format: { type: 'json_object' },
+                    ...(typeof options?.max_tokens === 'number' ? { max_tokens: options.max_tokens } : {}),
                 }),
             });
 
@@ -552,6 +606,165 @@ major_incidents, minor_incidents (numbers for KPI breakdown).`;
         const merged = this.mergeRiskReport(fallback, result);
         const aligned = this.alignAlertsToDistribution(merged, bundle);
         return applyHistoricalContextToReport(bundle, applyDynamicExecutiveKpis(bundle, aligned));
+    }
+
+    /**
+     * AI Integrity for COOP attachments: PDF, DOCX, CSV, XLSX (text excerpt + plan context).
+     */
+    async analyzeCoopAttachmentIntegrity(input: {
+        planLabel: string;
+        planOverview: string;
+        steps: string[];
+        fileName: string;
+        fileExtension: string;
+        fileSizeBytes: number;
+        extractedText?: string;
+        /** Cap excerpt length for latency/token use (default 12000). Upload uses ~8000. */
+        maxExcerptChars?: number;
+    }): Promise<CoopAttachmentIntegrity> {
+        const fallback: CoopAttachmentIntegrity = {
+            status: 'Reviewing',
+            score: 50,
+            summary: 'Analysis unavailable — configure OPENAI_API_KEY or retry.',
+        };
+
+        const cap = typeof input.maxExcerptChars === 'number' && input.maxExcerptChars > 0 ? input.maxExcerptChars : 12000;
+        const ext = String(input.fileExtension || '').toLowerCase().replace(/^\./, '');
+        const excerpt = (input.extractedText || '').trim().slice(0, cap);
+        const payload = {
+            fileKind: ext === 'pdf' ? 'PDF' : ext === 'docx' || ext === 'doc' ? 'Word' : ext === 'xlsx' || ext === 'xls' ? 'Spreadsheet' : ext === 'csv' ? 'CSV' : 'Document',
+            planLabel: input.planLabel,
+            planOverview: input.planOverview.slice(0, 4000),
+            planSteps: input.steps.slice(0, 50).join('\n').slice(0, 6000),
+            fileName: input.fileName,
+            fileExtension: ext,
+            fileSizeBytes: input.fileSizeBytes,
+            documentTextExcerpt: excerpt.length ? excerpt : null,
+            guidance:
+                excerpt.length === 0
+                    ? 'No extractable text (empty, corrupted, or scan-only PDF). Score conservatively (35–55) and use Reviewing or Deviation Found as appropriate; explain in summary.'
+                    : `Evaluate the excerpt as a ${ext.toUpperCase()} continuity / emergency-plan artifact. Check alignment with plan overview and steps; clarity of objectives, roles, communications, recovery threads; tabular data coherence for spreadsheets.`,
+        };
+
+        const system = `You are a continuity of operations (COOP) and emergency preparedness document reviewer for Ready2Go.
+The uploaded files are limited to PDF, DOCX, CSV, and XLSX for this module.
+Return ONLY valid JSON: {"status":"In Sync"|"Reviewing"|"Deviation Found","score":<integer 0-100>,"summary":"<plain English, max 220 chars>"}.
+Status meanings:
+- "In Sync": content substantively supports the plan context and looks operationally usable.
+- "Reviewing": partial/unclear content, weak alignment, or needs human review.
+- "Deviation Found": serious gaps, wrong intent vs plan, or unusable as a continuity artifact.
+Score: 0–100 (higher = stronger alignment and completeness). Map score visually: low scores (~0–40) imply deviation risk; mid (41–70) review; high (71–100) in sync.
+Do not give legal advice. If excerpt is empty or useless, keep score low and status Reviewing or Deviation Found.`;
+
+        const raw = await this.callOpenAI<{ status?: string; score?: number; summary?: string }>(
+            [
+                { role: 'system', content: system },
+                { role: 'user', content: JSON.stringify(payload) },
+            ],
+            {
+                status: fallback.status,
+                score: fallback.score,
+                summary: fallback.summary,
+            },
+            { max_tokens: 380 },
+        );
+
+        return {
+            status: this.normalizeCoopIntegrityStatus(raw.status),
+            score: Math.min(100, Math.max(0, Math.round(Number(raw.score) || fallback.score))),
+            summary: String(raw.summary || fallback.summary).slice(0, 280),
+        };
+    }
+
+    /**
+     * Generates an executive-style audit summary for the entire continuity vault — what's in it,
+     * AI integrity posture, and 2–4 actionable findings to surface to operators.
+     */
+    async generateContinuityAuditSummary(input: ContinuityAuditInput): Promise<ContinuityAuditSummary> {
+        const posture = this.derivePosture(input);
+        const fallback: ContinuityAuditSummary = {
+            summary: input.totals.plans
+                ? `Continuity vault holds ${input.totals.plans} plan${input.totals.plans === 1 ? '' : 's'} and ${input.totals.attachments} attachment${input.totals.attachments === 1 ? '' : 's'}; configure OPENAI_API_KEY for a tailored audit.`
+                : 'No continuity plans yet — register a plan to begin tracking COOP/BCP/Compliance posture.',
+            findings: [],
+            posture,
+            averageScore: input.averageScore,
+        };
+
+        if (!this.canUseOpenAI() || !input.totals.plans) return fallback;
+
+        const compactPlans = input.plans.slice(0, 25).map((p) => ({
+            planId: p.planId,
+            label: p.label.slice(0, 80),
+            category: p.category,
+            files: p.attachmentCount,
+            steps: p.stepCount,
+            attachments: p.attachments.slice(0, 6).map((a) => ({
+                file: a.fileName.slice(0, 80),
+                status: a.status || 'unscored',
+                score: typeof a.score === 'number' ? a.score : null,
+            })),
+        }));
+
+        const payload = {
+            totals: input.totals,
+            averageScore: input.averageScore,
+            categoryCounts: input.counts,
+            integrityBreakdown: input.integrity,
+            plans: compactPlans,
+        };
+
+        const system = `You are a Continuity-of-Operations auditor for the Ready2Go emergency-management platform.
+Given a JSON inventory of COOP/BCP/Compliance plans and their AI-integrity scored attachments, output ONLY JSON:
+{"summary":"<one or two sentences, plain English, max 360 chars, no markdown>","findings":["<short actionable bullet, max 140 chars>", ...]}
+Rules:
+- 2 to 4 findings, ordered by urgency. Reference real plan labels or categories where useful.
+- Highlight: coverage gaps (empty categories), low integrity scores, files with "Deviation Found", plans without steps or attachments, missing analysis.
+- If posture is strong, still flag the weakest area for continuous improvement.
+- Do NOT recommend actions outside the continuity/emergency-management domain. No legal advice.`;
+
+        const raw = await this.callOpenAI<{ summary?: string; findings?: unknown }>(
+            [
+                { role: 'system', content: system },
+                { role: 'user', content: JSON.stringify(payload) },
+            ],
+            { summary: fallback.summary, findings: [] },
+            { max_tokens: 420 },
+        );
+
+        const findings = Array.isArray(raw.findings)
+            ? raw.findings
+                  .map((f) => String(f ?? '').trim())
+                  .filter(Boolean)
+                  .slice(0, 4)
+                  .map((f) => f.slice(0, 160))
+            : [];
+
+        return {
+            summary: String(raw.summary || fallback.summary).slice(0, 420),
+            findings,
+            posture,
+            averageScore: input.averageScore,
+        };
+    }
+
+    private derivePosture(input: ContinuityAuditInput): ContinuityAuditSummary['posture'] {
+        if (!input.totals.plans) return 'At Risk';
+        const deviations = input.integrity.deviation;
+        const reviewing = input.integrity.reviewing;
+        const analyzed = input.totals.analyzed;
+        const avg = input.averageScore;
+        if (deviations > 0 || avg < 55 || analyzed === 0) return 'At Risk';
+        if (reviewing > 0 || avg < 75) return 'Steady';
+        return 'Resilient';
+    }
+
+    private normalizeCoopIntegrityStatus(s: string | undefined): CoopAttachmentIntegrity['status'] {
+        const u = String(s || '').trim().toLowerCase();
+        if (u === 'deviation found' || (u.includes('deviation') && !u.includes('no deviation'))) return 'Deviation Found';
+        if (u === 'in sync' || u.includes('in sync')) return 'In Sync';
+        if (u === 'reviewing' || u.includes('review')) return 'Reviewing';
+        return 'Reviewing';
     }
 
     private mergeRiskReport(base: RiskReport, ai?: RiskReport | null): RiskReport {
