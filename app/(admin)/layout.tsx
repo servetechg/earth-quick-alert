@@ -66,7 +66,7 @@ export default function AdminLayout({
                 <Header
                     userName={userName || 'Admin User'}
                     onLogout={handleLogout}
-                    hideSearch={userRole === 'super-admin' || userRole === 'sub-admin'}
+                    hideSearch={userRole === 'super-admin'}
                 />
                 <div className="flex-1 overflow-auto">
                     {children}
