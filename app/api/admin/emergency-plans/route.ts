@@ -1,23 +1,88 @@
 import { NextResponse } from 'next/server';
 import connectDB from '@/lib/mongodb';
 import EmergencyPlan from '@/models/EmergencyPlan';
-import { writeFile, mkdir } from 'fs/promises';
-import { join } from 'path';
+import { getSession } from '@/lib/auth';
+import { uploadEmergencyPlanBuffer } from '@/lib/emergency-plan-cloudinary';
+import { openaiService } from '@/lib/services/openai-service';
+import { extractTextFromBuffer, FAST_TEXT_CAP } from '@/lib/emergency-plan-ai-integrity';
+
+export const runtime = 'nodejs';
+
+const MAX_BYTES = 25 * 1024 * 1024;
+
+/** Continuity vault — PDF, Word, CSV, Excel only */
+const ALLOWED_EXT = new Set(['pdf', 'docx', 'csv', 'xlsx']);
+
+function canManageEmergencyPlans(role: string | undefined) {
+    return role === 'super-admin' || role === 'sub-admin' || role === 'admin';
+}
+
+function extensionFromFilename(name: string): string {
+    const m = /\.([^.]+)$/i.exec(name.trim());
+    return m ? m[1].toLowerCase() : '';
+}
+
+function mimeFromExtension(ext: string): string {
+    const map: Record<string, string> = {
+        pdf: 'application/pdf',
+        csv: 'text/csv',
+        txt: 'text/plain',
+        png: 'image/png',
+        jpg: 'image/jpeg',
+        jpeg: 'image/jpeg',
+        gif: 'image/gif',
+        bmp: 'image/bmp',
+        webp: 'image/webp',
+        ppt: 'application/vnd.ms-powerpoint',
+        pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        doc: 'application/msword',
+        docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        xls: 'application/vnd.ms-excel',
+        xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    };
+    return map[ext] || 'application/octet-stream';
+}
+
+function asNonEmptyString(v: unknown): string | null {
+    if (typeof v !== 'string') return null;
+    const s = v.trim();
+    return s.length ? s : null;
+}
+
+const PLAN_ID_RE = /^[a-z0-9][a-z0-9-_]*$/i;
+
+const PLAN_CATEGORIES = ['coop', 'bcp', 'compliance'] as const;
+type PlanCategory = typeof PLAN_CATEGORIES[number];
+
+function normalizeCategory(v: unknown): PlanCategory | null {
+    if (typeof v !== 'string') return null;
+    const s = v.trim().toLowerCase();
+    return (PLAN_CATEGORIES as readonly string[]).includes(s) ? (s as PlanCategory) : null;
+}
 
 export async function GET() {
     try {
+        const session = await getSession();
+        if (!session?.user?.role || !canManageEmergencyPlans(session.user.role)) {
+            return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+        }
+
         await connectDB();
         const plans = await EmergencyPlan.find({});
-        const dataMap = plans.reduce((acc, plan) => {
-            acc[plan.planId] = {
-                id: plan._id,
-                label: plan.label,
-                overview: plan.overview,
-                steps: plan.steps,
-                attachments: plan.attachments
-            };
-            return acc;
-        }, {} as Record<string, any>);
+        const dataMap = plans.reduce(
+            (acc, plan) => {
+                acc[plan.planId] = {
+                    id: plan._id,
+                    label: plan.label,
+                    overview: plan.overview,
+                    category: plan.category,
+                    steps: plan.steps,
+                    attachments: plan.attachments,
+                };
+                return acc;
+            },
+            {} as Record<string, unknown>
+        );
 
         return NextResponse.json({ success: true, data: dataMap });
     } catch (error) {
@@ -26,61 +91,253 @@ export async function GET() {
     }
 }
 
-export async function POST(req: Request) {
+/** Create or replace metadata for a plan (no file). */
+export async function PUT(req: Request) {
     try {
+        const session = await getSession();
+        if (!session?.user?.role || !canManageEmergencyPlans(session.user.role)) {
+            return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+        }
+
         await connectDB();
-
-        // Use FormData to parse incoming multipart/form-data for file uploads
-        const formData = await req.formData();
-        const planId = formData.get('planId') as string;
-        const file = formData.get('file') as File;
-
-        if (!planId || !file) {
-            return NextResponse.json({ success: false, error: 'Missing plan ID or file' }, { status: 400 });
-        }
-
-        const bytes = await file.arrayBuffer();
-        const buffer = Buffer.from(bytes);
-
-        // Define directory to save
-        const uploadDir = join(process.cwd(), 'public', 'uploads');
-        // Ensure directory exists
+        let body: { planId?: unknown; label?: unknown; overview?: unknown; category?: unknown };
         try {
-            await mkdir(uploadDir, { recursive: true });
-        } catch (dirError) {
-            // ignore if exists
+            body = await req.json();
+        } catch {
+            return NextResponse.json({ success: false, error: 'Invalid JSON body' }, { status: 400 });
         }
 
-        const uniqueFilename = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.\-_]/g, '')}`;
-        const filePath = join(uploadDir, uniqueFilename);
+        const planId = asNonEmptyString(body?.planId);
+        const label = asNonEmptyString(body?.label);
+        const overview = asNonEmptyString(body?.overview) ?? '';
+        const category = normalizeCategory(body?.category);
 
-        await writeFile(filePath, buffer);
+        if (!planId || !PLAN_ID_RE.test(planId)) {
+            return NextResponse.json(
+                {
+                    success: false,
+                    error: 'planId must be a non-empty slug (letters, numbers, hyphen, underscore)',
+                },
+                { status: 400 }
+            );
+        }
 
-        const fileUrl = `/uploads/${uniqueFilename}`;
+        if (!label) {
+            return NextResponse.json({ success: false, error: 'label is required' }, { status: 400 });
+        }
+
+        if (body?.category !== undefined && !category) {
+            return NextResponse.json(
+                { success: false, error: `category must be one of: ${PLAN_CATEGORIES.join(', ')}` },
+                { status: 400 }
+            );
+        }
 
         let plan = await EmergencyPlan.findOne({ planId });
         if (!plan) {
             plan = new EmergencyPlan({
                 planId,
-                label: planId.replace(/_/g, ' ').toUpperCase(),
+                label,
+                overview,
+                ...(category ? { category } : {}),
+                steps: [],
+                attachments: [],
+            });
+        } else {
+            plan.label = label;
+            plan.overview = overview;
+            if (category) plan.category = category;
+        }
+
+        await plan.save();
+        return NextResponse.json({ success: true, message: 'Plan saved', data: plan });
+    } catch (error: unknown) {
+        const code = error && typeof error === 'object' && 'code' in error ? (error as { code?: number }).code : undefined;
+        if (code === 11000) {
+            return NextResponse.json({ success: false, error: 'Duplicate plan key' }, { status: 409 });
+        }
+        console.error('EmergencyPlan PUT error:', error);
+        return NextResponse.json({ success: false, error: 'Internal Server Error' }, { status: 500 });
+    }
+}
+
+/** Patch label / overview on an existing plan. */
+export async function PATCH(req: Request) {
+    try {
+        const session = await getSession();
+        if (!session?.user?.role || !canManageEmergencyPlans(session.user.role)) {
+            return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+        }
+
+        await connectDB();
+        let body: { planId?: unknown; label?: unknown; overview?: unknown; category?: unknown };
+        try {
+            body = await req.json();
+        } catch {
+            return NextResponse.json({ success: false, error: 'Invalid JSON body' }, { status: 400 });
+        }
+
+        const planId = asNonEmptyString(body?.planId);
+        if (!planId) {
+            return NextResponse.json({ success: false, error: 'planId is required' }, { status: 400 });
+        }
+
+        const label = typeof body.label === 'string' ? body.label.trim() : undefined;
+        const overview = typeof body.overview === 'string' ? body.overview.trim() : undefined;
+        const categoryProvided = body.category !== undefined;
+        const category = categoryProvided ? normalizeCategory(body.category) : undefined;
+
+        if (categoryProvided && !category) {
+            return NextResponse.json(
+                { success: false, error: `category must be one of: ${PLAN_CATEGORIES.join(', ')}` },
+                { status: 400 }
+            );
+        }
+
+        if (label === undefined && overview === undefined && !categoryProvided) {
+            return NextResponse.json({ success: false, error: 'Provide label, overview, and/or category' }, { status: 400 });
+        }
+
+        const plan = await EmergencyPlan.findOne({ planId });
+        if (!plan) {
+            return NextResponse.json({ success: false, error: 'Plan not found' }, { status: 404 });
+        }
+
+        if (label !== undefined) {
+            if (!label.length) return NextResponse.json({ success: false, error: 'label cannot be empty' }, { status: 400 });
+            plan.label = label;
+        }
+        if (overview !== undefined) {
+            plan.overview = overview;
+        }
+        if (category) {
+            plan.category = category;
+        }
+
+        await plan.save();
+        return NextResponse.json({ success: true, message: 'Plan updated', data: plan });
+    } catch (error) {
+        console.error('EmergencyPlan PATCH error:', error);
+        return NextResponse.json({ success: false, error: 'Internal Server Error' }, { status: 500 });
+    }
+}
+
+export async function POST(req: Request) {
+    try {
+        const session = await getSession();
+        if (!session?.user?.role || !canManageEmergencyPlans(session.user.role)) {
+            return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+        }
+
+        await connectDB();
+
+        const formData = await req.formData();
+        const planId = asNonEmptyString(formData.get('planId') as string);
+        const file = formData.get('file');
+
+        if (!planId || !file || !(file instanceof File)) {
+            return NextResponse.json({ success: false, error: 'Missing plan ID or file' }, { status: 400 });
+        }
+
+        const ext = extensionFromFilename(file.name);
+        if (!ALLOWED_EXT.has(ext)) {
+            return NextResponse.json(
+                {
+                    success: false,
+                    error: `Unsupported file type ".${ext || '?'}"`,
+                },
+                { status: 415 }
+            );
+        }
+
+        if (file.size <= 0) {
+            return NextResponse.json({ success: false, error: 'Empty file' }, { status: 400 });
+        }
+
+        if (file.size > MAX_BYTES) {
+            return NextResponse.json(
+                {
+                    success: false,
+                    error: `File too large. Maximum ${Math.round(MAX_BYTES / (1024 * 1024))} MB`,
+                },
+                { status: 413 }
+            );
+        }
+
+        const bytes = await file.arrayBuffer();
+        const buffer = Buffer.from(bytes);
+
+        const mime = file.type && file.type.trim() ? file.type.trim() : mimeFromExtension(ext);
+
+        const upload = await uploadEmergencyPlanBuffer({
+            buffer,
+            mime,
+            filename: file.name.replace(/[^\w.-]+/g, '_'),
+        });
+
+        let plan = await EmergencyPlan.findOne({ planId });
+        if (!plan) {
+            plan = new EmergencyPlan({
+                planId,
+                label: planId.replace(/[-_]/g, ' ').replace(/\s+/g, ' ').toUpperCase(),
                 overview: `Uploaded Emergency Plan Documents for ${planId}`,
                 steps: [],
-                attachments: []
+                attachments: [],
             });
         }
 
         plan.attachments.push({
             fileName: file.name,
-            fileUrl: fileUrl,
+            fileUrl: upload.secure_url,
             size: buffer.length,
-            uploadedAt: new Date()
+            uploadedAt: new Date(),
+            cloudinaryPublicId: upload.public_id,
+            cloudinaryResourceType: upload.resource_type,
         });
 
         await plan.save();
 
-        return NextResponse.json({ success: true, message: 'File uploaded successfully', data: plan });
+        let responsePlan = plan;
+        const lastAtt = plan.attachments[plan.attachments.length - 1];
+        const attachmentId = lastAtt?._id;
+
+        if (attachmentId) {
+            try {
+                const extractedText = await extractTextFromBuffer(buffer, ext, {
+                    maxChars: FAST_TEXT_CAP,
+                    maxSheets: 5,
+                });
+                const result = await openaiService.analyzeCoopAttachmentIntegrity({
+                    planLabel: plan.label,
+                    planOverview: plan.overview || '',
+                    steps: Array.isArray(plan.steps) ? plan.steps.map(String) : [],
+                    fileName: file.name,
+                    fileExtension: ext,
+                    fileSizeBytes: buffer.length,
+                    extractedText: extractedText || undefined,
+                    maxExcerptChars: FAST_TEXT_CAP,
+                });
+
+                await EmergencyPlan.updateOne(
+                    { planId, 'attachments._id': attachmentId },
+                    {
+                        $set: {
+                            'attachments.$.aiIntegrityStatus': result.status,
+                            'attachments.$.aiIntegrityScore': result.score,
+                            'attachments.$.aiIntegritySummary': result.summary,
+                            'attachments.$.aiIntegrityAnalyzedAt': new Date(),
+                        },
+                    }
+                );
+            } catch (aiErr) {
+                console.error('EmergencyPlan upload AI integrity:', aiErr);
+            }
+            responsePlan = (await EmergencyPlan.findOne({ planId })) ?? plan;
+        }
+
+        return NextResponse.json({ success: true, message: 'File uploaded successfully', data: responsePlan });
     } catch (error) {
         console.error('EmergencyPlan POST error:', error);
-        return NextResponse.json({ success: false, error: 'Internal Server Error' }, { status: 500 });
+        return NextResponse.json({ success: false, error: 'Upload failed — check Cloudinary credentials and retry' }, { status: 500 });
     }
 }

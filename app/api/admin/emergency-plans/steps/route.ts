@@ -1,9 +1,19 @@
 import { NextResponse } from 'next/server';
 import connectDB from '@/lib/mongodb';
 import EmergencyPlan from '@/models/EmergencyPlan';
+import { getSession } from '@/lib/auth';
+
+function canManageEmergencyPlans(role: string | undefined) {
+    return role === 'super-admin' || role === 'sub-admin' || role === 'admin';
+}
 
 export async function POST(req: Request) {
     try {
+        const session = await getSession();
+        if (!session?.user?.role || !canManageEmergencyPlans(session.user.role)) {
+            return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+        }
+
         await connectDB();
         const { planId, steps } = await req.json();
 
