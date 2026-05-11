@@ -38,7 +38,10 @@ import {
     Zap,
     CheckCircle,
     Sparkles,
+    Download,
 } from 'lucide-react'
+import { AdminPageShell } from '@/components/admin-page-shell'
+import { AdminPageHeader } from '@/components/admin-page-header'
 
 type EmergencyAttachment = {
     _id?: string
@@ -599,24 +602,17 @@ export default function EmergencyPlanPage() {
 
     if (isLoading) {
         return (
-            <div className="flex items-center justify-center h-[calc(100vh-64px)] bg-[#0A0B10]">
-                <div className="flex flex-col items-center gap-6">
-                    <div className="relative">
-                        <Loader2 className="w-16 h-16 animate-spin text-[#33375D]" />
-                        <div className="absolute inset-0 flex items-center justify-center text-[10px] font-black text-blue-400">
-                            PLAN
-                        </div>
-                    </div>
-                    <p className="font-black text-xs uppercase tracking-[0.4em] text-slate-500 animate-pulse">
-                        Synchronizing Planning Database...
-                    </p>
+            <div className="min-h-screen flex items-center justify-center bg-slate-50">
+                <div className="flex flex-col items-center gap-4">
+                    <Loader2 className="w-10 h-10 animate-spin text-[#33375D]" />
+                    <p className="text-slate-500 font-bold animate-pulse">Loading continuity plans...</p>
                 </div>
             </div>
         )
     }
 
     return (
-        <main className="min-h-screen bg-[#0A0B10] p-8 lg:p-12 space-y-12 overflow-hidden relative">
+        <AdminPageShell>
             <input
                 ref={fileRef}
                 type="file"
@@ -625,47 +621,32 @@ export default function EmergencyPlanPage() {
                 onChange={onFileChosen}
             />
 
-            <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-blue-600/5 rounded-full blur-[150px] pointer-events-none" />
-            <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-purple-600/5 rounded-full blur-[120px] pointer-events-none" />
-
-            {/* Header Section */}
-            <div className="relative flex flex-col lg:flex-row lg:items-end justify-between gap-8 pb-8 border-b border-white/5">
-                <div className="space-y-4">
-                    <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-[#33375D] rounded-2xl flex items-center justify-center text-white shadow-2xl shadow-blue-600/20">
-                            <Folder size={24} />
-                        </div>
-                        <div>
-                            <h1 className="text-4xl font-black text-white uppercase tracking-tighter">
-                                COOP / BC Plans
-                            </h1>
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mt-1">
-                                Continuity of Operations & Strategic Recovery
-                            </p>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="flex items-center gap-4">
-                    <Button
-                        type="button"
-                        onClick={() => setBulkOpen(true)}
-                        className="h-14 px-8 rounded-2xl bg-white/5 border border-white/10 text-white font-black uppercase tracking-widest text-[10px] hover:bg-white/10 transition-all gap-3"
-                    >
-                        <Upload size={16} /> Bulk Continuity Plan
-                    </Button>
-                    <Button
-                        type="button"
-                        onClick={() => setNewPlanOpen(true)}
-                        className="h-14 gap-3 rounded-2xl bg-[#33375D] px-8 font-black text-[10px] uppercase tracking-widest text-white shadow-2xl shadow-[#33375D]/25 hover:bg-[#2B2F50]"
-                    >
-                        <Plus size={16} /> New Continuity Plan
-                    </Button>
-                </div>
-            </div>
+            <AdminPageHeader
+                title="COOP / BC Plans"
+                description="Continuity of Operations & Strategic Recovery — manage continuity frameworks, attach protocol files, and review AI integrity audits."
+                actions={
+                    <>
+                        <Button
+                            type="button"
+                            onClick={() => setBulkOpen(true)}
+                            variant="outline"
+                            className="flex h-12 gap-2 rounded-xl border-slate-200 bg-white px-6 text-xs font-bold uppercase tracking-wider text-slate-700 shadow-sm transition-all hover:bg-slate-50 active:scale-95"
+                        >
+                            <Upload size={16} /> Bulk Plan
+                        </Button>
+                        <Button
+                            type="button"
+                            onClick={() => setNewPlanOpen(true)}
+                            className="flex h-12 gap-2 rounded-xl bg-[#33375D] px-6 text-xs font-bold uppercase tracking-wider text-white shadow-lg transition-all hover:bg-[#2B2F50] active:scale-95"
+                        >
+                            <Plus size={18} /> New Plan
+                        </Button>
+                    </>
+                }
+            />
 
             {/* Categories Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 relative z-10">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {documentCategories.map((cat, i) => (
                     <Card
                         key={cat.name}
@@ -679,29 +660,29 @@ export default function EmergencyPlanPage() {
                             }
                         }}
                         className={cn(
-                            'p-8 bg-white/[0.02] border rounded-[40px] shadow-2xl hover:bg-white/[0.04] transition-all cursor-pointer group relative overflow-hidden',
-                            selectedCategoryIdx === i ? 'border-blue-500/40 ring-2 ring-blue-500/25' : 'border-white/5'
+                            'p-6 bg-white border rounded-2xl shadow-sm hover:shadow-md transition-all cursor-pointer group',
+                            selectedCategoryIdx === i ? 'border-[#33375D] ring-2 ring-[#33375D]/15' : 'border-slate-200'
                         )}
                     >
                         <div
                             className={cn(
-                                'inline-flex w-14 h-14 rounded-2xl items-center justify-center mb-6',
+                                'inline-flex w-12 h-12 rounded-xl items-center justify-center mb-4',
                                 cat.bg,
                                 cat.color
                             )}
                         >
-                            <cat.icon size={28} />
+                            <cat.icon size={24} />
                         </div>
                         <div className="flex justify-between items-end">
                             <div>
-                                <h4 className="text-sm font-black text-white uppercase tracking-tight leading-tight">
+                                <h4 className="text-sm font-black text-slate-900 uppercase tracking-tight leading-tight">
                                     {cat.name}
                                 </h4>
-                                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-1">
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
                                     Strategic Files
                                 </p>
                             </div>
-                            <span className="text-2xl font-black text-white group-hover:text-blue-400 transition-colors">
+                            <span className="text-2xl font-black text-slate-900 group-hover:text-[#33375D] transition-colors">
                                 {cat.count}
                             </span>
                         </div>
@@ -710,32 +691,32 @@ export default function EmergencyPlanPage() {
             </div>
 
             {/* Main Content: File Explorer */}
-            <Card className="bg-slate-900/40 backdrop-blur-3xl border-white/5 rounded-[48px] shadow-2xl overflow-hidden relative">
-                <div className="p-10 border-b border-white/5 flex flex-col md:flex-row items-center justify-between gap-8">
-                    <div className="relative w-full max-w-xl">
-                        <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-500" size={20} />
+            <Card className="bg-white border-slate-200 rounded-2xl shadow-sm overflow-hidden p-0 gap-0">
+                <div className="p-6 border-b border-slate-100 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+                    <div className="relative w-full md:max-w-md">
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
                         <Input
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
-                            placeholder="SEARCH CONTINUITY PROTOCOLS..."
-                            className="h-16 pl-16 rounded-[24px] bg-white/[0.03] border-white/5 text-white font-black text-xs placeholder:text-slate-600 focus:ring-blue-500/20 focus:border-blue-500/40 uppercase tracking-widest"
+                            placeholder="Search continuity protocols..."
+                            className="h-11 pl-11 rounded-xl bg-white border-slate-200 text-slate-900 text-sm placeholder:text-slate-400 focus:ring-2 focus:ring-[#33375D]/10 focus:border-[#33375D]"
                         />
                     </div>
-                    <div className="flex flex-wrap items-center gap-4 justify-end">
-                        <div className="flex flex-wrap gap-4 items-center min-h-16 px-6 py-2 bg-white/[0.03] border border-white/5 rounded-[24px]">
-                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">
+                    <div className="flex flex-wrap items-center gap-3 justify-end">
+                        <div className="flex flex-wrap gap-2 items-center px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl">
+                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest whitespace-nowrap">
                                 Attach to plan
                             </span>
                             <select
                                 value={uploadTargetPlanId}
                                 onChange={(e) => setUploadTargetPlanId(e.target.value)}
-                                className="h-11 min-w-[160px] rounded-xl bg-white/[0.04] border border-white/10 px-4 text-[10px] font-black uppercase tracking-wider text-white focus:border-blue-500/40 outline-none"
+                                className="h-9 min-w-[140px] rounded-lg bg-white border border-slate-200 px-3 text-xs font-semibold text-slate-700 focus:border-[#33375D] outline-none"
                             >
                                 {planIdsSorted.length === 0 ? (
                                     <option value="">No plans loaded</option>
                                 ) : (
                                     planIdsSorted.map((pid) => (
-                                        <option key={pid} value={pid} className="bg-slate-900">
+                                        <option key={pid} value={pid}>
                                             {pid}
                                         </option>
                                     ))
@@ -744,12 +725,13 @@ export default function EmergencyPlanPage() {
                             <Button
                                 type="button"
                                 onClick={handlePickFile}
-                                className="h-11 px-6 rounded-xl bg-white/10 text-[10px] font-black uppercase tracking-wider text-white border border-white/10 hover:bg-white/15"
+                                variant="outline"
+                                className="h-9 px-4 rounded-lg border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50"
                             >
                                 Browse
                             </Button>
                             {selectedUploadFile ? (
-                                <span className="text-[10px] font-medium text-slate-400 truncate max-w-[140px]" title={selectedUploadFile.name}>
+                                <span className="text-[11px] font-medium text-slate-500 truncate max-w-[140px]" title={selectedUploadFile.name}>
                                     {selectedUploadFile.name}
                                 </span>
                             ) : null}
@@ -757,47 +739,45 @@ export default function EmergencyPlanPage() {
                                 type="button"
                                 disabled={uploading || !planIdsSorted.length}
                                 onClick={submitUpload}
-                                className="h-11 px-6 rounded-xl bg-[#33375D] text-[10px] font-black uppercase tracking-wider text-white hover:bg-[#2B2F50]"
+                                className="h-9 px-4 rounded-lg bg-[#33375D] text-xs font-bold text-white hover:bg-[#2B2F50]"
                             >
                                 {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Upload'}
                             </Button>
                         </div>
-                        <div className="h-16 px-6 bg-white/[0.03] border border-white/5 rounded-[24px] flex items-center gap-6">
-                            <div className="flex items-center gap-2">
-                                <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-lg shadow-emerald-500/20" />
-                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">
-                                    Database Linked
-                                </span>
-                            </div>
+                        <div className="hidden lg:flex h-11 px-4 bg-emerald-50 border border-emerald-100 rounded-xl items-center gap-2">
+                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                            <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-widest whitespace-nowrap">
+                                Database Linked
+                            </span>
                         </div>
                     </div>
                 </div>
 
-                <div className="overflow-x-auto overflow-y-auto max-h-[600px] custom-scrollbar">
+                <div className="overflow-x-auto overflow-y-auto max-h-[600px]">
                     <table className="w-full">
                         <thead>
-                            <tr className="bg-white/[0.02]">
-                                <th className="px-10 py-8 text-left text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">
+                            <tr className="bg-slate-50/50 border-b border-slate-100">
+                                <th className="px-6 py-4 text-left text-[10px] font-black text-slate-500 uppercase tracking-widest">
                                     Resource Identifier
                                 </th>
-                                <th className="px-10 py-8 text-left text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">
-                                    File Matrix
+                                <th className="px-6 py-4 text-left text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                                    File Type
                                 </th>
-                                <th className="px-10 py-8 text-left text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">
-                                    Audit Cycle
+                                <th className="px-6 py-4 text-left text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                                    Last Updated
                                 </th>
-                                <th className="px-10 py-8 text-center text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">
+                                <th className="px-6 py-4 text-center text-[10px] font-black text-slate-500 uppercase tracking-widest">
                                     AI Integrity
                                 </th>
-                                <th className="px-10 py-8 text-right text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">
-                                    Protocols
+                                <th className="px-6 py-4 text-right text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                                    Actions
                                 </th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-white/5">
+                        <tbody className="divide-y divide-slate-100">
                             {visibleRows.length === 0 ? (
                                 <tr>
-                                    <td colSpan={5} className="px-10 py-16 text-center text-sm font-medium text-slate-500 uppercase tracking-wider">
+                                    <td colSpan={5} className="px-6 py-16 text-center text-sm font-medium text-slate-500">
                                         No continuity protocols indexed for this lens.
                                         {planIdsSorted.length === 0
                                             ? ' Create a plan framework or ingest files above.'
@@ -816,31 +796,31 @@ export default function EmergencyPlanPage() {
                                     const attachmentId =
                                         typeof doc._id === 'string' ? doc._id : String((doc as { _id?: unknown })._id ?? '')
                                     return (
-                                        <tr key={`${doc.planId}-${attachmentId}`} className="group hover:bg-white/[0.03] transition-all">
-                                            <td className="px-10 py-8">
-                                                <div className="flex items-center gap-6">
-                                                    <div className="w-14 h-14 bg-white/[0.03] border border-white/5 rounded-2xl flex items-center justify-center text-slate-400 group-hover:text-blue-400 group-hover:bg-blue-600/10 transition-all">
-                                                        <FileText size={24} />
+                                        <tr key={`${doc.planId}-${attachmentId}`} className="group hover:bg-blue-50/30 transition-colors">
+                                            <td className="px-6 py-5">
+                                                <div className="flex items-center gap-4">
+                                                    <div className="w-11 h-11 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-center text-slate-400 group-hover:text-[#33375D] group-hover:bg-white group-hover:shadow-sm transition-all">
+                                                        <FileText size={20} />
                                                     </div>
-                                                    <div>
-                                                        <span className="text-sm font-black text-white group-hover:text-blue-400 transition-colors uppercase tracking-tight">
+                                                    <div className="min-w-0">
+                                                        <span className="text-sm font-black text-slate-900 group-hover:text-[#33375D] transition-colors block truncate">
                                                             {doc.fileName}
                                                         </span>
-                                                        <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest mt-1">
+                                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
                                                             {doc.planLabel} · {doc.planId}
                                                         </p>
                                                     </div>
                                                 </div>
                                             </td>
-                                            <td className="px-10 py-8">
-                                                <span className="h-8 px-4 rounded-xl bg-white/[0.03] border border-white/5 flex items-center justify-center w-fit text-[9px] font-black text-slate-500 uppercase tracking-widest">
+                                            <td className="px-6 py-5">
+                                                <span className="h-7 px-3 rounded-md bg-slate-100 border border-slate-200 inline-flex items-center w-fit text-[10px] font-black text-slate-600 uppercase tracking-widest">
                                                     {fileMatrixLabel(doc.fileName)}
                                                 </span>
                                             </td>
-                                            <td className="px-10 py-8 text-sm font-black text-slate-400 uppercase tracking-widest">
+                                            <td className="px-6 py-5 text-xs font-bold italic text-slate-400">
                                                 {auditLabel}
                                             </td>
-                                            <td className="px-10 py-8 text-center min-w-[200px]">
+                                            <td className="px-6 py-5 text-center min-w-[200px]">
                                                 <div
                                                     className="flex flex-col items-center gap-1 max-w-[240px] mx-auto"
                                                     title={
@@ -851,7 +831,7 @@ export default function EmergencyPlanPage() {
                                                     }
                                                 >
                                                     {!doc.aiIntegrityAnalyzedAt && !doc.aiIntegrityStatus ? (
-                                                        <span className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-500">
+                                                        <span className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400">
                                                             Not analyzed
                                                         </span>
                                                     ) : (
@@ -864,7 +844,7 @@ export default function EmergencyPlanPage() {
                                                             >
                                                                 {doc.aiIntegrityStatus || 'Reviewing'}
                                                             </span>
-                                                            <div className="w-32 h-1.5 bg-white/5 rounded-full overflow-hidden">
+                                                            <div className="w-32 h-1.5 bg-slate-100 rounded-full overflow-hidden">
                                                                 <div
                                                                     className={cn(
                                                                         'h-full transition-all duration-700',
@@ -874,7 +854,7 @@ export default function EmergencyPlanPage() {
                                                                 />
                                                             </div>
                                                             {doc.aiIntegritySummary ? (
-                                                                <p className="text-[8px] font-medium text-slate-500 leading-snug line-clamp-2 mt-1">
+                                                                <p className="text-[10px] font-medium text-slate-500 leading-snug line-clamp-2 mt-1">
                                                                     {doc.aiIntegritySummary}
                                                                 </p>
                                                             ) : null}
@@ -882,8 +862,8 @@ export default function EmergencyPlanPage() {
                                                     )}
                                                 </div>
                                             </td>
-                                            <td className="px-10 py-8 text-right">
-                                                <div className="flex justify-end gap-3 opacity-0 group-hover:opacity-100 transition-all transform translate-x-4 group-hover:translate-x-0">
+                                            <td className="px-6 py-5 text-right">
+                                                <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                                     <Button
                                                         type="button"
                                                         title="Download / view"
@@ -895,18 +875,18 @@ export default function EmergencyPlanPage() {
                                                                 'noopener,noreferrer'
                                                             )
                                                         }
-                                                        className="h-10 w-10 bg-blue-600/10 text-blue-400 hover:bg-blue-600 hover:text-white rounded-xl transition-all"
+                                                        className="h-9 w-9 bg-[#33375D]/10 text-[#33375D] hover:bg-[#33375D] hover:text-white rounded-lg transition-colors"
                                                     >
-                                                        <Zap size={16} />
+                                                        <Download size={15} />
                                                     </Button>
                                                     <Button
                                                         type="button"
                                                         title="Edit protocol steps"
                                                         size="icon"
                                                         onClick={() => openEditSteps(doc)}
-                                                        className="h-10 w-10 bg-white/5 text-slate-400 hover:bg-white/10 rounded-xl transition-all"
+                                                        className="h-9 w-9 bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-900 rounded-lg transition-colors"
                                                     >
-                                                        <Edit size={16} />
+                                                        <Edit size={15} />
                                                     </Button>
                                                     <Button
                                                         type="button"
@@ -920,9 +900,9 @@ export default function EmergencyPlanPage() {
                                                                 fileName: doc.fileName,
                                                             })
                                                         }
-                                                        className="h-10 w-10 bg-red-600/10 text-red-500 hover:bg-red-600 hover:text-white rounded-xl transition-all"
+                                                        className="h-9 w-9 bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white rounded-lg transition-colors"
                                                     >
-                                                        <Trash2 size={16} />
+                                                        <Trash2 size={15} />
                                                     </Button>
                                                 </div>
                                             </td>
@@ -936,42 +916,42 @@ export default function EmergencyPlanPage() {
             </Card>
 
             {/* AI Intelligence Note */}
-            <div className="bg-blue-600/5 p-12 rounded-[48px] border border-blue-500/10 flex flex-col lg:flex-row gap-12 relative overflow-hidden group">
-                <div className="absolute top-0 right-0 p-12 text-blue-500/5 grayscale group-hover:grayscale-0 transition-all duration-1000">
-                    <Sparkles size={160} />
+            <Card className="bg-white border-slate-200 p-8 rounded-2xl shadow-sm flex flex-col lg:flex-row gap-8 relative overflow-hidden group">
+                <div className="absolute top-0 right-0 p-8 text-[#33375D]/5 grayscale group-hover:grayscale-0 transition-all duration-1000">
+                    <Sparkles size={140} />
                 </div>
-                <div className="w-20 h-20 bg-blue-600 rounded-[30px] flex items-center justify-center text-white shadow-2xl shadow-blue-600/20 shrink-0 relative z-10">
-                    <Zap size={40} />
+                <div className="w-16 h-16 bg-[#33375D] rounded-2xl flex items-center justify-center text-white shadow-lg shadow-[#33375D]/20 shrink-0 relative z-10">
+                    <Sparkles size={28} />
                 </div>
-                <div className="relative z-10 space-y-4 flex-1">
-                    <div className="flex flex-wrap items-center gap-4">
-                        <h4 className="text-2xl font-black text-white uppercase tracking-tighter">AI-Driven Continuity Audit</h4>
+                <div className="relative z-10 space-y-3 flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-3">
+                        <h4 className="text-xl font-black text-slate-900 uppercase tracking-tight">AI-Driven Continuity Audit</h4>
                         {auditSummary ? (
                             <span
                                 className={cn(
-                                    'h-7 px-3 rounded-full border text-[9px] font-black uppercase tracking-[0.2em] flex items-center',
-                                    auditSummary.posture === 'Resilient' && 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400',
-                                    auditSummary.posture === 'Steady' && 'bg-blue-500/10 border-blue-500/30 text-blue-400',
-                                    auditSummary.posture === 'At Risk' && 'bg-amber-500/10 border-amber-500/30 text-amber-400',
+                                    'h-6 px-2.5 rounded-full border text-[9px] font-black uppercase tracking-[0.2em] flex items-center',
+                                    auditSummary.posture === 'Resilient' && 'bg-emerald-50 border-emerald-100 text-emerald-600',
+                                    auditSummary.posture === 'Steady' && 'bg-blue-50 border-blue-100 text-blue-600',
+                                    auditSummary.posture === 'At Risk' && 'bg-amber-50 border-amber-100 text-amber-600',
                                 )}
                             >
                                 Posture · {auditSummary.posture}
                             </span>
                         ) : null}
                         {auditSummary && auditSummary.totals.plans > 0 ? (
-                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
                                 Avg integrity · {auditSummary.averageScore} / 100 · {auditSummary.totals.attachments} file{auditSummary.totals.attachments === 1 ? '' : 's'} across {auditSummary.totals.plans} plan{auditSummary.totals.plans === 1 ? '' : 's'}
                             </span>
                         ) : null}
                     </div>
 
                     {auditLoading && !auditSummary ? (
-                        <p className="text-sm font-medium text-slate-400 leading-relaxed max-w-5xl flex items-center gap-2">
-                            <Loader2 className="w-4 h-4 animate-spin" /> Synthesizing continuity audit…
+                        <p className="text-sm font-medium text-slate-500 leading-relaxed max-w-5xl flex items-center gap-2">
+                            <Loader2 className="w-4 h-4 animate-spin text-[#33375D]" /> Synthesizing continuity audit…
                         </p>
                     ) : auditSummary ? (
                         <>
-                            <p className="text-base font-medium text-slate-300 leading-relaxed max-w-5xl">
+                            <p className="text-sm font-medium text-slate-600 leading-relaxed max-w-5xl">
                                 {auditSummary.summary}
                             </p>
                             {auditSummary.findings.length ? (
@@ -979,9 +959,9 @@ export default function EmergencyPlanPage() {
                                     {auditSummary.findings.map((f, i) => (
                                         <li
                                             key={i}
-                                            className="flex items-start gap-3 text-sm font-medium text-slate-400 leading-relaxed"
+                                            className="flex items-start gap-3 text-sm font-medium text-slate-500 leading-relaxed"
                                         >
-                                            <span className="mt-1 w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0" />
+                                            <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-[#33375D] shrink-0" />
                                             <span>{f}</span>
                                         </li>
                                     ))}
@@ -989,13 +969,13 @@ export default function EmergencyPlanPage() {
                             ) : null}
                         </>
                     ) : (
-                        <p className="text-base font-medium text-slate-400 leading-relaxed max-w-5xl">
+                        <p className="text-sm font-medium text-slate-500 leading-relaxed max-w-5xl">
                             Add a continuity plan to generate an AI audit of your inventory.
                         </p>
                     )}
 
                     {auditSummary?.generatedAt ? (
-                        <span className="block text-[10px] font-black text-slate-600 uppercase tracking-widest pt-2">
+                        <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest pt-1">
                             Updated {(() => {
                                 try {
                                     return formatDistanceToNow(new Date(auditSummary.generatedAt), { addSuffix: true })
@@ -1007,13 +987,13 @@ export default function EmergencyPlanPage() {
                         </span>
                     ) : null}
                 </div>
-            </div>
+            </Card>
 
             <Dialog open={bulkOpen} onOpenChange={setBulkOpen}>
-                <DialogContent className="border-white/10 bg-[#0A0B10] text-white sm:max-w-3xl">
+                <DialogContent className="border-slate-200 bg-white text-slate-900 sm:max-w-3xl">
                     <DialogHeader>
-                        <DialogTitle className="uppercase tracking-tight font-black text-lg">Bulk continuity plan</DialogTitle>
-                        <DialogDescription className="text-slate-400 text-xs">
+                        <DialogTitle className="tracking-tight font-black text-lg text-slate-900">Bulk continuity plan</DialogTitle>
+                        <DialogDescription className="text-slate-500 text-xs">
                             Add as many continuity plans as you need in one shot. Each row creates (or updates) a plan with its
                             Plan ID, label, category, and overview. Existing attachments and steps are preserved.
                         </DialogDescription>
@@ -1028,7 +1008,7 @@ export default function EmergencyPlanPage() {
                             size="sm"
                             variant="outline"
                             onClick={() => setBulkRows([emptyBulkRow()])}
-                            className="h-7 border-white/15 bg-transparent text-[10px] uppercase tracking-widest text-white hover:bg-white/10"
+                            className="h-7 border-slate-200 bg-white text-[10px] uppercase tracking-widest text-slate-700 hover:bg-slate-50"
                         >
                             Reset
                         </Button>
@@ -1038,7 +1018,7 @@ export default function EmergencyPlanPage() {
                         {bulkRows.map((row, idx) => (
                             <div
                                 key={idx}
-                                className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 space-y-3"
+                                className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 space-y-3"
                             >
                                 <div className="flex items-center justify-between gap-2">
                                     <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
@@ -1050,7 +1030,7 @@ export default function EmergencyPlanPage() {
                                         variant="ghost"
                                         onClick={() => removeBulkRow(idx)}
                                         title="Remove row"
-                                        className="h-8 w-8 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg"
+                                        className="h-8 w-8 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg"
                                     >
                                         <Trash2 size={14} />
                                     </Button>
@@ -1063,7 +1043,7 @@ export default function EmergencyPlanPage() {
                                             value={row.planId}
                                             onChange={(e) => updateBulkRow(idx, { planId: e.target.value })}
                                             placeholder="e.g. pandemic-coop-plan"
-                                            className="rounded-xl border-white/10 bg-white/[0.04] font-mono text-xs"
+                                            className="rounded-lg border-slate-200 bg-white font-mono text-xs"
                                         />
                                     </div>
                                     <div className="sm:col-span-7 space-y-1">
@@ -1072,7 +1052,7 @@ export default function EmergencyPlanPage() {
                                             value={row.label}
                                             onChange={(e) => updateBulkRow(idx, { label: e.target.value })}
                                             placeholder="Human-readable continuity title"
-                                            className="rounded-xl border-white/10 bg-white/[0.04] text-xs"
+                                            className="rounded-lg border-slate-200 bg-white text-xs"
                                         />
                                     </div>
                                     <div className="sm:col-span-5 space-y-1">
@@ -1080,10 +1060,10 @@ export default function EmergencyPlanPage() {
                                         <select
                                             value={row.category}
                                             onChange={(e) => updateBulkRow(idx, { category: e.target.value as PlanCategory })}
-                                            className="h-10 w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 text-xs font-medium text-white outline-none focus:border-blue-500/40"
+                                            className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 outline-none focus:border-[#33375D]"
                                         >
                                             {SELECTABLE_CATEGORIES.map((c) => (
-                                                <option key={c.key} value={c.key} className="bg-slate-900">
+                                                <option key={c.key} value={c.key}>
                                                     {c.name}
                                                 </option>
                                             ))}
@@ -1096,7 +1076,7 @@ export default function EmergencyPlanPage() {
                                             onChange={(e) => updateBulkRow(idx, { overview: e.target.value })}
                                             rows={2}
                                             placeholder="Short purpose statement for this plan"
-                                            className="rounded-xl border-white/10 bg-white/[0.04] text-xs resize-none"
+                                            className="rounded-lg border-slate-200 bg-white text-xs resize-none"
                                         />
                                     </div>
                                 </div>
@@ -1107,22 +1087,22 @@ export default function EmergencyPlanPage() {
                             type="button"
                             variant="outline"
                             onClick={addBulkRow}
-                            className="w-full h-10 border-dashed border-white/20 bg-transparent text-[10px] font-black uppercase tracking-widest text-slate-400 hover:bg-white/5 hover:text-white gap-2"
+                            className="w-full h-10 border-dashed border-slate-300 bg-white text-[10px] font-black uppercase tracking-widest text-slate-500 hover:bg-slate-50 hover:text-slate-900 gap-2"
                         >
                             <Plus size={14} /> Add another plan
                         </Button>
                     </div>
 
                     <p className="text-[10px] text-slate-500 pt-2">
-                        Existing Plan IDs are <strong className="text-slate-300">updated</strong>; new ones are
-                        <strong className="text-slate-300"> created</strong>. Steps and attachments are not affected.
+                        Existing Plan IDs are <strong className="text-slate-700">updated</strong>; new ones are
+                        <strong className="text-slate-700"> created</strong>. Steps and attachments are not affected.
                     </p>
 
-                    <DialogFooter className="gap-2 sm:gap-0">
+                    <DialogFooter className="gap-3">
                         <Button
                             variant="outline"
                             type="button"
-                            className="border-white/15 bg-transparent text-white hover:bg-white/10"
+                            className="border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
                             onClick={() => setBulkOpen(false)}
                         >
                             Cancel
@@ -1130,7 +1110,7 @@ export default function EmergencyPlanPage() {
                         <Button
                             type="button"
                             disabled={bulkRunning}
-                            className="bg-[#33375D]"
+                            className="bg-[#33375D] text-white hover:bg-[#2B2F50]"
                             onClick={submitBulkPlans}
                         >
                             {bulkRunning ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Create / update plans'}
@@ -1140,10 +1120,10 @@ export default function EmergencyPlanPage() {
             </Dialog>
 
             <Dialog open={newPlanOpen} onOpenChange={setNewPlanOpen}>
-                <DialogContent className="border-white/10 bg-[#0A0B10] text-white sm:max-w-lg">
+                <DialogContent className="border-slate-200 bg-white text-slate-900 sm:max-w-lg">
                     <DialogHeader>
-                        <DialogTitle className="uppercase tracking-tight font-black text-lg">Register continuity framework</DialogTitle>
-                        <DialogDescription className="text-slate-400 text-xs">
+                        <DialogTitle className="tracking-tight font-black text-lg text-slate-900">Register continuity framework</DialogTitle>
+                        <DialogDescription className="text-slate-500 text-xs">
                             Create a keyed plan vault you can attach files to. Use lowercase slug identifiers (hyphens encouraged).
                         </DialogDescription>
                     </DialogHeader>
@@ -1154,7 +1134,7 @@ export default function EmergencyPlanPage() {
                                 value={newPlanId}
                                 onChange={(e) => setNewPlanId(e.target.value)}
                                 placeholder="e.g. regional-power-outage-plan"
-                                className="rounded-xl border-white/10 bg-white/[0.04] font-mono text-xs"
+                                className="rounded-lg border-slate-200 bg-white font-mono text-xs"
                             />
                         </div>
                         <div className="space-y-2">
@@ -1163,7 +1143,7 @@ export default function EmergencyPlanPage() {
                                 value={newPlanLabel}
                                 onChange={(e) => setNewPlanLabel(e.target.value)}
                                 placeholder="Human-readable continuity title"
-                                className="rounded-xl border-white/10 bg-white/[0.04]"
+                                className="rounded-lg border-slate-200 bg-white"
                             />
                         </div>
                         <div className="space-y-2">
@@ -1171,10 +1151,10 @@ export default function EmergencyPlanPage() {
                             <select
                                 value={newPlanCategory}
                                 onChange={(e) => setNewPlanCategory(e.target.value as PlanCategory)}
-                                className="h-10 w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 text-xs font-medium text-white outline-none focus:border-blue-500/40"
+                                className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 outline-none focus:border-[#33375D]"
                             >
                                 {SELECTABLE_CATEGORIES.map((c) => (
-                                    <option key={c.key} value={c.key} className="bg-slate-900">
+                                    <option key={c.key} value={c.key}>
                                         {c.name}
                                     </option>
                                 ))}
@@ -1187,7 +1167,7 @@ export default function EmergencyPlanPage() {
                                 value={newPlanOverview}
                                 onChange={(e) => setNewPlanOverview(e.target.value)}
                                 rows={4}
-                                className="rounded-xl border-white/10 bg-white/[0.04] text-sm resize-none"
+                                className="rounded-lg border-slate-200 bg-white text-sm resize-none"
                             />
                         </div>
                     </div>
@@ -1195,7 +1175,7 @@ export default function EmergencyPlanPage() {
                         <Button
                             variant="outline"
                             type="button"
-                            className="border-white/15 bg-transparent text-white hover:bg-white/10"
+                            className="border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
                             onClick={() => setNewPlanOpen(false)}
                         >
                             Cancel
@@ -1203,7 +1183,7 @@ export default function EmergencyPlanPage() {
                         <Button
                             type="button"
                             disabled={savingPlan}
-                            className="bg-[#33375D]"
+                            className="bg-[#33375D] text-white hover:bg-[#2B2F50]"
                             onClick={submitNewPlan}
                         >
                             {savingPlan ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Create vault'}
@@ -1213,12 +1193,12 @@ export default function EmergencyPlanPage() {
             </Dialog>
 
             <Dialog open={editOpen} onOpenChange={setEditOpen}>
-                <DialogContent className="border-white/10 bg-[#0A0B10] text-white sm:max-w-lg">
+                <DialogContent className="border-slate-200 bg-white text-slate-900 sm:max-w-lg">
                     <DialogHeader>
-                        <DialogTitle className="uppercase tracking-tight font-black text-lg">Protocol cascade — {editPlanLabel}</DialogTitle>
-                        <DialogDescription className="text-slate-400 text-xs">
+                        <DialogTitle className="tracking-tight font-black text-lg text-slate-900">Protocol steps — {editPlanLabel}</DialogTitle>
+                        <DialogDescription className="text-slate-500 text-xs">
                             One actionable step per line. These checkpoints appear for operators referencing this continuity plan bucket (
-                            <span className="font-mono">{editPlanId}</span>).
+                            <span className="font-mono text-slate-700">{editPlanId}</span>).
                         </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-2 pb-2">
@@ -1226,10 +1206,10 @@ export default function EmergencyPlanPage() {
                         <select
                             value={editPlanCategory === 'response' ? 'coop' : editPlanCategory}
                             onChange={(e) => setEditPlanCategory(e.target.value as PlanCategory)}
-                            className="h-10 w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 text-xs font-medium text-white outline-none focus:border-blue-500/40"
+                            className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 outline-none focus:border-[#33375D]"
                         >
                             {SELECTABLE_CATEGORIES.map((c) => (
-                                <option key={c.key} value={c.key} className="bg-slate-900">
+                                <option key={c.key} value={c.key}>
                                     {c.name}
                                 </option>
                             ))}
@@ -1239,18 +1219,18 @@ export default function EmergencyPlanPage() {
                         value={editStepsText}
                         onChange={(e) => setEditStepsText(e.target.value)}
                         rows={14}
-                        className="rounded-xl border-white/10 bg-white/[0.04] text-sm resize-none font-medium"
+                        className="rounded-lg border-slate-200 bg-white text-sm resize-none font-medium"
                     />
                     <DialogFooter>
                         <Button
                             variant="outline"
                             type="button"
-                            className="border-white/15 bg-transparent text-white hover:bg-white/10"
+                            className="border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
                             onClick={() => setEditOpen(false)}
                         >
                             Close
                         </Button>
-                        <Button type="button" disabled={savingSteps} className="bg-[#33375D]" onClick={saveSteps}>
+                        <Button type="button" disabled={savingSteps} className="bg-[#33375D] text-white hover:bg-[#2B2F50]" onClick={saveSteps}>
                             {savingSteps ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save steps'}
                         </Button>
                     </DialogFooter>
@@ -1258,29 +1238,29 @@ export default function EmergencyPlanPage() {
             </Dialog>
 
             <AlertDialog open={Boolean(deleteTarget)} onOpenChange={(o) => !o && setDeleteTarget(null)}>
-                <AlertDialogContent className="border-white/10 bg-[#0A0B10] text-white">
+                <AlertDialogContent className="border-slate-200 bg-white text-slate-900">
                     <AlertDialogHeader>
-                        <AlertDialogTitle className="font-black uppercase tracking-tighter">Purge continuity attachment?</AlertDialogTitle>
-                        <AlertDialogDescription className="text-slate-400 text-sm leading-relaxed">
-                            This terminates <strong className="text-white">{deleteTarget?.fileName}</strong> from the mission dossier — the backing
+                        <AlertDialogTitle className="font-black tracking-tight text-slate-900">Remove continuity attachment?</AlertDialogTitle>
+                        <AlertDialogDescription className="text-slate-500 text-sm leading-relaxed">
+                            This removes <strong className="text-slate-900">{deleteTarget?.fileName}</strong> from the continuity dossier — the backing
                             object is revoked from encrypted storage immediately.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogCancel className="border-white/10 bg-transparent text-white hover:bg-white/10 hover:text-white">
-                            Abort
+                        <AlertDialogCancel className="border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900">
+                            Cancel
                         </AlertDialogCancel>
                         <Button
                             type="button"
-                            className="bg-red-600 hover:bg-red-700 text-white"
+                            className="bg-rose-600 hover:bg-rose-700 text-white"
                             disabled={deleting}
                             onClick={() => confirmDelete()}
                         >
-                            {deleting ? 'Purging…' : 'Confirm purge'}
+                            {deleting ? 'Removing…' : 'Confirm remove'}
                         </Button>
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
-        </main>
+        </AdminPageShell>
     )
 }
