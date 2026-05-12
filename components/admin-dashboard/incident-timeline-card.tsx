@@ -41,7 +41,7 @@ export function IncidentTimelineCard({
     >
       <h3 className="text-[13px] font-bold text-slate-900">Incident Timeline</h3>
 
-      <ul className="flex flex-col gap-2.5">
+      <ul className="flex flex-col gap-4">
         {entries.map((entry, idx) => (
           <li key={`${entry.time}-${idx}`} className="flex items-start gap-2.5">
             <span

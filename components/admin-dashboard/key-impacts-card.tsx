@@ -32,7 +32,7 @@ export function KeyImpactsCard({ className, rows = MOCK_ROWS }: KeyImpactsCardPr
     >
       <h3 className="text-[13px] font-bold text-slate-900">Key Impacts</h3>
 
-      <ul className="flex flex-col gap-2.5">
+      <ul className="flex flex-col gap-1.5">
         {rows.map((row) => {
           const Icon = row.Icon
           return (

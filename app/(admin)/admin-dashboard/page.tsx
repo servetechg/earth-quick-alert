@@ -88,14 +88,6 @@ export default function Dashboard() {
 
           {/* Live Situational Map — same Google Map as super-admin, with Map Layers overlay */}
           <GISMap title="Live Situational Map" hideTabs showLayersPanel />
-
-          {/* Bottom 4 cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-            <ShelterStatusCard />
-            <HospitalCapacityCard />
-            <PowerOutageSummaryCard />
-            <ResourceDeploymentCard />
-          </div>
         </div>
 
         {/* Right column — fixed compact width on xl+ screens */}
@@ -103,6 +95,14 @@ export default function Dashboard() {
           <RealTimeResourcesPanel />
           <CitizenActivityFeed />
         </div>
+      </div>
+
+      {/* Bottom 4 cards — spans the full dashboard width (under both columns) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        <ShelterStatusCard />
+        <HospitalCapacityCard />
+        <PowerOutageSummaryCard />
+        <ResourceDeploymentCard />
       </div>
     </AdminPageShell>
   )
