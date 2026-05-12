@@ -64,6 +64,14 @@ export interface CoopAttachmentIntegrity {
     summary: string;
 }
 
+/** AI-inferred metadata for a freshly uploaded continuity-vault file. */
+export interface CoopPlanMetadata {
+    planId: string;
+    label: string;
+    category: 'coop' | 'bcp' | 'compliance';
+    overview: string;
+}
+
 /** Audit summary for the entire continuity-plan inventory shown on the admin emergency-plan page. */
 export interface ContinuityAuditSummary {
     summary: string;
@@ -606,6 +614,116 @@ major_incidents, minor_incidents (numbers for KPI breakdown).`;
         const merged = this.mergeRiskReport(fallback, result);
         const aligned = this.alignAlertsToDistribution(merged, bundle);
         return applyHistoricalContextToReport(bundle, applyDynamicExecutiveKpis(bundle, aligned));
+    }
+
+    /**
+     * Infer the continuity-plan metadata (planId slug, label, category bucket, overview)
+     * for a freshly uploaded continuity-vault file. Used by the upload route to auto-create
+     * or match a plan from the file content, without forcing the admin to fill out a form.
+     */
+    async inferCoopPlanMetadata(input: {
+        fileName: string;
+        fileExtension: string;
+        fileSizeBytes: number;
+        extractedText?: string;
+    }): Promise<CoopPlanMetadata> {
+        const ext = String(input.fileExtension || '').toLowerCase().replace(/^\./, '');
+        const excerpt = (input.extractedText || '').trim().slice(0, 8000);
+        const fallback = this.coopMetadataFallback(input.fileName, ext);
+
+        if (!this.canUseOpenAI()) return fallback;
+
+        const payload = {
+            fileName: input.fileName,
+            fileExtension: ext,
+            fileSizeBytes: input.fileSizeBytes,
+            fileKind:
+                ext === 'pdf'
+                    ? 'PDF'
+                    : ext === 'docx' || ext === 'doc'
+                      ? 'Word'
+                      : ext === 'xlsx' || ext === 'xls'
+                        ? 'Spreadsheet'
+                        : ext === 'csv'
+                          ? 'CSV'
+                          : 'Document',
+            documentTextExcerpt: excerpt.length ? excerpt : null,
+        };
+
+        const system = `You are a Continuity-of-Operations records librarian for the Ready2Go platform.
+Given a single uploaded file (continuity-plan artifact), return STRICT JSON only:
+{"planId":"<slug>","label":"<short title>","category":"coop"|"bcp"|"compliance","overview":"<1-2 sentences, max 280 chars>"}
+
+Rules:
+- planId: lowercase ASCII slug, 3-60 chars, [a-z0-9-] only, no leading/trailing hyphen. Derive it from the document's *subject* (e.g. "pandemic-coop-plan", "it-disaster-recovery", "annual-compliance-training-register"). If two different uploads describe the same program, the slug MUST collide (so they get attached to the same plan).
+- label: human-readable title in Title Case, max 80 chars.
+- category:
+   * "coop"        — Continuity of Operations: essential functions, succession, vital records, hazard response playbooks for the *organization*, pandemic, evacuation, devolution, reconstitution.
+   * "bcp"         — Business Continuity: IT/telecom disaster recovery, network, supply chain, vendor failover, facilities, RTO/RPO.
+   * "compliance"  — Regulatory & audit: training records, NIMS/ICS, HIPAA, OSHA, audit findings, attestations, retention/policy.
+- overview: factual purpose statement grounded in the excerpt (no marketing language, no markdown). If excerpt is empty, infer from the file name conservatively and keep overview short.
+- Never output keys other than planId / label / category / overview. Never output category outside the three values above.`;
+
+        const raw = await this.callOpenAI<Partial<CoopPlanMetadata>>(
+            [
+                { role: 'system', content: system },
+                { role: 'user', content: JSON.stringify(payload) },
+            ],
+            fallback,
+            { max_tokens: 220 },
+        );
+
+        const planId = this.normalizePlanSlug(raw.planId, fallback.planId);
+        const label = this.normalizeLabel(raw.label, fallback.label);
+        const overview = this.normalizeOverview(raw.overview, fallback.overview);
+        const category = this.normalizePlanCategory(raw.category, fallback.category);
+        return { planId, label, category, overview };
+    }
+
+    private coopMetadataFallback(fileName: string, ext: string): CoopPlanMetadata {
+        const base = String(fileName || 'document')
+            .replace(/\.[^.]+$/, '')
+            .trim();
+        const slug = this.normalizePlanSlug(base, 'uploaded-plan');
+        const label = base.replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80) || 'Uploaded Plan';
+        const overview = `Imported ${ext ? `${ext.toUpperCase()} ` : ''}continuity artifact pending review.`;
+        return { planId: slug, label: this.titleCase(label), category: 'coop', overview };
+    }
+
+    private titleCase(s: string): string {
+        return s
+            .toLowerCase()
+            .split(/\s+/)
+            .map((w) => (w ? w[0].toUpperCase() + w.slice(1) : ''))
+            .join(' ');
+    }
+
+    private normalizePlanSlug(raw: unknown, fallback: string): string {
+        const s = String(raw || '')
+            .toLowerCase()
+            .replace(/[^a-z0-9-_\s]/g, '')
+            .replace(/[\s_]+/g, '-')
+            .replace(/-+/g, '-')
+            .replace(/^-+|-+$/g, '')
+            .slice(0, 60);
+        if (s && /^[a-z0-9][a-z0-9-_]*$/i.test(s)) return s;
+        return fallback;
+    }
+
+    private normalizeLabel(raw: unknown, fallback: string): string {
+        const s = String(raw || '').trim().slice(0, 80);
+        return s || fallback;
+    }
+
+    private normalizeOverview(raw: unknown, fallback: string): string {
+        const s = String(raw || '').trim().slice(0, 320);
+        return s || fallback;
+    }
+
+    private normalizePlanCategory(raw: unknown, fallback: 'coop' | 'bcp' | 'compliance'): 'coop' | 'bcp' | 'compliance' {
+        const s = String(raw || '').toLowerCase().trim();
+        if (s === 'coop' || s === 'bcp' || s === 'compliance') return s;
+        return fallback;
     }
 
     /**

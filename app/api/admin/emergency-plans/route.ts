@@ -232,11 +232,10 @@ export async function POST(req: Request) {
         await connectDB();
 
         const formData = await req.formData();
-        const planId = asNonEmptyString(formData.get('planId') as string);
         const file = formData.get('file');
 
-        if (!planId || !file || !(file instanceof File)) {
-            return NextResponse.json({ success: false, error: 'Missing plan ID or file' }, { status: 400 });
+        if (!file || !(file instanceof File)) {
+            return NextResponse.json({ success: false, error: 'Missing file' }, { status: 400 });
         }
 
         const ext = extensionFromFilename(file.name);
@@ -275,12 +274,45 @@ export async function POST(req: Request) {
             filename: file.name.replace(/[^\w.-]+/g, '_'),
         });
 
-        let plan = await EmergencyPlan.findOne({ planId });
+        // Extract text once so both AI metadata inference and AI integrity reuse it.
+        let extractedText = '';
+        try {
+            extractedText = await extractTextFromBuffer(buffer, ext, {
+                maxChars: FAST_TEXT_CAP,
+                maxSheets: 5,
+            });
+        } catch (extractErr) {
+            console.error('EmergencyPlan upload text extract:', extractErr);
+        }
+
+        let metadata;
+        try {
+            metadata = await openaiService.inferCoopPlanMetadata({
+                fileName: file.name,
+                fileExtension: ext,
+                fileSizeBytes: buffer.length,
+                extractedText: extractedText || undefined,
+            });
+        } catch (metaErr) {
+            console.error('EmergencyPlan upload metadata inference:', metaErr);
+            metadata = null;
+        }
+
+        const resolvedPlanId = metadata?.planId
+            || file.name.replace(/\.[^.]+$/, '').toLowerCase().replace(/[^a-z0-9-_]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60)
+            || `upload-${Date.now()}`;
+        const resolvedLabel = metadata?.label || file.name.replace(/\.[^.]+$/, '');
+        const resolvedCategory = metadata?.category || 'coop';
+        const resolvedOverview = metadata?.overview || `Imported ${ext.toUpperCase()} continuity artifact pending review.`;
+
+        let plan = await EmergencyPlan.findOne({ planId: resolvedPlanId });
+        const planExisted = Boolean(plan);
         if (!plan) {
             plan = new EmergencyPlan({
-                planId,
-                label: planId.replace(/[-_]/g, ' ').replace(/\s+/g, ' ').toUpperCase(),
-                overview: `Uploaded Emergency Plan Documents for ${planId}`,
+                planId: resolvedPlanId,
+                label: resolvedLabel,
+                overview: resolvedOverview,
+                category: resolvedCategory,
                 steps: [],
                 attachments: [],
             });
@@ -303,10 +335,6 @@ export async function POST(req: Request) {
 
         if (attachmentId) {
             try {
-                const extractedText = await extractTextFromBuffer(buffer, ext, {
-                    maxChars: FAST_TEXT_CAP,
-                    maxSheets: 5,
-                });
                 const result = await openaiService.analyzeCoopAttachmentIntegrity({
                     planLabel: plan.label,
                     planOverview: plan.overview || '',
@@ -319,7 +347,7 @@ export async function POST(req: Request) {
                 });
 
                 await EmergencyPlan.updateOne(
-                    { planId, 'attachments._id': attachmentId },
+                    { planId: resolvedPlanId, 'attachments._id': attachmentId },
                     {
                         $set: {
                             'attachments.$.aiIntegrityStatus': result.status,
@@ -332,10 +360,16 @@ export async function POST(req: Request) {
             } catch (aiErr) {
                 console.error('EmergencyPlan upload AI integrity:', aiErr);
             }
-            responsePlan = (await EmergencyPlan.findOne({ planId })) ?? plan;
+            responsePlan = (await EmergencyPlan.findOne({ planId: resolvedPlanId })) ?? plan;
         }
 
-        return NextResponse.json({ success: true, message: 'File uploaded successfully', data: responsePlan });
+        return NextResponse.json({
+            success: true,
+            message: planExisted ? 'File attached to existing plan' : 'New plan created and file uploaded',
+            attachedToExistingPlan: planExisted,
+            planId: resolvedPlanId,
+            data: responsePlan,
+        });
     } catch (error) {
         console.error('EmergencyPlan POST error:', error);
         return NextResponse.json({ success: false, error: 'Upload failed — check Cloudinary credentials and retry' }, { status: 500 });
