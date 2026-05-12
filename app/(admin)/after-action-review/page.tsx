@@ -5,15 +5,11 @@ import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import jsPDF from 'jspdf'
 import {
-    Flame,
     Layers,
     Clock,
-    Columns,
     Loader2,
     FileText,
     CheckCircle,
-    AlertTriangle,
-    Shield,
     Activity,
     Download,
     Share2,
@@ -22,10 +18,12 @@ import {
     Target,
     Zap,
     RotateCcw,
-    Plus
+    Plus,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
+import { AdminPageShell } from '@/components/admin-page-shell'
+import { AdminPageHeader } from '@/components/admin-page-header'
 
 // Dynamic Type for the Incident data
 type IncidentReviewDef = {
@@ -64,13 +62,15 @@ export default function AfterActionReviewPage() {
 
     if (isLoading) {
         return (
-            <div className="flex items-center justify-center h-[calc(100vh-64px)] bg-[#0A0B10]">
-                <div className="flex flex-col items-center gap-6">
+            <div className="min-h-screen flex items-center justify-center bg-slate-50">
+                <div className="flex flex-col items-center gap-4">
                     <div className="relative">
-                        <Loader2 className="w-16 h-16 animate-spin text-[#33375D]" />
-                        <div className="absolute inset-0 flex items-center justify-center text-[10px] font-black text-blue-400">AI</div>
+                        <Loader2 className="w-12 h-12 animate-spin text-[#33375D]" />
+                        <div className="absolute inset-0 flex items-center justify-center text-[10px] font-black text-[#33375D]">AI</div>
                     </div>
-                    <p className="font-black text-xs uppercase tracking-[0.4em] text-slate-500 animate-pulse">Synchronizing Mission Metadata...</p>
+                    <p className="text-[#33375D] font-black text-xs uppercase tracking-[0.5em] animate-pulse">
+                        Synchronizing Mission Metadata...
+                    </p>
                 </div>
             </div>
         )
@@ -92,10 +92,10 @@ export default function AfterActionReviewPage() {
     }
 
     const kpiCards = [
-        { label: 'Tactical Name', value: displayData.name, sub: 'Identity Marker', icon: Target, color: 'text-blue-500', bg: 'bg-blue-500/10' },
-        { label: 'Event Classification', value: displayData.type, sub: 'Impact Category', icon: Layers, color: 'text-orange-500', bg: 'bg-orange-500/10' },
-        { label: 'Deployment Duration', value: displayData.duration, sub: 'Mission Window', icon: Activity, color: 'text-purple-500', bg: 'bg-purple-500/10' },
-        { label: 'AI Intel Count', value: displayData.insights, sub: 'Automated Insights', icon: Sparkles, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
+        { label: 'Tactical Name', value: displayData.name, sub: 'Identity Marker', icon: Target, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100' },
+        { label: 'Event Classification', value: displayData.type, sub: 'Impact Category', icon: Layers, color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-100' },
+        { label: 'Deployment Duration', value: displayData.duration, sub: 'Mission Window', icon: Activity, color: 'text-purple-600', bg: 'bg-purple-50', border: 'border-purple-100' },
+        { label: 'AI Intel Count', value: displayData.insights, sub: 'Automated Insights', icon: Sparkles, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100' },
     ]
 
     const performanceIndicators = [
@@ -261,71 +261,81 @@ export default function AfterActionReviewPage() {
     }
 
     return (
-        <main className="min-h-screen bg-[#0A0B10] p-8 lg:p-12 space-y-12 overflow-hidden relative">
-            {/* Background Artifacts */}
-            <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-blue-600/5 rounded-full blur-[150px] pointer-events-none" />
-            <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-indigo-600/5 rounded-full blur-[120px] pointer-events-none" />
-
-            {/* Hero Header */}
-            <div className="relative flex flex-col lg:flex-row lg:items-end justify-between gap-8 pb-8 border-b border-white/5">
-                <div className="space-y-6">
-                    <div className="flex items-center gap-4">
-                        <div className="rounded-full bg-[#33375D] px-4 py-1.5 font-black text-[10px] uppercase tracking-widest text-white shadow-2xl shadow-[#33375D]/30">
-                            Official Record
+        <AdminPageShell>
+            <AdminPageHeader
+                title="After-Action Review"
+                description={`Strategic tactical analysis of ${displayData.name}. Modern failure analysis and operational intelligence.`}
+                actions={
+                    <>
+                        <div className="hidden md:flex items-center gap-2 h-12 px-4 rounded-xl bg-slate-50 border border-slate-200">
+                            <span className="inline-flex items-center gap-1.5 rounded-full bg-[#33375D] px-3 py-1 text-[9px] font-black uppercase tracking-widest text-white">
+                                Official Record
+                            </span>
+                            <span className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                                <Clock size={12} /> {new Date().toLocaleDateString()}
+                            </span>
                         </div>
-                        <div className="flex items-center gap-2 text-slate-500 text-[10px] font-black uppercase tracking-widest">
-                            <Clock size={12} /> Generated {new Date().toLocaleDateString()}
-                        </div>
-                    </div>
-                    <div className="space-y-2">
-                        <h1 className="text-5xl font-black text-white uppercase tracking-tighter leading-tight">After-Action Review</h1>
-                        <p className="text-lg font-bold text-slate-400 max-w-2xl leading-relaxed">
-                            Strategic tactical analysis of <span className="text-white underline underline-offset-4 decoration-blue-500/50">{displayData.name}</span>. Modern failure analysis and operational intelligence.
-                        </p>
-                    </div>
-                </div>
-
-                <div className="flex items-center gap-4">
-                    <Button
-                        onClick={() => toast.success('Mission Intel serialized and distributed to command nodes.')}
-                        variant="ghost"
-                        className="h-14 px-8 rounded-2xl text-[10px] font-black text-slate-400 h-16 uppercase tracking-[0.2em] border border-white/10 hover:bg-white/5 hover:text-white transition-all gap-3"
-                    >
-                        <Share2 size={16} /> Distribute Report
-                    </Button>
-                    <Button
-                        onClick={downloadReportPdf}
-                        disabled={isExporting}
-                        className="h-14 h-16 gap-3 rounded-2xl bg-[#33375D] px-8 font-black text-[10px] uppercase tracking-[0.2em] text-white shadow-2xl shadow-[#33375D]/25 hover:bg-[#2B2F50]"
-                    >
-                        <Download size={16} /> {isExporting ? 'Exporting...' : 'Export Intelligence'}
-                    </Button>
-                </div>
-            </div>
+                        <Button
+                            onClick={() => toast.success('Mission Intel serialized and distributed to command nodes.')}
+                            variant="outline"
+                            className="flex h-12 gap-2 rounded-xl border-slate-200 bg-white px-6 text-xs font-bold uppercase tracking-wider text-slate-700 shadow-sm transition-all hover:bg-slate-50 active:scale-95"
+                        >
+                            <Share2 size={16} /> Distribute Report
+                        </Button>
+                        <Button
+                            onClick={downloadReportPdf}
+                            disabled={isExporting}
+                            className="flex h-12 gap-2 rounded-xl bg-[#33375D] px-6 text-xs font-bold uppercase tracking-wider text-white shadow-lg transition-all hover:bg-[#2B2F50] active:scale-95"
+                        >
+                            <Download size={16} /> {isExporting ? 'Exporting...' : 'Export Intelligence'}
+                        </Button>
+                    </>
+                }
+            />
 
             {/* KPI Dashboard */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 relative z-10">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {kpiCards.map((kpi, i) => (
-                    <Card key={i} className="p-8 bg-white/[0.02] border border-white/5 rounded-[40px] shadow-2xl group hover:bg-white/[0.04] transition-all relative overflow-hidden">
-                        <div className={cn("absolute right-8 top-8 w-12 h-12 rounded-2xl flex items-center justify-center transition-all", kpi.bg, kpi.color)}>
-                            <kpi.icon size={24} />
+                    <Card
+                        key={i}
+                        className="p-6 bg-white border border-slate-200 rounded-2xl shadow-sm hover:shadow-md transition-all relative overflow-hidden group"
+                    >
+                        <div
+                            className={cn(
+                                'absolute right-6 top-6 w-12 h-12 rounded-xl flex items-center justify-center border transition-all',
+                                kpi.bg,
+                                kpi.color,
+                                kpi.border,
+                            )}
+                        >
+                            <kpi.icon size={22} />
                         </div>
-                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">{kpi.label}</p>
-                        <h3 className="text-2xl font-black text-white uppercase tracking-tight">{kpi.value}</h3>
-                        <p className="text-[9px] font-black text-slate-600 uppercase tracking-widest mt-2">{kpi.sub}</p>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">
+                            {kpi.label}
+                        </p>
+                        <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight pr-14 truncate">
+                            {kpi.value}
+                        </h3>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-2">
+                            {kpi.sub}
+                        </p>
                     </Card>
                 ))}
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
-                {/* Timeline Side */}
-                <div className="lg:col-span-12 space-y-8">
-                    <div className="flex items-center justify-between px-4">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                {/* Timeline */}
+                <div className="lg:col-span-12 space-y-4">
+                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 px-1">
                         <div>
-                            <h2 className="text-2xl font-black text-white uppercase tracking-tight">Mission Chronology</h2>
-                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-1">High-fidelity event serialization</p>
+                            <h2 className="text-xl font-black text-slate-900 uppercase tracking-tight">
+                                Mission Chronology
+                            </h2>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
+                                High-fidelity event serialization
+                            </p>
                         </div>
-                        <div className="flex items-center gap-6 text-[9px] font-black text-slate-500 uppercase tracking-widest">
+                        <div className="flex flex-wrap items-center gap-4 text-[9px] font-bold text-slate-500 uppercase tracking-widest">
                             <div className="flex items-center gap-2">
                                 <div className="w-2 h-2 rounded-full bg-red-500" /> Critical
                             </div>
@@ -338,41 +348,56 @@ export default function AfterActionReviewPage() {
                         </div>
                     </div>
 
-                    <Card className="bg-slate-900/40 backdrop-blur-3xl border-white/5 rounded-[48px] p-12 shadow-2xl relative overflow-hidden">
-                        <div className="absolute left-[54px] top-12 bottom-12 w-px bg-gradient-to-b from-blue-500/50 via-white/5 to-transparent" />
+                    <Card className="bg-white border border-slate-200 rounded-2xl p-8 lg:p-10 shadow-sm relative overflow-hidden">
+                        <div className="absolute left-[42px] lg:left-[50px] top-10 bottom-10 w-px bg-gradient-to-b from-[#33375D]/30 via-slate-200 to-transparent" />
 
-                        <div className="space-y-16">
+                        <div className="space-y-10">
                             {displayData.events.map((event: any, i: number) => (
-                                <div key={i} className="relative pl-16 group">
+                                <div key={i} className="relative pl-12 lg:pl-14 group">
                                     {/* Connector Dot */}
-                                    <div className={cn(
-                                        "absolute left-0 top-1 w-3 h-3 rounded-full border-4 border-[#0A0B10] z-10 transition-transform group-hover:scale-150",
-                                        event.color === 'red' ? 'bg-red-500 shadow-[0_0_12px_rgba(239,68,68,0.5)]' :
-                                            event.color === 'blue' ? 'bg-blue-500 shadow-[0_0_12px_rgba(59,130,246,0.5)]' :
-                                                'bg-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.5)]'
-                                    )} />
+                                    <div
+                                        className={cn(
+                                            'absolute left-0 top-1.5 w-3 h-3 rounded-full ring-4 ring-white z-10 transition-transform group-hover:scale-150',
+                                            event.color === 'red'
+                                                ? 'bg-red-500 shadow-[0_0_0_4px_rgba(239,68,68,0.15)]'
+                                                : event.color === 'blue'
+                                                  ? 'bg-blue-500 shadow-[0_0_0_4px_rgba(59,130,246,0.15)]'
+                                                  : 'bg-emerald-500 shadow-[0_0_0_4px_rgba(16,185,129,0.15)]',
+                                        )}
+                                    />
 
-                                    <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-12">
-                                        <div className="space-y-4 max-w-2xl">
-                                            <div className="flex items-center gap-4">
-                                                <span className="text-xs font-black text-white bg-white/5 h-8 px-4 rounded-xl flex items-center border border-white/10 uppercase tracking-widest">{event.time}</span>
-                                                <span className={cn(
-                                                    "text-[9px] font-black uppercase tracking-[0.2em] px-3 py-1 rounded-lg border",
-                                                    event.color === 'red' ? 'bg-red-500/10 text-red-500 border-red-500/20' :
-                                                        event.color === 'blue' ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' :
-                                                            'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
-                                                )}>
+                                    <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-6">
+                                        <div className="space-y-3 max-w-2xl">
+                                            <div className="flex items-center gap-3 flex-wrap">
+                                                <span className="text-[10px] font-black text-slate-700 bg-slate-50 h-7 px-3 rounded-lg inline-flex items-center border border-slate-200 uppercase tracking-widest">
+                                                    {event.time}
+                                                </span>
+                                                <span
+                                                    className={cn(
+                                                        'text-[9px] font-black uppercase tracking-[0.2em] px-3 py-1 rounded-md border',
+                                                        event.color === 'red'
+                                                            ? 'bg-red-50 text-red-600 border-red-100'
+                                                            : event.color === 'blue'
+                                                              ? 'bg-blue-50 text-blue-600 border-blue-100'
+                                                              : 'bg-emerald-50 text-emerald-600 border-emerald-100',
+                                                    )}
+                                                >
                                                     {event.type}
                                                 </span>
                                             </div>
-                                            <h3 className="text-2xl font-black text-white uppercase tracking-tighter group-hover:text-blue-400 transition-colors">{event.title}</h3>
-                                            <p className="text-slate-400 font-bold leading-relaxed text-[15px]">
+                                            <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight group-hover:text-[#33375D] transition-colors">
+                                                {event.title}
+                                            </h3>
+                                            <p className="text-slate-500 font-medium leading-relaxed text-sm">
                                                 {event.description}
                                             </p>
                                         </div>
 
-                                        <div className="shrink-0 pt-2 opacity-0 group-hover:opacity-100 transition-all transform translate-x-4 group-hover:translate-x-0">
-                                            <Button variant="ghost" className="h-12 px-6 rounded-2xl text-[9px] font-black text-blue-400 uppercase tracking-widest border border-blue-500/20 hover:bg-blue-500/10 transition-all gap-3">
+                                        <div className="shrink-0 pt-1 opacity-0 group-hover:opacity-100 transition-all">
+                                            <Button
+                                                variant="outline"
+                                                className="h-10 px-4 rounded-xl text-[9px] font-bold text-[#33375D] uppercase tracking-widest border-slate-200 hover:bg-[#33375D]/5 hover:border-[#33375D]/30 transition-all gap-2"
+                                            >
                                                 Examine Intel <ArrowUpRight size={14} />
                                             </Button>
                                         </div>
@@ -383,60 +408,76 @@ export default function AfterActionReviewPage() {
                     </Card>
                 </div>
 
-                {/* AI Insight Cards — typography aligned with KPI row + Mission Chronology (dark) */}
-                <div className="lg:col-span-12 space-y-8">
-                    <div className="px-4">
-                        <h2 className="text-2xl font-black text-white uppercase tracking-tight">Intelligence Analysis</h2>
-                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-1">
+                {/* Intelligence Analysis */}
+                <div className="lg:col-span-12 space-y-4">
+                    <div className="px-1">
+                        <h2 className="text-xl font-black text-slate-900 uppercase tracking-tight">
+                            Intelligence Analysis
+                        </h2>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
                             Structured operational intelligence
                         </p>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                        {/* Tactical Summary */}
-                        <Card className="relative overflow-hidden rounded-[40px] border border-white/5 bg-white/[0.02] p-8 shadow-2xl transition-all group hover:bg-white/[0.04]">
-                            <div className="pointer-events-none absolute right-6 top-6 opacity-[0.07] transition-transform group-hover:scale-110">
-                                <FileText size={88} className="text-white" />
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {/* Operational Summary */}
+                        <Card className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-sm hover:shadow-md transition-all group">
+                            <div className="pointer-events-none absolute right-5 top-5 opacity-[0.06] transition-transform group-hover:scale-110">
+                                <FileText size={80} className="text-[#33375D]" />
                             </div>
-                            <div className="relative z-10 space-y-5">
-                                <div>
-                                    <h3 className="mt-1 text-md font-black uppercase tracking-widest text-blue-400">
-                                        Operational summary
-                                    </h3>
+                            <div className="relative z-10 space-y-4">
+                                <div className="inline-flex w-11 h-11 rounded-xl items-center justify-center bg-blue-50 border border-blue-100 text-blue-600">
+                                    <FileText size={20} />
                                 </div>
-                                <p className="text-[15px] font-bold leading-relaxed text-slate-300">
+                                <div>
+                                    <h3 className="text-sm font-black uppercase tracking-widest text-slate-900">
+                                        Operational Summary
+                                    </h3>
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
+                                        AI Tactical Digest
+                                    </p>
+                                </div>
+                                <p className="text-sm font-medium leading-relaxed text-slate-600">
                                     {displayData.aiInsights[0]?.description}
                                 </p>
-                                <div className="flex items-center justify-between border-t border-white/5 pt-5">
+                                <div className="flex items-center justify-between border-t border-slate-100 pt-4">
                                     <div className="flex items-center gap-2">
                                         <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                                        <span className="text-[9px] font-black uppercase tracking-widest text-slate-500">
+                                        <span className="text-[9px] font-bold uppercase tracking-widest text-slate-500">
                                             Confidence: 99.4%
                                         </span>
                                     </div>
-                                    <CheckCircle size={14} className="shrink-0 text-blue-500" aria-hidden />
+                                    <CheckCircle size={14} className="shrink-0 text-emerald-500" aria-hidden />
                                 </div>
                             </div>
                         </Card>
 
-                        {/* Efficiency Targets */}
-                        <Card className="relative overflow-hidden rounded-[40px] border border-white/5 bg-white/[0.02] p-8 shadow-2xl transition-all group hover:bg-white/[0.04]">
-                            <div className="pointer-events-none absolute right-6 top-6 opacity-[0.07] transition-transform group-hover:rotate-6">
-                                <Zap size={88} className="text-white" />
+                        {/* Performance Indicators */}
+                        <Card className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-sm hover:shadow-md transition-all group">
+                            <div className="pointer-events-none absolute right-5 top-5 opacity-[0.06] transition-transform group-hover:rotate-6">
+                                <Zap size={80} className="text-emerald-600" />
                             </div>
-                            <div className="relative z-10 space-y-5">
-                                <div>
-                                    <h3 className="mt-1 text-md font-black uppercase tracking-widest text-emerald-400">
-                                        Performance indicators
-                                    </h3>
+                            <div className="relative z-10 space-y-4">
+                                <div className="inline-flex w-11 h-11 rounded-xl items-center justify-center bg-emerald-50 border border-emerald-100 text-emerald-600">
+                                    <Zap size={20} />
                                 </div>
-                                <div className="space-y-5">
+                                <div>
+                                    <h3 className="text-sm font-black uppercase tracking-widest text-slate-900">
+                                        Performance Indicators
+                                    </h3>
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
+                                        Real-Time Telemetry
+                                    </p>
+                                </div>
+                                <div className="space-y-4 pt-1">
                                     {performanceIndicators.map((met, i) => (
                                         <div key={i} className="flex flex-col gap-2">
-                                            <div className="flex items-center justify-between gap-3 text-[10px] font-black uppercase tracking-widest text-slate-500">
+                                            <div className="flex items-center justify-between gap-3 text-[10px] font-bold uppercase tracking-widest text-slate-500">
                                                 <span className="min-w-0 truncate">{met.label}</span>
-                                                <span className="shrink-0 tabular-nums text-sm font-black text-white">{met.val}</span>
+                                                <span className="shrink-0 tabular-nums text-sm font-black text-slate-900">
+                                                    {met.val}
+                                                </span>
                                             </div>
-                                            <div className="h-1 overflow-hidden rounded-full bg-white/5">
+                                            <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
                                                 <div className="h-full w-[90%] bg-emerald-500" />
                                             </div>
                                         </div>
@@ -445,24 +486,32 @@ export default function AfterActionReviewPage() {
                             </div>
                         </Card>
 
-                        {/* Strategic Improvements */}
-                        <Card className="relative overflow-hidden rounded-[40px] border border-white/5 bg-white/[0.02] p-8 shadow-2xl transition-all group hover:bg-white/[0.04]">
-                            <div className="pointer-events-none absolute bottom-4 right-4 opacity-[0.07] transition-transform group-hover:-translate-y-1">
-                                <RotateCcw size={88} className="text-white" />
+                        {/* Strategic Enhancements */}
+                        <Card className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-sm hover:shadow-md transition-all group">
+                            <div className="pointer-events-none absolute right-5 top-5 opacity-[0.06] transition-transform group-hover:-rotate-6">
+                                <RotateCcw size={80} className="text-orange-600" />
                             </div>
-                            <div className="relative z-10 space-y-5">
-                                <div>
-                                    <h3 className="mt-1 text-md font-black uppercase tracking-widest text-orange-400">
-                                        Strategic enhancements
-                                    </h3>
+                            <div className="relative z-10 space-y-4">
+                                <div className="inline-flex w-11 h-11 rounded-xl items-center justify-center bg-orange-50 border border-orange-100 text-orange-600">
+                                    <RotateCcw size={20} />
                                 </div>
-                                <ul className="space-y-4">
+                                <div>
+                                    <h3 className="text-sm font-black uppercase tracking-widest text-slate-900">
+                                        Strategic Enhancements
+                                    </h3>
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
+                                        Recommended Actions
+                                    </p>
+                                </div>
+                                <ul className="space-y-3">
                                     {strategicEnhancements.map((imp, i) => (
                                         <li key={i} className="flex gap-3">
-                                            <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-lg border border-orange-500/20 bg-orange-500/10">
-                                                <Plus size={12} className="text-orange-500" />
+                                            <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-orange-100 bg-orange-50">
+                                                <Plus size={12} className="text-orange-600" />
                                             </div>
-                                            <p className="min-w-0 text-[15px] font-bold leading-relaxed text-slate-300">{imp}</p>
+                                            <p className="min-w-0 text-sm font-medium leading-relaxed text-slate-600">
+                                                {imp}
+                                            </p>
                                         </li>
                                     ))}
                                 </ul>
@@ -471,6 +520,6 @@ export default function AfterActionReviewPage() {
                     </div>
                 </div>
             </div>
-        </main>
+        </AdminPageShell>
     )
 }
