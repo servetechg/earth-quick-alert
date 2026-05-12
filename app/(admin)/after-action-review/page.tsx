@@ -287,7 +287,7 @@ export default function AfterActionReviewPage() {
                             disabled={isExporting}
                             className="flex h-12 gap-2 rounded-xl bg-[#33375D] px-6 text-xs font-bold uppercase tracking-wider text-white shadow-lg transition-all hover:bg-[#2B2F50] active:scale-95"
                         >
-                            <Download size={16} /> {isExporting ? 'Exporting...' : 'Export Intelligence'}
+                            <Download size={16} /> {isExporting ? 'Exporting...' : 'Export PDF'}
                         </Button>
                     </>
                 }
