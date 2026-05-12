@@ -37,7 +37,7 @@ export function AIRiskPredictionCard({
         <span className="text-[12px] text-[#A41E22] font-bold">{riskLabel}</span>
       </div>
 
-      <div className="space-y-2 pt-1">
+      <div className="space-y-2 pt-4">
         <div className="relative h-2 rounded-full bg-gradient-to-r from-[#16A34A] via-[#FACC15] via-50% to-[#A41E22] overflow-visible">
           <div
             className="absolute -top-1 w-1 h-4 bg-slate-900 rounded-full shadow-md"

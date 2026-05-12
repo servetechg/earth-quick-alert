@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { UserSidebar } from '@/components/user-sidebar'
 import { Header } from '@/components/header'
@@ -16,10 +16,17 @@ export default function UserLayout({
     const pathname = usePathname()
     const { getActiveEvents } = useEvents()
     const { refreshSafetyData } = useSafety()
+    const scrollContainerRef = useRef<HTMLDivElement | null>(null)
     const [userName, setUserName] = useState('')
     const [isLoading, setIsLoading] = useState(true)
 
     const isVirtualEOC = pathname?.startsWith('/virtual-eoc')
+
+    // Internal scroll container — Next.js only resets window scroll on route
+    // changes, so we manually snap this back to the top whenever the route changes.
+    useEffect(() => {
+        scrollContainerRef.current?.scrollTo({ top: 0, left: 0 })
+    }, [pathname])
 
     useEffect(() => {
         const userRole = localStorage.getItem('userRole')
@@ -91,7 +98,10 @@ export default function UserLayout({
             {!isVirtualEOC && <UserSidebar />}
             <div className="flex-1 flex flex-col overflow-hidden">
                 {!isVirtualEOC && <Header userName={userName} onLogout={handleLogout} />}
-                <div className={`flex-1 overflow-auto ${isVirtualEOC ? 'w-full h-full' : ''}`}>
+                <div
+                    ref={scrollContainerRef}
+                    className={`flex-1 overflow-auto ${isVirtualEOC ? 'w-full h-full' : ''}`}
+                >
                     {children}
                 </div>
             </div>

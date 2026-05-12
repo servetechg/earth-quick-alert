@@ -8,7 +8,7 @@ import Link from 'next/link'
 import { Input } from '@/components/ui/input'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
-import { USER_PROFILE_UPDATED_EVENT } from '@/lib/sync-client-user-profile'
+import { useUser } from '@/lib/store/user-store'
 
 interface HeaderProps {
   userName?: string
@@ -20,8 +20,12 @@ interface HeaderProps {
 export function Header({ userName = 'Admin User', onLogout, hideSearch = false }: HeaderProps) {
   const [showDropdown, setShowDropdown] = useState(false)
   const [showSidebar, setShowSidebar] = useState(false)
-  const [localUserTick, setLocalUserTick] = useState(0)
   const dropdownRef = useRef<HTMLDivElement>(null)
+
+  // Server is the source of truth via UserProvider. localStorage is only used as a
+  // first-paint fallback so the header doesn't flicker before /api/user/profile
+  // resolves on initial mount.
+  const { me } = useUser()
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -33,22 +37,29 @@ export function Header({ userName = 'Admin User', onLogout, hideSearch = false }
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  useEffect(() => {
-    const sync = () => setLocalUserTick((n) => n + 1)
-    window.addEventListener(USER_PROFILE_UPDATED_EVENT, sync)
-    return () => window.removeEventListener(USER_PROFILE_UPDATED_EVENT, sync)
-  }, [])
-
   const displayName = useMemo(() => {
-    if (typeof window === 'undefined') return userName || 'User'
-    return localStorage.getItem('userName') || userName || 'User'
-  }, [userName, localUserTick])
-  const userEmail = useMemo(
-    () => (typeof window !== 'undefined' ? localStorage.getItem('userEmail') : ''),
-    [localUserTick]
-  )
-  const userRole = typeof window !== 'undefined' ? localStorage.getItem('userRole') : ''
-  const isUserSafe = typeof window !== 'undefined' ? localStorage.getItem('isSafe') !== 'false' : true
+    if (me?.name) return me.name
+    if (typeof window !== 'undefined') {
+      const cached = localStorage.getItem('userName')
+      if (cached) return cached
+    }
+    return userName || 'User'
+  }, [me?.name, userName])
+
+  const userEmail = useMemo(() => {
+    if (me?.email) return me.email
+    if (typeof window !== 'undefined') return localStorage.getItem('userEmail') || ''
+    return ''
+  }, [me?.email])
+
+  const userRole = useMemo(() => {
+    if (me?.role) return me.role
+    if (typeof window !== 'undefined') return localStorage.getItem('userRole') || ''
+    return ''
+  }, [me?.role])
+
+  const isUserSafe =
+    typeof window !== 'undefined' ? localStorage.getItem('isSafe') !== 'false' : true
 
   const editProfileHref = useMemo(() => {
     if (userRole === 'super-admin') return '/settings?tab=profile'
@@ -57,12 +68,14 @@ export function Header({ userName = 'Admin User', onLogout, hideSearch = false }
   }, [userRole])
 
   const avatarSrc = useMemo(() => {
-    const pic = typeof window !== 'undefined' ? localStorage.getItem('userProfilePic')?.trim() : ''
+    const pic =
+      me?.profilePic?.trim() ||
+      (typeof window !== 'undefined' ? localStorage.getItem('userProfilePic')?.trim() : '')
     return (
       pic ||
       'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?q=80&w=100&auto=format&fit=crop'
     )
-  }, [localUserTick])
+  }, [me?.profilePic])
 
   return (
     <header className="border-b border-slate-100 bg-white px-4 md:px-8 py-3 flex items-center justify-between gap-8 h-16 sticky top-0 z-50">

@@ -38,15 +38,15 @@ export function PowerOutageSummaryCard({
     >
       <h3 className="text-[13px] font-bold text-slate-900">Power Outage Summary</h3>
 
-      <div className="flex items-center gap-3 flex-1">
-        <div className="relative w-[90px] h-[90px] shrink-0">
+      <div className="flex items-center gap-4 flex-1">
+        <div className="relative w-[130px] h-[130px] shrink-0">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie
                 data={segments}
                 dataKey="value"
-                innerRadius={28}
-                outerRadius={42}
+                innerRadius={42}
+                outerRadius={62}
                 paddingAngle={2}
                 startAngle={90}
                 endAngle={-270}
@@ -59,27 +59,27 @@ export function PowerOutageSummaryCard({
             </PieChart>
           </ResponsiveContainer>
           <div className="absolute inset-0 flex flex-col items-center justify-center leading-none">
-            <span className="text-[15px] font-bold text-slate-900 tabular-nums">{totalOut}</span>
-            <span className="text-[8px] font-semibold text-slate-500 text-center mt-0.5">
+            <span className="text-[20px] font-bold text-slate-900 tabular-nums">{totalOut}</span>
+            <span className="text-[9px] font-semibold text-slate-500 text-center mt-1 px-2">
               Customers Out
             </span>
           </div>
         </div>
 
-        <ul className="flex flex-col gap-1.5 flex-1">
+        <ul className="flex flex-col gap-2 flex-1">
           {segments.map((seg) => (
             <li key={seg.name} className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-1.5 min-w-0">
+              <div className="flex items-center gap-2 min-w-0">
                 <span
-                  className="w-2 h-2 rounded-sm shrink-0"
+                  className="w-2.5 h-2.5 rounded-full shrink-0"
                   style={{ backgroundColor: seg.color }}
                   aria-hidden
                 />
-                <span className="text-[10px] font-medium text-slate-600 truncate">
+                <span className="text-[12px] font-medium text-slate-600 truncate">
                   {seg.name}
                 </span>
               </div>
-              <span className="text-[11px] font-bold text-slate-900 tabular-nums">
+              <span className="text-[13px] font-bold text-slate-900 tabular-nums">
                 {seg.value}
               </span>
             </li>
