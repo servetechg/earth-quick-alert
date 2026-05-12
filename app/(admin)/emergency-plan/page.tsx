@@ -193,32 +193,12 @@ export default function EmergencyPlanPage() {
     const [isLoading, setIsLoading] = useState(true)
 
     const [uploading, setUploading] = useState(false)
-    const [uploadTargetPlanId, setUploadTargetPlanId] = useState('')
-    const [selectedUploadFile, setSelectedUploadFile] = useState<File | null>(null)
+    const [selectedUploadFiles, setSelectedUploadFiles] = useState<File[]>([])
+    const [uploadOpen, setUploadOpen] = useState(false)
     const fileRef = useRef<HTMLInputElement>(null)
 
     const [search, setSearch] = useState('')
     const [selectedCategoryIdx, setSelectedCategoryIdx] = useState<number | null>(null)
-
-    const [newPlanOpen, setNewPlanOpen] = useState(false)
-    const [newPlanId, setNewPlanId] = useState('')
-    const [newPlanLabel, setNewPlanLabel] = useState('')
-    const [newPlanOverview, setNewPlanOverview] = useState('')
-    const [newPlanCategory, setNewPlanCategory] = useState<PlanCategory>('coop')
-    const [savingPlan, setSavingPlan] = useState(false)
-
-    type BulkRow = {
-        planId: string
-        label: string
-        category: PlanCategory
-        overview: string
-    }
-
-    const emptyBulkRow = (): BulkRow => ({ planId: '', label: '', category: 'coop', overview: '' })
-
-    const [bulkOpen, setBulkOpen] = useState(false)
-    const [bulkRows, setBulkRows] = useState<BulkRow[]>([emptyBulkRow()])
-    const [bulkRunning, setBulkRunning] = useState(false)
 
     type AuditSummary = {
         summary: string
@@ -235,6 +215,7 @@ export default function EmergencyPlanPage() {
     const [editOpen, setEditOpen] = useState(false)
     const [editPlanId, setEditPlanId] = useState('')
     const [editPlanLabel, setEditPlanLabel] = useState('')
+    const [editPlanOverview, setEditPlanOverview] = useState('')
     const [editPlanCategory, setEditPlanCategory] = useState<PlanCategory>('coop')
     const [editStepsText, setEditStepsText] = useState('')
     const [savingSteps, setSavingSteps] = useState(false)
@@ -310,12 +291,6 @@ export default function EmergencyPlanPage() {
 
     const planIdsSorted = useMemo(() => Object.keys(plans).sort((a, b) => a.localeCompare(b)), [plans])
 
-    useEffect(() => {
-        if (!uploadTargetPlanId && planIdsSorted.length) {
-            setUploadTargetPlanId(planIdsSorted[0])
-        }
-    }, [planIdsSorted, uploadTargetPlanId])
-
     const flattenedRows = useMemo((): RowItem[] => {
         return Object.entries(plans).flatMap(([planId, p]) =>
             (p.attachments || []).map((att) => ({
@@ -367,37 +342,64 @@ export default function EmergencyPlanPage() {
     const handlePickFile = () => fileRef.current?.click()
 
     const onFileChosen = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const f = e.target.files?.[0]
-        setSelectedUploadFile(f || null)
+        const fl = e.target.files
+        if (fl && fl.length) {
+            setSelectedUploadFiles((prev) => {
+                const merged = [...prev]
+                const seen = new Set(prev.map((f) => `${f.name}|${f.size}`))
+                for (const f of Array.from(fl)) {
+                    const k = `${f.name}|${f.size}`
+                    if (!seen.has(k)) {
+                        merged.push(f)
+                        seen.add(k)
+                    }
+                }
+                return merged
+            })
+        }
         e.target.value = ''
     }
 
+    const removeQueuedFile = (idx: number) => {
+        setSelectedUploadFiles((prev) => prev.filter((_, i) => i !== idx))
+    }
+
     const submitUpload = async () => {
-        if (!uploadTargetPlanId) {
-            toast.error('Choose a continuity plan bucket first')
-            return
-        }
-        if (!selectedUploadFile) {
-            toast.info('Pick a protocol file')
+        if (!selectedUploadFiles.length) {
+            toast.info('Pick at least one continuity file')
             handlePickFile()
             return
         }
         setUploading(true)
+        let attached = 0
+        let created = 0
+        const failed: string[] = []
         try {
-            const fd = new FormData()
-            fd.append('planId', uploadTargetPlanId)
-            fd.append('file', selectedUploadFile)
-            const res = await fetch('/api/admin/emergency-plans', { method: 'POST', body: fd })
-            const body = await res.json().catch(() => ({}))
-            if (!res.ok) {
-                throw new Error(body.error || body.message || 'Upload failed')
+            for (const file of selectedUploadFiles) {
+                try {
+                    const fd = new FormData()
+                    fd.append('file', file)
+                    const res = await fetch('/api/admin/emergency-plans', { method: 'POST', body: fd })
+                    const body = await res.json().catch(() => ({}))
+                    if (!res.ok) {
+                        failed.push(`${file.name}: ${body.error || body.message || res.statusText}`)
+                        continue
+                    }
+                    if (body.attachedToExistingPlan) attached++
+                    else created++
+                } catch (err) {
+                    failed.push(`${file.name}: ${err instanceof Error ? err.message : 'network error'}`)
+                }
             }
-            toast.success('File synced to continuity vault')
-            setSelectedUploadFile(null)
-            await fetchPlans()
-            refreshAuditSummary()
-        } catch (e: unknown) {
-            toast.error(e instanceof Error ? e.message : 'Upload failed')
+            if (created) toast.success(`Created ${created} new plan${created === 1 ? '' : 's'} from upload${created === 1 ? '' : 's'}`)
+            if (attached) toast.success(`Attached ${attached} file${attached === 1 ? '' : 's'} to existing plan${attached === 1 ? '' : 's'}`)
+            if (failed.length) toast.error(`${failed.length} upload${failed.length === 1 ? '' : 's'} failed — ${failed[0]}`)
+            if (created + attached > 0) {
+                setSelectedUploadFiles([])
+                setUploadOpen(false)
+                await fetchPlans()
+                refreshAuditSummary()
+            }
         } finally {
             setUploading(false)
         }
@@ -408,6 +410,7 @@ export default function EmergencyPlanPage() {
         const steps = p?.steps || []
         setEditPlanId(row.planId)
         setEditPlanLabel(p?.label || row.planLabel)
+        setEditPlanOverview(p?.overview || '')
         setEditPlanCategory(resolveCategory(p, row.planId))
         setEditStepsText(steps.map((s) => s.trim()).join('\n'))
         setEditOpen(true)
@@ -421,16 +424,23 @@ export default function EmergencyPlanPage() {
                 .split('\n')
                 .map((s) => s.trim())
                 .filter(Boolean)
-            const currentCategory = resolveCategory(plans[editPlanId], editPlanId)
+            const current = plans[editPlanId]
+            const currentCategory = resolveCategory(current, editPlanId)
             const stored = toStoredCategory(editPlanCategory)
-            if (editPlanCategory !== currentCategory && stored) {
-                const catRes = await fetch('/api/admin/emergency-plans', {
+            const trimmedLabel = editPlanLabel.trim()
+            const trimmedOverview = editPlanOverview.trim()
+            const patchPayload: Record<string, unknown> = {}
+            if (trimmedLabel && trimmedLabel !== (current?.label || '')) patchPayload.label = trimmedLabel
+            if (trimmedOverview !== (current?.overview || '')) patchPayload.overview = trimmedOverview
+            if (editPlanCategory !== currentCategory && stored) patchPayload.category = stored
+            if (Object.keys(patchPayload).length) {
+                const patchRes = await fetch('/api/admin/emergency-plans', {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ planId: editPlanId, category: stored }),
+                    body: JSON.stringify({ planId: editPlanId, ...patchPayload }),
                 })
-                const catBody = await catRes.json().catch(() => ({}))
-                if (!catRes.ok) throw new Error(catBody.error || 'Could not update category')
+                const patchBody = await patchRes.json().catch(() => ({}))
+                if (!patchRes.ok) throw new Error(patchBody.error || 'Could not update plan')
             }
             const res = await fetch('/api/admin/emergency-plans/steps', {
                 method: 'POST',
@@ -439,139 +449,14 @@ export default function EmergencyPlanPage() {
             })
             const body = await res.json().catch(() => ({}))
             if (!res.ok) throw new Error(body.error || 'Could not save steps')
-            toast.success('Protocol steps serialized')
+            toast.success('Plan updated')
             setEditOpen(false)
             await fetchPlans()
             refreshAuditSummary()
         } catch (e: unknown) {
-            toast.error(e instanceof Error ? e.message : 'Could not save steps')
+            toast.error(e instanceof Error ? e.message : 'Could not save plan')
         } finally {
             setSavingSteps(false)
-        }
-    }
-
-    const PLAN_ID_REGEX = /^[a-z0-9][a-z0-9-_]*$/i
-
-    const updateBulkRow = (index: number, patch: Partial<BulkRow>) => {
-        setBulkRows((prev) => prev.map((r, i) => (i === index ? { ...r, ...patch } : r)))
-    }
-
-    const addBulkRow = () => setBulkRows((prev) => [...prev, emptyBulkRow()])
-
-    const removeBulkRow = (index: number) => {
-        setBulkRows((prev) => (prev.length <= 1 ? [emptyBulkRow()] : prev.filter((_, i) => i !== index)))
-    }
-
-    const submitBulkPlans = async () => {
-        const rows = bulkRows
-            .map((r) => ({
-                planId: r.planId.trim(),
-                label: r.label.trim(),
-                category: r.category,
-                overview: r.overview.trim(),
-            }))
-            .filter((r) => r.planId || r.label || r.overview)
-
-        if (!rows.length) {
-            toast.info('Add at least one plan row.')
-            return
-        }
-
-        for (const r of rows) {
-            if (!r.planId) {
-                toast.error('Each row needs a Plan ID slug.')
-                return
-            }
-            if (!PLAN_ID_REGEX.test(r.planId)) {
-                toast.error(`Invalid Plan ID slug: "${r.planId}"`)
-                return
-            }
-            if (!r.label) {
-                toast.error(`Plan "${r.planId}" needs a display label.`)
-                return
-            }
-        }
-
-        const seen = new Set<string>()
-        for (const r of rows) {
-            const key = r.planId.toLowerCase()
-            if (seen.has(key)) {
-                toast.error(`Duplicate plan ID in rows: "${r.planId}"`)
-                return
-            }
-            seen.add(key)
-        }
-
-        setBulkRunning(true)
-        let created = 0
-        const failed: string[] = []
-        try {
-            for (const row of rows) {
-                const stored = toStoredCategory(row.category)
-                const payload: Record<string, unknown> = {
-                    planId: row.planId,
-                    label: row.label,
-                    overview: row.overview,
-                }
-                if (stored) payload.category = stored
-                try {
-                    const res = await fetch('/api/admin/emergency-plans', {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload),
-                    })
-                    const body = await res.json().catch(() => ({}))
-                    if (!res.ok) {
-                        failed.push(`${row.planId}: ${body.error || res.statusText}`)
-                    } else {
-                        created++
-                    }
-                } catch (e) {
-                    failed.push(`${row.planId}: ${e instanceof Error ? e.message : 'network error'}`)
-                }
-            }
-            if (created) toast.success(`Created/updated ${created} plan${created === 1 ? '' : 's'}`)
-            if (failed.length) toast.error(`${failed.length} row${failed.length === 1 ? '' : 's'} failed — ${failed[0]}`)
-            if (created && !failed.length) {
-                setBulkOpen(false)
-                setBulkRows([emptyBulkRow()])
-            }
-            await fetchPlans()
-            if (created) refreshAuditSummary()
-        } finally {
-            setBulkRunning(false)
-        }
-    }
-
-    const submitNewPlan = async () => {
-        setSavingPlan(true)
-        try {
-            const stored = toStoredCategory(newPlanCategory)
-            const payload: Record<string, unknown> = {
-                planId: newPlanId.trim(),
-                label: newPlanLabel.trim(),
-                overview: newPlanOverview.trim(),
-            }
-            if (stored) payload.category = stored
-            const res = await fetch('/api/admin/emergency-plans', {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload),
-            })
-            const body = await res.json().catch(() => ({}))
-            if (!res.ok) throw new Error(body.error || 'Could not create plan')
-            toast.success('Continuity framework registered')
-            setNewPlanOpen(false)
-            setNewPlanId('')
-            setNewPlanLabel('')
-            setNewPlanOverview('')
-            setNewPlanCategory('coop')
-            await fetchPlans()
-            refreshAuditSummary()
-        } catch (e: unknown) {
-            toast.error(e instanceof Error ? e.message : 'Could not create plan')
-        } finally {
-            setSavingPlan(false)
         }
     }
 
@@ -617,31 +502,22 @@ export default function EmergencyPlanPage() {
                 ref={fileRef}
                 type="file"
                 className="hidden"
+                multiple
                 accept=".pdf,.docx,.csv,.xlsx"
                 onChange={onFileChosen}
             />
 
             <AdminPageHeader
                 title="COOP / BC Plans"
-                description="Continuity of Operations & Strategic Recovery — manage continuity frameworks, attach protocol files, and review AI integrity audits."
+                description="Continuity of Operations & Strategic Recovery — drop files in and the AI will classify, label, and file them into the right continuity bucket automatically."
                 actions={
-                    <>
-                        <Button
-                            type="button"
-                            onClick={() => setBulkOpen(true)}
-                            variant="outline"
-                            className="flex h-12 gap-2 rounded-xl border-slate-200 bg-white px-6 text-xs font-bold uppercase tracking-wider text-slate-700 shadow-sm transition-all hover:bg-slate-50 active:scale-95"
-                        >
-                            <Upload size={16} /> Bulk Plan
-                        </Button>
-                        <Button
-                            type="button"
-                            onClick={() => setNewPlanOpen(true)}
-                            className="flex h-12 gap-2 rounded-xl bg-[#33375D] px-6 text-xs font-bold uppercase tracking-wider text-white shadow-lg transition-all hover:bg-[#2B2F50] active:scale-95"
-                        >
-                            <Plus size={18} /> New Plan
-                        </Button>
-                    </>
+                    <Button
+                        type="button"
+                        onClick={() => setUploadOpen(true)}
+                        className="flex h-12 gap-2 rounded-xl bg-[#33375D] px-6 text-xs font-bold uppercase tracking-wider text-white shadow-lg transition-all hover:bg-[#2B2F50] active:scale-95"
+                    >
+                        <Plus size={18} /> Add Plans
+                    </Button>
                 }
             />
 
@@ -703,47 +579,6 @@ export default function EmergencyPlanPage() {
                         />
                     </div>
                     <div className="flex flex-wrap items-center gap-3 justify-end">
-                        <div className="flex flex-wrap gap-2 items-center px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl">
-                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest whitespace-nowrap">
-                                Attach to plan
-                            </span>
-                            <select
-                                value={uploadTargetPlanId}
-                                onChange={(e) => setUploadTargetPlanId(e.target.value)}
-                                className="h-9 min-w-[140px] rounded-lg bg-white border border-slate-200 px-3 text-xs font-semibold text-slate-700 focus:border-[#33375D] outline-none"
-                            >
-                                {planIdsSorted.length === 0 ? (
-                                    <option value="">No plans loaded</option>
-                                ) : (
-                                    planIdsSorted.map((pid) => (
-                                        <option key={pid} value={pid}>
-                                            {pid}
-                                        </option>
-                                    ))
-                                )}
-                            </select>
-                            <Button
-                                type="button"
-                                onClick={handlePickFile}
-                                variant="outline"
-                                className="h-9 px-4 rounded-lg border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50"
-                            >
-                                Browse
-                            </Button>
-                            {selectedUploadFile ? (
-                                <span className="text-[11px] font-medium text-slate-500 truncate max-w-[140px]" title={selectedUploadFile.name}>
-                                    {selectedUploadFile.name}
-                                </span>
-                            ) : null}
-                            <Button
-                                type="button"
-                                disabled={uploading || !planIdsSorted.length}
-                                onClick={submitUpload}
-                                className="h-9 px-4 rounded-lg bg-[#33375D] text-xs font-bold text-white hover:bg-[#2B2F50]"
-                            >
-                                {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Upload'}
-                            </Button>
-                        </div>
                         <div className="hidden lg:flex h-11 px-4 bg-emerald-50 border border-emerald-100 rounded-xl items-center gap-2">
                             <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                             <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-widest whitespace-nowrap">
@@ -780,7 +615,7 @@ export default function EmergencyPlanPage() {
                                     <td colSpan={5} className="px-6 py-16 text-center text-sm font-medium text-slate-500">
                                         No continuity protocols indexed for this lens.
                                         {planIdsSorted.length === 0
-                                            ? ' Create a plan framework or ingest files above.'
+                                            ? ' Click “Add Plans” to upload files — the AI will create plans for them.'
                                             : ''}
                                     </td>
                                 </tr>
@@ -989,238 +824,179 @@ export default function EmergencyPlanPage() {
                 </div>
             </Card>
 
-            <Dialog open={bulkOpen} onOpenChange={setBulkOpen}>
-                <DialogContent className="border-slate-200 bg-white text-slate-900 sm:max-w-3xl">
+            <Dialog
+                open={uploadOpen}
+                onOpenChange={(o) => {
+                    if (uploading) return
+                    setUploadOpen(o)
+                }}
+            >
+                <DialogContent className="border-slate-200 bg-white text-slate-900 sm:max-w-xl">
                     <DialogHeader>
-                        <DialogTitle className="tracking-tight font-black text-lg text-slate-900">Bulk continuity plan</DialogTitle>
+                        <DialogTitle className="tracking-tight font-black text-lg text-slate-900">Add continuity plans</DialogTitle>
                         <DialogDescription className="text-slate-500 text-xs">
-                            Add as many continuity plans as you need in one shot. Each row creates (or updates) a plan with its
-                            Plan ID, label, category, and overview. Existing attachments and steps are preserved.
+                            Drop one or more PDF / DOCX / CSV / XLSX files. The AI reads each file, classifies it into a
+                            continuity bucket, and either creates a new plan or attaches the file to an existing one.
                         </DialogDescription>
                     </DialogHeader>
 
-                    <div className="flex items-center justify-between gap-2 pb-2">
-                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
-                            {bulkRows.length} plan{bulkRows.length === 1 ? '' : 's'}
-                        </span>
-                        <Button
+                    <div className="py-2 space-y-4">
+                        <button
                             type="button"
-                            size="sm"
-                            variant="outline"
-                            onClick={() => setBulkRows([emptyBulkRow()])}
-                            className="h-7 border-slate-200 bg-white text-[10px] uppercase tracking-widest text-slate-700 hover:bg-slate-50"
+                            onClick={handlePickFile}
+                            disabled={uploading}
+                            className="group w-full flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/60 px-6 py-8 text-slate-500 transition hover:border-[#33375D]/40 hover:bg-slate-50 disabled:opacity-60"
                         >
-                            Reset
-                        </Button>
-                    </div>
+                            <span className="w-11 h-11 rounded-xl bg-white border border-slate-200 inline-flex items-center justify-center text-[#33375D] shadow-sm group-hover:shadow-md transition">
+                                <Upload size={18} />
+                            </span>
+                            <span className="text-sm font-black uppercase tracking-widest text-slate-700">
+                                {selectedUploadFiles.length ? 'Add more files' : 'Browse files'}
+                            </span>
+                            <span className="text-[11px] font-medium text-slate-500">
+                                PDF · DOCX · CSV · XLSX — multiple files supported
+                            </span>
+                        </button>
 
-                    <div className="max-h-[55vh] overflow-y-auto space-y-3 pr-1">
-                        {bulkRows.map((row, idx) => (
-                            <div
-                                key={idx}
-                                className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 space-y-3"
-                            >
-                                <div className="flex items-center justify-between gap-2">
+                        {selectedUploadFiles.length ? (
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between">
                                     <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
-                                        Plan #{idx + 1}
+                                        Queued · {selectedUploadFiles.length} file{selectedUploadFiles.length === 1 ? '' : 's'}
                                     </span>
                                     <Button
                                         type="button"
-                                        size="icon"
-                                        variant="ghost"
-                                        onClick={() => removeBulkRow(idx)}
-                                        title="Remove row"
-                                        className="h-8 w-8 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg"
+                                        size="sm"
+                                        variant="outline"
+                                        disabled={uploading}
+                                        onClick={() => setSelectedUploadFiles([])}
+                                        className="h-7 border-slate-200 bg-white text-[10px] uppercase tracking-widest text-slate-700 hover:bg-slate-50"
                                     >
-                                        <Trash2 size={14} />
+                                        Clear
                                     </Button>
                                 </div>
-
-                                <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
-                                    <div className="sm:col-span-5 space-y-1">
-                                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Plan ID slug</label>
-                                        <Input
-                                            value={row.planId}
-                                            onChange={(e) => updateBulkRow(idx, { planId: e.target.value })}
-                                            placeholder="e.g. pandemic-coop-plan"
-                                            className="rounded-lg border-slate-200 bg-white font-mono text-xs"
-                                        />
-                                    </div>
-                                    <div className="sm:col-span-7 space-y-1">
-                                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Display label</label>
-                                        <Input
-                                            value={row.label}
-                                            onChange={(e) => updateBulkRow(idx, { label: e.target.value })}
-                                            placeholder="Human-readable continuity title"
-                                            className="rounded-lg border-slate-200 bg-white text-xs"
-                                        />
-                                    </div>
-                                    <div className="sm:col-span-5 space-y-1">
-                                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Category</label>
-                                        <select
-                                            value={row.category}
-                                            onChange={(e) => updateBulkRow(idx, { category: e.target.value as PlanCategory })}
-                                            className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 outline-none focus:border-[#33375D]"
+                                <div className="max-h-[220px] overflow-y-auto rounded-lg border border-slate-200 divide-y divide-slate-100 bg-white">
+                                    {selectedUploadFiles.map((f, i) => (
+                                        <div
+                                            key={`${f.name}-${i}`}
+                                            className="flex items-center gap-3 px-3 py-2"
                                         >
-                                            {SELECTABLE_CATEGORIES.map((c) => (
-                                                <option key={c.key} value={c.key}>
-                                                    {c.name}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    <div className="sm:col-span-7 space-y-1">
-                                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Overview</label>
-                                        <Textarea
-                                            value={row.overview}
-                                            onChange={(e) => updateBulkRow(idx, { overview: e.target.value })}
-                                            rows={2}
-                                            placeholder="Short purpose statement for this plan"
-                                            className="rounded-lg border-slate-200 bg-white text-xs resize-none"
-                                        />
-                                    </div>
+                                            <span className="w-8 h-8 rounded-md bg-slate-50 border border-slate-100 inline-flex items-center justify-center text-slate-400 shrink-0">
+                                                <FileText size={14} />
+                                            </span>
+                                            <div className="min-w-0 flex-1">
+                                                <div className="text-xs font-semibold text-slate-800 truncate" title={f.name}>
+                                                    {f.name}
+                                                </div>
+                                                <div className="text-[10px] font-medium text-slate-400 uppercase tracking-widest">
+                                                    {fileMatrixLabel(f.name)} · {(f.size / 1024).toFixed(1)} KB
+                                                </div>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => removeQueuedFile(i)}
+                                                disabled={uploading}
+                                                aria-label={`Remove ${f.name}`}
+                                                className="h-7 w-7 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 inline-flex items-center justify-center shrink-0"
+                                            >
+                                                <Trash2 size={13} />
+                                            </button>
+                                        </div>
+                                    ))}
                                 </div>
                             </div>
-                        ))}
-
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={addBulkRow}
-                            className="w-full h-10 border-dashed border-slate-300 bg-white text-[10px] font-black uppercase tracking-widest text-slate-500 hover:bg-slate-50 hover:text-slate-900 gap-2"
-                        >
-                            <Plus size={14} /> Add another plan
-                        </Button>
+                        ) : null}
                     </div>
 
-                    <p className="text-[10px] text-slate-500 pt-2">
-                        Existing Plan IDs are <strong className="text-slate-700">updated</strong>; new ones are
-                        <strong className="text-slate-700"> created</strong>. Steps and attachments are not affected.
-                    </p>
-
-                    <DialogFooter className="gap-3">
+                    <DialogFooter className="gap-2 sm:gap-2">
                         <Button
                             variant="outline"
                             type="button"
+                            disabled={uploading}
                             className="border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-                            onClick={() => setBulkOpen(false)}
+                            onClick={() => setUploadOpen(false)}
                         >
                             Cancel
                         </Button>
                         <Button
                             type="button"
-                            disabled={bulkRunning}
-                            className="bg-[#33375D] text-white hover:bg-[#2B2F50]"
-                            onClick={submitBulkPlans}
+                            disabled={uploading || !selectedUploadFiles.length}
+                            onClick={submitUpload}
+                            className="bg-[#33375D] text-white hover:bg-[#2B2F50] disabled:opacity-60"
                         >
-                            {bulkRunning ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Create / update plans'}
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-
-            <Dialog open={newPlanOpen} onOpenChange={setNewPlanOpen}>
-                <DialogContent className="border-slate-200 bg-white text-slate-900 sm:max-w-lg">
-                    <DialogHeader>
-                        <DialogTitle className="tracking-tight font-black text-lg text-slate-900">Register continuity framework</DialogTitle>
-                        <DialogDescription className="text-slate-500 text-xs">
-                            Create a keyed plan vault you can attach files to. Use lowercase slug identifiers (hyphens encouraged).
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="grid gap-4 py-2">
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Plan ID slug</label>
-                            <Input
-                                value={newPlanId}
-                                onChange={(e) => setNewPlanId(e.target.value)}
-                                placeholder="e.g. regional-power-outage-plan"
-                                className="rounded-lg border-slate-200 bg-white font-mono text-xs"
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Display label</label>
-                            <Input
-                                value={newPlanLabel}
-                                onChange={(e) => setNewPlanLabel(e.target.value)}
-                                placeholder="Human-readable continuity title"
-                                className="rounded-lg border-slate-200 bg-white"
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Continuity bucket</label>
-                            <select
-                                value={newPlanCategory}
-                                onChange={(e) => setNewPlanCategory(e.target.value as PlanCategory)}
-                                className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 outline-none focus:border-[#33375D]"
-                            >
-                                {SELECTABLE_CATEGORIES.map((c) => (
-                                    <option key={c.key} value={c.key}>
-                                        {c.name}
-                                    </option>
-                                ))}
-                            </select>
-                            <p className="text-[10px] text-slate-500">Drives the dashboard counts (Response, COOP, BCP, Compliance).</p>
-                        </div>
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Overview</label>
-                            <Textarea
-                                value={newPlanOverview}
-                                onChange={(e) => setNewPlanOverview(e.target.value)}
-                                rows={4}
-                                className="rounded-lg border-slate-200 bg-white text-sm resize-none"
-                            />
-                        </div>
-                    </div>
-                    <DialogFooter className="gap-2 sm:gap-0">
-                        <Button
-                            variant="outline"
-                            type="button"
-                            className="border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-                            onClick={() => setNewPlanOpen(false)}
-                        >
-                            Cancel
-                        </Button>
-                        <Button
-                            type="button"
-                            disabled={savingPlan}
-                            className="bg-[#33375D] text-white hover:bg-[#2B2F50]"
-                            onClick={submitNewPlan}
-                        >
-                            {savingPlan ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Create vault'}
+                            {uploading ? (
+                                <>
+                                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                                    Filing…
+                                </>
+                            ) : (
+                                <>
+                                    <Upload size={14} className="mr-2" />
+                                    Upload {selectedUploadFiles.length > 1 ? `(${selectedUploadFiles.length})` : selectedUploadFiles.length === 1 ? '(1)' : ''}
+                                </>
+                            )}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
 
             <Dialog open={editOpen} onOpenChange={setEditOpen}>
-                <DialogContent className="border-slate-200 bg-white text-slate-900 sm:max-w-lg">
+                <DialogContent className="border-slate-200 bg-white text-slate-900 sm:max-w-2xl">
                     <DialogHeader>
-                        <DialogTitle className="tracking-tight font-black text-lg text-slate-900">Protocol steps — {editPlanLabel}</DialogTitle>
+                        <DialogTitle className="tracking-tight font-black text-lg text-slate-900">Edit plan — {editPlanLabel}</DialogTitle>
                         <DialogDescription className="text-slate-500 text-xs">
-                            One actionable step per line. These checkpoints appear for operators referencing this continuity plan bucket (
-                            <span className="font-mono text-slate-700">{editPlanId}</span>).
+                            Fix any field the AI got wrong, refine the bucket, and add operator steps. Plan ID
+                            (<span className="font-mono text-slate-700">{editPlanId}</span>) stays fixed because attachments are pinned to it.
                         </DialogDescription>
                     </DialogHeader>
-                    <div className="space-y-2 pb-2">
-                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Continuity bucket</label>
-                        <select
-                            value={editPlanCategory === 'response' ? 'coop' : editPlanCategory}
-                            onChange={(e) => setEditPlanCategory(e.target.value as PlanCategory)}
-                            className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 outline-none focus:border-[#33375D]"
-                        >
-                            {SELECTABLE_CATEGORIES.map((c) => (
-                                <option key={c.key} value={c.key}>
-                                    {c.name}
-                                </option>
-                            ))}
-                        </select>
+                    <div className="grid gap-4 py-1 max-h-[60vh] overflow-y-auto pr-1">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Display label</label>
+                                <Input
+                                    value={editPlanLabel}
+                                    onChange={(e) => setEditPlanLabel(e.target.value)}
+                                    placeholder="Human-readable continuity title"
+                                    className="rounded-lg border-slate-200 bg-white text-sm"
+                                />
+                            </div>
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Continuity bucket</label>
+                                <select
+                                    value={editPlanCategory === 'response' ? 'coop' : editPlanCategory}
+                                    onChange={(e) => setEditPlanCategory(e.target.value as PlanCategory)}
+                                    className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 outline-none focus:border-[#33375D]"
+                                >
+                                    {SELECTABLE_CATEGORIES.map((c) => (
+                                        <option key={c.key} value={c.key}>
+                                            {c.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Overview</label>
+                            <Textarea
+                                value={editPlanOverview}
+                                onChange={(e) => setEditPlanOverview(e.target.value)}
+                                rows={3}
+                                placeholder="Short purpose statement for this plan"
+                                className="rounded-lg border-slate-200 bg-white text-sm resize-none"
+                            />
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Protocol steps</label>
+                            <Textarea
+                                value={editStepsText}
+                                onChange={(e) => setEditStepsText(e.target.value)}
+                                rows={10}
+                                placeholder="One actionable step per line"
+                                className="rounded-lg border-slate-200 bg-white text-sm resize-none font-medium"
+                            />
+                            <p className="text-[10px] text-slate-500">One actionable step per line. Appears for operators referencing this plan.</p>
+                        </div>
                     </div>
-                    <Textarea
-                        value={editStepsText}
-                        onChange={(e) => setEditStepsText(e.target.value)}
-                        rows={14}
-                        className="rounded-lg border-slate-200 bg-white text-sm resize-none font-medium"
-                    />
                     <DialogFooter>
                         <Button
                             variant="outline"
@@ -1231,7 +1007,7 @@ export default function EmergencyPlanPage() {
                             Close
                         </Button>
                         <Button type="button" disabled={savingSteps} className="bg-[#33375D] text-white hover:bg-[#2B2F50]" onClick={saveSteps}>
-                            {savingSteps ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save steps'}
+                            {savingSteps ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save changes'}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
