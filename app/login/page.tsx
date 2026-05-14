@@ -7,9 +7,11 @@ import { Eye, EyeOff, Mail, Lock, Shield, Key } from 'lucide-react'
 import Link from 'next/link'
 import Image from 'next/image'
 import logo from '../../public/logo.png'
+import { useUser } from '@/lib/store/user-store'
 
 export default function LoginPage() {
   const router = useRouter()
+  const { refresh: refreshUserProfile } = useUser()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -38,12 +40,27 @@ export default function LoginPage() {
         localStorage.setItem('isSafe', String(data.user.isSafe ?? true))
         localStorage.setItem('userLocation', data.user.location || '')
         localStorage.setItem('userCity', data.user.city || '')
+        localStorage.setItem('userState', data.user.state || '')
         localStorage.setItem('userCountry', data.user.country || '')
+        if (data.user.responderVertical) {
+          localStorage.setItem('responderVertical', data.user.responderVertical)
+        } else {
+          localStorage.removeItem('responderVertical')
+        }
+        if (data.user.responderFunction) {
+          localStorage.setItem('responderFunction', data.user.responderFunction)
+        } else {
+          localStorage.removeItem('responderFunction')
+        }
+
+        await refreshUserProfile()
 
         if (data.user.role === 'super-admin') {
           router.push('/super-admin-dashboard')
         } else if (data.user.role === 'admin' || data.user.role === 'sub-admin') {
           router.push('/admin-dashboard')
+        } else if (data.user.role === 'responder') {
+          router.push('/responder-dashboard')
         } else if (data.user.role === 'eoc-manager' || data.user.role === 'eoc-observer') {
           router.push('/virtual-eoc')
         } else {

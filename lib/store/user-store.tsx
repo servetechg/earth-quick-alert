@@ -8,7 +8,7 @@ import React, {
     useRef,
     useState,
 } from 'react'
-import { USER_PROFILE_UPDATED_EVENT } from '@/lib/sync-client-user-profile'
+import { AUTH_SESSION_CHANGED_EVENT, USER_PROFILE_UPDATED_EVENT } from '@/lib/sync-client-user-profile'
 
 /**
  * Source of truth for the currently signed-in user on the client.
@@ -19,7 +19,8 @@ import { USER_PROFILE_UPDATED_EVENT } from '@/lib/sync-client-user-profile'
  *   updated their profile on laptop A, laptop B kept showing stale data even
  *   after a hard reload. This provider treats the server (`GET /api/user/profile`)
  *   as the source of truth and re-fetches on mount + tab focus + after profile
- *   mutations dispatched via `USER_PROFILE_UPDATED_EVENT`.
+ *   mutations dispatched via `USER_PROFILE_UPDATED_EVENT` or `AUTH_SESSION_CHANGED_EVENT`
+ *   (login / logout).
  */
 
 export interface CurrentUser {
@@ -31,7 +32,9 @@ export interface CurrentUser {
     profilePicPublicId?: string
     location?: string
     city?: string
+    state?: string
     country?: string
+    responderVertical?: string
 }
 
 interface UserStore {
@@ -55,6 +58,9 @@ function mirrorToLocalStorage(user: CurrentUser | null) {
         localStorage.removeItem('userEmail')
         localStorage.removeItem('userProfilePic')
         localStorage.removeItem('userLocation')
+        localStorage.removeItem('userCity')
+        localStorage.removeItem('userState')
+        localStorage.removeItem('userCountry')
         return
     }
     localStorage.setItem('userName', user.name ?? '')
@@ -62,6 +68,9 @@ function mirrorToLocalStorage(user: CurrentUser | null) {
     localStorage.setItem('userProfilePic', user.profilePic ?? '')
     if (user.location != null) localStorage.setItem('userLocation', user.location)
     if (user.role) localStorage.setItem('userRole', user.role)
+    if (user.city != null) localStorage.setItem('userCity', user.city)
+    if (user.state != null) localStorage.setItem('userState', user.state)
+    if (user.country != null) localStorage.setItem('userCountry', user.country)
 }
 
 export function UserProvider({ children }: { children: React.ReactNode }) {
@@ -148,14 +157,17 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         }
     }, [refresh])
 
-    // Settings pages already dispatch USER_PROFILE_UPDATED_EVENT after a save —
-    // listen for it so the provider re-syncs without each page knowing about us.
+    // Profile saves, login, and logout — re-sync from `/api/user/profile`.
     useEffect(() => {
         const handler = () => {
             void refresh()
         }
         window.addEventListener(USER_PROFILE_UPDATED_EVENT, handler)
-        return () => window.removeEventListener(USER_PROFILE_UPDATED_EVENT, handler)
+        window.addEventListener(AUTH_SESSION_CHANGED_EVENT, handler)
+        return () => {
+            window.removeEventListener(USER_PROFILE_UPDATED_EVENT, handler)
+            window.removeEventListener(AUTH_SESSION_CHANGED_EVENT, handler)
+        }
     }, [refresh])
 
     const value: UserStore = { me, loading, error, refresh, clear }

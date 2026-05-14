@@ -1,8 +1,8 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { Cpu } from 'lucide-react'
 import { SetupWizard } from '@/components/setup-wizard'
+import { AdminPageLoader } from '@/components/admin-page-loader'
 import { AdminPageShell } from '@/components/admin-page-shell'
 import { GISMap } from '@/components/gis-map'
 import {
@@ -17,16 +17,46 @@ import {
   PowerOutageSummaryCard,
   ResourceDeploymentCard,
 } from '@/components/admin-dashboard'
+import { useUser } from '@/lib/store/user-store'
 
 export default function Dashboard() {
+  const { me } = useUser()
   const [checkingSetup, setCheckingSetup] = useState(true)
   const [requiresSetup, setRequiresSetup] = useState(false)
   const [isOrphan, setIsOrphan] = useState(false)
   const [licenseData, setLicenseData] = useState({ id: '', orgName: '' })
+  const [gisSelectedLocation, setGisSelectedLocation] = useState<string>('All')
+  const [gisFocusState, setGisFocusState] = useState<string | undefined>(undefined)
 
   useEffect(() => {
     checkSetupStatus()
   }, [])
+
+  useEffect(() => {
+    const role = (
+      me?.role ||
+      (typeof window !== 'undefined' ? localStorage.getItem('userRole') : null) ||
+      ''
+    )
+      .toString()
+      .toLowerCase()
+
+    if (role !== 'sub-admin') {
+      setGisSelectedLocation('All')
+      setGisFocusState(undefined)
+      return
+    }
+
+    const name = (me?.name || (typeof window !== 'undefined' ? localStorage.getItem('userName') : null) || '')
+      .toString()
+      .trim()
+    const st = (me?.state || (typeof window !== 'undefined' ? localStorage.getItem('userState') : null) || '')
+      .toString()
+      .trim()
+
+    setGisSelectedLocation(name || 'All')
+    setGisFocusState(st || undefined)
+  }, [me?.role, me?.name, me?.state])
 
   const checkSetupStatus = async () => {
     try {
@@ -49,16 +79,7 @@ export default function Dashboard() {
   }
 
   if (checkingSetup) {
-    return (
-      <div className="flex-1 flex items-center justify-center bg-slate-50 min-h-screen">
-        <div className="flex flex-col items-center gap-4">
-          <Cpu className="w-12 h-12 text-[#33375D] animate-spin" />
-          <div className="text-[#33375D] font-black text-xs uppercase tracking-[0.5em] animate-pulse">
-            Initializing Command Terminal...
-          </div>
-        </div>
-      </div>
-    )
+    return <AdminPageLoader />
   }
 
   if (requiresSetup && !isOrphan) {
@@ -87,7 +108,13 @@ export default function Dashboard() {
           </div>
 
           {/* Live Situational Map — same Google Map as super-admin, with Map Layers overlay */}
-          <GISMap title="Live Situational Map" hideTabs showLayersPanel />
+          <GISMap
+            title="Live Situational Map"
+            hideTabs
+            showLayersPanel
+            selectedLocation={gisSelectedLocation}
+            focusState={gisFocusState}
+          />
         </div>
 
         {/* Right column — fixed compact width on xl+ screens */}

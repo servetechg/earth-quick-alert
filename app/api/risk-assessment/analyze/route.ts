@@ -1,9 +1,12 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
+import dbConnect from '@/lib/mongodb';
 import { runDashboardIngest } from '@/lib/services/risk-ingest-service';
 import { openaiService } from '@/lib/services/openai-service';
 import { countReady2GoReachableUsers } from '@/lib/services/ready2go-reachable-users';
 import { recordActivity, ACTIVITY_ACTIONS } from '@/lib/activity-log';
+import { fetchAlignedAlertCommunicationFeed } from '@/lib/services/alert-communication-aligned-feed';
+import { applyRiskReportToAlignedAlertFeed } from '@/lib/services/risk-report-alert-alignment';
 
 /** Roles allowed to run Dashboard A fusion (aligned with admin operational tooling). */
 const ALLOWED_ROLES = new Set([
@@ -19,6 +22,7 @@ const ALLOWED_ROLES = new Set([
 
 export async function POST(req: Request) {
     try {
+        await dbConnect();
         const session = await getSession();
         const role = session?.user?.role as string | undefined;
         if (!session?.user?.email || !role || !ALLOWED_ROLES.has(role)) {
@@ -71,6 +75,12 @@ export async function POST(req: Request) {
             ready2go_users_reachable: reachable,
         };
 
+        const alignedAlerts = await fetchAlignedAlertCommunicationFeed({
+            userId: session.user.id as string | undefined,
+            role,
+        });
+        report = applyRiskReportToAlignedAlertFeed(report, alignedAlerts);
+
         if (body.recordActivity === true) {
             void recordActivity({
                 userId: session.user.id,
@@ -97,6 +107,8 @@ export async function POST(req: Request) {
                 populationsAtRiskAcsEstimate: bundle.riskExposure?.populationAffectedEstimate ?? null,
                 reachableReady2GoUsers: reachable,
                 riskExposureVintage: bundle.riskExposure?.censusVintageLabel ?? null,
+                /** Same live rows as Alerts & Communication after refresh + role filter (KPIs are aligned to this). */
+                aligned_alert_count: alignedAlerts.length,
                 sources: bundle.sources.map((s) => ({
                     source: s.source,
                     ok: s.ok,

@@ -3,6 +3,7 @@ import connectDB from '@/lib/mongodb';
 import User from '@/models/User';
 import { getSession } from '@/lib/auth';
 import { getSubAdminUserFilter } from '@/lib/admin-filters';
+import { isResponderVertical } from '@/lib/responder-verticals';
 
 export async function GET(req: NextRequest) {
     try {
@@ -15,6 +16,36 @@ export async function GET(req: NextRequest) {
 
         if (!session || (session.user.role !== 'super-admin' && session.user.role !== 'sub-admin' && session.user.role !== 'admin')) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        /** GIS / org map: sub-admins may list peer sub-admins on the same license (not full directory). */
+        if (session.user.role === 'sub-admin' && roleFilter === 'sub-admin') {
+            const me = await User.findById(session.user.id).select('licenseId role').lean();
+            if (!me || me.role !== 'sub-admin') {
+                return NextResponse.json({ users: [], currentUser: null, userStats: await buildUserStats() });
+            }
+            const leaderQuery: Record<string, unknown> = { role: 'sub-admin' };
+            if (me.licenseId) {
+                leaderQuery.licenseId = me.licenseId;
+            } else {
+                leaderQuery._id = session.user.id;
+            }
+            const users = await User.find(leaderQuery).sort({ createdAt: -1 });
+            const userStats = {
+                totalUsers: await User.countDocuments({}),
+                pendingSubAdmins: await User.countDocuments({ role: 'sub-admin', accountStatus: 'pending' }),
+                approvedSubAdmins: await User.countDocuments({ role: 'sub-admin', accountStatus: 'approved' }),
+                superAdmins: await User.countDocuments({ role: 'super-admin' }),
+            };
+            let currentUser: any = null;
+            const user = await User.findById(session.user.id);
+            if (user) {
+                currentUser = {
+                    hasLicense: !!user.licenseId,
+                    requestedLicense: !!user.requestedLicense,
+                };
+            }
+            return NextResponse.json({ users, currentUser, userStats });
         }
 
         let baseQuery: any = {};
@@ -93,7 +124,7 @@ export async function PATCH(req: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const { userId, accountStatus, role, requestedLicense } = await req.json();
+        const { userId, accountStatus, role, requestedLicense, responderVertical } = await req.json();
 
         if (!userId) {
             return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
@@ -119,6 +150,21 @@ export async function PATCH(req: NextRequest) {
                 return NextResponse.json({ error: 'Unauthorized role promotion' }, { status: 403 });
             }
             updateData.role = role;
+            if (role !== 'responder') {
+                updateData.responderVertical = '';
+            } else if (responderVertical === undefined) {
+                updateData.responderVertical =
+                    targetUser.responderVertical || 'general-responder';
+            }
+        }
+        if (responderVertical !== undefined && session.user.role !== 'sub-admin') {
+            const raw = responderVertical === null || responderVertical === '' ? '' : String(responderVertical).trim();
+            if (raw && !isResponderVertical(raw)) {
+                return NextResponse.json({ error: 'Invalid responder vertical' }, { status: 400 });
+            }
+            if (targetUser.role === 'responder' || updateData.role === 'responder') {
+                updateData.responderVertical = raw || 'general-responder';
+            }
         }
 
         const updatedUser = await User.findByIdAndUpdate(
@@ -170,12 +216,26 @@ export async function POST(req: NextRequest) {
         const results = [];
 
         for (const userData of usersToCreate) {
-            const { name, email, password, role, responderFunction } = userData;
+            const { name, email, password, role, responderFunction, responderVertical } = userData;
 
             if (!name || !email || !password || !role) {
                 if (!isBulk) return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
                 results.push({ email, error: 'Missing required fields', success: false });
                 continue;
+            }
+
+            let verticalField = '';
+            if (role === 'responder') {
+                const raw =
+                    responderVertical !== undefined && responderVertical !== null
+                        ? String(responderVertical).trim()
+                        : '';
+                if (raw && !isResponderVertical(raw)) {
+                    if (!isBulk) return NextResponse.json({ error: 'Invalid responder vertical' }, { status: 400 });
+                    results.push({ email, error: 'Invalid responder vertical', success: false });
+                    continue;
+                }
+                verticalField = raw || 'general-responder';
             }
 
             const userExists = await User.findOne({ email });
@@ -194,6 +254,7 @@ export async function POST(req: NextRequest) {
                 password: hashedPassword,
                 role,
                 responderFunction: responderFunction || '',
+                responderVertical: verticalField,
                 licenseId: creator.licenseId || null,
                 city: creator.city || '',
                 country: creator.country || '',

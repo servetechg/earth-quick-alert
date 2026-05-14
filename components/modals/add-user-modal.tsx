@@ -33,6 +33,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { MapPin } from "lucide-react"
+import { RESPONDER_VERTICALS, RESPONDER_VERTICAL_LABELS } from '@/lib/responder-verticals'
 
 interface AddUserModalProps {
   isOpen: boolean;
@@ -48,7 +49,8 @@ export function AddUserModal({ isOpen, onClose, onSuccess }: AddUserModalProps) 
     email: '',
     password: '',
     role: 'eoc-observer',
-    responderFunction: ''
+    responderFunction: '',
+    responderVertical: 'hospital',
   })
 
   const fileInputRef = React.useRef<HTMLInputElement>(null)
@@ -78,6 +80,7 @@ export function AddUserModal({ isOpen, onClose, onSuccess }: AddUserModalProps) 
             if (header === 'role') obj.role = values[index] || 'eoc-observer'
             if (header === 'password') obj.password = values[index]
             if (header === 'function' || header === 'responderfunction') obj.responderFunction = values[index]
+            if (header === 'respondervertical' || header === 'vertical') obj.responderVertical = values[index]
           })
           return obj
         }).filter(row => row.name && row.email && row.password)
@@ -114,7 +117,7 @@ export function AddUserModal({ isOpen, onClose, onSuccess }: AddUserModalProps) 
         toast.success(data.message || `User(s) successfully created`)
         onSuccess()
         onClose()
-        setFormData({ name: '', email: '', password: '', role: 'eoc-observer', responderFunction: '' })
+        setFormData({ name: '', email: '', password: '', role: 'eoc-observer', responderFunction: '', responderVertical: 'hospital' })
         setBulkData(null)
       } else {
         toast.error(data.error || 'Failed to create user(s)')
@@ -237,11 +240,23 @@ export function AddUserModal({ isOpen, onClose, onSuccess }: AddUserModalProps) 
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Role</Label>
-                      <Select value={formData.role} onValueChange={(val) => setFormData({ ...formData, role: val })}>
+                      <Select
+                        value={formData.role}
+                        onValueChange={(val) =>
+                          setFormData({
+                            ...formData,
+                            role: val,
+                            responderVertical:
+                              val === 'responder'
+                                ? formData.responderVertical || 'hospital'
+                                : formData.responderVertical,
+                          })
+                        }
+                      >
                         <SelectTrigger className="h-14 border-slate-200 focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10 rounded-2xl font-bold text-slate-700 shadow-sm">
                           <SelectValue placeholder="Select role" />
                         </SelectTrigger>
-                        <SelectContent className="rounded-2xl border-slate-100 shadow-2xl">
+                        <SelectContent className="rounded-2xl border-slate-100 shadow-2xl max-h-[280px] overflow-y-auto">
                           <SelectItem value="eoc-manager" className="rounded-xl focus:bg-blue-50 py-3">
                             <div className="flex items-center gap-2">
                               <Shield size={16} className="text-indigo-600" />
@@ -251,7 +266,13 @@ export function AddUserModal({ isOpen, onClose, onSuccess }: AddUserModalProps) 
                           <SelectItem value="eoc-observer" className="rounded-xl focus:bg-blue-50 py-3">
                             <div className="flex items-center gap-2">
                               <Eye size={16} className="text-indigo-600" />
-                              <span className="font-bold text-xs uppercase tracking-tight">Responder</span>
+                              <span className="font-bold text-xs uppercase tracking-tight">Virtual EOC — Responder</span>
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="responder" className="rounded-xl focus:bg-blue-50 py-3">
+                            <div className="flex items-center gap-2">
+                              <Shield size={16} className="text-amber-600" />
+                              <span className="font-bold text-xs uppercase tracking-tight">Responder sub-admin (portal)</span>
                             </div>
                           </SelectItem>
                         </SelectContent>
@@ -273,6 +294,29 @@ export function AddUserModal({ isOpen, onClose, onSuccess }: AddUserModalProps) 
                       </div>
                     </div>
                   </div>
+
+                  {formData.role === 'responder' && (
+                    <div className="space-y-2">
+                      <Label className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] ml-1">
+                        Responder dashboard (vertical)
+                      </Label>
+                      <Select
+                        value={formData.responderVertical}
+                        onValueChange={(val) => setFormData({ ...formData, responderVertical: val })}
+                      >
+                        <SelectTrigger className="h-14 border-slate-200 focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10 rounded-2xl font-bold text-slate-700 shadow-sm">
+                          <SelectValue placeholder="Select vertical" />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-2xl border-slate-100 shadow-2xl max-h-[280px] overflow-y-auto">
+                          {RESPONDER_VERTICALS.map((v) => (
+                            <SelectItem key={v} value={v} className="rounded-xl py-3">
+                              <span className="font-bold text-xs">{RESPONDER_VERTICAL_LABELS[v]}</span>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                 </div>
               </>
             )}

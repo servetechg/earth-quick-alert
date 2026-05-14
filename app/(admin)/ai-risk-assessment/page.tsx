@@ -2,11 +2,14 @@
 
 import { useEffect, useMemo, useState, Fragment, type ElementType, type ReactNode } from "react";
 import { AdminPageShell } from "@/components/admin-page-shell";
+import { AdminPageLoader } from "@/components/admin-page-loader";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
+import { useUser } from "@/lib/store/user-store";
+import { normalizeStateToUsps } from "@/lib/utils/us-state-usps";
 import {
   Sparkles,
   CloudLightning,
@@ -435,6 +438,7 @@ function HistoricalAnalysisSection({ data }: { data?: HistoricalAnalysis }) {
 }
 
 export default function RiskAssessment() {
+  const { me } = useUser();
   const [report, setReport] = useState<RiskReport | null>(null);
   const [loading, setLoading] = useState(false);
   const [bootstrapping, setBootstrapping] = useState(true);
@@ -442,7 +446,30 @@ export default function RiskAssessment() {
     successfulSources: number;
     sources: { source: string; ok: boolean; error?: string }[];
     reachableReady2GoUsers?: number;
+    ingestScope?: string;
+    stateCd?: string;
   } | null>(null);
+
+  const riskAnalyzeContext = useMemo(() => {
+    const role = (
+      me?.role ||
+      (typeof window !== "undefined" ? localStorage.getItem("userRole") : null) ||
+      ""
+    )
+      .toString()
+      .toLowerCase();
+    const stateRaw = (
+      me?.state ||
+      (typeof window !== "undefined" ? localStorage.getItem("userState") : null) ||
+      ""
+    )
+      .toString()
+      .trim();
+    const usps = role === "sub-admin" ? normalizeStateToUsps(stateRaw) : null;
+    const stateCd =
+      usps && /^[A-Z]{2}$/i.test(usps) ? usps.toLowerCase() : null;
+    return { role, stateRaw, stateCd };
+  }, [me?.role, me?.state]);
 
   useEffect(() => {
     // Simulate loading initial data
@@ -456,11 +483,18 @@ export default function RiskAssessment() {
     setLoading(true);
     setIngestMeta(null);
     try {
+      const body: Record<string, unknown> = {
+        recordActivity: riskAnalyzeContext.role === "super-admin",
+      };
+      if (riskAnalyzeContext.role === "sub-admin" && riskAnalyzeContext.stateCd) {
+        body.nationwide = false;
+        body.stateCd = riskAnalyzeContext.stateCd;
+      }
+
       const res = await fetch("/api/risk-assessment/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        /** Default nationwide ingest — pass `{ nationwide: false, stateCd: "ca", nwpsGaugeId, usgsSite }` for single-state AOI. */
-        body: JSON.stringify({ recordActivity: true }),
+        body: JSON.stringify(body),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -475,6 +509,8 @@ export default function RiskAssessment() {
           successfulSources: data.ingest.successfulSources,
           sources: data.ingest.sources ?? [],
           reachableReady2GoUsers: data.ingest.reachableReady2GoUsers,
+          ingestScope: data.ingest.ingestScope,
+          stateCd: data.ingest.stateCd,
         });
         const srcList = data.ingest.sources ?? [];
         const totalFeeds = srcList.length || 8;
@@ -731,14 +767,7 @@ export default function RiskAssessment() {
       {/* Empty / loading states */}
       {loading && !report && (
         <Card className="rounded-2xl bg-white p-10 text-center shadow-xl shadow-slate-200/50">
-          <Loader2 className="mx-auto h-8 w-8 animate-spin text-[#33375D]" />
-          <p className="mt-4 text-sm font-bold text-slate-800">
-            AI is analyzing multi-source data...
-          </p>
-          <p className="mt-1 text-xs text-slate-500">
-            Aggregating USGS gauges, NOAA advisories, NASA FIRMS hot spots and InciWeb
-            incidents.
-          </p>
+          <AdminPageLoader layout="inline" containerClassName="!py-0" />
         </Card>
       )}
 
@@ -822,7 +851,7 @@ export default function RiskAssessment() {
                   Incident Distribution
                 </h3>
                 <p className="text-xs text-slate-500">
-                  Deduped event counts by hazard family (from this ingest — same keys as Alerts & Communication where sources overlap)
+                  Same live rows as Alerts & Communication for your role, grouped by hazard family (counts sum to Active Incidents).
                 </p>
               </div>
               <Badge variant="outline" className="text-[10px] font-bold uppercase bg-slate-50 text-slate-600 border-slate-200">
@@ -953,8 +982,8 @@ export default function RiskAssessment() {
 
           <p className="text-center text-[11px] text-slate-400">
             Last assessment generated {new Date(report.generated_at).toLocaleString()} · {report.sources_count}{" "}
-            ingest sources succeeded · {report.alerts_count} deduped incident
-            {report.alerts_count === 1 ? "" : "s"} in chart categories
+            ingest sources succeeded · {report.alerts_count} incident
+            {report.alerts_count === 1 ? "" : "s"} aligned with your Alerts & Communication list
           </p>
         </div>
       )}

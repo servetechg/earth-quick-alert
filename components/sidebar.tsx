@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useLayoutEffect } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -30,6 +30,8 @@ import Image from 'next/image'
 import logo from '../public/logo.png'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { ResponderSidebar } from '@/components/responder-sidebar'
+import { notifyAuthSessionChanged } from '@/lib/sync-client-user-profile'
 
 export const menuItems = [
   { icon: LayoutDashboard, label: 'Dashboard', href: '/admin-dashboard' },
@@ -54,14 +56,45 @@ export function Sidebar() {
   const pathname = usePathname()
   const [showHelpModal, setShowHelpModal] = useState(false)
   const [userRole, setUserRole] = useState<string | null>(null)
+  const [roleReady, setRoleReady] = useState(false)
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     setUserRole(localStorage.getItem('userRole'))
+    setRoleReady(true)
   }, [])
+
+  const isResponderRole = userRole === 'responder'
+  const isOperationalAdmin =
+    userRole === 'admin' ||
+    userRole === 'sub-admin' ||
+    userRole === 'observer' ||
+    userRole === 'manager'
+
+  if (!roleReady) {
+    return (
+      <div
+        className="hidden md:flex min-h-0 w-70 shrink-0 flex-col bg-[#33375D] text-white h-full border-r border-slate-700/50"
+        aria-hidden
+      >
+        <div className="p-8 flex flex-col items-center shrink-0 animate-pulse">
+          <div className="h-14 w-32 rounded-lg bg-white/10 mb-4" />
+          <div className="h-3 w-24 rounded bg-white/10" />
+        </div>
+        <div className="flex-1 p-4 space-y-2">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="h-12 rounded-xl bg-white/5" />
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  if (isResponderRole) {
+    return <ResponderSidebar />
+  }
 
   const isSuperAdminRole = userRole === 'super-admin'
   const isEOCRole = userRole === 'eoc-manager' || userRole === 'eoc-observer'
-  const isOperationalAdmin = userRole === 'admin' || userRole === 'sub-admin' || userRole === 'observer' || userRole === 'responder' || userRole === 'manager'
 
   const eocMenuItems = [
     { icon: LayoutDashboard, label: 'Dashboard', href: '/virtual-eoc' },
@@ -74,34 +107,38 @@ export function Sidebar() {
 
   const adminMenuItems = isSuperAdminRole
     ? [
-      { icon: LayoutDashboard, label: 'Dashboard', href: '/super-admin-dashboard' },
-      { icon: Bell, label: 'Alerts & Communication', href: '/alerts-communication' },
-      { icon: FileText, label: 'Preparedness Information', href: '/preparedness-information' },
-      { icon: Building2, label: 'Licenses', href: '/admin/licenses' },
-      { icon: Shield, label: 'Sub-Admins', href: '/admin/sub-admins' },
-      { icon: Users, label: 'Responder and Leader Approval', href: '/admin/users' },
-      { icon: Sparkles, label: 'AI Risk Assessment', href: '/ai-risk-assessment' },
-    ]
+        { icon: LayoutDashboard, label: 'Dashboard', href: '/super-admin-dashboard' },
+        { icon: Bell, label: 'Alerts & Communication', href: '/alerts-communication' },
+        { icon: FileText, label: 'Preparedness Information', href: '/preparedness-information' },
+        { icon: Building2, label: 'Licenses', href: '/admin/licenses' },
+        { icon: Shield, label: 'Sub-Admins', href: '/admin/sub-admins' },
+        { icon: Users, label: 'Responder and Leader Approval', href: '/admin/users' },
+        { icon: Sparkles, label: 'AI Risk Assessment', href: '/ai-risk-assessment' },
+      ]
     : isEOCRole
       ? eocMenuItems
       : userRole === 'sub-admin'
-        ? [...menuItems]
+        ? [
+            menuItems[0],
+            menuItems[1],
+            { icon: Sparkles, label: 'AI Risk Assessment', href: '/ai-risk-assessment' },
+            ...menuItems.slice(2),
+          ]
         : isOperationalAdmin
           ? [
-            ...menuItems,
-            { icon: Users, label: 'Responder and Leader Approval', href: '/admin/users' },
-          ]
+              ...menuItems,
+              { icon: Users, label: 'Responder and Leader Approval', href: '/admin/users' },
+            ]
           : [...menuItems]
 
   const filteredBottomItems = isSuperAdminRole
     ? [
-      { icon: Settings, label: 'Settings', href: '/settings' },
-      { icon: LogOut, label: 'Log out', href: '#' },
-    ]
+        { icon: Settings, label: 'Settings', href: '/settings' },
+        { icon: LogOut, label: 'Log out', href: '#' },
+      ]
     : userRole === 'sub-admin'
       ? [
           { icon: Settings, label: 'Settings', href: '/sub-admin-settings' },
-          { icon: HelpCircle, label: 'Help', href: '#' },
           { icon: LogOut, label: 'Log out', href: '#' },
         ]
       : bottomItems
@@ -184,8 +221,11 @@ export function Sidebar() {
                       console.error('Logout failed:', error)
                     }
                     localStorage.removeItem('userRole')
+                    localStorage.removeItem('responderVertical')
+                    localStorage.removeItem('responderFunction')
                     localStorage.removeItem('userEmail')
                     localStorage.removeItem('userName')
+                    notifyAuthSessionChanged()
                     router.push('/login')
                   }}
                   className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-colors text-slate-300 hover:bg-white/10 hover:text-white"

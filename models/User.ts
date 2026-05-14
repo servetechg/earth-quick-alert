@@ -1,4 +1,5 @@
 import mongoose, { Schema, model, models } from 'mongoose';
+import { RESPONDER_VERTICALS } from '@/lib/responder-verticals';
 
 const UserSchema = new Schema({
     name: {
@@ -142,6 +143,12 @@ const UserSchema = new Schema({
     },
     responderFunction: {
         type: String,
+        default: '',
+    },
+    /** Operational dashboard vertical when role is `responder`. */
+    responderVertical: {
+        type: String,
+        enum: [...RESPONDER_VERTICALS, ''],
         default: '',
     },
     lat: {

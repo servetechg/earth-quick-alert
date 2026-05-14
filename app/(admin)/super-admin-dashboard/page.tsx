@@ -58,13 +58,24 @@ export default function SuperAdminDashboard() {
         }
       }
 
+      const fetchSubAdminUsers = async () => {
+        try {
+          const res = await fetch('/api/admin/users?role=sub-admin')
+          if (!res.ok) return
+          const data = await res.json()
+          setSubAdminUsers(Array.isArray(data?.users) ? data.users : [])
+        } catch (e) {
+          console.error('Failed to fetch sub-admin users:', e)
+        }
+      }
+
       await Promise.all([
         fetchMetric('/api/active-emergencies', setActiveEmergencies),
         fetchMetric('/api/alerts-sent-emergencies', setAlertsSent),
         fetchMetric('/api/ready2go-users-impacted', setImpactedUsers),
         fetchMetric('/api/virtual-eoc-status', setEocStatus),
         fetchMetric('/api/responders', setResponders),
-        fetchMetric('/api/admin/users?role=sub-admin', (data) => setSubAdminUsers(data.users || []))
+        fetchSubAdminUsers(),
       ])
 
       setLoading(false)
@@ -73,32 +84,66 @@ export default function SuperAdminDashboard() {
     fetchData()
   }, [])
 
-  const allSubAdmins = Array.from(new Set([
-    ...activeEmergencies.map((e: any) => e.subAdminName),
-    ...alertsSent.map((e: any) => e.subAdminName),
-    ...impactedUsers.map((e: any) => e.subAdminName),
-    ...eocStatus.map((e: any) => e.subAdminName)
-  ].filter(Boolean))).sort()
+  const allSubAdmins = Array.from(
+    new Set(
+      [
+        ...subAdminUsers.map((u: any) => (u.name || u.email || '').trim()).filter(Boolean),
+        ...activeEmergencies.map((e: any) => e.subAdminName),
+        ...alertsSent.map((e: any) => e.subAdminName),
+        ...impactedUsers.map((e: any) => e.subAdminName),
+        ...eocStatus.map((e: any) => e.subAdminName),
+      ].filter(Boolean)
+    )
+  ).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
+
+  const subAdminKeysForFilter =
+    selectedLocation === 'All'
+      ? null
+      : (() => {
+          const u = subAdminUsers.find(
+            (x: any) =>
+              (typeof x.name === 'string' && x.name === selectedLocation) ||
+              (typeof x.email === 'string' && x.email === selectedLocation)
+          )
+          if (u) {
+            return [u.name, u.email].filter((k): k is string => Boolean(k && String(k).trim()))
+          }
+          return [selectedLocation]
+        })()
+
+  const rowMatchesSelectedSubAdmin = (e: { subAdminName?: string }) => {
+    if (selectedLocation === 'All') return true
+    const name = e?.subAdminName
+    if (!name) return false
+    return subAdminKeysForFilter!.includes(name)
+  }
 
   const filteredActive = selectedLocation === 'All'
     ? activeEmergencies
-    : activeEmergencies.filter((e: any) => e.subAdminName === selectedLocation)
+    : activeEmergencies.filter((e: any) => rowMatchesSelectedSubAdmin(e))
 
   const filteredAlerts = selectedLocation === 'All'
     ? alertsSent
-    : alertsSent.filter((e: any) => e.subAdminName === selectedLocation)
+    : alertsSent.filter((e: any) => rowMatchesSelectedSubAdmin(e))
 
   const filteredImpacted = selectedLocation === 'All'
     ? impactedUsers
-    : impactedUsers.filter((e: any) => e.subAdminName === selectedLocation)
+    : impactedUsers.filter((e: any) => rowMatchesSelectedSubAdmin(e))
 
   const filteredEOC = selectedLocation === 'All'
     ? eocStatus
-    : eocStatus.filter((e: any) => e.subAdminName === selectedLocation)
+    : eocStatus.filter((e: any) => rowMatchesSelectedSubAdmin(e))
 
-  const selectedAdminCoords = selectedLocation !== 'All'
-    ? subAdminUsers.find(u => u.name === selectedLocation)
-    : undefined
+  const selectedSubAdmin =
+    selectedLocation !== 'All'
+      ? subAdminUsers.find(
+          (u: any) =>
+            (typeof u.name === 'string' && u.name === selectedLocation) ||
+            (typeof u.email === 'string' && u.email === selectedLocation)
+        )
+      : undefined
+
+  const selectedAdminCoords = selectedSubAdmin
 
   return (
     <AdminPageShell className="selection:bg-[#33375D]/15">
@@ -201,7 +246,11 @@ export default function SuperAdminDashboard() {
             </div>
             <div className="pt-4 border-t border-slate-50">
               <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest leading-relaxed">
-                {selectedLocation === 'All' ? 'All areas' : `Managed by ${selectedLocation}`}
+                {selectedLocation === 'All'
+                  ? 'All areas'
+                  : selectedSubAdmin?.state
+                    ? `${String(selectedSubAdmin.state).trim()} · Managed by ${selectedLocation}`
+                    : `Managed by ${selectedLocation}`}
               </p>
             </div>
           </Card>
@@ -243,7 +292,17 @@ export default function SuperAdminDashboard() {
         {/* Main Content Area */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 pb-10">
           <div className="lg:col-span-2 space-y-8">
-            <GISMap key={selectedLocation} selectedLocation={selectedLocation} />
+            <GISMap
+              key={selectedLocation}
+              selectedLocation={
+                selectedLocation === 'All' ? 'All' : selectedSubAdmin?.name || selectedLocation
+              }
+              focusState={
+                selectedLocation === 'All' || !selectedSubAdmin?.state
+                  ? undefined
+                  : String(selectedSubAdmin.state).trim() || undefined
+              }
+            />
           </div>
 
           <div className="space-y-8">
@@ -268,7 +327,13 @@ export default function SuperAdminDashboard() {
               key={selectedLocation}
               lat={selectedAdminCoords?.lat}
               lon={selectedAdminCoords?.lng}
-              locationName={selectedLocation !== 'All' ? selectedLocation : 'USA'}
+              locationName={
+                selectedLocation === 'All'
+                  ? 'USA'
+                  : selectedSubAdmin?.state
+                    ? String(selectedSubAdmin.state).trim()
+                    : selectedLocation
+              }
             />
           </div>
         </div>

@@ -37,7 +37,9 @@ function jsonUser(doc: InstanceType<typeof User>) {
     role: doc.role,
     location: doc.location ?? '',
     city: doc.city ?? '',
+    state: doc.state ?? '',
     country: doc.country ?? '',
+    responderVertical: doc.responderVertical ?? '',
   };
 }
 
@@ -51,7 +53,7 @@ export async function GET() {
     if (!auth.ok) return auth.response;
 
     const user = await User.findById(auth.userId).select(
-      'name email phoneNumber profilePic profilePicPublicId role location city country'
+      'name email phoneNumber profilePic profilePicPublicId role location city state country'
     );
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
@@ -185,7 +187,7 @@ export async function PUT(req: Request) {
       new: true,
       runValidators: true,
     }).select(
-      'name email phoneNumber profilePic profilePicPublicId role location city country'
+      'name email phoneNumber profilePic profilePicPublicId role location city state country'
     );
 
     if (!updatedUser) {
@@ -283,7 +285,7 @@ export async function POST(req: Request) {
       new: true,
       runValidators: true,
     }).select(
-      'name email phoneNumber profilePic profilePicPublicId role location city country'
+      'name email phoneNumber profilePic profilePicPublicId role location city state country'
     );
 
     if (!updatedUser) {
