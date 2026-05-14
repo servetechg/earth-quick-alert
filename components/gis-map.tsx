@@ -58,6 +58,8 @@ const DEFAULT_MAP_LAYERS: MapLayerDef[] = [
 
 interface GISMapProps {
   selectedLocation?: string
+  /** When set, map can center on this US state even if `selectedLocation` is `All` (e.g. sub-admin home state). */
+  focusState?: string
   /** Override the panel header title. Defaults to `GIS Impact Map`. */
   title?: string
   /** Hide the Citizens / Responders / Leaders / Infrastructure tabs. */
@@ -68,6 +70,7 @@ interface GISMapProps {
 
 export function GISMap({
   selectedLocation = 'All',
+  focusState,
   title = 'GIS Impact Map',
   hideTabs = false,
   showLayersPanel = false,
@@ -156,7 +159,8 @@ export function GISMap({
         // Process Leaders
         const adminMarkersArray = Array.isArray(subAdminsData.users) ? subAdminsData.users : []
         const adminMarkers = await Promise.all((adminMarkersArray || []).map(async (user: any) => {
-          const pos = await geocodeAddress(user.city || user.country || 'USA')
+          const geoQuery = [user.city, user.state, user.country || 'USA'].filter(Boolean).join(', ') || 'USA'
+          const pos = await geocodeAddress(geoQuery)
           return {
             id: user._id || Math.random().toString(),
             position: pos,
@@ -164,6 +168,8 @@ export function GISMap({
             type: 'admin',
             status: 'Online',
             location: user.city || user.country,
+            city: user.city,
+            state: user.state,
             description: `Sub-Admin: ${user.city || ''} ${user.country || ''}`
           }
         }))
@@ -178,52 +184,93 @@ export function GISMap({
     fetchData()
   }, [])
 
-  // Auto-zoom and center when selection changes
+  // Auto-zoom and center when selection changes (USA vs sub-admin state / metro)
   useEffect(() => {
-    if (selectedLocation === 'All') {
-      setMapCenter({ lat: 37.0902, lng: -95.7129 });
-      setMapZoom(4);
-    } else {
-      // 1. Find the admin's coordinates (for fallback)
-      const rawAdmin = subAdmins.find(u => u.name === selectedLocation);
-      const adminPos = rawAdmin && rawAdmin.lat && rawAdmin.lng 
-        ? { lat: Number(rawAdmin.lat), lng: Number(rawAdmin.lng) }
-        : null;
+    let cancelled = false
 
-      // 2. Filter impacted users for this admin
-      const filteredUsers = impactedUsers.filter(u => u.subAdminName === selectedLocation);
+    async function applyCenter() {
+      if (selectedLocation === 'All') {
+        const stAll = (focusState || '').trim()
+        if (stAll) {
+          const geo = await geocodeAddress(`${stAll}, USA`)
+          if (
+            !cancelled &&
+            geo &&
+            Number.isFinite(geo.lat) &&
+            Number.isFinite(geo.lng) &&
+            !(geo.lat === 37.0902 && geo.lng === -95.7129)
+          ) {
+            setMapCenter(geo)
+            setMapZoom(6)
+            return
+          }
+        }
+        setMapCenter({ lat: 37.0902, lng: -95.7129 })
+        setMapZoom(4)
+        return
+      }
+
+      const rawAdmin = subAdmins.find((u) => u.title === selectedLocation)
+      const adminPos =
+        rawAdmin?.position &&
+        Number.isFinite(rawAdmin.position.lat) &&
+        Number.isFinite(rawAdmin.position.lng)
+          ? rawAdmin.position
+          : null
+
+      const filteredUsers = impactedUsers.filter((u) => u.subAdminName === selectedLocation)
 
       if (filteredUsers.length > 0) {
-        // 3. Calculate center of users
-        const lats = filteredUsers.map(u => u.position.lat);
-        const lngs = filteredUsers.map(u => u.position.lng);
-        const avgLat = lats.reduce((a, b) => a + b, 0) / lats.length;
-        const avgLng = lngs.reduce((a, b) => a + b, 0) / lngs.length;
+        const lats = filteredUsers.map((u) => u.position.lat)
+        const lngs = filteredUsers.map((u) => u.position.lng)
+        const avgLat = lats.reduce((a, b) => a + b, 0) / lats.length
+        const avgLng = lngs.reduce((a, b) => a + b, 0) / lngs.length
 
-        // 4. Calculate appropriate zoom level based on spread
-        const latSpan = Math.max(...lats) - Math.min(...lats);
-        const lngSpan = Math.max(...lngs) - Math.min(...lngs);
-        const maxSpan = Math.max(latSpan, lngSpan);
+        const latSpan = Math.max(...lats) - Math.min(...lats)
+        const lngSpan = Math.max(...lngs) - Math.min(...lngs)
+        const maxSpan = Math.max(latSpan, lngSpan)
 
-        // Heuristic: Zoom levels roughly correlate to span
-        // Zoom 12 is city level (~0.1 deg span)
-        // Zoom 6 is state level (~5.0 deg span)
-        let dynamicZoom = 12;
-        if (maxSpan > 5) dynamicZoom = 5;
-        else if (maxSpan > 2) dynamicZoom = 6;
-        else if (maxSpan > 1) dynamicZoom = 7;
-        else if (maxSpan > 0.5) dynamicZoom = 9;
-        else if (maxSpan > 0.1) dynamicZoom = 11;
-        
-        setMapCenter({ lat: avgLat, lng: avgLng });
-        setMapZoom(dynamicZoom);
-      } else if (adminPos) {
-        // Fallback to admin city if no users found
-        setMapCenter(adminPos);
-        setMapZoom(12);
+        let dynamicZoom = 12
+        if (maxSpan > 5) dynamicZoom = 5
+        else if (maxSpan > 2) dynamicZoom = 6
+        else if (maxSpan > 1) dynamicZoom = 7
+        else if (maxSpan > 0.5) dynamicZoom = 9
+        else if (maxSpan > 0.1) dynamicZoom = 11
+
+        if (!cancelled) {
+          setMapCenter({ lat: avgLat, lng: avgLng })
+          setMapZoom(dynamicZoom)
+        }
+        return
+      }
+
+      const st = (focusState || '').trim()
+      if (st) {
+        const geo = await geocodeAddress(`${st}, USA`)
+        if (
+          !cancelled &&
+          geo &&
+          Number.isFinite(geo.lat) &&
+          Number.isFinite(geo.lng) &&
+          !(geo.lat === 37.0902 && geo.lng === -95.7129)
+        ) {
+          setMapCenter(geo)
+          setMapZoom(6)
+          return
+        }
+      }
+
+      if (adminPos && !cancelled) {
+        setMapCenter(adminPos)
+        setMapZoom(12)
       }
     }
-  }, [selectedLocation, subAdmins, impactedUsers]);
+
+    void applyCenter()
+    return () => {
+      cancelled = true
+    }
+  }, [selectedLocation, focusState, subAdmins, impactedUsers])
 
   // Fetch Infrastructure when the "Infrastructure" tab is activated
   useEffect(() => {

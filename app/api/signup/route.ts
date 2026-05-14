@@ -92,7 +92,10 @@ export async function POST(req: NextRequest) {
                 role: user.role,
                 accountStatus: user.accountStatus,
                 isSafe: user.isSafe ?? true,
-                location: user.location || ''
+                location: user.location || '',
+                city: user.city || '',
+                state: user.state || '',
+                country: user.country || '',
             },
             systemMode: systemStatus.emergencyMode
         });

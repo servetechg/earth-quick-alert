@@ -14,6 +14,7 @@ function clearSiteSessionStorage() {
       'userEmail',
       'userName',
       'userCity',
+      'userState',
       'userCountry',
       'systemMode',
       'isSafe',

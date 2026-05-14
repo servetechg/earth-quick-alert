@@ -1,5 +1,5 @@
 export const Roads = ({ style }: { style?: React.CSSProperties }) => (
-    <svg width="16" height="14" viewBox="0 0 16 14" fill="none"><path d="m.875 13.125 3.5-12.25m7 0 3.5 12.25m-7-9.625V1.75m0 6.125v-1.75m0 6.125V10.5" stroke="#34385e" strokeWidth="1.75" strokeLinecap="round" stroke-linejoin="round"/></svg>
+    <svg width="16" height="14" viewBox="0 0 16 14" fill="none"><path d="m.875 13.125 3.5-12.25m7 0 3.5 12.25m-7-9.625V1.75m0 6.125v-1.75m0 6.125V10.5" stroke="#34385e" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"/></svg>
 );
 
 export const Users = ({ style }: { style?: React.CSSProperties }) => (

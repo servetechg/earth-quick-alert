@@ -85,7 +85,12 @@ export function Sidebar() {
     : isEOCRole
       ? eocMenuItems
       : userRole === 'sub-admin'
-        ? [...menuItems]
+        ? [
+            menuItems[0],
+            menuItems[1],
+            { icon: Sparkles, label: 'AI Risk Assessment', href: '/ai-risk-assessment' },
+            ...menuItems.slice(2),
+          ]
         : isOperationalAdmin
           ? [
             ...menuItems,

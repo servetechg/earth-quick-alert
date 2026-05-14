@@ -31,6 +31,7 @@ export interface CurrentUser {
     profilePicPublicId?: string
     location?: string
     city?: string
+    state?: string
     country?: string
 }
 
@@ -55,6 +56,9 @@ function mirrorToLocalStorage(user: CurrentUser | null) {
         localStorage.removeItem('userEmail')
         localStorage.removeItem('userProfilePic')
         localStorage.removeItem('userLocation')
+        localStorage.removeItem('userCity')
+        localStorage.removeItem('userState')
+        localStorage.removeItem('userCountry')
         return
     }
     localStorage.setItem('userName', user.name ?? '')
@@ -62,6 +66,9 @@ function mirrorToLocalStorage(user: CurrentUser | null) {
     localStorage.setItem('userProfilePic', user.profilePic ?? '')
     if (user.location != null) localStorage.setItem('userLocation', user.location)
     if (user.role) localStorage.setItem('userRole', user.role)
+    if (user.city != null) localStorage.setItem('userCity', user.city)
+    if (user.state != null) localStorage.setItem('userState', user.state)
+    if (user.country != null) localStorage.setItem('userCountry', user.country)
 }
 
 export function UserProvider({ children }: { children: React.ReactNode }) {
