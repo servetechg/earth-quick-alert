@@ -155,6 +155,9 @@ export default function SignupPage() {
         localStorage.setItem('systemMode', data.systemMode || 'safe')
         localStorage.setItem('isSafe', String(data.user.isSafe ?? true))
         localStorage.setItem('userLocation', data.user.location || '')
+        localStorage.setItem('userCity', data.user.city || '')
+        localStorage.setItem('userState', data.user.state || '')
+        localStorage.setItem('userCountry', data.user.country || '')
 
         if (data.user.accountStatus === 'pending') {
           router.push('/pending-approval')

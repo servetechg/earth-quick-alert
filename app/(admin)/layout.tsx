@@ -49,6 +49,7 @@ export default function AdminLayout({
         localStorage.removeItem('userEmail')
         localStorage.removeItem('userName')
         localStorage.removeItem('userCity')
+        localStorage.removeItem('userState')
         localStorage.removeItem('userCountry')
         localStorage.removeItem('systemMode')
         localStorage.removeItem('isSafe')

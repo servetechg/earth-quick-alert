@@ -67,17 +67,15 @@ export function middleware(request: NextRequest) {
             return NextResponse.redirect(new URL('/admin-dashboard', request.url))
         }
 
-        // 2b. AI Risk Assessment — super-admin only (not in sub-admin / admin / other sidebars)
+        // 2b. AI Risk Assessment — super-admin, admin, sub-admin (EOC roles use Virtual EOC)
         if (pathname.startsWith('/ai-risk-assessment')) {
             if (isEOCRole) {
                 return NextResponse.redirect(new URL('/virtual-eoc', request.url))
             }
-            if (userRole !== 'super-admin') {
-                const dest =
-                    userRole === 'admin' || userRole === 'sub-admin' || userRole === 'observer' || userRole === 'responder' || userRole === 'manager'
-                        ? '/admin-dashboard'
-                        : '/user-dashboard'
-                return NextResponse.redirect(new URL(dest, request.url))
+            const allowedAiRisk =
+                userRole === 'super-admin' || userRole === 'admin' || userRole === 'sub-admin'
+            if (!allowedAiRisk) {
+                return NextResponse.redirect(new URL('/user-dashboard', request.url))
             }
         }
 

@@ -17,6 +17,36 @@ export async function GET(req: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
+        /** GIS / org map: sub-admins may list peer sub-admins on the same license (not full directory). */
+        if (session.user.role === 'sub-admin' && roleFilter === 'sub-admin') {
+            const me = await User.findById(session.user.id).select('licenseId role').lean();
+            if (!me || me.role !== 'sub-admin') {
+                return NextResponse.json({ users: [], currentUser: null, userStats: await buildUserStats() });
+            }
+            const leaderQuery: Record<string, unknown> = { role: 'sub-admin' };
+            if (me.licenseId) {
+                leaderQuery.licenseId = me.licenseId;
+            } else {
+                leaderQuery._id = session.user.id;
+            }
+            const users = await User.find(leaderQuery).sort({ createdAt: -1 });
+            const userStats = {
+                totalUsers: await User.countDocuments({}),
+                pendingSubAdmins: await User.countDocuments({ role: 'sub-admin', accountStatus: 'pending' }),
+                approvedSubAdmins: await User.countDocuments({ role: 'sub-admin', accountStatus: 'approved' }),
+                superAdmins: await User.countDocuments({ role: 'super-admin' }),
+            };
+            let currentUser: any = null;
+            const user = await User.findById(session.user.id);
+            if (user) {
+                currentUser = {
+                    hasLicense: !!user.licenseId,
+                    requestedLicense: !!user.requestedLicense,
+                };
+            }
+            return NextResponse.json({ users, currentUser, userStats });
+        }
+
         let baseQuery: any = {};
         if (session.user.role === 'sub-admin') {
             const filter = await getSubAdminUserFilter(session.user.id);

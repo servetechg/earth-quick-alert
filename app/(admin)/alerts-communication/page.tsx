@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { Card } from '@/components/ui/card'
 import { AdminPageHeader } from '@/components/admin-page-header'
 import { AdminPageShell } from '@/components/admin-page-shell'
@@ -51,6 +51,7 @@ import {
 } from 'lucide-react'
 import { Switch } from '@/components/ui/switch'
 import { cn } from '@/lib/utils'
+import { useUser } from '@/lib/store/user-store'
 import Image from 'next/image'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
@@ -128,6 +129,8 @@ const SOURCE_BADGE_STYLES: Record<string, { label: string; className: string }> 
   inciweb: { label: 'InciWeb', className: 'border-red-300 bg-red-50 text-red-700' },
   nwps: { label: 'NWPS', className: 'border-sky-300 bg-sky-50 text-sky-700' },
   fema: { label: 'FEMA', className: 'border-violet-300 bg-violet-50 text-violet-700' },
+  earthquake: { label: 'USGS EQ', className: 'border-rose-300 bg-rose-50 text-rose-800' },
+  wfigs: { label: 'WFIGS', className: 'border-orange-200 bg-orange-50 text-orange-900' },
   manual: { label: 'Manual', className: 'border-slate-300 bg-slate-50 text-slate-700' },
   seed: { label: 'Seed', className: 'border-zinc-300 bg-zinc-50 text-zinc-700' },
 }
@@ -173,7 +176,6 @@ export default function AlertsCommunicationPage() {
             ? item.locations
             : [item.locationSummary ?? item.location]
         }))
-        console.log(formattedAlerts, 'formattedAlerts')
         setAlerts(formattedAlerts)
 
         setSelectedAlertId(prev => prev ?? formattedAlerts[0]?.id ?? null)

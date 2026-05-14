@@ -55,6 +55,13 @@ export function ThreatMonitoring({ locationName }: ThreatMonitoringProps) {
                 typeof window !== 'undefined' ? (localStorage.getItem('userCity') || '').trim() : ''
             const countryFromStorage =
                 typeof window !== 'undefined' ? (localStorage.getItem('userCountry') || '').trim() : ''
+            const loc = label.trim()
+
+            // Super-admin dashboard passes selected sub-admin's US state here — show state, not country/city.
+            if (roleFromStorage === 'super-admin' && loc && loc !== 'USA' && loc !== 'Current Location') {
+                if (!cancelled) setAffectedAreaLabel(loc)
+                return
+            }
 
             // Use localStorage first (set at login) for immediate rendering.
             if (roleFromStorage === 'super-admin' && countryFromStorage) {

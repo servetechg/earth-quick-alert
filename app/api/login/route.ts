@@ -81,6 +81,7 @@ export async function POST(req: NextRequest) {
                 isSafe: user.isSafe ?? true,
                 location: user.location || '',
                 city: user.city || '',
+                state: user.state || '',
                 country: user.country || '',
             },
             systemMode: systemStatus.emergencyMode
