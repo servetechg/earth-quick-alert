@@ -8,7 +8,6 @@ import {
     CheckCircle,
     Shield,
     Users,
-    Loader2,
     ChevronDown,
     Layers,
     MapPin,
@@ -23,6 +22,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import dynamic from 'next/dynamic'
+import { AdminPageLoader } from '@/components/admin-page-loader'
 import { useMemo, useEffect, useState } from 'react'
 import {
     Popover,
@@ -32,14 +32,7 @@ import {
 
 const LeafletMap = dynamic(() => import('@/components/leaflet-map'), {
     ssr: false,
-    loading: () => (
-        <div className="w-full h-full bg-slate-50 flex items-center justify-center">
-            <div className="flex flex-col items-center gap-4">
-                <Loader2 className="w-10 h-10 animate-spin text-[#33375D]" />
-                <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em]">Initializing Global Positioning System...</p>
-            </div>
-        </div>
-    ),
+    loading: () => <AdminPageLoader layout="fill" />,
 })
 
 export default function VirtualEOCAICenterPage() {
@@ -90,12 +83,7 @@ export default function VirtualEOCAICenterPage() {
 
     if (isLoading) {
         return (
-            <div className="flex items-center justify-center h-[80vh] bg-slate-50">
-                <div className="flex flex-col items-center gap-4 text-slate-400">
-                    <Loader2 className="w-12 h-12 animate-spin text-[#33375D]" />
-                    <p className="font-black text-xs uppercase tracking-[0.2em] text-[#33375D]">Synchronizing Live EOC Data...</p>
-                </div>
-            </div>
+            <AdminPageLoader layout="page" containerClassName="min-h-0 h-[80vh]" />
         )
     }
 
