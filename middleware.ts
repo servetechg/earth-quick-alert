@@ -88,6 +88,7 @@ export function middleware(request: NextRequest) {
             '/responder-field-status',
             '/responder-lodging-status',
             '/responder-pharmacy-sites',
+            '/responder-transit-deployment',
             '/alerts-communication',
             '/virtual-eoc-settings',
             '/responder-guides',
@@ -107,6 +108,7 @@ export function middleware(request: NextRequest) {
             '/responder-field-status',
             '/responder-lodging-status',
             '/responder-pharmacy-sites',
+            '/responder-transit-deployment',
             '/responder-guides',
         ]
         const isResponderExclusivePage = responderExclusiveRoutes.some(

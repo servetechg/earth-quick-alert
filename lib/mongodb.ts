@@ -53,12 +53,7 @@ async function connectDB() {
             bufferCommands: false,
         };
 
-        console.log('Connecting to MongoDB...');
-        const obfuscatedUri = connectionString.replace(/:([^@]+)@/, ':****@');
-        console.log(`Using URI: ${obfuscatedUri}`);
-
         cached.promise = mongoose.connect(connectionString, opts).then((mongoose) => {
-            console.log('MongoDB connected successfully');
             return mongoose;
         }).catch((err) => {
             console.error('MongoDB connection error:', err);

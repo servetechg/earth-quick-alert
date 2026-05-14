@@ -79,7 +79,6 @@ export function SafetyProvider({ children }: { children: React.ReactNode }) {
             const address = await reverseGeocode(geoLoc.lat, geoLoc.lng)
 
             if (address) {
-                console.log(`Syncing location: ${address}`)
                 const response = await fetch('/api/user/update-location', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -186,9 +185,7 @@ export function SafetyProvider({ children }: { children: React.ReactNode }) {
     }
 
     const verifyFamilySafety = async () => {
-        console.log('--- Starting Individual Family Safety Verification ---')
         const updatedMembers = [...familyMembers]
-        let hasChanges = false
 
         for (let i = 0; i < updatedMembers.length; i++) {
             const member = updatedMembers[i]
@@ -219,8 +216,6 @@ export function SafetyProvider({ children }: { children: React.ReactNode }) {
                 else if (hasWeatherRisk) newReason = 'WEATHER ALERT'
 
                 if (member.status !== newStatus || member.statusReason !== newReason) {
-                    console.log(`Updating status for ${member.name} in ${member.location} to ${newStatus}`)
-
                     // Update in MongoDB
                     const response = await fetch('/api/user/safety', {
                         method: 'PUT',
@@ -231,7 +226,6 @@ export function SafetyProvider({ children }: { children: React.ReactNode }) {
                     if (response.ok) {
                         const data = await response.json()
                         setFamilyMembers(data.familyMembers)
-                        hasChanges = true
                     }
                 }
             } catch (err) {
@@ -239,9 +233,6 @@ export function SafetyProvider({ children }: { children: React.ReactNode }) {
             }
         }
 
-        if (!hasChanges) {
-            console.log('No safety status changes detected for family members.')
-        }
     }
 
     return (

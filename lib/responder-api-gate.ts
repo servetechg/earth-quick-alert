@@ -6,7 +6,9 @@ type ResponderGate =
     | { ok: true; session: any; vertical: string; kind: ReturnType<typeof getResponderDashboardKind> }
     | { ok: false; response: NextResponse };
 
-export async function gateResponder(allowedKind?: 'hospital' | 'police' | 'hotel'): Promise<ResponderGate> {
+export async function gateResponder(
+    allowedKind?: 'hospital' | 'police' | 'hotel' | 'pharmacy' | 'transit',
+): Promise<ResponderGate> {
     const session = await getSession();
     if (!session?.user?.id) {
         return { ok: false, response: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
