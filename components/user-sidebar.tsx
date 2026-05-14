@@ -20,6 +20,7 @@ import Image from 'next/image'
 import logo from '../public/logo.png'
 import Link from 'next/link'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { notifyAuthSessionChanged } from '@/lib/sync-client-user-profile'
 
 export const menuItems = [
   { icon: LayoutDashboard, label: 'Dashboard', href: '/user-dashboard' },
@@ -96,6 +97,7 @@ export function UserSidebar() {
             localStorage.removeItem('userEmail')
             localStorage.removeItem('userName')
             document.cookie = "userRole=; path=/; max-age=0"
+            notifyAuthSessionChanged()
             router.push('/login')
           }}
           className="w-full flex items-center gap-3 px-5 py-3 rounded-xl text-left text-slate-300 hover:bg-white/10 hover:text-white transition-all duration-200 group"

@@ -136,10 +136,10 @@ export function SetupWizard({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-xl p-4 overflow-y-auto">
-      <Card className="w-full max-w-4xl bg-slate-900 border-slate-700 shadow-2xl overflow-hidden mt-10 mb-10">
+      <Card className="w-full max-w-5xl bg-slate-900 border-slate-700 shadow-2xl overflow-hidden mt-10 mb-10">
         <div className="flex">
             {/* Sidebar Flow Indicators */}
-            <div className="w-64 bg-slate-800 p-6 hidden md:block border-r border-slate-700">
+            <div className="w-72 bg-slate-800 p-6 hidden md:block border-r border-slate-700">
                 <div className="mb-8">
                     <Building2 className="w-10 h-10 text-yellow-400 mb-2" />
                     <h2 className="text-xl font-bold text-white">EOC Onboarding</h2>

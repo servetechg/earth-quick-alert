@@ -1,8 +1,8 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { Cpu } from 'lucide-react'
 import { SetupWizard } from '@/components/setup-wizard'
+import { AdminPageLoader } from '@/components/admin-page-loader'
 import { AdminPageShell } from '@/components/admin-page-shell'
 import { GISMap } from '@/components/gis-map'
 import {
@@ -79,16 +79,7 @@ export default function Dashboard() {
   }
 
   if (checkingSetup) {
-    return (
-      <div className="flex-1 flex items-center justify-center bg-slate-50 min-h-screen">
-        <div className="flex flex-col items-center gap-4">
-          <Cpu className="w-12 h-12 text-[#33375D] animate-spin" />
-          <div className="text-[#33375D] font-black text-xs uppercase tracking-[0.5em] animate-pulse">
-            Initializing Command Terminal...
-          </div>
-        </div>
-      </div>
-    )
+    return <AdminPageLoader />
   }
 
   if (requiresSetup && !isOrphan) {

@@ -39,6 +39,7 @@ function jsonUser(doc: InstanceType<typeof User>) {
     city: doc.city ?? '',
     state: doc.state ?? '',
     country: doc.country ?? '',
+    responderVertical: doc.responderVertical ?? '',
   };
 }
 

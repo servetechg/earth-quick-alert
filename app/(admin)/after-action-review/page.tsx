@@ -7,7 +7,6 @@ import jsPDF from 'jspdf'
 import {
     Layers,
     Clock,
-    Loader2,
     FileText,
     CheckCircle,
     Activity,
@@ -24,6 +23,7 @@ import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { AdminPageShell } from '@/components/admin-page-shell'
 import { AdminPageHeader } from '@/components/admin-page-header'
+import { AdminPageLoader } from '@/components/admin-page-loader'
 
 // Dynamic Type for the Incident data
 type IncidentReviewDef = {
@@ -61,19 +61,7 @@ export default function AfterActionReviewPage() {
     }, [])
 
     if (isLoading) {
-        return (
-            <div className="min-h-screen flex items-center justify-center bg-slate-50">
-                <div className="flex flex-col items-center gap-4">
-                    <div className="relative">
-                        <Loader2 className="w-12 h-12 animate-spin text-[#33375D]" />
-                        <div className="absolute inset-0 flex items-center justify-center text-[10px] font-black text-[#33375D]">AI</div>
-                    </div>
-                    <p className="text-[#33375D] font-black text-xs uppercase tracking-[0.5em] animate-pulse">
-                        Synchronizing Mission Metadata...
-                    </p>
-                </div>
-            </div>
-        )
+        return <AdminPageLoader />
     }
 
     const displayData = incidentData || {

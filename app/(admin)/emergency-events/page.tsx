@@ -35,6 +35,7 @@ import { SituationReportModal } from '@/components/modals/situation-report-modal
 import { GISMap } from '@/components/gis-map'
 import { useEvents } from '@/lib/store/event-store'
 import { useAlerts } from '@/lib/store/alert-store'
+import { AdminPageLoader } from '@/components/admin-page-loader'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
@@ -63,15 +64,7 @@ export default function EmergencyEventsPage() {
 
     if (eventsLoading) {
         return (
-            <div className="flex items-center justify-center h-[calc(100vh-64px)] bg-slate-50">
-                <div className="flex flex-col items-center gap-6">
-                    <div className="relative">
-                        <Loader2 className="w-16 h-16 animate-spin text-[#33375D]" />
-                        <div className="absolute inset-0 flex items-center justify-center text-[10px] font-black text-blue-600">HQ</div>
-                    </div>
-                    <p className="font-black text-xs uppercase tracking-[0.4em] text-slate-400 animate-pulse">Synchronizing Tactical Matrix...</p>
-                </div>
-            </div>
+            <AdminPageLoader layout="page" containerClassName="h-[calc(100vh-64px)] min-h-0" />
         )
     }
 

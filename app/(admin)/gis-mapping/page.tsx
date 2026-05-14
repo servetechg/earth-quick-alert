@@ -17,7 +17,6 @@ import {
     Shield,
     AlertTriangle,
     Navigation,
-    Loader2,
     RotateCcw,
     Zap
 } from 'lucide-react'
@@ -25,6 +24,7 @@ import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { GISEOCActivatedModal } from '@/components/modals/gis-eoc-activated-modal'
 import { SendCommunityAlertModal } from '@/components/modals/send-community-alert-modal'
+import { AdminPageLoader } from '@/components/admin-page-loader'
 import { cn } from '@/lib/utils'
 import dynamic from 'next/dynamic'
 import {
@@ -35,14 +35,7 @@ import {
 
 const LeafletMap = dynamic(() => import('@/components/leaflet-map'), {
     ssr: false,
-    loading: () => (
-        <div className="w-full h-full bg-slate-50 flex items-center justify-center">
-            <div className="flex flex-col items-center gap-4">
-                <Loader2 className="w-10 h-10 animate-spin text-[#33375D]" />
-                <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em]">Synchronizing Surface Assets...</p>
-            </div>
-        </div>
-    ),
+    loading: () => <AdminPageLoader layout="fill" />,
 })
 
 export default function GISMappingPage() {
