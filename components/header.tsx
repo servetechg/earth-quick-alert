@@ -147,7 +147,7 @@ export function Header({
               <Link
                 href={editProfileHref}
                 onClick={() => setShowDropdown(false)}
-                className="flex items-center gap-3 px-4 py-3 mx-2 rounded-2xl text-sm font-black text-slate-600 hover:bg-slate-50 hover:text-blue-600 transition-all"
+                className="flex items-center gap-3 px-4 py-3 mx-2 rounded-2xl text-sm font-bold text-slate-600 hover:bg-slate-50 hover:text-blue-600 transition-all"
               >
                 <div className="w-8 h-8 rounded-xl bg-blue-50 flex items-center justify-center text-blue-500">
                   <User className="w-4 h-4" />
@@ -162,7 +162,7 @@ export function Header({
                   setShowDropdown(false)
                   onLogout?.()
                 }}
-                className="flex items-center gap-3 px-4 py-3 mx-2 rounded-2xl text-sm font-black text-red-600 hover:bg-red-50 transition-all w-[calc(100%-16px)] text-left"
+                className="flex items-center gap-3 px-4 py-3 mx-2 rounded-2xl text-sm font-bold text-red-600 hover:bg-red-50 transition-all w-[calc(100%-16px)] text-left"
               >
                 <div className="w-8 h-8 rounded-xl bg-red-50 flex items-center justify-center text-red-500">
                   <LogOut className="w-4 h-4" />

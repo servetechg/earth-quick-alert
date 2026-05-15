@@ -83,9 +83,8 @@ export function EventProvider({ children }: { children: React.ReactNode }) {
         }
     }, [fetchEvents])
 
-    const addTimelineItem = useCallback(async (eventId: string, item: Omit<EventTimelineItem, 'id' | 'timestamp'>) => {
-        // Implementation for timeline updates via API
-        console.log('Timeline updates to follow in next iteration')
+    const addTimelineItem = useCallback(async (_eventId: string, _item: Omit<EventTimelineItem, 'id' | 'timestamp'>) => {
+        // Timeline updates via API — not implemented yet
     }, [])
 
     const getActiveEvents = useCallback((): EmergencyEvent[] => {
