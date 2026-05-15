@@ -3,8 +3,6 @@ import {
     getHospitalCapacity,
     getPoliceDeployment,
     getHotelAvailability,
-    getPharmacyResourceDeployment,
-    getTransitResourceDeployment,
     recomputeHospitalSummary,
 } from './store';
 import type { GeneralResponderSummary } from './types';
@@ -17,10 +15,6 @@ export {
     setPoliceDeployment,
     getHotelAvailability,
     setHotelAvailability,
-    getPharmacyResourceDeployment,
-    setPharmacyResourceDeployment,
-    getTransitResourceDeployment,
-    setTransitResourceDeployment,
     recomputeHospitalSummary,
 } from './store';
 
@@ -40,7 +34,7 @@ export function getGeneralResponderSummary(
     return {
         title: `${org} — responder portal`,
         message:
-            'You are on the general responder dashboard. Ask your administrator to assign a specific vertical (hospital, police, hotel, pharmacy, transit) for tailored tools. Until then, use shared links below.',
+            'You are on the general responder dashboard. Ask your administrator to assign a specific vertical (hospital, police, hotel) for tailored tools. Until then, use shared links below.',
         checklist: [
             { id: 'c1', label: 'Verify alert notification settings', done: false },
             { id: 'c2', label: 'Confirm staging channel with EOC', done: false },
@@ -63,8 +57,6 @@ export function getResponderDashboardBundle(vertical: string, responderFunction:
         hospital: kind === 'hospital' ? getHospitalCapacity() : null,
         police: kind === 'police' ? getPoliceDeployment() : null,
         hotel: kind === 'hotel' ? getHotelAvailability() : null,
-        pharmacy: kind === 'pharmacy' ? getPharmacyResourceDeployment() : null,
-        transit: kind === 'transit' ? getTransitResourceDeployment() : null,
         general: kind === 'general' ? getGeneralResponderSummary(vertical, responderFunction, displayName) : null,
     };
 }

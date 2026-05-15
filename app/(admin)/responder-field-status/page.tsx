@@ -11,10 +11,10 @@ export default function ResponderFieldStatusPage() {
       <AdminPageHeader
         title="Field deployment"
         titleUppercase={false}
-        description="HQ view: incident teams committed, operation summaries, staging areas, and active beats. Same mock store as the responder dashboard; edit rows here for the full layout."
+        description="Staging, beats, and deployment counts for law enforcement and related staging roles. Mock data for demo."
       />
       <ResponderInfoBar>
-        Incident deployment rows are headquarters-maintained in demo; wire to CAD / RMS when available.
+        Deployment numbers are illustrative; replace with CAD / mutual-aid feeds in production.
       </ResponderInfoBar>
       <PoliceDeploymentSection />
     </AdminPageShell>

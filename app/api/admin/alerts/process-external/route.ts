@@ -24,6 +24,8 @@ export async function POST(req: NextRequest) {
         // 2. Send emails via SendGrid/SES for unactivated ones
         // 3. Save the alert to a 'pending_alerts' collection for those users
 
+        console.log(`Processing outreach for ${emails.length} recipients...`)
+        
         return NextResponse.json({ 
             success: true, 
             summary: {

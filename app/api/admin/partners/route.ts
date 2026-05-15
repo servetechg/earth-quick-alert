@@ -46,6 +46,7 @@ export async function GET() {
 
         // Auto-seed defaults on first boot
         if (partners.length === 0) {
+            console.log('Seeding default Partners into MongoDB...');
             await Partner.insertMany(SEED_PARTNERS);
             partners = await Partner.find().lean();
         }

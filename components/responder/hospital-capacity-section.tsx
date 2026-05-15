@@ -1,9 +1,8 @@
 'use client'
 
-import Link from 'next/link'
 import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
-import { Loader2, Save, BedDouble, Users, CircleCheck, Stethoscope, Trash2, Edit, Download } from 'lucide-react'
+import { Loader2, Save, BedDouble, Users, CircleCheck, Stethoscope, Trash2, Edit } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -142,25 +141,6 @@ export function HospitalCapacitySection({ compact }: Props) {
     if (ok) setDeleteIndex(null)
   }
 
-  const downloadUnitRow = (u: HospitalUnitRow) => {
-    if (!data) return
-    const payload = {
-      facilityName: data.facilityName,
-      facilityId: data.facilityId,
-      unit: u,
-      available: Math.max(0, u.capacity - u.occupied),
-      exportedAt: new Date().toISOString(),
-    }
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `hospital-bed-${u.id}.json`
-    a.click()
-    URL.revokeObjectURL(url)
-    toast.message('Download started', { description: `Saved as hospital-bed-${u.id}.json` })
-  }
-
   const editAvailable =
     editIndex !== null && data?.units[editIndex]
       ? Math.max(0, (Number(editCapacity) || 0) - (Number(editOccupied) || 0))
@@ -247,8 +227,7 @@ export function HospitalCapacitySection({ compact }: Props) {
         </Card>
       </div>
 
-      <Card className={RESPONDER_PANEL_CARD}>
-        <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between px-0">
           <div>
             <CardTitle>{data.facilityName}</CardTitle>
             <CardDescription>
@@ -263,7 +242,7 @@ export function HospitalCapacitySection({ compact }: Props) {
             </Button>
           )}
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4 px-0">
           {!compact && (
             <>
               <div className="grid gap-4 sm:grid-cols-2">
@@ -320,15 +299,6 @@ export function HospitalCapacitySection({ compact }: Props) {
                         <div className="flex justify-end gap-2">
                           <Button
                             type="button"
-                            title="Download / view row"
-                            size="icon"
-                            onClick={() => downloadUnitRow(u)}
-                            className="h-9 w-9 bg-[#33375D]/10 text-[#33375D] hover:bg-[#33375D] hover:text-white rounded-lg transition-colors"
-                          >
-                            <Download size={15} />
-                          </Button>
-                          <Button
-                            type="button"
                             title="Edit unit"
                             size="icon"
                             onClick={() => openEdit(i)}
@@ -356,7 +326,6 @@ export function HospitalCapacitySection({ compact }: Props) {
             </table>
           </div>
         </CardContent>
-      </Card>
 
       <Dialog open={editOpen} onOpenChange={(o) => !o && closeEdit()}>
         <DialogContent className="border-slate-200 bg-white text-slate-900 sm:max-w-lg">

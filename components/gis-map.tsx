@@ -302,6 +302,8 @@ export function GISMap({
           }
         }
 
+        console.log(`Searching infrastructure for ${searchCenters.length} locations...`);
+
         // 2. Fetch infrastructure for each type at each location
         await Promise.all(searchCenters.map(async (center) => {
           await Promise.all(types.map(async (type) => {

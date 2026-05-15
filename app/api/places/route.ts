@@ -23,6 +23,8 @@ export async function GET(req: Request) {
         // Construct Google Maps Nearby Search URL
         const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=${radius}&type=${type}&key=${GOOGLE_MAPS_API_KEY}`;
 
+        console.log(`Fetching from Google Places: ${type} at ${lat},${lng} (radius: ${radius})`);
+
         const response = await fetch(url);
         
         if (!response.ok) {
