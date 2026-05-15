@@ -9,9 +9,11 @@ import Image from 'next/image'
 import logo from '../../public/logo.png'
 import { useJsApiLoader, Autocomplete, GoogleMap, MarkerF } from '@react-google-maps/api'
 import { GOOGLE_MAPS_API_KEY, GOOGLE_MAPS_LIBRARIES, GOOGLE_MAPS_LOADER_ID } from '@/lib/constants/google-maps-config'
+import { useUser } from '@/lib/store/user-store'
 
 export default function SignupPage() {
   const router = useRouter()
+  const { refresh: refreshUserProfile } = useUser()
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -159,6 +161,8 @@ export default function SignupPage() {
         localStorage.setItem('userState', data.user.state || '')
         localStorage.setItem('userCountry', data.user.country || '')
 
+        await refreshUserProfile()
+
         if (data.user.accountStatus === 'pending') {
           router.push('/pending-approval')
         } else if (data.user.role === 'super-admin' || data.user.role === 'admin' || data.user.role === 'sub-admin') {
@@ -291,7 +295,7 @@ export default function SignupPage() {
                       : 'bg-slate-50 border-slate-200 text-slate-500 hover:border-[#33375D]/30'
                       }`}
                   >
-                    Agency Admin
+                    Authorized Admin
                   </button>
                 </div>
               </div>
