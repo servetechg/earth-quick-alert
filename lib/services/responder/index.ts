@@ -1,28 +1,24 @@
 import { getResponderDashboardKind, type ResponderDashboardKind } from '@/lib/responder-verticals';
-import {
-    getHospitalCapacity,
-    getPoliceDeployment,
-    getHotelAvailability,
-    getPharmacyResourceDeployment,
-    getTransitResourceDeployment,
-    recomputeHospitalSummary,
-} from './store';
+import { getHotelAvailability } from './store';
 import type { GeneralResponderSummary } from './types';
+import { getHospitalCapacityForUser } from './hospital-capacity-db';
+import { getPoliceDeploymentForUser } from './police-deployment-db';
+import { getPharmacyResourceDeploymentForUser } from './pharmacy-resource-db';
+import { getTransitResourceDeploymentForUser } from './transit-resource-db';
 
 export * from './types';
+export { recomputeHospitalSummary } from './hospital-summary';
+export { getHotelAvailability, setHotelAvailability } from './store';
+export { getHospitalCapacityForUser, mergeHospitalCapacityForUser, normalizeHospitalUnitsFromPartial } from './hospital-capacity-db';
+export { getPoliceDeploymentForUser, mergePoliceDeploymentForUser } from './police-deployment-db';
 export {
-    getHospitalCapacity,
-    setHospitalCapacity,
-    getPoliceDeployment,
-    setPoliceDeployment,
-    getHotelAvailability,
-    setHotelAvailability,
-    getPharmacyResourceDeployment,
-    setPharmacyResourceDeployment,
-    getTransitResourceDeployment,
-    setTransitResourceDeployment,
-    recomputeHospitalSummary,
-} from './store';
+    getPharmacyResourceDeploymentForUser,
+    mergePharmacyResourceDeploymentForUser,
+} from './pharmacy-resource-db';
+export {
+    getTransitResourceDeploymentForUser,
+    mergeTransitResourceDeploymentForUser,
+} from './transit-resource-db';
 
 export function dashboardKindForUser(vertical: string): ResponderDashboardKind {
     return getResponderDashboardKind(vertical || '');
@@ -54,17 +50,25 @@ export function getGeneralResponderSummary(
     };
 }
 
-export function getResponderDashboardBundle(vertical: string, responderFunction: string, displayName: string) {
+export async function getResponderDashboardBundle(
+    vertical: string,
+    responderFunction: string,
+    displayName: string,
+    userId: string,
+    licenseId?: string | null,
+) {
+    const fn = responderFunction || '';
+    const lic = licenseId ?? null;
     const kind = dashboardKindForUser(vertical);
     return {
         kind,
         vertical,
-        responderFunction: responderFunction || '',
-        hospital: kind === 'hospital' ? getHospitalCapacity() : null,
-        police: kind === 'police' ? getPoliceDeployment() : null,
+        responderFunction: fn,
+        hospital: kind === 'hospital' ? await getHospitalCapacityForUser(userId, lic) : null,
+        police: kind === 'police' ? await getPoliceDeploymentForUser(userId, lic, fn) : null,
         hotel: kind === 'hotel' ? getHotelAvailability() : null,
-        pharmacy: kind === 'pharmacy' ? getPharmacyResourceDeployment() : null,
-        transit: kind === 'transit' ? getTransitResourceDeployment() : null,
+        pharmacy: kind === 'pharmacy' ? await getPharmacyResourceDeploymentForUser(userId, lic, fn) : null,
+        transit: kind === 'transit' ? await getTransitResourceDeploymentForUser(userId, lic, fn) : null,
         general: kind === 'general' ? getGeneralResponderSummary(vertical, responderFunction, displayName) : null,
     };
 }

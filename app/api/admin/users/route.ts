@@ -65,8 +65,14 @@ export async function GET(req: NextRequest) {
         // 1. If explicit role filter is provided
         if (roleFilter && roleFilter !== 'all') {
             // Security: Sub-admins can't filter for roles they are not allowed to manage
-            if (session.user.role === 'sub-admin' && (roleFilter !== 'user' && !roleFilter.split(',').every(r => r === 'user'))) {
-                return NextResponse.json({ error: 'Unauthorized role access' }, { status: 403 });
+            if (session.user.role === 'sub-admin') {
+                const roles = roleFilter.includes(',')
+                    ? roleFilter.split(',').map((r) => r.trim())
+                    : [roleFilter.trim()];
+                const allowed = roles.every((r) => r === 'user' || r === 'responder');
+                if (!allowed) {
+                    return NextResponse.json({ error: 'Unauthorized role access' }, { status: 403 });
+                }
             }
 
             if (roleFilter.includes(',')) {

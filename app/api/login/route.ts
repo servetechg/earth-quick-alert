@@ -7,17 +7,6 @@ import { cookies } from 'next/headers';
 import SystemStatus from '@/models/SystemStatus';
 import { recordActivity, ACTIVITY_ACTIONS } from '@/lib/activity-log';
 
-import {
-    isDevDemoResponderAttempt,
-    upsertDevDemoResponder,
-    isDevDemoPoliceResponderAttempt,
-    upsertDevDemoPoliceResponder,
-    isDevDemoPharmacyResponderAttempt,
-    upsertDevDemoPharmacyResponder,
-    isDevDemoTransitResponderAttempt,
-    upsertDevDemoTransitResponder,
-} from '@/lib/dev-demo-responder';
-
 export async function POST(req: NextRequest) {
     try {
         await connectDB();
@@ -37,62 +26,6 @@ export async function POST(req: NextRequest) {
         }
 
         const normalizedEmail = String(email).toLowerCase().trim();
-
-        if (isDevDemoResponderAttempt(normalizedEmail, password)) {
-            try {
-                await upsertDevDemoResponder();
-            } catch (e) {
-                console.error('Dev demo responder upsert failed:', e);
-                return NextResponse.json(
-                    {
-                        error: 'Database unavailable — could not create demo responder. Check MONGODB_URI in .env and restart the dev server.',
-                    },
-                    { status: 503 },
-                );
-            }
-        }
-
-        if (isDevDemoPoliceResponderAttempt(normalizedEmail, password)) {
-            try {
-                await upsertDevDemoPoliceResponder();
-            } catch (e) {
-                console.error('Dev demo police responder upsert failed:', e);
-                return NextResponse.json(
-                    {
-                        error: 'Database unavailable — could not create demo police responder. Check MONGODB_URI in .env and restart the dev server.',
-                    },
-                    { status: 503 },
-                );
-            }
-        }
-
-        if (isDevDemoPharmacyResponderAttempt(normalizedEmail, password)) {
-            try {
-                await upsertDevDemoPharmacyResponder();
-            } catch (e) {
-                console.error('Dev demo pharmacy responder upsert failed:', e);
-                return NextResponse.json(
-                    {
-                        error: 'Database unavailable — could not create demo pharmacy responder. Check MONGODB_URI in .env and restart the dev server.',
-                    },
-                    { status: 503 },
-                );
-            }
-        }
-
-        if (isDevDemoTransitResponderAttempt(normalizedEmail, password)) {
-            try {
-                await upsertDevDemoTransitResponder();
-            } catch (e) {
-                console.error('Dev demo transit responder upsert failed:', e);
-                return NextResponse.json(
-                    {
-                        error: 'Database unavailable — could not create demo transit responder. Check MONGODB_URI in .env and restart the dev server.',
-                    },
-                    { status: 503 },
-                );
-            }
-        }
 
         // Find user and include password field
         const user = await User.findOne({ email: normalizedEmail }).select('+password');

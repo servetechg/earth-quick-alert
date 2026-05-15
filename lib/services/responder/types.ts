@@ -1,10 +1,14 @@
 export type DataSourceBadge = 'mock' | 'api';
 
+export type HospitalUnitType = 'icu' | 'medsurg';
+
 export interface HospitalUnitRow {
     id: string;
     name: string;
     capacity: number;
     occupied: number;
+    /** When set, ICU aggregates use this instead of name heuristics. */
+    unitType?: HospitalUnitType;
 }
 
 export interface HospitalCapacityPayload {

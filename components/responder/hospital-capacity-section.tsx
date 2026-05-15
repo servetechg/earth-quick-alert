@@ -85,7 +85,7 @@ export function HospitalCapacitySection({ compact }: Props) {
         throw new Error((err as { error?: string }).error || 'Save failed')
       }
       setData(await res.json())
-      toast.success('Bed grid updated (mock persistence)')
+      toast.success('Bed grid updated.')
       return true
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : 'Save failed'
@@ -432,7 +432,7 @@ export function HospitalCapacitySection({ compact }: Props) {
             <AlertDialogTitle className="font-black tracking-tight text-slate-900">Remove bed unit?</AlertDialogTitle>
             <AlertDialogDescription className="text-slate-500 text-sm leading-relaxed">
               This removes <strong className="text-slate-900">{deleteTarget?.name ?? 'this unit'}</strong> from the
-              bed grid. You can restore counts later only by re-adding data in the mock store (or contact an admin).
+              bed grid. You can update counts anytime from this screen.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

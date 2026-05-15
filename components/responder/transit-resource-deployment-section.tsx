@@ -125,7 +125,7 @@ export function TransitResourceDeploymentSection({ compact }: Props) {
         throw new Error((err as { error?: string }).error || 'Save failed')
       }
       setData(await res.json())
-      toast.success('Mass transit deployment updated (mock)')
+      toast.success('Mass transit deployment updated.')
       return true
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : 'Save failed'
@@ -525,7 +525,7 @@ export function TransitResourceDeploymentSection({ compact }: Props) {
             <AlertDialogTitle>Remove this asset?</AlertDialogTitle>
             <AlertDialogDescription>
               {deleteIndex !== null && data.sites[deleteIndex]
-                ? `Remove “${data.sites[deleteIndex].name}” from the deployment list (mock store).`
+                ? `Remove “${data.sites[deleteIndex].name}” from the deployment list.`
                 : 'Remove this row from the deployment list.'}
             </AlertDialogDescription>
           </AlertDialogHeader>
