@@ -1,14 +1,6 @@
 /** Dispatched after localStorage user fields are updated so Header and layouts can refresh. */
 export const USER_PROFILE_UPDATED_EVENT = 'earthquick:userProfileUpdated' as const
 
-/** After login or logout — UserProvider should re-fetch `/api/user/profile` (or 401 and clear). */
-export const AUTH_SESSION_CHANGED_EVENT = 'earthquick:authSessionChanged' as const
-
-export function notifyAuthSessionChanged() {
-  if (typeof window === 'undefined') return
-  window.dispatchEvent(new Event(AUTH_SESSION_CHANGED_EVENT))
-}
-
 /** Keeps client session fields in sync with server profile (name, email, photo, location). */
 export function syncClientUserProfileFromServer(user: {
   name?: string | null

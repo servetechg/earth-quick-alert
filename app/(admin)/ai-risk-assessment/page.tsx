@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState, Fragment, type ElementType, type ReactNode } from "react";
 import { AdminPageShell } from "@/components/admin-page-shell";
-import { AdminPageLoader } from "@/components/admin-page-loader";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -767,7 +766,14 @@ export default function RiskAssessment() {
       {/* Empty / loading states */}
       {loading && !report && (
         <Card className="rounded-2xl bg-white p-10 text-center shadow-xl shadow-slate-200/50">
-          <AdminPageLoader layout="inline" containerClassName="!py-0" />
+          <Loader2 className="mx-auto h-8 w-8 animate-spin text-[#33375D]" />
+          <p className="mt-4 text-sm font-bold text-slate-800">
+            AI is analyzing multi-source data...
+          </p>
+          <p className="mt-1 text-xs text-slate-500">
+            Aggregating USGS gauges, NOAA advisories, NASA FIRMS hot spots and InciWeb
+            incidents.
+          </p>
         </Card>
       )}
 

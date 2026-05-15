@@ -30,7 +30,6 @@ import { GrantLicenseModal } from '@/components/modals/grant-license-modal'
 import { cn } from "@/lib/utils"
 import { AdminPageHeader } from '@/components/admin-page-header'
 import { AdminPageShell } from '@/components/admin-page-shell'
-import { AdminPageLoader } from '@/components/admin-page-loader'
 import { toast } from 'sonner'
 
 interface License {
@@ -199,7 +198,14 @@ export default function LicenseManagement() {
     }
 
     if (isLoading) {
-        return <AdminPageLoader />
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-slate-50">
+                <div className="flex flex-col items-center gap-4">
+                    <Loader2 className="w-10 h-10 animate-spin text-[#33375D]" />
+                    <p className="text-slate-500 font-bold animate-pulse">Loading licenses...</p>
+                </div>
+            </div>
+        )
     }
 
     return (

@@ -8,8 +8,7 @@
     "lint": "eslint .",
     "start": "next start",
     "worker:ingest": "npx tsx server/workers/ingestion-worker.ts",
-    "worker:stream": "npx tsx server/workers/stream-worker.ts",
-    "seed:responder": "npx tsx scripts/create-demo-responder.ts"
+    "worker:stream": "npx tsx server/workers/stream-worker.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

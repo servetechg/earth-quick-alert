@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button'
 import { Clock, ShieldCheck, Mail, LogOut } from 'lucide-react'
 import Image from 'next/image'
 import logo from '../../public/logo.png'
-import { notifyAuthSessionChanged } from '@/lib/sync-client-user-profile'
 
 export default function PendingApprovalPage() {
   const router = useRouter()
@@ -15,7 +14,6 @@ export default function PendingApprovalPage() {
     try {
       await fetch('/api/logout', { method: 'POST' })
       localStorage.clear()
-      notifyAuthSessionChanged()
       router.push('/login')
     } catch (error) {
       console.error('Logout error:', error)
@@ -23,7 +21,7 @@ export default function PendingApprovalPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-[#33375D]">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 p-4">
       <div className="w-full max-w-lg">
         <div className="text-center mb-10 flex flex-col items-center">
           <Image
