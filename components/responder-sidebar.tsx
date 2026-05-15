@@ -6,8 +6,9 @@ import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import {
   LayoutDashboard,
-  Crosshair,
   Hotel,
+  Pill,
+  Bus,
   HelpCircle,
   LogOut,
   X,
@@ -33,18 +34,27 @@ function navForVertical(v: string): NavItem[] {
   if (kind === 'hospital') {
     return common
   }
+  // Police: dashboard-only (deployment tables + dialogs live on /responder-dashboard).
   if (kind === 'police') {
-    return [
-      common[0],
-      { icon: Crosshair, label: 'Field deployment', href: '/responder-field-status' },
-      ...common.slice(1),
-    ]
+    return common
   }
   if (kind === 'hotel') {
     return [
       common[0],
       { icon: Hotel, label: 'Lodging availability', href: '/responder-lodging-status' },
       ...common.slice(1),
+    ]
+  }
+  if (kind === 'pharmacy') {
+    return [
+      common[0],
+      { icon: Pill, label: 'Pharmacy sites & map', href: '/responder-pharmacy-sites' },
+      ...common.slice(1),
+    ]
+  }
+  if (kind === 'transit') {
+    return [
+      common[0],
     ]
   }
   return common

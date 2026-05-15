@@ -28,7 +28,6 @@ export async function GET() {
         let guides = (await PreparednessGuide.find().sort({ order: 1, category: 1 }).lean()) as unknown as GuideLean[];
 
         if (guides.length === 0) {
-            console.log('Seeding Preparedness Guides into MongoDB...');
             await PreparednessGuide.insertMany(SEED_GUIDES);
             guides = (await PreparednessGuide.find().sort({ order: 1, category: 1 }).lean()) as unknown as GuideLean[];
         }
