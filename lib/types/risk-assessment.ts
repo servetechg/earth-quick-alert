@@ -25,6 +25,20 @@ export interface HistoricalAnalysis {
   future_measures?: string[];
 }
 
+/** Tabs under Historical Context — one per bar-chart incident family; only categories with live ingest lines are emitted in `historical_analysis_by_incident`. */
+export const INCIDENT_HISTORY_TAB_KEYS = [
+  'flood',
+  'tornado',
+  'storm',
+  'hazardous',
+  'coastal_surf',
+  'marine',
+  'wildfire',
+  'earthquake',
+] as const;
+
+export type IncidentHistoryCategory = (typeof INCIDENT_HISTORY_TAB_KEYS)[number];
+
 /** County / parish ACS resolution used for population estimate (see `risk-exposure-service`). */
 export interface RiskExposureCountyRow {
   stateAbbr: string;
@@ -68,6 +82,10 @@ export interface RiskReport {
   recommendations_list: RecommendationItem[];
   incident_distribution: DistroPoint[];
   historical_analysis: HistoricalAnalysis;
+  /** Per hazard tab: matched event / playbook vs live findings in `current_procedures`. */
+  historical_analysis_by_incident?: Partial<
+    Record<IncidentHistoryCategory, HistoricalAnalysis>
+  >;
   sources_count: number;
   alerts_count: number;
   meteorological_summary: string;

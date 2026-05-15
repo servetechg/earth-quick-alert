@@ -43,7 +43,19 @@ import {
   CartesianGrid,
   Cell,
 } from "recharts";
-import type { HistoricalAnalysis, RiskReport } from "@/lib/types/risk-assessment";
+import {
+  INCIDENT_HISTORY_TAB_LABELS,
+  pickDefaultHistoricalTab,
+  incidentCategoriesWithPositiveChartCount,
+  incidentDistributionRowsAligned,
+} from "@/lib/services/risk-historical-context";
+import {
+  INCIDENT_HISTORY_TAB_KEYS,
+  type HistoricalAnalysis,
+  type IncidentHistoryCategory,
+  type RiskReport,
+} from "@/lib/types/risk-assessment";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const overallTone = (level: string) => {
   switch (level) {
@@ -362,36 +374,32 @@ function HistoricalQuadrant({
   );
 }
 
-function HistoricalAnalysisSection({ data }: { data?: HistoricalAnalysis }) {
+function liveIngestFootnote(cat: IncidentHistoryCategory): string {
+  const label = INCIDENT_HISTORY_TAB_LABELS[cat];
+  const ingest =
+    cat === "flood"
+      ? "hydrological plus flood-related meteorological lines"
+      : cat === "wildfire"
+        ? "wildfire"
+        : cat === "earthquake"
+          ? "seismic meteorological findings"
+          : "meteorological (NWS / surface hazards) lines bucketed as this incident type";
+  return `Past damages and past procedures reference historical ${label} patterns in your scope. Current procedures are built from live ${ingest}.`;
+}
+
+function HistoricalAnalysisBody({ data }: { data?: HistoricalAnalysis }) {
   const h = data ?? {};
   const conf = h.match_confidence ?? 0;
   return (
-    <Card className="rounded-2xl bg-white p-6 shadow-xl shadow-slate-200/50 border-slate-100">
-      <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-700">
-            <History className="h-5 w-5" />
-          </div>
-          <div>
-            <h3 className="text-base font-extrabold tracking-tight text-slate-800">
-              Historical Context & Mitigation Strategy
-            </h3>
-            <p className="text-xs text-slate-500">
-              Comparative analysis vs. closest matched past emergency
-            </p>
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="outline" className="text-[10px] font-bold uppercase bg-blue-50 text-blue-600 border-blue-100">
-            Match Confidence {conf}%
-          </Badge>
-        </div>
+    <>
+      <div className="mb-4 flex flex-wrap items-center justify-end gap-2">
+        <Badge variant="outline" className="text-[10px] font-bold uppercase bg-blue-50 text-blue-600 border-blue-100">
+          Match Confidence {conf}%
+        </Badge>
       </div>
 
       <div className="mb-5 rounded-xl border-l-4 border-l-blue-500 bg-blue-50 p-4">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-blue-600">
-          Matched Event
-        </p>
+        <p className="text-[10px] font-bold uppercase tracking-widest text-blue-600">Matched Event</p>
         <p className="mt-1 text-lg font-extrabold tracking-tight text-slate-800">
           {h.matched_event ?? "No comparable historical event identified."}
         </p>
@@ -422,7 +430,7 @@ function HistoricalAnalysisSection({ data }: { data?: HistoricalAnalysis }) {
         <HistoricalQuadrant
           icon={Radio}
           title="Current Procedures"
-          subtitle="Active response right now"
+          subtitle="From live ingest for this category"
           items={h.current_procedures}
           accent="success"
           iconBg="bg-emerald-50 text-emerald-500"
@@ -436,6 +444,78 @@ function HistoricalAnalysisSection({ data }: { data?: HistoricalAnalysis }) {
           iconBg="bg-blue-50 text-blue-500"
         />
       </div>
+    </>
+  );
+}
+
+function HistoricalAnalysisSection({ report }: { report: RiskReport }) {
+  const byIncident = report.historical_analysis_by_incident;
+  const tabOrder = useMemo(() => {
+    const chartPositive = new Set(incidentCategoriesWithPositiveChartCount(report));
+    return INCIDENT_HISTORY_TAB_KEYS.filter((k) => chartPositive.has(k) && byIncident?.[k]);
+  }, [report, byIncident]);
+  const hasTabs = tabOrder.length > 0;
+
+  const preferred = useMemo(() => pickDefaultHistoricalTab(report), [report]);
+
+  const [tab, setTab] = useState<IncidentHistoryCategory | null>(null);
+
+  useEffect(() => {
+    const next =
+      (preferred != null && tabOrder.includes(preferred) ? preferred : tabOrder[0]) ?? null;
+    setTab(next);
+  }, [report, tabOrder, preferred]);
+
+  const activeTab =
+    tab != null && tabOrder.includes(tab) ? tab : (tabOrder[0] ?? null);
+
+  return (
+    <Card className="rounded-2xl bg-white p-6 shadow-xl shadow-slate-200/50 border-slate-100">
+      <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-700">
+            <History className="h-5 w-5" />
+          </div>
+          <div>
+            <h3 className="text-base font-extrabold tracking-tight text-slate-800">
+              Historical Context & Mitigation Strategy
+            </h3>
+            <p className="text-xs text-slate-500">
+              {hasTabs
+                ? "Tabs match the incident bar chart: only categories with a non-zero deduped count appear, and each shows ingest-backed current procedures when available."
+                : "Comparative analysis vs. closest matched past emergency"}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {!hasTabs || activeTab == null ? (
+        <HistoricalAnalysisBody data={report.historical_analysis} />
+      ) : (
+        <Tabs
+          value={activeTab}
+          onValueChange={(v) => setTab(v as IncidentHistoryCategory)}
+          className="w-full"
+        >
+          <TabsList className="mb-4 flex h-auto w-full flex-wrap justify-start gap-1 bg-slate-100/80 p-1.5">
+            {tabOrder.map((k) => (
+              <TabsTrigger
+                key={k}
+                value={k}
+                className="text-xs font-bold data-[state=active]:bg-white"
+              >
+                {INCIDENT_HISTORY_TAB_LABELS[k]}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+          {tabOrder.map((k) => (
+            <TabsContent key={k} value={k} className="mt-0 outline-none">
+              <p className="mb-4 text-xs leading-relaxed text-slate-500">{liveIngestFootnote(k)}</p>
+              <HistoricalAnalysisBody data={byIncident![k]} />
+            </TabsContent>
+          ))}
+        </Tabs>
+      )}
     </Card>
   );
 }
@@ -515,7 +595,10 @@ export default function RiskAssessment() {
   const majorCount = report?.major_incidents ?? 0;
   const minorCount = report?.minor_incidents ?? 0;
 
-  const distribution = report?.incident_distribution ?? [];
+  const distribution = useMemo(
+    () => (report ? incidentDistributionRowsAligned(report) : []),
+    [report],
+  );
 
   const downloadPdf = () => {
     if (!report) return;
@@ -618,44 +701,89 @@ export default function RiskAssessment() {
     writeBullets("Active Fire Threats", report.fire_findings, report.domain_severities?.fire);
 
     // Historical Comparative Analysis
-    const h = report.historical_analysis ?? {};
-    ensure(60);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(13);
-    doc.setTextColor(35, 56, 102);
-    doc.text("Historical Context & Mitigation Strategy", margin, y);
-    y += 8;
-    doc.setDrawColor(220, 225, 235);
-    doc.line(margin, y, pageW - margin, y);
-    y += 14;
-    if (h.matched_event) {
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(11);
-      doc.setTextColor(20, 25, 40);
-      doc.text(
-        `Matched Event: ${h.matched_event}  (Match ${h.match_confidence ?? 0}%)`,
-        margin,
-        y,
-      );
-      y += 14;
-      if (h.similarity_summary) {
-        doc.setFont("helvetica", "italic");
-        doc.setFontSize(10);
-        doc.setTextColor(80, 90, 110);
-        const simLines = doc.splitTextToSize(h.similarity_summary, contentW);
-        simLines.forEach((line: string) => {
-          ensure(13);
-          doc.text(line, margin, y);
-          y += 12;
-        });
-        y += 4;
+    const writeHistoricalQuadrants = (h: HistoricalAnalysis) => {
+      if (h.matched_event) {
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(11);
+        doc.setTextColor(20, 25, 40);
+        doc.text(
+          `Matched Event: ${h.matched_event}  (Match ${h.match_confidence ?? 0}%)`,
+          margin,
+          y,
+        );
+        y += 14;
+        if (h.similarity_summary) {
+          doc.setFont("helvetica", "italic");
+          doc.setFontSize(10);
+          doc.setTextColor(80, 90, 110);
+          const simLines = doc.splitTextToSize(h.similarity_summary, contentW);
+          simLines.forEach((line: string) => {
+            ensure(13);
+            doc.text(line, margin, y);
+            y += 12;
+          });
+          y += 4;
+        }
       }
+      if (h.past_damages?.length) writeBullets("Past Damages & Losses", h.past_damages);
+      if (h.past_procedures?.length) writeBullets("Past Procedures", h.past_procedures);
+      if (h.current_procedures?.length)
+        writeBullets("Current Procedures (live ingest for this category)", h.current_procedures);
+      if (h.future_measures?.length) writeBullets("Future Preventative Measures", h.future_measures);
+    };
+
+    const byCat = report.historical_analysis_by_incident;
+    const pdfTabOrder = incidentCategoriesWithPositiveChartCount(report).filter((k) => byCat?.[k]);
+    const hasPerIncidentPdf = pdfTabOrder.length > 0;
+
+    if (hasPerIncidentPdf) {
+      ensure(60);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(13);
+      doc.setTextColor(35, 56, 102);
+      doc.text("Historical Context & Mitigation Strategy", margin, y);
+      y += 8;
+      doc.setDrawColor(220, 225, 235);
+      doc.line(margin, y, pageW - margin, y);
+      y += 12;
+      doc.setFont("helvetica", "italic");
+      doc.setFontSize(9);
+      doc.setTextColor(100, 110, 125);
+      const note = doc.splitTextToSize(
+        "Subsections by incident type: past damages and past procedures use historical comparators; current procedures pull from this report's live findings for that hazard family.",
+        contentW,
+      );
+      note.forEach((line: string) => {
+        ensure(12);
+        doc.text(line, margin, y);
+        y += 11;
+      });
+      y += 8;
+
+      for (const k of pdfTabOrder) {
+        const hCat = byCat![k]!;
+        ensure(36);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(12);
+        doc.setTextColor(35, 56, 102);
+        doc.text(INCIDENT_HISTORY_TAB_LABELS[k], margin, y);
+        y += 12;
+        writeHistoricalQuadrants(hCat);
+        y += 6;
+      }
+    } else {
+      const h = report.historical_analysis ?? {};
+      ensure(60);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(13);
+      doc.setTextColor(35, 56, 102);
+      doc.text("Historical Context & Mitigation Strategy", margin, y);
+      y += 8;
+      doc.setDrawColor(220, 225, 235);
+      doc.line(margin, y, pageW - margin, y);
+      y += 14;
+      writeHistoricalQuadrants(h);
     }
-    if (h.past_damages?.length) writeBullets("Past Damages & Losses", h.past_damages);
-    if (h.past_procedures?.length) writeBullets("Past Procedures", h.past_procedures);
-    if (h.current_procedures?.length)
-      writeBullets("Current Procedures (Active)", h.current_procedures);
-    if (h.future_measures?.length) writeBullets("Future Preventative Measures", h.future_measures);
 
     ensure(40);
     doc.setFont("helvetica", "bold");
@@ -906,7 +1034,7 @@ export default function RiskAssessment() {
           </div>
 
           {/* Historical Comparative Analysis */}
-          <HistoricalAnalysisSection data={report.historical_analysis} />
+          <HistoricalAnalysisSection report={report} />
 
           {/* Strategic recommendations action plan */}
           <Card className="rounded-2xl bg-white p-6 shadow-xl shadow-slate-200/50 border-slate-100">

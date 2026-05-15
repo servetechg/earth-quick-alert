@@ -1,5 +1,11 @@
 import { Alert, AlertSeverity, AlertSource, SocialMediaAlert, ResourceAlert } from '@/lib/types/api-alerts';
-import type { DashboardIngestBundle, RecommendationItem, RiskReport } from '@/lib/types/risk-assessment';
+import type {
+    DashboardIngestBundle,
+    IncidentHistoryCategory,
+    RecommendationItem,
+    RiskReport,
+} from '@/lib/types/risk-assessment';
+import { INCIDENT_HISTORY_TAB_KEYS } from '@/lib/types/risk-assessment';
 
 function normalizeRecommendationPriority(p: string | undefined): RecommendationItem['priority'] {
     const u = String(p ?? 'STANDARD').toUpperCase().trim();
@@ -905,7 +911,27 @@ Rules:
             /** Deterministic unique-event counts from ingest (same basis as AlertCommunication normalizers). */
             incident_distribution: base.incident_distribution,
             historical_analysis: { ...base.historical_analysis, ...ai.historical_analysis },
+            historical_analysis_by_incident: this.mergeHistoricalAnalysisByIncident(
+                base.historical_analysis_by_incident,
+                ai?.historical_analysis_by_incident,
+            ),
         };
+    }
+
+    private mergeHistoricalAnalysisByIncident(
+        base?: Partial<Record<IncidentHistoryCategory, RiskReport['historical_analysis']>>,
+        ai?: Partial<Record<IncidentHistoryCategory, RiskReport['historical_analysis']>>,
+    ): Partial<Record<IncidentHistoryCategory, RiskReport['historical_analysis']>> | undefined {
+        if (!base && !ai) return undefined;
+        const out: Partial<Record<IncidentHistoryCategory, RiskReport['historical_analysis']>> = {
+            ...(base ?? {}),
+        };
+        for (const k of INCIDENT_HISTORY_TAB_KEYS) {
+            const next = ai?.[k];
+            if (!next) continue;
+            out[k] = { ...out[k], ...next };
+        }
+        return Object.keys(out).length ? out : undefined;
     }
 
     private heuristicDashboardRiskReport(bundle: DashboardIngestBundle): RiskReport {
