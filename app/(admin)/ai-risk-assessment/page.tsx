@@ -9,7 +9,10 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import { useUser } from "@/lib/store/user-store";
-import { normalizeStateToUsps } from "@/lib/utils/us-state-usps";
+import {
+  buildRiskAnalyzeRequestBody,
+  getRiskAnalyzeContextFromBrowser,
+} from "@/lib/risk-assessment/client-analyze-context";
 import {
   Sparkles,
   CloudLightning,
@@ -450,26 +453,7 @@ export default function RiskAssessment() {
     stateCd?: string;
   } | null>(null);
 
-  const riskAnalyzeContext = useMemo(() => {
-    const role = (
-      me?.role ||
-      (typeof window !== "undefined" ? localStorage.getItem("userRole") : null) ||
-      ""
-    )
-      .toString()
-      .toLowerCase();
-    const stateRaw = (
-      me?.state ||
-      (typeof window !== "undefined" ? localStorage.getItem("userState") : null) ||
-      ""
-    )
-      .toString()
-      .trim();
-    const usps = role === "sub-admin" ? normalizeStateToUsps(stateRaw) : null;
-    const stateCd =
-      usps && /^[A-Z]{2}$/i.test(usps) ? usps.toLowerCase() : null;
-    return { role, stateRaw, stateCd };
-  }, [me?.role, me?.state]);
+  const riskAnalyzeContext = useMemo(() => getRiskAnalyzeContextFromBrowser(me), [me?.role, me?.state]);
 
   useEffect(() => {
     // Simulate loading initial data
@@ -483,13 +467,9 @@ export default function RiskAssessment() {
     setLoading(true);
     setIngestMeta(null);
     try {
-      const body: Record<string, unknown> = {
+      const body = buildRiskAnalyzeRequestBody(riskAnalyzeContext, {
         recordActivity: riskAnalyzeContext.role === "super-admin",
-      };
-      if (riskAnalyzeContext.role === "sub-admin" && riskAnalyzeContext.stateCd) {
-        body.nationwide = false;
-        body.stateCd = riskAnalyzeContext.stateCd;
-      }
+      });
 
       const res = await fetch("/api/risk-assessment/analyze", {
         method: "POST",

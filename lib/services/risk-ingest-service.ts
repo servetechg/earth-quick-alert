@@ -7,6 +7,16 @@ import {
   DEFAULT_NWPS_GAUGE_LIDS_NATIONWIDE,
   DEFAULT_USGS_SITES_NATIONWIDE,
 } from '@/lib/constants/nationwide-alert-feed-defaults';
+import {
+  filterFirmsPointsForState,
+  filterTextLinesForState,
+  femaRowMatchesState,
+  formatEarthquakeLinesFromFeatures,
+  isNationwideRiskIngestState,
+  pickEarthquakeFeaturesForIngest,
+  uspsFromRiskStateCd,
+} from '@/lib/services/risk-ingest-state-scope';
+import { textMentionsUsState } from '@/lib/utils/us-state-usps';
 
 const USGS_BASE = 'https://waterservices.usgs.gov/nwis';
 const NWPS_BASE = 'https://api.water.noaa.gov/nwps/v1';
@@ -28,10 +38,25 @@ const USER_AGENT =
 const RSS_BROWSER_UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
 
-/** True when ingest uses Alerts & Communication–style nationwide NWS + sampled gauges (not single-state AOI). */
 function isNationwideIngestState(stateCd: string): boolean {
-  const s = stateCd.toLowerCase();
-  return s === 'us' || s === 'usa' || s === 'all' || s === 'national';
+  return isNationwideRiskIngestState(stateCd);
+}
+
+function resolveStateNwpsLid(stateUsps: string): string | null {
+  const key = `RISK_NWPS_LID_${stateUsps.trim().toUpperCase()}`;
+  return process.env[key]?.trim() || null;
+}
+
+async function ingestNwpsForState(stateUsps: string): Promise<IngestSourceResult> {
+  const lid = resolveStateNwpsLid(stateUsps);
+  if (!lid) {
+    return {
+      ok: true,
+      source: 'NOAA_NWPS_GAUGE',
+      summary: `NWPS single-gauge sample omitted for ${stateUsps} (set RISK_NWPS_LID_${stateUsps} to enable). Hydrology from USGS IV stations in ${stateUsps}.`,
+    };
+  }
+  return ingestNwpsGauge(lid);
 }
 
 function resolveNationwideNwpsLids(): string[] {
@@ -326,7 +351,6 @@ async function ingestNwpsGauge(lid: string): Promise<IngestSourceResult> {
   }
 }
 
-/** M2.5+ worldwide last day; US-wide ranking when {@link isNationwideIngestState}; else prioritize state mentioned in place. */
 async function ingestUsgsEarthquakes(stateCd: string): Promise<IngestSourceResult> {
   try {
     const res = await fetchWithTimeout(USGS_EQ_FEED_DAY, {
@@ -339,42 +363,14 @@ async function ingestUsgsEarthquakes(stateCd: string): Promise<IngestSourceResul
     if (!res.ok) return { ok: false, source: 'USGS_EARTHQUAKES', error: `HTTP ${res.status}` };
     const geo = (await res.json()) as { features?: any[] };
     const feats = geo?.features ?? [];
-    const inRoughUs = (lon: number, lat: number) =>
-      lon >= -170 && lon <= -60 && lat >= 15 && lat <= 72;
-    const ranked = feats
-      .map((f) => ({ f, p: f?.properties ?? {}, c: f?.geometry?.coordinates as number[] }))
-      .filter(({ c, p }) => Array.isArray(c) && c.length >= 2 && p?.mag != null)
-      .sort((a, b) => (Number(b.p.mag) || 0) - (Number(a.p.mag) || 0));
-    const usBox = ranked.filter(({ c }) => inRoughUs(c[0], c[1]));
-    const nationwide = isNationwideIngestState(stateCd);
-    const stateToken = new RegExp(
-      `\\b${stateCd.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`,
-      'i',
-    );
-    /** Prefer U.S.-area events; boost rows that mention the selected state in `place` (state mode only). */
-    const stateMatch = nationwide ? [] : usBox.filter(({ p }) => stateToken.test(String(p.place ?? '')));
-    const cap = nationwide ? 25 : 15;
-    const pick = nationwide
-      ? usBox.slice(0, cap)
-      : (stateMatch.length ? stateMatch : usBox.length ? usBox : ranked).slice(0, cap);
-    const lines = pick.map(({ p }) => {
-      const t = p.time
-        ? new Date(p.time).toLocaleString('en-US', {
-            dateStyle: 'medium',
-            timeStyle: 'short',
-            timeZone: 'UTC',
-          }) + ' UTC'
-        : 'time unavailable';
-      const mag = Number(p.mag);
-      const magTxt = Number.isFinite(mag) ? mag.toFixed(1).replace(/\.0$/, '') : String(p.mag ?? '?');
-      const place = p.place ?? 'unspecified epicenter';
-      return `Earthquake magnitude M${magTxt} — ${place} · ${t}.`;
-    });
+    const cap = isNationwideRiskIngestState(stateCd) ? 25 : 15;
+    const pick = pickEarthquakeFeaturesForIngest(feats, stateCd, cap);
+    const summary = formatEarthquakeLinesFromFeatures(pick);
     return {
       ok: true,
       source: 'USGS_EARTHQUAKES',
-      data: geo,
-      summary: lines.length ? lines.join('\n') : 'No earthquakes in M2.5+ past-day feed.',
+      data: { ...geo, features: pick },
+      summary,
     };
   } catch (e: any) {
     return { ok: false, source: 'USGS_EARTHQUAKES', error: e?.message ?? 'USGS earthquakes fetch failed' };
@@ -502,14 +498,18 @@ async function ingestNwpsGaugesNationwide(): Promise<IngestSourceResult> {
   };
 }
 
-async function ingestFemaFloods(): Promise<IngestSourceResult> {
+async function ingestFemaFloods(stateCd: string): Promise<IngestSourceResult> {
   const filter = encodeURIComponent("incidentType eq 'Flood'");
-  const url = `${FEMA_BASE}/DisasterDeclarationsSummaries?$filter=${filter}&$orderby=declarationDate desc&$top=8&$format=json`;
+  const url = `${FEMA_BASE}/DisasterDeclarationsSummaries?$filter=${filter}&$orderby=declarationDate desc&$top=24&$format=json`;
   try {
     const res = await fetchWithTimeout(url, { headers: { Accept: 'application/json' }, timeoutMs: 15000 });
     if (!res.ok) return { ok: false, source: 'FEMA_OPENFEMA', error: `HTTP ${res.status}` };
     const json = await res.json();
-    const rows = json?.DisasterDeclarationsSummaries ?? json?.value ?? [];
+    let rows = json?.DisasterDeclarationsSummaries ?? json?.value ?? [];
+    const usps = uspsFromRiskStateCd(stateCd);
+    if (usps && Array.isArray(rows)) {
+      rows = rows.filter((r: { state?: string }) => femaRowMatchesState(r, usps));
+    }
     const lines: string[] = [];
     if (Array.isArray(rows)) {
       const seen = new Set<string>();
@@ -524,11 +524,14 @@ async function ingestFemaFloods(): Promise<IngestSourceResult> {
         lines.push(formatted);
       }
     }
+    const emptyMsg = usps
+      ? `No recent FEMA flood declarations for ${usps} in this pull.`
+      : 'No recent flood disaster declarations returned.';
     return {
       ok: true,
       source: 'FEMA_OPENFEMA',
       data: json,
-      summary: lines.length ? lines.join('\n') : 'No recent flood disaster declarations returned.',
+      summary: lines.length ? lines.join('\n') : emptyMsg,
     };
   } catch (e: any) {
     return { ok: false, source: 'FEMA_OPENFEMA', error: e?.message ?? 'FEMA fetch failed' };
@@ -558,7 +561,7 @@ function summarizeFirmsCsv(csvText: string): { lines: string[]; rawSample: strin
   };
 }
 
-async function ingestNasaFirms(): Promise<IngestSourceResult> {
+async function ingestNasaFirms(stateCd: string): Promise<IngestSourceResult> {
   const rawKey = process.env.NASA_FIRMS_MAP_KEY || process.env.NASA_FIRMS_API_KEY;
   const key = rawKey?.trim().replace(/^["']|["']$/g, '');
   if (!key) {
@@ -614,23 +617,25 @@ async function ingestNasaFirms(): Promise<IngestSourceResult> {
           : Array.isArray((json as any)?.features)
             ? (json as any).features
             : [];
-      const points: { lat: string; lon: string }[] = [];
+      let points: { lat: string; lon: string }[] = [];
       list.slice(0, 50).forEach((row: unknown) => {
         const r = row as Record<string, unknown>;
         const lat = String(r.latitude ?? r.lat ?? '');
         const lon = String(r.longitude ?? r.lon ?? '');
         if (lat && lon) points.push({ lat, lon });
       });
+      const usps = uspsFromRiskStateCd(stateCd);
+      if (usps) points = filterFirmsPointsForState(points, usps);
       const lines = buildViirsBriefingLines(points);
+      const emptyFirms = usps
+        ? `No NASA VIIRS hotspots inside ${usps} in this pull.`
+        : 'FIRMS JSON OK but no hotspot rows in array (empty region/time window).';
       return {
         ok: true,
         source: 'NASA_FIRMS',
         data: json,
         signalCount: points.length,
-        summary:
-          lines.length > 0
-            ? lines.join('\n')
-            : 'FIRMS JSON OK but no hotspot rows in array (empty region/time window).',
+        summary: lines.length > 0 ? lines.join('\n') : emptyFirms,
       };
     }
 
@@ -644,13 +649,18 @@ async function ingestNasaFirms(): Promise<IngestSourceResult> {
       }
       const text = await res.text();
       const { lines, rawSample, hotspotCount } = summarizeFirmsCsv(text);
-      if (lines.length > 0) {
+      const uspsCsv = uspsFromRiskStateCd(stateCd);
+      let csvLines = lines;
+      if (uspsCsv && csvLines.length) {
+        csvLines = filterTextLinesForState(csvLines, uspsCsv);
+      }
+      if (csvLines.length > 0) {
         return {
           ok: true,
           source: 'NASA_FIRMS',
           data: { format: 'csv', header: rawSample },
-          signalCount: hotspotCount,
-          summary: lines.join('\n'),
+          signalCount: uspsCsv ? csvLines.length : hotspotCount,
+          summary: csvLines.join('\n'),
         };
       }
       lastDetail = text.includes('latitude') ? 'CSV parsed but no coordinate rows' : text.slice(0, 200);
@@ -679,7 +689,7 @@ function parseRssWildfires(xml: string, max = 12): string {
   return lines.length ? lines.join('\n') : 'No RSS items parsed.';
 }
 
-async function ingestInciwebWildfire(): Promise<IngestSourceResult> {
+async function ingestInciwebWildfire(stateCd: string): Promise<IngestSourceResult> {
   const urls = [
     `${INCIWEB_BASE}/feeds/rss/incidents/type/wildfire/`,
     `https://www.inciweb.wildfire.gov/feeds/rss/incidents/type/wildfire/`,
@@ -700,7 +710,14 @@ async function ingestInciwebWildfire(): Promise<IngestSourceResult> {
       if (!res.ok) continue;
       const xml = await res.text();
       if (!xml.includes('<rss') && !xml.includes('<feed') && !xml.includes('<item')) continue;
-      const summary = parseRssWildfires(xml, 12);
+      let summary = parseRssWildfires(xml, 12);
+      const usps = uspsFromRiskStateCd(stateCd);
+      if (usps) {
+        const filtered = filterTextLinesForState(summary.split('\n').filter(Boolean), usps);
+        summary = filtered.length
+          ? filtered.join('\n')
+          : `No InciWeb wildfire RSS items referencing ${usps} in this pull.`;
+      }
       return {
         ok: true,
         source: 'INCIWEB_RSS',
@@ -718,7 +735,7 @@ async function ingestInciwebWildfire(): Promise<IngestSourceResult> {
   }
 }
 
-async function ingestArcgisPerimeters(): Promise<IngestSourceResult> {
+async function ingestArcgisPerimeters(stateCd: string): Promise<IngestSourceResult> {
   const q = new URLSearchParams({
     where: '1=1',
     outFields: 'IncidentName,PercentContained,poly_GISAcres,UniqueFireIdentifier,FireDiscoveryDateTime',
@@ -732,27 +749,29 @@ async function ingestArcgisPerimeters(): Promise<IngestSourceResult> {
     const json = await res.json();
     const feats = json?.features;
     const lines: string[] = [];
+    const usps = uspsFromRiskStateCd(stateCd);
     if (Array.isArray(feats)) {
-      for (const f of feats.slice(0, 15)) {
+      for (const f of feats.slice(0, 30)) {
         const a = f?.attributes ?? {};
         const nm = a.IncidentName ?? 'Interagency mapped fire';
         const pct =
           a.PercentContained != null && String(a.PercentContained).length
             ? `${a.PercentContained}% contained`
             : 'containment not published';
-        lines.push(
-          `${nm} — ${roundAcres(a.poly_GISAcres)}, ${pct} on WFIGS perimeter layer (verify with local incident command).`,
-        );
+        const line = `${nm} — ${roundAcres(a.poly_GISAcres)}, ${pct} on WFIGS perimeter layer (verify with local incident command).`;
+        if (usps && !textMentionsUsState(line, usps)) continue;
+        lines.push(line);
+        if (lines.length >= 15) break;
       }
     }
+    const emptyMsg = usps
+      ? `No WFIGS perimeter features referencing ${usps} in this pull.`
+      : 'Interagency perimeter layer returned no features for this pull (empty window or outside current AOI).';
     return {
       ok: true,
       source: 'ESRI_ARCGIS_WFIGS',
       data: json,
-      summary:
-        lines.length > 0
-          ? lines.join('\n')
-          : 'Interagency perimeter layer returned no features for this pull (empty window or outside current AOI).',
+      summary: lines.length > 0 ? lines.join('\n') : emptyMsg,
     };
   } catch (e: any) {
     return { ok: false, source: 'ESRI_ARCGIS_WFIGS', error: e?.message ?? 'ArcGIS fetch failed' };
@@ -774,17 +793,20 @@ export async function runDashboardIngest(options: {
   const nwpsGaugeId = options.nwpsGaugeId || 'SACC1';
   const usgsSite = options.usgsSite || '11447650';
   const stateCd = nationwide ? 'us' : (options.stateCd || 'ca').toLowerCase();
+  const stateUsps = uspsFromRiskStateCd(stateCd);
 
   const [usgs, nwps, nws, fema, firms, inci, arcgis, eq] = await Promise.all([
     nationwide
       ? ingestUsgs({ sites: resolveNationwideUsgsSitesCsv(), period: 'P1D' })
-      : ingestUsgs({ sites: usgsSite, period: 'P1D' }),
-    nationwide ? ingestNwpsGaugesNationwide() : ingestNwpsGauge(nwpsGaugeId),
+      : ingestUsgs({ stateCd: stateUsps ?? stateCd.toUpperCase(), period: 'P1D' }),
+    nationwide
+      ? ingestNwpsGaugesNationwide()
+      : ingestNwpsForState(stateUsps ?? stateCd.toUpperCase()),
     nationwide ? ingestNwsFloodAlertsNationwide() : ingestNwsFloodAlerts(stateCd),
-    ingestFemaFloods(),
-    ingestNasaFirms(),
-    ingestInciwebWildfire(),
-    ingestArcgisPerimeters(),
+    ingestFemaFloods(stateCd),
+    ingestNasaFirms(stateCd),
+    ingestInciwebWildfire(stateCd),
+    ingestArcgisPerimeters(stateCd),
     ingestUsgsEarthquakes(stateCd),
   ]);
 
@@ -793,10 +815,10 @@ export async function runDashboardIngest(options: {
 
   const usgsHead = nationwide
     ? `USGS instantaneous values — nationwide site sample (${resolveNationwideUsgsSitesCsv().split(',').length} stations)`
-    : `USGS (instantaneous, site ${usgsSite})`;
+    : `USGS instantaneous values — state ${(stateUsps ?? stateCd).toUpperCase()} (active IV stations)`;
   const nwpsHead = nationwide
     ? `NOAA NWPS — nationwide gauge sample (${resolveNationwideNwpsLids().length} LIDs)`
-    : `NOAA NWPS gauge ${nwpsGaugeId}`;
+    : `NOAA NWPS — state ${(stateUsps ?? stateCd).toUpperCase()}`;
   const nwsHead = nationwide ? 'NWS flood/hydro (nationwide active, filtered)' : 'NWS flood/hydro (state area, filtered)';
 
   const narrativeParts = [

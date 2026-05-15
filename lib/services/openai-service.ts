@@ -596,12 +596,17 @@ alerts_count: optional — server sets from incident_distribution,
 meteorological_summary, hydrological_risk, fire_threats, recommendations (short paragraph strings),
 major_incidents, minor_incidents (numbers for KPI breakdown).`;
 
+        const stateOnly =
+            bundle.ingestScope === 'state'
+                ? ` Jurisdiction is single-state (${bundle.stateCd?.toUpperCase() ?? 'state AOI'}): cite only hazards inside that state from the ingest summaries; do not mention Alaska, California, or other states unless explicitly in the data for this AOI.`
+                : '';
+
         const result = await this.callOpenAI<RiskReport>(
             [
                 {
                     role: 'system',
                     content:
-                        'You are Ready2Go emergency intelligence. Output only valid JSON matching the user schema at the root (no wrapper keys). Ground findings in the ingested data; mark uncertainty where feeds conflict or are missing. Never invent specific incidents not supported by the summaries. Format each finding bullet as a short operations briefing clause (readable to a Duty Officer): emphasize location names, magnitudes/flows/acres/percents, and timing—not raw GPS coordinates.',
+                        `You are Ready2Go emergency intelligence. Output only valid JSON matching the user schema at the root (no wrapper keys). Ground findings in the ingested data; mark uncertainty where feeds conflict or are missing. Never invent specific incidents not supported by the summaries. Format each finding bullet as a short operations briefing clause (readable to a Duty Officer): emphasize location names, magnitudes/flows/acres/percents, and timing—not raw GPS coordinates.${stateOnly}`,
                 },
                 {
                     role: 'user',

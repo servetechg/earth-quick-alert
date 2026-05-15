@@ -7,16 +7,20 @@ export interface AIRiskPredictionCardProps {
   className?: string
   score?: number
   riskLabel?: 'Low' | 'Moderate' | 'High Risk' | 'Extreme'
+  /** When true, show loading copy instead of numeric score. */
+  loading?: boolean
 }
 
 const LABELS = ['Low', 'Moderate', 'High', 'Extreme'] as const
 
 export function AIRiskPredictionCard({
   className,
-  score = 85,
-  riskLabel = 'High Risk',
+  score,
+  riskLabel,
+  loading = false,
 }: AIRiskPredictionCardProps) {
-  const indicatorPosition = Math.min(Math.max(score, 0), 100)
+  const hasLive = typeof score === 'number' && Number.isFinite(score) && riskLabel != null && riskLabel !== ''
+  const indicatorPosition = hasLive ? Math.min(Math.max(score as number, 0), 100) : 50
 
   return (
     <div
@@ -32,16 +36,18 @@ export function AIRiskPredictionCard({
 
       <div className="flex items-baseline gap-2">
         <span className="text-[44px] font-bold text-slate-900 leading-none tracking-tight">
-          {score}
+          {loading ? '—' : hasLive ? Math.round(score as number) : '—'}
         </span>
-        <span className="text-[12px] text-[#A41E22] font-bold">{riskLabel}</span>
+        <span className="text-[12px] text-[#A41E22] font-bold">
+          {loading ? 'Loading…' : hasLive ? riskLabel : 'Unavailable'}
+        </span>
       </div>
 
       <div className="space-y-2 pt-4">
         <div className="relative h-2 rounded-full bg-gradient-to-r from-[#16A34A] via-[#FACC15] via-50% to-[#A41E22] overflow-visible">
           <div
             className="absolute -top-1 w-1 h-4 bg-slate-900 rounded-full shadow-md"
-            style={{ left: `calc(${indicatorPosition}% - 2px)` }}
+            style={{ left: loading || !hasLive ? '50%' : `calc(${indicatorPosition}% - 2px)` }}
             aria-hidden
           />
         </div>
