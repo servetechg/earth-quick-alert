@@ -8,6 +8,8 @@ import { PoliceDeploymentSection } from '@/components/responder/police-deploymen
 import { HotelAvailabilitySection } from '@/components/responder/hotel-availability-section'
 import { PharmacyResourceDeploymentSection } from '@/components/responder/pharmacy-resource-deployment-section'
 import { TransitResourceDeploymentSection } from '@/components/responder/transit-resource-deployment-section'
+import { EnergyResourceDeploymentSection } from '@/components/responder/energy-resource-deployment-section'
+import { GasResourceDeploymentSection } from '@/components/responder/gas-resource-deployment-section'
 import { GeneralResponderSection } from '@/components/responder/general-responder-section'
 import { ResponderInfoBar } from '@/components/responder/responder-info-bar'
 import { RESPONDER_VERTICAL_LABELS, type ResponderVertical, type ResponderDashboardKind } from '@/lib/responder-verticals'
@@ -15,6 +17,8 @@ import type {
   GeneralResponderSummary,
   PharmacyResourceDeploymentPayload,
   TransitResourceDeploymentPayload,
+  EnergyResourceDeploymentPayload,
+  GasResourceDeploymentPayload,
 } from '@/lib/services/responder'
 
 type Bundle = {
@@ -26,6 +30,8 @@ type Bundle = {
   hotel: unknown
   pharmacy: PharmacyResourceDeploymentPayload | null
   transit: TransitResourceDeploymentPayload | null
+  energy: EnergyResourceDeploymentPayload | null
+  gas: GasResourceDeploymentPayload | null
   general: GeneralResponderSummary | null
 }
 
@@ -67,7 +73,11 @@ export default function ResponderDashboardPage() {
             ? `${vLabel}${bundle.responderFunction ? ` · ${bundle.responderFunction}` : ''}. Update pop-up pharmacy sites and coordinates for GIS resource deployment (mock).`
             : bundle.kind === 'transit'
               ? `${vLabel}${bundle.responderFunction ? ` · ${bundle.responderFunction}` : ''}. Mass transit locations and vehicles deployed per site (mock).`
-              : `${vLabel}${bundle.responderFunction ? ` · ${bundle.responderFunction}` : ''}. This overview uses the same layout as other admin tools; metrics are mock until external APIs are connected.`
+              : bundle.kind === 'energy'
+                ? `${vLabel}${bundle.responderFunction ? ` · ${bundle.responderFunction}` : ''}. Power outage areas and deployed power crews (mock).`
+                : bundle.kind === 'gas'
+                  ? `${vLabel}${bundle.responderFunction ? ` · ${bundle.responderFunction}` : ''}. Gas leak areas and deployed repair crews (mock).`
+                  : `${vLabel}${bundle.responderFunction ? ` · ${bundle.responderFunction}` : ''}. This overview uses the same layout as other admin tools; metrics are mock until external APIs are connected.`
       : 'Loading your operational summary…'
 
   return (
@@ -87,6 +97,8 @@ export default function ResponderDashboardPage() {
       {bundle?.kind === 'hotel' && <HotelAvailabilitySection compact />}
       {bundle?.kind === 'pharmacy' && <PharmacyResourceDeploymentSection compact />}
       {bundle?.kind === 'transit' && <TransitResourceDeploymentSection compact />}
+      {bundle?.kind === 'energy' && <EnergyResourceDeploymentSection compact />}
+      {bundle?.kind === 'gas' && <GasResourceDeploymentSection compact />}
       {bundle?.kind === 'general' && bundle.general && <GeneralResponderSection general={bundle.general} />}
     </AdminPageShell>
   )

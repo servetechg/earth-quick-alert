@@ -168,3 +168,85 @@ export function isDevDemoTransitResponderAttempt(email: string, password: string
     const e = String(email).toLowerCase().trim();
     return e === DEV_DEMO_TRANSIT_RESPONDER_EMAIL && password === DEV_DEMO_TRANSIT_RESPONDER_PASSWORD;
 }
+
+/** Idempotent demo account for local dev only (energy vertical). */
+export const DEV_DEMO_ENERGY_RESPONDER_EMAIL = 'energy_demo@yopmail.com';
+export const DEV_DEMO_ENERGY_RESPONDER_PASSWORD = 'energy_demo_pass';
+const DEMO_ENERGY_NAME = 'Demo Energy Responder';
+
+export async function upsertDevDemoEnergyResponder(): Promise<void> {
+    if (process.env.NODE_ENV === 'production') return;
+
+    await connectDB();
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(DEV_DEMO_ENERGY_RESPONDER_PASSWORD, salt);
+
+    const existing = await User.findOne({ email: DEV_DEMO_ENERGY_RESPONDER_EMAIL }).select('+password');
+    if (existing) {
+        existing.password = hashedPassword;
+        existing.role = 'responder';
+        existing.responderVertical = 'utility-energy';
+        existing.responderFunction = 'Regional energy utility (demo)';
+        existing.accountStatus = 'approved';
+        await existing.save();
+        return;
+    }
+
+    await User.create({
+        name: DEMO_ENERGY_NAME,
+        email: DEV_DEMO_ENERGY_RESPONDER_EMAIL,
+        password: hashedPassword,
+        role: 'responder',
+        responderVertical: 'utility-energy',
+        responderFunction: 'Regional energy utility (demo)',
+        accountStatus: 'approved',
+        licenseId: null,
+    });
+}
+
+export function isDevDemoEnergyResponderAttempt(email: string, password: string): boolean {
+    if (process.env.NODE_ENV === 'production') return false;
+    const e = String(email).toLowerCase().trim();
+    return e === DEV_DEMO_ENERGY_RESPONDER_EMAIL && password === DEV_DEMO_ENERGY_RESPONDER_PASSWORD;
+}
+
+/** Idempotent demo account for local dev only (gas vertical). */
+export const DEV_DEMO_GAS_RESPONDER_EMAIL = 'gas_demo@yopmail.com';
+export const DEV_DEMO_GAS_RESPONDER_PASSWORD = 'gas_demo_pass';
+const DEMO_GAS_NAME = 'Demo Gas Responder';
+
+export async function upsertDevDemoGasResponder(): Promise<void> {
+    if (process.env.NODE_ENV === 'production') return;
+
+    await connectDB();
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(DEV_DEMO_GAS_RESPONDER_PASSWORD, salt);
+
+    const existing = await User.findOne({ email: DEV_DEMO_GAS_RESPONDER_EMAIL }).select('+password');
+    if (existing) {
+        existing.password = hashedPassword;
+        existing.role = 'responder';
+        existing.responderVertical = 'utility-gas';
+        existing.responderFunction = 'Regional gas utility (demo)';
+        existing.accountStatus = 'approved';
+        await existing.save();
+        return;
+    }
+
+    await User.create({
+        name: DEMO_GAS_NAME,
+        email: DEV_DEMO_GAS_RESPONDER_EMAIL,
+        password: hashedPassword,
+        role: 'responder',
+        responderVertical: 'utility-gas',
+        responderFunction: 'Regional gas utility (demo)',
+        accountStatus: 'approved',
+        licenseId: null,
+    });
+}
+
+export function isDevDemoGasResponderAttempt(email: string, password: string): boolean {
+    if (process.env.NODE_ENV === 'production') return false;
+    const e = String(email).toLowerCase().trim();
+    return e === DEV_DEMO_GAS_RESPONDER_EMAIL && password === DEV_DEMO_GAS_RESPONDER_PASSWORD;
+}

@@ -4,10 +4,14 @@ import type {
     HotelAvailabilityPayload,
     PharmacyResourceDeploymentPayload,
     PharmacySiteStatus,
-    TransitResourceDeploymentPayload,
     TransitAssetStatus,
+    EnergyResourceDeploymentPayload,
+    EnergyCrewStatus,
+    TransitResourceDeploymentPayload,
+    GasResourceDeploymentPayload,
+    GasCrewStatus,
 } from './types';
-import { seedHospital, seedPolice, seedHotel, seedPharmacy, seedTransit } from './mock-seeds';
+import { seedHospital, seedPolice, seedHotel, seedPharmacy, seedTransit, seedEnergy, seedGas } from './mock-seeds';
 
 /** Dev/demo in-memory persistence (per server process). */
 let hospital: HospitalCapacityPayload | null = null;
@@ -15,6 +19,8 @@ let police: PoliceDeploymentPayload | null = null;
 let hotel: HotelAvailabilityPayload | null = null;
 let pharmacy: PharmacyResourceDeploymentPayload | null = null;
 let transit: TransitResourceDeploymentPayload | null = null;
+let energy: EnergyResourceDeploymentPayload | null = null;
+let gas: GasResourceDeploymentPayload | null = null;
 
 export function getHospitalCapacity(): HospitalCapacityPayload {
     if (!hospital) hospital = seedHospital();
@@ -123,6 +129,76 @@ export function getTransitResourceDeployment(): TransitResourceDeploymentPayload
 export function setTransitResourceDeployment(next: TransitResourceDeploymentPayload): TransitResourceDeploymentPayload {
     transit = normalizeTransitPayload(next);
     return transit;
+}
+
+function normalizeEnergyPayload(p: EnergyResourceDeploymentPayload): EnergyResourceDeploymentPayload {
+    const raw = Array.isArray(p.sites) ? p.sites : [];
+    const sites = raw.map((s, i) => {
+        const status: EnergyCrewStatus =
+            s.status === 'limited' || s.status === 'suspended' ? s.status : 'active';
+        return {
+            id: typeof s.id === 'string' && s.id.trim() ? s.id.trim() : `en-${i}`,
+            name: String(s.name || 'Power outage / crew staging').slice(0, 160),
+            address: String(s.address || '').slice(0, 240),
+            lat: Number.isFinite(s.lat) ? s.lat : 0,
+            lng: Number.isFinite(s.lng) ? s.lng : 0,
+            crewsDeployed: Math.max(0, Math.floor(Number(s.crewsDeployed) || 0)),
+            status,
+            notes: s.notes != null ? String(s.notes).slice(0, 2000) : undefined,
+        };
+    });
+    return {
+        ...p,
+        networkId: p.networkId?.trim() ? p.networkId.trim() : 'mock-energy-net-001',
+        networkName: p.networkName?.trim() ? p.networkName.trim() : 'Energy utility net',
+        sites,
+    };
+}
+
+export function getEnergyResourceDeployment(): EnergyResourceDeploymentPayload {
+    if (!energy) energy = seedEnergy();
+    energy = normalizeEnergyPayload(energy);
+    return energy;
+}
+
+export function setEnergyResourceDeployment(next: EnergyResourceDeploymentPayload): EnergyResourceDeploymentPayload {
+    energy = normalizeEnergyPayload(next);
+    return energy;
+}
+
+function normalizeGasPayload(p: GasResourceDeploymentPayload): GasResourceDeploymentPayload {
+    const raw = Array.isArray(p.sites) ? p.sites : [];
+    const sites = raw.map((s, i) => {
+        const status: GasCrewStatus =
+            s.status === 'limited' || s.status === 'suspended' ? s.status : 'active';
+        return {
+            id: typeof s.id === 'string' && s.id.trim() ? s.id.trim() : `gas-${i}`,
+            name: String(s.name || 'Gas leak / crew staging').slice(0, 160),
+            address: String(s.address || '').slice(0, 240),
+            lat: Number.isFinite(s.lat) ? s.lat : 0,
+            lng: Number.isFinite(s.lng) ? s.lng : 0,
+            crewsDeployed: Math.max(0, Math.floor(Number(s.crewsDeployed) || 0)),
+            status,
+            notes: s.notes != null ? String(s.notes).slice(0, 2000) : undefined,
+        };
+    });
+    return {
+        ...p,
+        networkId: p.networkId?.trim() ? p.networkId.trim() : 'mock-gas-net-001',
+        networkName: p.networkName?.trim() ? p.networkName.trim() : 'Gas utility net',
+        sites,
+    };
+}
+
+export function getGasResourceDeployment(): GasResourceDeploymentPayload {
+    if (!gas) gas = seedGas();
+    gas = normalizeGasPayload(gas);
+    return gas;
+}
+
+export function setGasResourceDeployment(next: GasResourceDeploymentPayload): GasResourceDeploymentPayload {
+    gas = normalizeGasPayload(next);
+    return gas;
 }
 
 export function recomputeHospitalSummary(payload: HospitalCapacityPayload): HospitalCapacityPayload {

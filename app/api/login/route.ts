@@ -16,6 +16,10 @@ import {
     upsertDevDemoPharmacyResponder,
     isDevDemoTransitResponderAttempt,
     upsertDevDemoTransitResponder,
+    isDevDemoEnergyResponderAttempt,
+    upsertDevDemoEnergyResponder,
+    isDevDemoGasResponderAttempt,
+    upsertDevDemoGasResponder,
 } from '@/lib/dev-demo-responder';
 
 export async function POST(req: NextRequest) {
@@ -88,6 +92,34 @@ export async function POST(req: NextRequest) {
                 return NextResponse.json(
                     {
                         error: 'Database unavailable — could not create demo transit responder. Check MONGODB_URI in .env and restart the dev server.',
+                    },
+                    { status: 503 },
+                );
+            }
+        }
+
+        if (isDevDemoEnergyResponderAttempt(normalizedEmail, password)) {
+            try {
+                await upsertDevDemoEnergyResponder();
+            } catch (e) {
+                console.error('Dev demo energy responder upsert failed:', e);
+                return NextResponse.json(
+                    {
+                        error: 'Database unavailable — could not create demo energy responder. Check MONGODB_URI in .env and restart the dev server.',
+                    },
+                    { status: 503 },
+                );
+            }
+        }
+
+        if (isDevDemoGasResponderAttempt(normalizedEmail, password)) {
+            try {
+                await upsertDevDemoGasResponder();
+            } catch (e) {
+                console.error('Dev demo gas responder upsert failed:', e);
+                return NextResponse.json(
+                    {
+                        error: 'Database unavailable — could not create demo gas responder. Check MONGODB_URI in .env and restart the dev server.',
                     },
                     { status: 503 },
                 );

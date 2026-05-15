@@ -116,3 +116,51 @@ export interface TransitResourceDeploymentPayload {
     sites: TransitMassTransitAsset[];
     coordinatorNotes?: string;
 }
+
+/** Energy Company power outage area / crew staging point with deployed crews (GIS + resource deployment). */
+export type EnergyCrewStatus = 'active' | 'limited' | 'suspended';
+
+export interface EnergyCrewAsset {
+    id: string;
+    name: string;
+    address: string;
+    lat: number;
+    lng: number;
+    /** Crews assigned or staged at this location. */
+    crewsDeployed: number;
+    status: EnergyCrewStatus;
+    notes?: string;
+}
+
+export interface EnergyResourceDeploymentPayload {
+    networkId: string;
+    networkName: string;
+    updatedAt: string;
+    source: DataSourceBadge;
+    sites: EnergyCrewAsset[];
+    coordinatorNotes?: string;
+}
+
+/** Gas Company leak area / crew staging point with deployed crews (GIS + resource deployment). */
+export type GasCrewStatus = 'active' | 'limited' | 'suspended';
+
+export interface GasCrewAsset {
+    id: string;
+    name: string;
+    address: string;
+    lat: number;
+    lng: number;
+    /** Crews assigned or staged at this location. */
+    crewsDeployed: number;
+    status: GasCrewStatus;
+    notes?: string;
+}
+
+export interface GasResourceDeploymentPayload {
+    networkId: string;
+    networkName: string;
+    updatedAt: string;
+    source: DataSourceBadge;
+    sites: GasCrewAsset[];
+    coordinatorNotes?: string;
+}

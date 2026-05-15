@@ -50,7 +50,7 @@ export function isResponderVertical(v: string): v is ResponderVertical {
 }
 
 /** Maps stored vertical → dashboard experience (mock + API namespace). */
-export type ResponderDashboardKind = 'hospital' | 'police' | 'hotel' | 'pharmacy' | 'transit' | 'general';
+export type ResponderDashboardKind = 'hospital' | 'police' | 'hotel' | 'pharmacy' | 'transit' | 'energy' | 'gas' | 'general';
 
 export function getResponderDashboardKind(vertical: string): ResponderDashboardKind {
     const v = vertical || '';
@@ -59,5 +59,7 @@ export function getResponderDashboardKind(vertical: string): ResponderDashboardK
     if (v === 'hotel') return 'hotel';
     if (v === 'pharmacy') return 'pharmacy';
     if (v === 'transit') return 'transit';
+    if (v === 'utility-gas') return 'gas';
+    if (v === 'utility-energy' || v === 'utility-electric') return 'energy';
     return 'general';
 }

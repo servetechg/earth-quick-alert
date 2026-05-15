@@ -35,12 +35,12 @@ export const menuItems = [
   { icon: Cloud, label: 'Regional Weather', href: '/user/weather' },
 ]
 
-export function UserSidebar() {
+export function UserSidebar({ className }: { className?: string }) {
   const router = useRouter()
   const pathname = usePathname()
 
   return (
-    <div className="hidden md:flex min-h-0 w-72 shrink-0 flex-col bg-[#33375D] text-white h-full border-r border-white/5">
+    <div className={cn("hidden md:flex min-h-0 w-72 shrink-0 flex-col bg-[#33375D] text-white h-full border-r border-white/5", className)}>
       {/* Logo Section */}
       <div className="shrink-0 p-6 border-b border-white/5 flex flex-col items-center">
         <Image

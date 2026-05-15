@@ -5,6 +5,8 @@ import {
     getHotelAvailability,
     getPharmacyResourceDeployment,
     getTransitResourceDeployment,
+    getEnergyResourceDeployment,
+    getGasResourceDeployment,
     recomputeHospitalSummary,
 } from './store';
 import type { GeneralResponderSummary } from './types';
@@ -21,6 +23,10 @@ export {
     setPharmacyResourceDeployment,
     getTransitResourceDeployment,
     setTransitResourceDeployment,
+    getEnergyResourceDeployment,
+    setEnergyResourceDeployment,
+    getGasResourceDeployment,
+    setGasResourceDeployment,
     recomputeHospitalSummary,
 } from './store';
 
@@ -65,6 +71,8 @@ export function getResponderDashboardBundle(vertical: string, responderFunction:
         hotel: kind === 'hotel' ? getHotelAvailability() : null,
         pharmacy: kind === 'pharmacy' ? getPharmacyResourceDeployment() : null,
         transit: kind === 'transit' ? getTransitResourceDeployment() : null,
+        energy: kind === 'energy' ? getEnergyResourceDeployment() : null,
+        gas: kind === 'gas' ? getGasResourceDeployment() : null,
         general: kind === 'general' ? getGeneralResponderSummary(vertical, responderFunction, displayName) : null,
     };
 }

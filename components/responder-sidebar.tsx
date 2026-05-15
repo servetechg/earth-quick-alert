@@ -60,7 +60,7 @@ function navForVertical(v: string): NavItem[] {
   return common
 }
 
-export function ResponderSidebar() {
+export function ResponderSidebar({ className }: { className?: string }) {
   const router = useRouter()
   const pathname = usePathname()
   const [showHelpModal, setShowHelpModal] = useState(false)
@@ -80,7 +80,7 @@ export function ResponderSidebar() {
   if (!ready) {
     return (
       <div
-        className="hidden md:flex min-h-0 w-70 shrink-0 flex-col bg-[#33375D] text-white h-full border-r border-slate-700/50"
+        className={cn("hidden md:flex min-h-0 w-70 shrink-0 flex-col bg-[#33375D] text-white h-full border-r border-slate-700/50", className)}
         aria-hidden
       >
         <div className="p-8 flex flex-col items-center shrink-0 animate-pulse">
@@ -91,7 +91,7 @@ export function ResponderSidebar() {
   }
 
   return (
-    <div className="hidden md:flex min-h-0 w-70 shrink-0 flex-col bg-[#33375D] text-white h-full border-r border-slate-700/50">
+    <div className={cn("hidden md:flex min-h-0 w-70 shrink-0 flex-col bg-[#33375D] text-white h-full border-r border-slate-700/50", className)}>
       <Link href="/responder-dashboard" className="p-8 flex flex-col items-center shrink-0 hover:bg-white/5 transition-colors">
         <Image src={logo} alt="Ready2Go" width={140} height={70} className="mb-2" />
         <p className="text-[10px] font-black uppercase tracking-widest text-[#FFD75E]/90 text-center px-2 leading-relaxed">

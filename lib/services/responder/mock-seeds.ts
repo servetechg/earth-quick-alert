@@ -5,6 +5,8 @@ import type {
     PoliceIncidentOperation,
     PharmacyResourceDeploymentPayload,
     TransitResourceDeploymentPayload,
+    EnergyResourceDeploymentPayload,
+    GasResourceDeploymentPayload,
 } from './types';
 
 export function seedHospital(): HospitalCapacityPayload {
@@ -160,5 +162,79 @@ export function seedHotel(): HotelAvailabilityPayload {
         roomsHeldForEm: 28,
         adaRoomsAvailable: 6,
         checkInNotes: 'EOC liaison: ext. 4200 (mock).',
+    };
+}
+
+export function seedEnergy(): EnergyResourceDeploymentPayload {
+    return {
+        networkId: 'mock-energy-net-001',
+        networkName: 'Demo Power Grid',
+        updatedAt: new Date().toISOString(),
+        source: 'mock',
+        sites: [
+            {
+                id: 'en-1',
+                name: 'Substation Alpha',
+                address: '100 Power Lane',
+                lat: 40.758,
+                lng: -111.888,
+                crewsDeployed: 12,
+                status: 'active',
+                notes: 'Restoring primary feeder. ETA 2 hours.',
+            },
+            {
+                id: 'en-2',
+                name: 'Downtown Underground Network',
+                address: 'Main St & 2nd South',
+                lat: 40.762,
+                lng: -111.890,
+                crewsDeployed: 5,
+                status: 'limited',
+                notes: 'Flooding in vault. Awaiting pump trucks.',
+            },
+            {
+                id: 'en-3',
+                name: 'Residential Sector 4',
+                address: '400 E 500 S',
+                lat: 40.750,
+                lng: -111.870,
+                crewsDeployed: 2,
+                status: 'active',
+                notes: 'Tree on line, clearing debris.',
+            },
+        ],
+        coordinatorNotes: 'Mock energy grid status and crew deployment for GIS resource demo.',
+    };
+}
+
+export function seedGas(): GasResourceDeploymentPayload {
+    return {
+        networkId: 'mock-gas-net-001',
+        networkName: 'Demo Gas Network',
+        updatedAt: new Date().toISOString(),
+        source: 'mock',
+        sites: [
+            {
+                id: 'gas-1',
+                name: 'Main Pipeline Sector 7',
+                address: '100 Industrial Parkway',
+                lat: 40.758,
+                lng: -111.888,
+                crewsDeployed: 8,
+                status: 'active',
+                notes: 'Securing pipeline leak. ETA 3 hours.',
+            },
+            {
+                id: 'gas-2',
+                name: 'Residential Area Block B',
+                address: 'Elm St & 4th West',
+                lat: 40.762,
+                lng: -111.890,
+                crewsDeployed: 3,
+                status: 'limited',
+                notes: 'Minor leak reported, investigation ongoing.',
+            },
+        ],
+        coordinatorNotes: 'Mock gas network status and crew deployment for GIS resource demo.',
     };
 }
