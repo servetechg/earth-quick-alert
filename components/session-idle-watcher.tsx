@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { notifyAuthSessionChanged } from '@/lib/sync-client-user-profile'
 
 const IDLE_MS = 30 * 60 * 1000
 
@@ -20,9 +19,6 @@ function clearSiteSessionStorage() {
       'systemMode',
       'isSafe',
       'userLocation',
-      'userProfilePic',
-      'responderVertical',
-      'responderFunction',
     ]
     keys.forEach((k) => localStorage.removeItem(k))
   } catch {
@@ -43,7 +39,6 @@ export function SessionIdleWatcher() {
       /* ignore */
     }
     clearSiteSessionStorage()
-    notifyAuthSessionChanged()
     router.replace('/login')
   }, [router])
 

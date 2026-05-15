@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useRef, useEffect, useMemo } from 'react'
-import { Bell, LogOut, Menu, X, Users, User, Settings, ChevronDown } from 'lucide-react'
+import { Bell, Search, LogOut, Menu, X, Users, User, Settings, ChevronDown } from 'lucide-react'
 import { menuItems } from '@/components/sidebar'
 import { menuItems as userMenuItems } from '@/components/user-sidebar'
 import Link from 'next/link'
+import { Input } from '@/components/ui/input'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
 import { useUser } from '@/lib/store/user-store'
@@ -14,16 +15,9 @@ interface HeaderProps {
   onLogout?: () => void
   /** When true, the top search field is hidden (e.g. super-admin layout). */
   hideSearch?: boolean
-  /** Strip demo notification bell (e.g. hospital responder minimal shell). */
-  hideNotificationBell?: boolean
 }
 
-export function Header({
-  userName = 'Admin User',
-  onLogout,
-  hideSearch: _hideSearch = false,
-  hideNotificationBell = false,
-}: HeaderProps) {
+export function Header({ userName = 'Admin User', onLogout, hideSearch = false }: HeaderProps) {
   const [showDropdown, setShowDropdown] = useState(false)
   const [showSidebar, setShowSidebar] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -70,7 +64,6 @@ export function Header({
   const editProfileHref = useMemo(() => {
     if (userRole === 'super-admin') return '/settings?tab=profile'
     if (userRole === 'sub-admin') return '/sub-admin-settings?tab=profile'
-    if (userRole === 'responder') return '/virtual-eoc-settings'
     return '/user/settings'
   }, [userRole])
 
@@ -95,7 +88,6 @@ export function Header({
           <Menu className="w-5 h-5" />
         </button>
 
-        {/* Search bar — commented out per product request
         {!hideSearch && (
           <div className="flex-1 max-w-sm hidden md:block">
             <div className="relative group">
@@ -107,20 +99,15 @@ export function Header({
             </div>
           </div>
         )}
-        */}
       </div>
 
       <div className="flex items-center gap-2 ">
-        {!hideNotificationBell && (
-          <div className="flex items-center gap-4 border-r border-slate-100 pr-4 mr-1">
-            <div className="relative p-2 hover:bg-slate-50 rounded-xl transition-colors cursor-pointer group">
-              <Bell fill="#33375D" size={22} className="text-slate-900 transition-colors" />
-              <span className="absolute top-1.5 right-1.5 h-4 w-4 bg-rose-600 text-[9px] font-black text-white flex items-center justify-center rounded-full border-2 border-white">
-                3
-              </span>
-            </div>
+        <div className="flex items-center gap-4 border-r border-slate-100 pr-4 mr-1">
+          <div className="relative p-2 hover:bg-slate-50 rounded-xl transition-colors cursor-pointer group">
+            <Bell fill='#33375D' size={22} className="text-slate-900 transition-colors" />
+            <span className="absolute top-1.5 right-1.5 h-4 w-4 bg-rose-600 text-[9px] font-black text-white flex items-center justify-center rounded-full border-2 border-white">3</span>
           </div>
-        )}
+        </div>
 
         <div className="relative" ref={dropdownRef}>
           <button

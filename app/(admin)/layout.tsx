@@ -5,8 +5,6 @@ import { useRouter, usePathname } from 'next/navigation'
 import { Sidebar } from '@/components/sidebar'
 import { Header } from '@/components/header'
 import { SessionIdleWatcher } from '@/components/session-idle-watcher'
-import { AdminPageLoader } from '@/components/admin-page-loader'
-import { notifyAuthSessionChanged } from '@/lib/sync-client-user-profile'
 
 export default function AdminLayout({
     children,
@@ -19,7 +17,6 @@ export default function AdminLayout({
     const [isLoading, setIsLoading] = useState(true)
     const [userName, setUserName] = useState('')
     const [userRole, setUserRole] = useState('')
-    const [responderVertical, setResponderVertical] = useState('')
 
     // The admin shell has its own internal scroll container (the children area),
     // so Next.js's default window-level scroll restoration cannot reset it on
@@ -37,7 +34,6 @@ export default function AdminLayout({
             router.push('/login')
         } else {
             setUserRole(role)
-            setResponderVertical(localStorage.getItem('responderVertical') || '')
             if (storedName) setUserName(storedName)
             setIsLoading(false)
         }
@@ -50,8 +46,6 @@ export default function AdminLayout({
             console.error('Logout failed:', error)
         }
         localStorage.removeItem('userRole')
-        localStorage.removeItem('responderVertical')
-        localStorage.removeItem('responderFunction')
         localStorage.removeItem('userEmail')
         localStorage.removeItem('userName')
         localStorage.removeItem('userCity')
@@ -60,17 +54,19 @@ export default function AdminLayout({
         localStorage.removeItem('systemMode')
         localStorage.removeItem('isSafe')
         localStorage.removeItem('userLocation')
-        notifyAuthSessionChanged()
         router.push('/login')
     }
 
     if (isLoading) {
-        return <AdminPageLoader layout="fullscreen" message="Verifying Session..." />
+        return (
+            <div className="flex items-center justify-center h-screen bg-background">
+                <div className="flex flex-col items-center gap-4">
+                    <div className="h-12 w-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+                    <p className="text-muted-foreground font-medium">Verifying Session...</p>
+                </div>
+            </div>
+        )
     }
-
-    const isHospitalResponder =
-        userRole === 'responder' &&
-        (responderVertical === 'hospital' || responderVertical === 'healthcare-hospital')
 
     return (
         <div className="flex h-screen min-h-0 bg-background text-foreground">
@@ -81,7 +77,6 @@ export default function AdminLayout({
                     userName={userName || 'Admin User'}
                     onLogout={handleLogout}
                     hideSearch={userRole === 'super-admin'}
-                    hideNotificationBell={isHospitalResponder}
                 />
                 <div ref={scrollContainerRef} className="flex-1 overflow-auto">
                     {children}

@@ -8,7 +8,7 @@ import React, {
     useRef,
     useState,
 } from 'react'
-import { AUTH_SESSION_CHANGED_EVENT, USER_PROFILE_UPDATED_EVENT } from '@/lib/sync-client-user-profile'
+import { USER_PROFILE_UPDATED_EVENT } from '@/lib/sync-client-user-profile'
 
 /**
  * Source of truth for the currently signed-in user on the client.
@@ -19,8 +19,7 @@ import { AUTH_SESSION_CHANGED_EVENT, USER_PROFILE_UPDATED_EVENT } from '@/lib/sy
  *   updated their profile on laptop A, laptop B kept showing stale data even
  *   after a hard reload. This provider treats the server (`GET /api/user/profile`)
  *   as the source of truth and re-fetches on mount + tab focus + after profile
- *   mutations dispatched via `USER_PROFILE_UPDATED_EVENT` or `AUTH_SESSION_CHANGED_EVENT`
- *   (login / logout).
+ *   mutations dispatched via `USER_PROFILE_UPDATED_EVENT`.
  */
 
 export interface CurrentUser {
@@ -34,7 +33,6 @@ export interface CurrentUser {
     city?: string
     state?: string
     country?: string
-    responderVertical?: string
 }
 
 interface UserStore {
@@ -157,17 +155,14 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         }
     }, [refresh])
 
-    // Profile saves, login, and logout — re-sync from `/api/user/profile`.
+    // Settings pages already dispatch USER_PROFILE_UPDATED_EVENT after a save —
+    // listen for it so the provider re-syncs without each page knowing about us.
     useEffect(() => {
         const handler = () => {
             void refresh()
         }
         window.addEventListener(USER_PROFILE_UPDATED_EVENT, handler)
-        window.addEventListener(AUTH_SESSION_CHANGED_EVENT, handler)
-        return () => {
-            window.removeEventListener(USER_PROFILE_UPDATED_EVENT, handler)
-            window.removeEventListener(AUTH_SESSION_CHANGED_EVENT, handler)
-        }
+        return () => window.removeEventListener(USER_PROFILE_UPDATED_EVENT, handler)
     }, [refresh])
 
     const value: UserStore = { me, loading, error, refresh, clear }

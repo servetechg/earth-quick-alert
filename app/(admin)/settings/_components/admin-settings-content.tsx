@@ -9,7 +9,6 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { AdminPageHeader } from '@/components/admin-page-header'
 import { AdminPageShell } from '@/components/admin-page-shell'
-import { AdminPageLoader } from '@/components/admin-page-loader'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
@@ -663,7 +662,11 @@ export function AdminSettingsContent({ variant }: { variant: AdminSettingsVarian
   }
 
   if (!isAuthorized) {
-    return <AdminPageLoader layout="fullscreen" />
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      </div>
+    )
   }
 
   return (

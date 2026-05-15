@@ -21,8 +21,8 @@ export async function GET(req: NextRequest) {
         let mode: 'super-admin' | 'sub-admin' | 'user';
         if (role === 'super-admin') mode = 'super-admin';
         else if (role === 'sub-admin') mode = 'sub-admin';
-        else if (role === 'user' || role === 'responder') mode = 'user';
-        else return jsonError('Forbidden — use a super-admin, sub-admin, user, or responder account', 403);
+        else if (role === 'user') mode = 'user';
+        else return jsonError('Forbidden — use a super-admin, sub-admin, or user account', 403);
 
         const data = await buildPreparednessWithTasks({
             mode,

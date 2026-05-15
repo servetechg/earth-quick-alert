@@ -24,6 +24,7 @@ import {
     ShieldCheck,
     Globe,
     Plus,
+    Loader2,
     ShieldAlert
 } from "lucide-react"
 import { toast } from "sonner"
@@ -31,7 +32,6 @@ import { cn } from "@/lib/utils"
 import { AdminPageHeader } from '@/components/admin-page-header'
 import { AdminPageShell } from '@/components/admin-page-shell'
 import { AddUserModal } from "@/components/modals/add-user-modal"
-import { AdminPageLoader } from '@/components/admin-page-loader'
 
 interface IUser {
     _id: string;
@@ -110,7 +110,14 @@ export default function SubAdminManagementPage() {
     }
 
     if (loading && users.length === 0) {
-        return <AdminPageLoader />
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-slate-50">
+                <div className="flex flex-col items-center gap-4">
+                    <Loader2 className="w-10 h-10 text-[#33375D] animate-spin" />
+                    <p className="text-slate-500 font-bold animate-pulse">Loading admins...</p>
+                </div>
+            </div>
+        )
     }
 
     return (

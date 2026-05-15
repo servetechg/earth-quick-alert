@@ -42,7 +42,6 @@ import {
 } from 'lucide-react'
 import { AdminPageShell } from '@/components/admin-page-shell'
 import { AdminPageHeader } from '@/components/admin-page-header'
-import { AdminPageLoader } from '@/components/admin-page-loader'
 
 type EmergencyAttachment = {
     _id?: string
@@ -487,7 +486,14 @@ export default function EmergencyPlanPage() {
     }
 
     if (isLoading) {
-        return <AdminPageLoader />
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-slate-50">
+                <div className="flex flex-col items-center gap-4">
+                    <Loader2 className="w-10 h-10 animate-spin text-[#33375D]" />
+                    <p className="text-slate-500 font-bold animate-pulse">Loading continuity plans...</p>
+                </div>
+            </div>
+        )
     }
 
     return (

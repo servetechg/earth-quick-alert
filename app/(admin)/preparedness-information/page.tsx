@@ -3,11 +3,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AdminPageHeader } from '@/components/admin-page-header';
 import { AdminPageShell } from '@/components/admin-page-shell';
-import { AdminPageLoader } from '@/components/admin-page-loader';
 import {
   CheckCircle2,
   Flame,
   Globe,
+  Loader2,
   MapPin,
   ShieldCheck,
   User,
@@ -313,7 +313,9 @@ export default function PreparednessInformationPage() {
         />
 
         {isLoading ? (
-          <AdminPageLoader layout="inline" />
+          <div className="py-20 flex justify-center">
+            <Loader2 className="h-8 w-8 animate-spin text-[#33375D]" />
+          </div>
         ) : (
           <>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">

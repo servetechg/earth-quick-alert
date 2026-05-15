@@ -3,7 +3,6 @@ import connectDB from '@/lib/mongodb';
 import User from '@/models/User';
 import { getSession } from '@/lib/auth';
 import { getSubAdminUserFilter } from '@/lib/admin-filters';
-import { isResponderVertical } from '@/lib/responder-verticals';
 
 export async function GET(req: NextRequest) {
     try {
@@ -124,7 +123,7 @@ export async function PATCH(req: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const { userId, accountStatus, role, requestedLicense, responderVertical } = await req.json();
+        const { userId, accountStatus, role, requestedLicense } = await req.json();
 
         if (!userId) {
             return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
@@ -150,21 +149,6 @@ export async function PATCH(req: NextRequest) {
                 return NextResponse.json({ error: 'Unauthorized role promotion' }, { status: 403 });
             }
             updateData.role = role;
-            if (role !== 'responder') {
-                updateData.responderVertical = '';
-            } else if (responderVertical === undefined) {
-                updateData.responderVertical =
-                    targetUser.responderVertical || 'general-responder';
-            }
-        }
-        if (responderVertical !== undefined && session.user.role !== 'sub-admin') {
-            const raw = responderVertical === null || responderVertical === '' ? '' : String(responderVertical).trim();
-            if (raw && !isResponderVertical(raw)) {
-                return NextResponse.json({ error: 'Invalid responder vertical' }, { status: 400 });
-            }
-            if (targetUser.role === 'responder' || updateData.role === 'responder') {
-                updateData.responderVertical = raw || 'general-responder';
-            }
         }
 
         const updatedUser = await User.findByIdAndUpdate(
@@ -216,26 +200,12 @@ export async function POST(req: NextRequest) {
         const results = [];
 
         for (const userData of usersToCreate) {
-            const { name, email, password, role, responderFunction, responderVertical } = userData;
+            const { name, email, password, role, responderFunction } = userData;
 
             if (!name || !email || !password || !role) {
                 if (!isBulk) return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
                 results.push({ email, error: 'Missing required fields', success: false });
                 continue;
-            }
-
-            let verticalField = '';
-            if (role === 'responder') {
-                const raw =
-                    responderVertical !== undefined && responderVertical !== null
-                        ? String(responderVertical).trim()
-                        : '';
-                if (raw && !isResponderVertical(raw)) {
-                    if (!isBulk) return NextResponse.json({ error: 'Invalid responder vertical' }, { status: 400 });
-                    results.push({ email, error: 'Invalid responder vertical', success: false });
-                    continue;
-                }
-                verticalField = raw || 'general-responder';
             }
 
             const userExists = await User.findOne({ email });
@@ -254,7 +224,6 @@ export async function POST(req: NextRequest) {
                 password: hashedPassword,
                 role,
                 responderFunction: responderFunction || '',
-                responderVertical: verticalField,
                 licenseId: creator.licenseId || null,
                 city: creator.city || '',
                 country: creator.country || '',

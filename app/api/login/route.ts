@@ -7,8 +7,6 @@ import { cookies } from 'next/headers';
 import SystemStatus from '@/models/SystemStatus';
 import { recordActivity, ACTIVITY_ACTIONS } from '@/lib/activity-log';
 
-import { isDevDemoResponderAttempt, upsertDevDemoResponder } from '@/lib/dev-demo-responder';
-
 export async function POST(req: NextRequest) {
     console.log('Login API request received at', new Date().toISOString());
     try {
@@ -28,27 +26,11 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Email and password are required' }, { status: 400 });
         }
 
-        const normalizedEmail = String(email).toLowerCase().trim();
-
-        if (isDevDemoResponderAttempt(normalizedEmail, password)) {
-            try {
-                await upsertDevDemoResponder();
-            } catch (e) {
-                console.error('Dev demo responder upsert failed:', e);
-                return NextResponse.json(
-                    {
-                        error: 'Database unavailable — could not create demo responder. Check MONGODB_URI in .env and restart the dev server.',
-                    },
-                    { status: 503 },
-                );
-            }
-        }
-
         // Find user and include password field
-        const user = await User.findOne({ email: normalizedEmail }).select('+password');
+        const user = await User.findOne({ email }).select('+password');
 
         if (!user) {
-            console.log('User not found:', normalizedEmail);
+            console.log('User not found:', email);
             return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 });
         }
 
@@ -85,8 +67,6 @@ export async function POST(req: NextRequest) {
                 role: user.role,
                 accountStatus: user.accountStatus,
                 licenseId: user.licenseId?.toString() || null,
-                responderVertical: user.responderVertical || '',
-                responderFunction: user.responderFunction || '',
             },
             expires
         });
@@ -103,8 +83,6 @@ export async function POST(req: NextRequest) {
                 city: user.city || '',
                 state: user.state || '',
                 country: user.country || '',
-                responderVertical: user.responderVertical || '',
-                responderFunction: user.responderFunction || '',
             },
             systemMode: systemStatus.emergencyMode
         });
