@@ -340,8 +340,7 @@ export function PoliceDeploymentSection({ compact }: Props) {
           <div>
             <CardTitle>{data.agencyName}</CardTitle>
             <CardDescription>
-              Source: <span className="font-semibold uppercase">{data.source}</span> · Last update{' '}
-              {new Date(data.updatedAt).toLocaleString()}
+              Last update {new Date(data.updatedAt).toLocaleString()}
             </CardDescription>
           </div>
           {!compact && (
@@ -350,16 +349,7 @@ export function PoliceDeploymentSection({ compact }: Props) {
               Save changes
             </Button>
           )}
-          {compact && (
-            <Button
-              type="button"
-              variant="outline"
-              className="gap-2 rounded-sm border-slate-200 font-bold text-slate-800"
-              onClick={openAgencyDialog}
-            >
-              Edit Agency & Fleet Totals
-            </Button>
-          )}
+          {/* Edit Agency button removed per request */}
         </CardHeader>
         <CardContent className="space-y-8 px-0">
           {!compact && (

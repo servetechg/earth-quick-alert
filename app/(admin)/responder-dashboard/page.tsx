@@ -62,7 +62,7 @@ export default function ResponderDashboardPage() {
       ? bundle.kind === 'hospital'
         ? `${vLabel}${bundle.responderFunction ? ` · ${bundle.responderFunction}` : ''}`
         : bundle.kind === 'police'
-          ? `${vLabel}${bundle.responderFunction ? ` · ${bundle.responderFunction}` : ''}. Track incident teams, operations, and staging (mock).`
+          ? `${vLabel}${bundle.responderFunction ? ` · ${bundle.responderFunction}` : ''}. Track incident teams, operations, and staging.`
           : bundle.kind === 'pharmacy'
             ? `${vLabel}${bundle.responderFunction ? ` · ${bundle.responderFunction}` : ''}. Update pop-up pharmacy sites and coordinates for GIS resource deployment (mock).`
             : bundle.kind === 'transit'
@@ -77,7 +77,7 @@ export default function ResponderDashboardPage() {
         titleUppercase={false}
         description={description}
       />
-      {bundle && !err && bundle.kind !== 'hospital' && (
+      {bundle && !err && bundle.kind !== 'hospital' && bundle.kind !== 'police' && (
         <ResponderInfoBar>
           Figures below refresh from the in-app mock service on save. Connect state or agency feeds when you move past demo.
         </ResponderInfoBar>
