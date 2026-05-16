@@ -78,8 +78,11 @@ export function pickEarthquakeFeaturesForIngest(feats: unknown[], stateCd: strin
 export function formatEarthquakeLinesFromFeatures(features: unknown[]): string {
     const lines = features.map((f) => {
         const p = (f as { properties?: Record<string, unknown> })?.properties ?? {};
-        const t = p.time
-            ? new Date(String(p.time)).toLocaleString('en-US', {
+        // USGS `time` is epoch milliseconds (a number); String() made `new Date` parse a
+        // digit-string and yield "Invalid Date". Convert numerically and guard against NaN.
+        const epochMs = p.time != null ? Number(p.time) : NaN;
+        const t = Number.isFinite(epochMs)
+            ? new Date(epochMs).toLocaleString('en-US', {
                   dateStyle: 'medium',
                   timeStyle: 'short',
                   timeZone: 'UTC',

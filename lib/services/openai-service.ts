@@ -1,6 +1,7 @@
 import { Alert, AlertSeverity, AlertSource, SocialMediaAlert, ResourceAlert } from '@/lib/types/api-alerts';
 import type {
     DashboardIngestBundle,
+    HistoricalAnalysis,
     IncidentHistoryCategory,
     RecommendationItem,
     RiskReport,
@@ -21,7 +22,7 @@ import {
     deriveMajorMinorSplit,
 } from '@/lib/services/risk-kpi-dynamic';
 import { deriveEventBasedIncidentDistribution } from '@/lib/services/risk-event-distribution';
-import { applyHistoricalContextToReport } from '@/lib/services/risk-historical-context';
+import { buildLiveHistoricalContext } from '@/lib/services/risk-historical-context';
 
 export interface EmergencyInsights {
     status: 'All Clear' | 'Warning' | 'Emergency';
@@ -125,9 +126,22 @@ type ChatMessage = {
     content: string;
 };
 
+/**
+ * Plain-English writing rules shared by every public-facing report section
+ * (executive risk report + Historical Context). Keeps the voice consistent.
+ */
+const PLAIN_ENGLISH_STYLE_RULES = `WRITING STYLE — this report is read by ordinary members of the public, not specialists. Every finding, summary, recommendation, and historical-analysis sentence MUST be understandable by someone with no emergency-management, weather, or science background:
+- Write in plain, everyday English using complete, self-explanatory sentences.
+- Do not use jargon, acronyms, or agency codes (such as NWPS, USGS, FIRMS, WFIGS, ICS, EOC, AOI, SCADA, URM, PSAP, WUI, SAR, LiDAR, cfs, kcfs, "stage", "gage") without explaining them in plain words — prefer the plain term outright.
+- When a technical number or measurement is unavoidable, explain what it means right after it. Examples: "a river flow of 10,200 cubic feet per second (very high — well above the normal range)", "a magnitude 5.1 earthquake (moderate — felt widely and can damage weaker buildings)", "30% contained (crews have a fire line around roughly a third of the fire's edge)".
+- Emphasize place names, what is happening, who or what it affects, and timing. Never output raw GPS coordinates.
+- Keep each bullet to one or two short, clear sentences.`;
+
 export class OpenAIService {
     private apiKey = process.env.OPENAI_API_KEY || '';
     private model = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+    /** Stronger model for the public-facing Historical Context narrative (plain-English summarization). */
+    private historicalModel = process.env.OPENAI_HISTORICAL_MODEL || 'gpt-4o';
 
     private canUseOpenAI(): boolean {
         return Boolean(this.apiKey);
@@ -136,11 +150,23 @@ export class OpenAIService {
     private async callOpenAI<T>(
         messages: ChatMessage[],
         fallback: T,
-        options?: { max_tokens?: number }
+        options?: { max_tokens?: number; model?: string; temperature?: number }
     ): Promise<T> {
-        if (!this.canUseOpenAI()) return fallback;
+        if (!this.canUseOpenAI()) {
+            console.log('⚠️ [OpenAI Service] Bypassed API call: OPENAI_API_KEY is missing. Using fallback heuristic data.');
+            return fallback;
+        }
+
+        const effectiveModel = options?.model || this.model;
 
         try {
+            // --- NEW LOGGING ADDED HERE ---
+            console.log('\n================ OPENAI API REQUEST START ================');
+            console.log(`[Target Model]: ${effectiveModel}`);
+            console.log(`[System Prompt]:\n`, messages.find(m => m.role === 'system')?.content);
+            console.log(`[User Payload / Data Sent]:\n`, messages.find(m => m.role === 'user')?.content);
+            console.log('==========================================================\n');
+
             const response = await fetch('https://api.openai.com/v1/chat/completions', {
                 method: 'POST',
                 headers: {
@@ -148,25 +174,31 @@ export class OpenAIService {
                     Authorization: `Bearer ${this.apiKey}`,
                 },
                 body: JSON.stringify({
-                    model: this.model,
+                    model: effectiveModel,
                     messages,
                     response_format: { type: 'json_object' },
                     ...(typeof options?.max_tokens === 'number' ? { max_tokens: options.max_tokens } : {}),
+                    ...(typeof options?.temperature === 'number' ? { temperature: options.temperature } : {}),
                 }),
             });
 
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
+                console.error('❌ [OpenAI Service] Request Failed with status:', response.status, errorData);
                 throw new Error(errorData?.error?.message || `OpenAI request failed: ${response.status}`);
             }
 
             const data = await response.json();
             const content = data?.choices?.[0]?.message?.content;
-            if (!content) return fallback;
+            if (!content) {
+                console.log('⚠️ [OpenAI Service] Response came back empty. Using fallback.');
+                return fallback;
+            }
 
+            console.log('✅ [OpenAI Service] Successfully received structured JSON response.');
             return JSON.parse(content) as T;
         } catch (error) {
-            console.error('OpenAI request failed, using fallback:', error);
+            console.error('❌ [OpenAI Service] request failed, using fallback:', error);
             return fallback;
         }
     }
@@ -506,7 +538,7 @@ export class OpenAIService {
         const fallback = {
             summary: `Stability report for ${country}: Monitoring active hazards. Weather alerts are currently present in some sectors. No major seismic activity impacting operations.`,
             suggestedType: 'Severe Thunderstorm Warning',
-            suggestedMessage: `Official NWS Alert for ${country}: Severe weather detected in region. Please monitor local conditions and follows safety protocols.`
+            suggestedMessage: `Official NWS Alert for ${country}: Severe weather detected in region. Please monitor local conditions and follows safety protocols.`,
         };
 
         try {
@@ -580,10 +612,12 @@ export class OpenAIService {
 
     async synthesizeDashboardRiskReport(bundle: DashboardIngestBundle): Promise<RiskReport> {
         const fallbackHeuristic = this.alignAlertsToDistribution(this.heuristicDashboardRiskReport(bundle), bundle);
-        const fallback = applyHistoricalContextToReport(
-            bundle,
-            applyDynamicExecutiveKpis(bundle, fallbackHeuristic),
-        );
+        const fallbackKpis = applyDynamicExecutiveKpis(bundle, fallbackHeuristic);
+        // Live-data-only historical scaffold — never the static copyFor* playbook prose.
+        const fallback: RiskReport = {
+            ...fallbackKpis,
+            ...buildLiveHistoricalContext(bundle, fallbackKpis),
+        };
         if (!this.canUseOpenAI()) return fallback;
 
         const narrative = bundle.narrative.slice(0, 16000);
@@ -596,7 +630,7 @@ hydrological_findings (string array — river/gauge-centric sentences; cfs, floo
 fire_findings (string array — named incidents, acres, containment; satellite cues as sectors—avoid bare lat/lon lists),
 recommendations_list: array of { priority: IMMEDIATE|URGENT|STANDARD exactly (never URGENCY or other synonyms), action: string, deployable: boolean },
 incident_distribution: optional — server recomputes unique event counts per category from ingest (you may omit),
-historical_analysis: { matched_event, match_confidence 0-100, similarity_summary, past_damages[], past_procedures[], current_procedures[], future_measures[] },
+historical_analysis: omit — the server generates the Historical Context section in a separate dedicated pass,
 sources_count (number, successful feeds was ${bundle.successfulSources}),
 alerts_count: optional — server sets from incident_distribution,
 meteorological_summary, hydrological_risk, fire_threats, recommendations (short paragraph strings),
@@ -612,7 +646,9 @@ major_incidents, minor_incidents (numbers for KPI breakdown).`;
                 {
                     role: 'system',
                     content:
-                        `You are Ready2Go emergency intelligence. Output only valid JSON matching the user schema at the root (no wrapper keys). Ground findings in the ingested data; mark uncertainty where feeds conflict or are missing. Never invent specific incidents not supported by the summaries. Format each finding bullet as a short operations briefing clause (readable to a Duty Officer): emphasize location names, magnitudes/flows/acres/percents, and timing—not raw GPS coordinates.${stateOnly}`,
+                        `You are Ready2Go emergency intelligence. Output only valid JSON matching the user schema at the root (no wrapper keys). Ground every finding in the ingested data; mark uncertainty where feeds conflict or are missing, and never invent specific incidents not supported by the summaries.
+
+${PLAIN_ENGLISH_STYLE_RULES}${stateOnly}`,
                 },
                 {
                     role: 'user',
@@ -624,7 +660,184 @@ major_incidents, minor_incidents (numbers for KPI breakdown).`;
 
         const merged = this.mergeRiskReport(fallback, result);
         const aligned = this.alignAlertsToDistribution(merged, bundle);
-        return applyHistoricalContextToReport(bundle, applyDynamicExecutiveKpis(bundle, aligned));
+        const withKpis = applyDynamicExecutiveKpis(bundle, aligned);
+        // Live-data-only scaffold: current procedures + confidence only. Every narrative field
+        // is written by the AI below — the static copyFor* templates are never shown to users.
+        const withHistory: RiskReport = {
+            ...withKpis,
+            ...buildLiveHistoricalContext(bundle, withKpis),
+        };
+        const aiHistory = await this.generateHistoricalContext(bundle, withHistory);
+        return { ...withHistory, ...aiHistory };
+    }
+
+    /**
+     * Dedicated OpenAI pass that GENERATES the public Historical Context
+     * (rollup + per-incident tabs) from live ingest data — plain English,
+     * scope-aware length caps, **bold** highlights. `current_procedures` comes
+     * from live ingest; every narrative field is written entirely by the model.
+     * No static copyFor* playbook templates are used for displayed content.
+     */
+    async generateHistoricalContext(
+        bundle: DashboardIngestBundle,
+        report: RiskReport,
+    ): Promise<Pick<RiskReport, 'historical_analysis' | 'historical_analysis_by_incident'>> {
+        const draftRollup: HistoricalAnalysis = report.historical_analysis ?? {};
+        const draftByIncident: Partial<Record<IncidentHistoryCategory, HistoricalAnalysis>> =
+            report.historical_analysis_by_incident ?? {};
+
+        const scope: 'state' | 'nationwide' = bundle.ingestScope === 'state' ? 'state' : 'nationwide';
+        const rollupCap = scope === 'state' ? 4 : 3;
+        const incidentCap = 3;
+
+        // Without an API key there is no narrative — keep only the live scaffold.
+        if (!this.canUseOpenAI()) {
+            return {
+                historical_analysis: draftRollup,
+                historical_analysis_by_incident: report.historical_analysis_by_incident,
+            };
+        }
+
+        const stateLabel =
+            scope === 'state'
+                ? (bundle.stateCd || '').toUpperCase() || 'the licensed state'
+                : 'the United States (nationwide)';
+
+        const lengthRules =
+            scope === 'state'
+                ? `- "rollup": at most ${rollupCap} bullets per list; each bullet 1-2 short sentences. "similarity_summary" at most 2 sentences.
+- each "by_incident" block: at most ${incidentCap} bullets per list.
+- Focus only on ${stateLabel}. Do not mention other states unless they appear in the live data below.`
+                : `- "rollup": at most ${rollupCap} bullets per list; each bullet 1-2 short sentences. "similarity_summary" at most 2 sentences.
+- each "by_incident" block: at most ${incidentCap} bullets per list.
+- This is a nationwide report — summarize at a national or regional level and mention only the few most significant events. Do not list every state.`;
+
+        const system = `You are Ready2Go emergency intelligence, writing the "Historical Context & Mitigation Strategy" section of a public emergency report.
+
+${PLAIN_ENGLISH_STYLE_RULES}
+
+YOUR TASK
+Write this section from the live emergency data below. "LIVE_SITUATION" lists what is happening or being tracked right now for each hazard. From those facts and the DATA section, produce the analysis for the public.
+
+OUTPUT — return ONLY this JSON object (no wrapper keys):
+{"rollup": <BLOCK>, "by_incident": {"<category>": <BLOCK>, ...}}
+Produce a "rollup" block (the whole-region overview) plus one "by_incident" block for EVERY category key listed in ACTIVE_HAZARDS — use those exact keys, and never add a hazard that is not listed. If ACTIVE_HAZARDS is empty, return "by_incident" as {}.
+Each <BLOCK> has exactly these keys:
+- "matched_event": string — a short, plain headline naming the kind of past situation today's conditions most resemble.
+- "similarity_summary": string — 1-2 plain sentences explaining, in everyday words, why today's conditions resemble that kind of past situation.
+- "past_damages": string[] — the kinds of damage and disruption this type of hazard has caused in the past, in everyday terms.
+- "past_procedures": string[] — the kinds of steps responders and officials have taken for this type of hazard in the past, in everyday terms.
+- "current_procedures": string[] — rewrite the LIVE_SITUATION lines for this hazard into plain, complete sentences describing what is happening right now and who or where it affects. Use ONLY those lines; do not add anything they do not support.
+- "future_measures": string[] — concrete, practical steps a community or household can take to be safer next time (for example: "Sign up for local emergency text alerts", "Keep a 3-day supply of drinking water"). Never policy or infrastructure jargon.
+Do NOT output a "match_confidence" key — the server keeps its own value.
+
+FORMATTING
+- Wrap the crucial detail of each sentence in **double asterisks** — place names, dates and times, magnitudes, and severity words. Example: "A **Flood Warning** is active for **Clinton, Illinois** through **May 19, 2026**."
+- Write every date and time in friendly form like "May 15, 2026, 10:23 PM" — never ISO timestamps, and never the words "Invalid Date".
+- Never output raw GPS coordinates.
+
+LENGTH
+${lengthRules}
+
+GROUNDING
+Base "current_procedures" ONLY on the LIVE_SITUATION lines for that hazard. Base "matched_event", "similarity_summary", "past_damages", and "past_procedures" on how this type of hazard has typically behaved — do not fabricate specific named past disasters or invented dates. Never invent a hazard category that is not in ACTIVE_HAZARDS.`;
+
+        const activeKeys = Object.keys(draftByIncident);
+        const liveBlock = (label: string, lines?: string[]): string =>
+            `${label}:\n${(lines && lines.length ? lines : ['(no live lines)']).join('\n')}`;
+        const liveSituation = [
+            liveBlock('ROLLUP', draftRollup.current_procedures),
+            ...activeKeys.map((k) =>
+                liveBlock(k, draftByIncident[k as IncidentHistoryCategory]?.current_procedures),
+            ),
+        ].join('\n\n');
+
+        const user = `INGEST_SCOPE=${scope}
+STATE=${bundle.stateCd ?? ''}
+
+ACTIVE_HAZARDS — produce one "by_incident" block for each of these category keys, and no others:
+${JSON.stringify(activeKeys)}
+
+LIVE_SITUATION — what is happening or being tracked right now, grouped by hazard. Treat these as the ONLY current facts:
+${liveSituation}
+
+DATA — full ingest summary for background context:
+${(bundle.narrative ?? '').slice(0, 8000)}`;
+
+        type HistoryAiShape = {
+            rollup?: Partial<HistoricalAnalysis>;
+            by_incident?: Partial<Record<string, Partial<HistoricalAnalysis>>>;
+        };
+
+        const result = await this.callOpenAI<HistoryAiShape>(
+            [
+                { role: 'system', content: system },
+                { role: 'user', content: user },
+            ],
+            { rollup: draftRollup, by_incident: draftByIncident },
+            { model: this.historicalModel, max_tokens: 1800, temperature: 0.3 },
+        );
+
+        const historical_analysis = this.normalizeHistoricalAnalysis(
+            result.rollup,
+            draftRollup,
+            rollupCap,
+        );
+
+        const incidentKeys = Object.keys(draftByIncident).filter((k): k is IncidentHistoryCategory =>
+            (INCIDENT_HISTORY_TAB_KEYS as readonly string[]).includes(k),
+        );
+        let historical_analysis_by_incident: RiskReport['historical_analysis_by_incident'] =
+            report.historical_analysis_by_incident;
+        if (incidentKeys.length) {
+            const out: Partial<Record<IncidentHistoryCategory, HistoricalAnalysis>> = {};
+            for (const k of incidentKeys) {
+                out[k] = this.normalizeHistoricalAnalysis(
+                    result.by_incident?.[k],
+                    draftByIncident[k] ?? {},
+                    incidentCap,
+                );
+            }
+            historical_analysis_by_incident = out;
+        }
+
+        return { historical_analysis, historical_analysis_by_incident };
+    }
+
+    /** Merge an AI-rewritten historical block over the deterministic draft, with array caps. */
+    private normalizeHistoricalAnalysis(
+        ai: Partial<HistoricalAnalysis> | undefined,
+        deterministic: HistoricalAnalysis,
+        cap: number,
+    ): HistoricalAnalysis {
+        const a = ai ?? {};
+        const pickStr = (v: unknown, fb?: string): string | undefined => {
+            const s = typeof v === 'string' ? v.trim() : '';
+            return s || (fb && fb.trim()) || undefined;
+        };
+        const pickArr = (v: unknown, fb: string[] | undefined): string[] | undefined => {
+            const list = Array.isArray(v) ? v.map((x) => String(x ?? '').trim()).filter(Boolean) : [];
+            if (list.length) return list.slice(0, cap);
+            return fb && fb.length ? fb : undefined;
+        };
+
+        // current_procedures: a capped AI summary wins; otherwise keep the full live ingest lines.
+        const aiCurrent = Array.isArray(a.current_procedures)
+            ? a.current_procedures.map((x) => String(x ?? '').trim()).filter(Boolean)
+            : [];
+        const current_procedures = aiCurrent.length
+            ? aiCurrent.slice(0, cap)
+            : deterministic.current_procedures;
+
+        return {
+            matched_event: pickStr(a.matched_event, deterministic.matched_event),
+            similarity_summary: pickStr(a.similarity_summary, deterministic.similarity_summary),
+            past_damages: pickArr(a.past_damages, deterministic.past_damages),
+            past_procedures: pickArr(a.past_procedures, deterministic.past_procedures),
+            current_procedures,
+            future_measures: pickArr(a.future_measures, deterministic.future_measures),
+            match_confidence: deterministic.match_confidence,
+        };
     }
 
     /**
@@ -1044,7 +1257,7 @@ Rules:
                 },
             ],
             incident_distribution: distro,
-            /** Filled after KPI alignment via {@link applyHistoricalContextToReport}. */
+            /** Filled after KPI alignment via {@link buildLiveHistoricalContext} + the AI Historical Context pass. */
             historical_analysis: {},
             sources_count: bundle.successfulSources,
             alerts_count,

@@ -181,8 +181,14 @@ function dedupeConsecutiveBullets(xs: string[]): string[] {
   return xs.filter((line, i) => i === 0 || line !== xs[i - 1]);
 }
 
+/** Strip every emphasis marker (any asterisks) from a string — for plain-text contexts like the PDF export. */
+function stripEmphasisMarkers(text: string): string {
+  return text.replace(/\*/g, "");
+}
+
 /**
- * Highlights measurements and IDs in ingest bullet lines (quake magnitudes, gauges, hotspots, dates).
+ * Highlights measurements and IDs in ingest bullet lines (quake magnitudes, gauges, hotspots,
+ * dates) and renders AI-emitted **double-asterisk** spans as bold.
  */
 function renderFindingEmphasis(text: string): ReactNode {
   const patterns = [
@@ -220,25 +226,52 @@ function renderFindingEmphasis(text: string): ReactNode {
     return best;
   };
 
-  const nodes: ReactNode[] = [];
-  let remaining = text;
-  let k = 0;
-  let guard = 0;
-  while (remaining.length > 0 && guard++ < 512) {
-    const span = findFirstSpan(remaining);
-    if (!span) {
-      nodes.push(<span key={`t-${k++}`}>{remaining}</span>);
-      break;
+  /** Auto-emphasize measurements / IDs within a plain (non-bold) text run. */
+  const emphasizePlain = (input: string, keyPrefix: string): ReactNode[] => {
+    const out: ReactNode[] = [];
+    let remaining = input;
+    let k = 0;
+    let guard = 0;
+    while (remaining.length > 0 && guard++ < 512) {
+      const span = findFirstSpan(remaining);
+      if (!span) {
+        out.push(<span key={`${keyPrefix}-t-${k++}`}>{remaining}</span>);
+        break;
+      }
+      if (span.start > 0) {
+        out.push(<span key={`${keyPrefix}-t-${k++}`}>{remaining.slice(0, span.start)}</span>);
+      }
+      out.push(
+        <strong key={`${keyPrefix}-b-${k++}`} className="font-bold text-[#232a43] tabular-nums">
+          {span.text}
+        </strong>,
+      );
+      remaining = remaining.slice(span.end);
     }
-    if (span.start > 0) {
-      nodes.push(<span key={`t-${k++}`}>{remaining.slice(0, span.start)}</span>);
+    return out;
+  };
+
+  // Split on emphasis markdown first — **bold** or *bold*; auto-emphasize the remaining runs.
+  // Any leftover/unmatched asterisk is removed so a marker never renders literally.
+  const nodes: ReactNode[] = [];
+  const stripStray = (s: string) => s.replace(/\*/g, "");
+  const boldRe = /\*\*([^*]+?)\*\*|\*([^*]+?)\*/g;
+  let last = 0;
+  let seg = 0;
+  let bm: RegExpExecArray | null;
+  while ((bm = boldRe.exec(text)) !== null) {
+    if (bm.index > last) {
+      nodes.push(...emphasizePlain(stripStray(text.slice(last, bm.index)), `s${seg++}`));
     }
     nodes.push(
-      <strong key={`b-${k++}`} className="font-bold text-[#232a43] tabular-nums">
-        {span.text}
+      <strong key={`md-${seg++}`} className="font-bold text-[#232a43]">
+        {bm[1] ?? bm[2] ?? ""}
       </strong>,
     );
-    remaining = remaining.slice(span.end);
+    last = bm.index + bm[0].length;
+  }
+  if (last < text.length) {
+    nodes.push(...emphasizePlain(stripStray(text.slice(last)), `s${seg++}`));
   }
 
   return nodes.length <= 1 ? (nodes[0] ?? text) : <Fragment>{nodes}</Fragment>;
@@ -701,7 +734,20 @@ export default function RiskAssessment() {
     writeBullets("Active Fire Threats", report.fire_findings, report.domain_severities?.fire);
 
     // Historical Comparative Analysis
-    const writeHistoricalQuadrants = (h: HistoricalAnalysis) => {
+    const writeHistoricalQuadrants = (raw: HistoricalAnalysis) => {
+      // jsPDF cannot render inline bold runs — drop the **markers** so no literal asterisks print.
+      const stripList = (xs?: string[]) => (xs ?? []).map(stripEmphasisMarkers);
+      const h: HistoricalAnalysis = {
+        ...raw,
+        matched_event: raw.matched_event ? stripEmphasisMarkers(raw.matched_event) : raw.matched_event,
+        similarity_summary: raw.similarity_summary
+          ? stripEmphasisMarkers(raw.similarity_summary)
+          : raw.similarity_summary,
+        past_damages: stripList(raw.past_damages),
+        past_procedures: stripList(raw.past_procedures),
+        current_procedures: stripList(raw.current_procedures),
+        future_measures: stripList(raw.future_measures),
+      };
       if (h.matched_event) {
         doc.setFont("helvetica", "bold");
         doc.setFontSize(11);

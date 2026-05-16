@@ -752,6 +752,41 @@ export function buildHistoricalAnalysisFromReport(
     };
 }
 
+/**
+ * Live-data-only historical scaffold. Supplies `current_procedures` (from live ingest)
+ * and the computed `match_confidence` ONLY — no static playbook prose. The OpenAI pass
+ * fills matched_event / similarity_summary / past_damages / past_procedures / future_measures.
+ *
+ * Use this instead of {@link applyHistoricalContextToReport} so the displayed Historical
+ * Context never shows the static copyFor* templates — only AI-generated analysis.
+ */
+export function buildLiveHistoricalContext(
+    bundle: DashboardIngestBundle,
+    report: RiskReport,
+): Pick<RiskReport, 'historical_analysis' | 'historical_analysis_by_incident'> {
+    const archetype = pickArchetype(report);
+    const historical_analysis: HistoricalAnalysis = {
+        current_procedures: buildRollupCurrentProcedures(report, archetype, bundle),
+        match_confidence: matchConfidence(report, archetype, bundle),
+    };
+
+    const byIncident: Partial<Record<IncidentHistoryCategory, HistoricalAnalysis>> = {};
+    for (const cat of INCIDENT_HISTORY_TAB_KEYS) {
+        if (distroCountForCategory(report, cat) <= 0) continue;
+        const live = deriveRealtimeProceduresForIncident(report, cat, bundle);
+        if (!live.length) continue;
+        byIncident[cat] = {
+            current_procedures: live,
+            match_confidence: matchConfidence(report, cat, bundle),
+        };
+    }
+
+    return {
+        historical_analysis,
+        historical_analysis_by_incident: Object.keys(byIncident).length ? byIncident : undefined,
+    };
+}
+
 export function applyHistoricalContextToReport(bundle: DashboardIngestBundle, report: RiskReport): RiskReport {
     return {
         ...report,
