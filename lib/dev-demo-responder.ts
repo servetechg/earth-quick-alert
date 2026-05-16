@@ -250,3 +250,167 @@ export function isDevDemoGasResponderAttempt(email: string, password: string): b
     const e = String(email).toLowerCase().trim();
     return e === DEV_DEMO_GAS_RESPONDER_EMAIL && password === DEV_DEMO_GAS_RESPONDER_PASSWORD;
 }
+
+/** Idempotent demo account for local dev only (electric vertical). */
+export const DEV_DEMO_ELECTRIC_RESPONDER_EMAIL = 'electric_demo@yopmail.com';
+export const DEV_DEMO_ELECTRIC_RESPONDER_PASSWORD = 'electric_demo_pass';
+const DEMO_ELECTRIC_NAME = 'Demo Electric Responder';
+
+export async function upsertDevDemoElectricResponder(): Promise<void> {
+    if (process.env.NODE_ENV === 'production') return;
+
+    await connectDB();
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(DEV_DEMO_ELECTRIC_RESPONDER_PASSWORD, salt);
+
+    const existing = await User.findOne({ email: DEV_DEMO_ELECTRIC_RESPONDER_EMAIL }).select('+password');
+    if (existing) {
+        existing.password = hashedPassword;
+        existing.role = 'responder';
+        existing.responderVertical = 'utility-electric';
+        existing.responderFunction = 'Regional electric company (demo)';
+        existing.accountStatus = 'approved';
+        await existing.save();
+        return;
+    }
+
+    await User.create({
+        name: DEMO_ELECTRIC_NAME,
+        email: DEV_DEMO_ELECTRIC_RESPONDER_EMAIL,
+        password: hashedPassword,
+        role: 'responder',
+        responderVertical: 'utility-electric',
+        responderFunction: 'Regional electric company (demo)',
+        accountStatus: 'approved',
+        licenseId: null,
+    });
+}
+
+export function isDevDemoElectricResponderAttempt(email: string, password: string): boolean {
+    if (process.env.NODE_ENV === 'production') return false;
+    const e = String(email).toLowerCase().trim();
+    return e === DEV_DEMO_ELECTRIC_RESPONDER_EMAIL && password === DEV_DEMO_ELECTRIC_RESPONDER_PASSWORD;
+}
+
+/** Idempotent demo account for local dev only (water vertical). */
+export const DEV_DEMO_WATER_RESPONDER_EMAIL = 'water_demo@yopmail.com';
+export const DEV_DEMO_WATER_RESPONDER_PASSWORD = 'water_demo_pass';
+const DEMO_WATER_NAME = 'Demo Water Responder';
+
+export async function upsertDevDemoWaterResponder(): Promise<void> {
+    if (process.env.NODE_ENV === 'production') return;
+
+    await connectDB();
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(DEV_DEMO_WATER_RESPONDER_PASSWORD, salt);
+
+    const existing = await User.findOne({ email: DEV_DEMO_WATER_RESPONDER_EMAIL }).select('+password');
+    if (existing) {
+        existing.password = hashedPassword;
+        existing.role = 'responder';
+        existing.responderVertical = 'utility-water';
+        existing.responderFunction = 'Regional water company (demo)';
+        existing.accountStatus = 'approved';
+        await existing.save();
+        return;
+    }
+
+    await User.create({
+        name: DEMO_WATER_NAME,
+        email: DEV_DEMO_WATER_RESPONDER_EMAIL,
+        password: hashedPassword,
+        role: 'responder',
+        responderVertical: 'utility-water',
+        responderFunction: 'Regional water company (demo)',
+        accountStatus: 'approved',
+        licenseId: null,
+    });
+}
+
+export function isDevDemoWaterResponderAttempt(email: string, password: string): boolean {
+    if (process.env.NODE_ENV === 'production') return false;
+    const e = String(email).toLowerCase().trim();
+    return e === DEV_DEMO_WATER_RESPONDER_EMAIL && password === DEV_DEMO_WATER_RESPONDER_PASSWORD;
+}
+
+/** Idempotent demo account for local dev only (food-supply-logistics vertical). */
+export const DEV_DEMO_FOOD_RESPONDER_EMAIL = 'food_demo@yopmail.com';
+export const DEV_DEMO_FOOD_RESPONDER_PASSWORD = 'food_demo_pass';
+const DEMO_FOOD_NAME = 'Demo Food & Supply Logistics';
+
+export async function upsertDevDemoFoodResponder(): Promise<void> {
+    if (process.env.NODE_ENV === 'production') return;
+
+    await connectDB();
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(DEV_DEMO_FOOD_RESPONDER_PASSWORD, salt);
+
+    const existing = await User.findOne({ email: DEV_DEMO_FOOD_RESPONDER_EMAIL }).select('+password');
+    if (existing) {
+        existing.password = hashedPassword;
+        existing.role = 'responder';
+        existing.responderVertical = 'food-logistics';
+        existing.responderFunction = 'Food, supply logistics - private sector (demo)';
+        existing.accountStatus = 'approved';
+        await existing.save();
+        return;
+    }
+
+    await User.create({
+        name: DEMO_FOOD_NAME,
+        email: DEV_DEMO_FOOD_RESPONDER_EMAIL,
+        password: hashedPassword,
+        role: 'responder',
+        responderVertical: 'food-logistics',
+        responderFunction: 'Food, supply logistics - private sector (demo)',
+        accountStatus: 'approved',
+        licenseId: null,
+    });
+}
+
+export function isDevDemoFoodResponderAttempt(email: string, password: string): boolean {
+    if (process.env.NODE_ENV === 'production') return false;
+    const e = String(email).toLowerCase().trim();
+    return e === DEV_DEMO_FOOD_RESPONDER_EMAIL && password === DEV_DEMO_FOOD_RESPONDER_PASSWORD;
+}
+
+/** Idempotent demo account for local dev only (national-guard vertical). */
+export const DEV_DEMO_NG_RESPONDER_EMAIL = 'ng_demo@yopmail.com';
+export const DEV_DEMO_NG_RESPONDER_PASSWORD = 'ng_demo_pass';
+const DEMO_NG_NAME = 'Demo National Guard';
+
+export async function upsertDevDemoNGResponder(): Promise<void> {
+    if (process.env.NODE_ENV === 'production') return;
+
+    await connectDB();
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(DEV_DEMO_NG_RESPONDER_PASSWORD, salt);
+
+    const existing = await User.findOne({ email: DEV_DEMO_NG_RESPONDER_EMAIL }).select('+password');
+    if (existing) {
+        existing.password = hashedPassword;
+        existing.role = 'responder';
+        existing.responderVertical = 'national-guard';
+        existing.responderFunction = 'National Guard (demo)';
+        existing.accountStatus = 'approved';
+        await existing.save();
+        return;
+    }
+
+    await User.create({
+        name: DEMO_NG_NAME,
+        email: DEV_DEMO_NG_RESPONDER_EMAIL,
+        password: hashedPassword,
+        role: 'responder',
+        responderVertical: 'national-guard',
+        responderFunction: 'National Guard (demo)',
+        accountStatus: 'approved',
+        licenseId: null,
+    });
+}
+
+export function isDevDemoNGResponderAttempt(email: string, password: string): boolean {
+    if (process.env.NODE_ENV === 'production') return false;
+    const e = String(email).toLowerCase().trim();
+    return e === DEV_DEMO_NG_RESPONDER_EMAIL && password === DEV_DEMO_NG_RESPONDER_PASSWORD;
+}

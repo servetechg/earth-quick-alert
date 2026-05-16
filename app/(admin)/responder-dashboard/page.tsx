@@ -10,6 +10,10 @@ import { PharmacyResourceDeploymentSection } from '@/components/responder/pharma
 import { TransitResourceDeploymentSection } from '@/components/responder/transit-resource-deployment-section'
 import { EnergyResourceDeploymentSection } from '@/components/responder/energy-resource-deployment-section'
 import { GasResourceDeploymentSection } from '@/components/responder/gas-resource-deployment-section'
+import { ElectricResourceDeploymentSection } from '@/components/responder/electric-resource-deployment-section'
+import { WaterResourceDeploymentSection } from '@/components/responder/water-resource-deployment-section'
+import { FoodLogisticsResourceDeploymentSection } from '@/components/responder/food-logistics-resource-deployment-section'
+import { NationalGuardResourceDeploymentSection } from '@/components/responder/national-guard-resource-deployment-section'
 import { GeneralResponderSection } from '@/components/responder/general-responder-section'
 import { ResponderInfoBar } from '@/components/responder/responder-info-bar'
 import { RESPONDER_VERTICAL_LABELS, type ResponderVertical, type ResponderDashboardKind } from '@/lib/responder-verticals'
@@ -19,6 +23,10 @@ import type {
   TransitResourceDeploymentPayload,
   EnergyResourceDeploymentPayload,
   GasResourceDeploymentPayload,
+  ElectricResourceDeploymentPayload,
+  WaterResourceDeploymentPayload,
+  FoodLogisticsResourceDeploymentPayload,
+  NationalGuardResourceDeploymentPayload,
 } from '@/lib/services/responder'
 
 type Bundle = {
@@ -32,6 +40,10 @@ type Bundle = {
   transit: TransitResourceDeploymentPayload | null
   energy: EnergyResourceDeploymentPayload | null
   gas: GasResourceDeploymentPayload | null
+  electric: ElectricResourceDeploymentPayload | null
+  water: WaterResourceDeploymentPayload | null
+  foodLogistics: FoodLogisticsResourceDeploymentPayload | null
+  nationalGuard: NationalGuardResourceDeploymentPayload | null
   general: GeneralResponderSummary | null
 }
 
@@ -77,7 +89,15 @@ export default function ResponderDashboardPage() {
                 ? `${vLabel}${bundle.responderFunction ? ` · ${bundle.responderFunction}` : ''}. Power outage areas and deployed power crews (mock).`
                 : bundle.kind === 'gas'
                   ? `${vLabel}${bundle.responderFunction ? ` · ${bundle.responderFunction}` : ''}. Gas leak areas and deployed repair crews (mock).`
-                  : `${vLabel}${bundle.responderFunction ? ` · ${bundle.responderFunction}` : ''}. This overview uses the same layout as other admin tools; metrics are mock until external APIs are connected.`
+                  : bundle.kind === 'electric'
+                    ? `${vLabel}${bundle.responderFunction ? ` · ${bundle.responderFunction}` : ''}. Power outage summary, vehicles deployed, outage map, and power crews (mock).`
+                    : bundle.kind === 'water'
+                      ? `${vLabel}${bundle.responderFunction ? ` · ${bundle.responderFunction}` : ''}. Water crews and resource deployment (mock).`
+                      : bundle.kind === 'food-logistics'
+                        ? `${vLabel}${bundle.responderFunction ? ` · ${bundle.responderFunction}` : ''}. Volunteers, dashboard response network (mock).`
+                        : bundle.kind === 'national-guard'
+                          ? `${vLabel}${bundle.responderFunction ? ` · ${bundle.responderFunction}` : ''}. Resource deployment — personnel, vehicles, staging areas (mock).`
+                          : `${vLabel}${bundle.responderFunction ? ` · ${bundle.responderFunction}` : ''}. This overview uses the same layout as other admin tools; metrics are mock until external APIs are connected.`
       : 'Loading your operational summary…'
 
   return (
@@ -99,6 +119,10 @@ export default function ResponderDashboardPage() {
       {bundle?.kind === 'transit' && <TransitResourceDeploymentSection compact />}
       {bundle?.kind === 'energy' && <EnergyResourceDeploymentSection compact />}
       {bundle?.kind === 'gas' && <GasResourceDeploymentSection compact />}
+      {bundle?.kind === 'electric' && <ElectricResourceDeploymentSection compact />}
+      {bundle?.kind === 'water' && <WaterResourceDeploymentSection compact />}
+      {bundle?.kind === 'food-logistics' && <FoodLogisticsResourceDeploymentSection compact />}
+      {bundle?.kind === 'national-guard' && <NationalGuardResourceDeploymentSection compact />}
       {bundle?.kind === 'general' && bundle.general && <GeneralResponderSection general={bundle.general} />}
     </AdminPageShell>
   )

@@ -7,6 +7,10 @@ import {
     getTransitResourceDeployment,
     getEnergyResourceDeployment,
     getGasResourceDeployment,
+    getElectricResourceDeployment,
+    getWaterResourceDeployment,
+    getFoodLogisticsResourceDeployment,
+    getNationalGuardResourceDeployment,
     recomputeHospitalSummary,
 } from './store';
 import type { GeneralResponderSummary } from './types';
@@ -27,6 +31,14 @@ export {
     setEnergyResourceDeployment,
     getGasResourceDeployment,
     setGasResourceDeployment,
+    getElectricResourceDeployment,
+    setElectricResourceDeployment,
+    getWaterResourceDeployment,
+    setWaterResourceDeployment,
+    getFoodLogisticsResourceDeployment,
+    setFoodLogisticsResourceDeployment,
+    getNationalGuardResourceDeployment,
+    setNationalGuardResourceDeployment,
     recomputeHospitalSummary,
 } from './store';
 
@@ -73,6 +85,10 @@ export function getResponderDashboardBundle(vertical: string, responderFunction:
         transit: kind === 'transit' ? getTransitResourceDeployment() : null,
         energy: kind === 'energy' ? getEnergyResourceDeployment() : null,
         gas: kind === 'gas' ? getGasResourceDeployment() : null,
+        electric: kind === 'electric' ? getElectricResourceDeployment() : null,
+        water: kind === 'water' ? getWaterResourceDeployment() : null,
+        foodLogistics: kind === 'food-logistics' ? getFoodLogisticsResourceDeployment() : null,
+        nationalGuard: kind === 'national-guard' ? getNationalGuardResourceDeployment() : null,
         general: kind === 'general' ? getGeneralResponderSummary(vertical, responderFunction, displayName) : null,
     };
 }

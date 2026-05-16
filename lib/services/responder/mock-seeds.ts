@@ -7,6 +7,10 @@ import type {
     TransitResourceDeploymentPayload,
     EnergyResourceDeploymentPayload,
     GasResourceDeploymentPayload,
+    ElectricResourceDeploymentPayload,
+    WaterResourceDeploymentPayload,
+    FoodLogisticsResourceDeploymentPayload,
+    NationalGuardResourceDeploymentPayload,
 } from './types';
 
 export function seedHospital(): HospitalCapacityPayload {
@@ -236,5 +240,211 @@ export function seedGas(): GasResourceDeploymentPayload {
             },
         ],
         coordinatorNotes: 'Mock gas network status and crew deployment for GIS resource demo.',
+    };
+}
+
+export function seedElectric(): ElectricResourceDeploymentPayload {
+    return {
+        networkId: 'mock-electric-net-001',
+        networkName: 'Demo Electric Company',
+        updatedAt: new Date().toISOString(),
+        source: 'mock',
+        sites: [
+            {
+                id: 'elec-1',
+                name: 'Downtown Substation Alpha',
+                address: '450 Main Street',
+                lat: 40.760,
+                lng: -111.891,
+                vehiclesDeployed: 6,
+                crewsDeployed: 12,
+                status: 'active',
+                notes: 'Major transformer outage. 3 repair teams on-site. ETA full restoration: 6 hours.',
+            },
+            {
+                id: 'elec-2',
+                name: 'Westside Grid Sector 4',
+                address: '1200 West Blvd',
+                lat: 40.755,
+                lng: -111.905,
+                vehiclesDeployed: 3,
+                crewsDeployed: 5,
+                status: 'limited',
+                notes: 'Partial power restored. Line crew assessing downed poles.',
+            },
+            {
+                id: 'elec-3',
+                name: 'Northgate Distribution Hub',
+                address: '800 Industrial Parkway N',
+                lat: 40.772,
+                lng: -111.882,
+                vehiclesDeployed: 4,
+                crewsDeployed: 8,
+                status: 'active',
+                notes: 'Preventive switchgear inspection post-earthquake.',
+            },
+            {
+                id: 'elec-4',
+                name: 'Residential Zone East 12',
+                address: 'Oak Ave & 7th East',
+                lat: 40.748,
+                lng: -111.870,
+                vehiclesDeployed: 2,
+                crewsDeployed: 4,
+                status: 'suspended',
+                notes: 'Awaiting safety clearance from structural engineers before line work.',
+            },
+        ],
+        coordinatorNotes: 'Mock electric company outage status and crew deployment for GIS resource demo. 4 active sites across metro area.',
+    };
+}
+
+export function seedWater(): WaterResourceDeploymentPayload {
+    return {
+        networkId: 'mock-water-net-001',
+        networkName: 'Demo Water Company',
+        updatedAt: new Date().toISOString(),
+        source: 'mock',
+        sites: [
+            {
+                id: 'water-1',
+                name: 'Main Reservoir Pump Station',
+                address: '300 Reservoir Drive',
+                lat: 40.765,
+                lng: -111.895,
+                crewsDeployed: 6,
+                status: 'active',
+                notes: 'Pump station running at 80% capacity. Crews monitoring pressure levels.',
+            },
+            {
+                id: 'water-2',
+                name: 'Eastside Water Main Break',
+                address: '900 East 5th Ave',
+                lat: 40.752,
+                lng: -111.875,
+                crewsDeployed: 4,
+                status: 'limited',
+                notes: 'Major water main rupture. Repair crew on-site, boil-water advisory issued.',
+            },
+            {
+                id: 'water-3',
+                name: 'Southgate Treatment Facility',
+                address: '1500 Industrial Blvd S',
+                lat: 40.740,
+                lng: -111.900,
+                crewsDeployed: 8,
+                status: 'active',
+                notes: 'Treatment plant operational. Extra crews for post-earthquake water quality testing.',
+            },
+        ],
+        coordinatorNotes: 'Mock water company crew deployment for GIS resource demo. 3 active sites.',
+    };
+}
+
+export function seedFoodLogistics(): FoodLogisticsResourceDeploymentPayload {
+    return {
+        networkId: 'mock-food-net-001',
+        networkName: 'Demo Food & Supply Logistics',
+        updatedAt: new Date().toISOString(),
+        source: 'mock',
+        sites: [
+            {
+                id: 'food-1',
+                name: 'Central Distribution Warehouse',
+                address: '200 Commerce Blvd',
+                lat: 40.760,
+                lng: -111.890,
+                volunteersDeployed: 25,
+                status: 'active',
+                notes: 'Main warehouse stocked with 10,000 MREs, bottled water, and hygiene kits. 3 trucks dispatched today.',
+            },
+            {
+                id: 'food-2',
+                name: 'Eastside Community Kitchen',
+                address: '855 East Center St',
+                lat: 40.750,
+                lng: -111.870,
+                volunteersDeployed: 12,
+                status: 'active',
+                notes: 'Hot meals served 7am-7pm. Capacity: 400 meals/day. Currently at 85% utilization.',
+            },
+            {
+                id: 'food-3',
+                name: 'Southgate Mobile Pantry',
+                address: '1400 South Main St',
+                lat: 40.738,
+                lng: -111.895,
+                volunteersDeployed: 8,
+                status: 'limited',
+                notes: 'Mobile pantry unit serving displaced families. Awaiting resupply of infant formula and diapers.',
+            },
+            {
+                id: 'food-4',
+                name: 'Northgate Volunteer Staging Area',
+                address: '3200 North Temple',
+                lat: 40.775,
+                lng: -111.910,
+                volunteersDeployed: 15,
+                status: 'active',
+                notes: 'Volunteer check-in and orientation site. Sorting donated goods for delivery routes.',
+            },
+        ],
+        coordinatorNotes: 'Mock food & supply logistics dashboard. 4 active distribution / staging sites across metro area.',
+    };
+}
+
+export function seedNationalGuard(): NationalGuardResourceDeploymentPayload {
+    return {
+        networkId: 'mock-ng-net-001',
+        networkName: 'Demo National Guard Unit',
+        updatedAt: new Date().toISOString(),
+        source: 'mock',
+        sites: [
+            {
+                id: 'ng-1',
+                name: 'Camp Williams Forward Operating Base',
+                address: '17800 Camp Williams Rd, Bluffdale',
+                lat: 40.438,
+                lng: -111.931,
+                personnelDeployed: 120,
+                vehiclesDeployed: 18,
+                status: 'active',
+                notes: 'Primary staging area. QRF team on 30-min recall. Aviation assets on standby.',
+            },
+            {
+                id: 'ng-2',
+                name: 'Downtown Emergency Staging Area',
+                address: '400 S State St, Salt Lake City',
+                lat: 40.760,
+                lng: -111.889,
+                personnelDeployed: 45,
+                vehiclesDeployed: 8,
+                status: 'active',
+                notes: 'Urban search-and-rescue element. Route clearance team coordinating with city PW.',
+            },
+            {
+                id: 'ng-3',
+                name: 'Westside Distribution Point',
+                address: '5600 West 3500 South',
+                lat: 40.700,
+                lng: -111.980,
+                personnelDeployed: 30,
+                vehiclesDeployed: 6,
+                status: 'limited',
+                notes: 'Water and MRE distribution. Awaiting fuel resupply for LMTV fleet.',
+            },
+            {
+                id: 'ng-4',
+                name: 'Northgate Medical Support Station',
+                address: '3200 North Temple',
+                lat: 40.775,
+                lng: -111.910,
+                personnelDeployed: 20,
+                vehiclesDeployed: 4,
+                status: 'active',
+                notes: 'CBRN monitoring and medical triage support. Coordinating with county EMS.',
+            },
+        ],
+        coordinatorNotes: 'Mock National Guard resource deployment. 4 staging sites with personnel and vehicles.',
     };
 }

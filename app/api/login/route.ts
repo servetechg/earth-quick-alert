@@ -20,6 +20,14 @@ import {
     upsertDevDemoEnergyResponder,
     isDevDemoGasResponderAttempt,
     upsertDevDemoGasResponder,
+    isDevDemoElectricResponderAttempt,
+    upsertDevDemoElectricResponder,
+    isDevDemoWaterResponderAttempt,
+    upsertDevDemoWaterResponder,
+    isDevDemoFoodResponderAttempt,
+    upsertDevDemoFoodResponder,
+    isDevDemoNGResponderAttempt,
+    upsertDevDemoNGResponder,
 } from '@/lib/dev-demo-responder';
 
 export async function POST(req: NextRequest) {
@@ -120,6 +128,62 @@ export async function POST(req: NextRequest) {
                 return NextResponse.json(
                     {
                         error: 'Database unavailable — could not create demo gas responder. Check MONGODB_URI in .env and restart the dev server.',
+                    },
+                    { status: 503 },
+                );
+            }
+        }
+
+        if (isDevDemoElectricResponderAttempt(normalizedEmail, password)) {
+            try {
+                await upsertDevDemoElectricResponder();
+            } catch (e) {
+                console.error('Dev demo electric responder upsert failed:', e);
+                return NextResponse.json(
+                    {
+                        error: 'Database unavailable — could not create demo electric responder. Check MONGODB_URI in .env and restart the dev server.',
+                    },
+                    { status: 503 },
+                );
+            }
+        }
+
+        if (isDevDemoWaterResponderAttempt(normalizedEmail, password)) {
+            try {
+                await upsertDevDemoWaterResponder();
+            } catch (e) {
+                console.error('Dev demo water responder upsert failed:', e);
+                return NextResponse.json(
+                    {
+                        error: 'Database unavailable — could not create demo water responder. Check MONGODB_URI in .env and restart the dev server.',
+                    },
+                    { status: 503 },
+                );
+            }
+        }
+
+        if (isDevDemoFoodResponderAttempt(normalizedEmail, password)) {
+            try {
+                await upsertDevDemoFoodResponder();
+            } catch (e) {
+                console.error('Dev demo food responder upsert failed:', e);
+                return NextResponse.json(
+                    {
+                        error: 'Database unavailable — could not create demo food responder. Check MONGODB_URI in .env and restart the dev server.',
+                    },
+                    { status: 503 },
+                );
+            }
+        }
+
+        if (isDevDemoNGResponderAttempt(normalizedEmail, password)) {
+            try {
+                await upsertDevDemoNGResponder();
+            } catch (e) {
+                console.error('Dev demo NG responder upsert failed:', e);
+                return NextResponse.json(
+                    {
+                        error: 'Database unavailable — could not create demo NG responder. Check MONGODB_URI in .env and restart the dev server.',
                     },
                     { status: 503 },
                 );
