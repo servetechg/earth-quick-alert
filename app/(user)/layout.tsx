@@ -6,6 +6,7 @@ import { UserSidebar } from '@/components/user-sidebar'
 import { Header } from '@/components/header'
 import { useEvents } from '@/lib/store/event-store'
 import { useSafety } from '@/lib/context/safety-context'
+import { notifyAuthSessionChanged } from '@/lib/sync-client-user-profile'
 
 export default function UserLayout({
     children,
@@ -79,6 +80,7 @@ export default function UserLayout({
         localStorage.removeItem('userRole')
         localStorage.removeItem('userEmail')
         localStorage.removeItem('userName')
+        notifyAuthSessionChanged()
         router.push('/login')
     }
 

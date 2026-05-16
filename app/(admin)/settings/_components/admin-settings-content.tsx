@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { AdminPageHeader } from '@/components/admin-page-header'
 import { AdminPageShell } from '@/components/admin-page-shell'
+import { AdminPageLoader } from '@/components/admin-page-loader'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
@@ -39,7 +40,7 @@ import type {
   SettingsTabKey,
 } from '../types'
 
-export type AdminSettingsVariant = 'super' | 'sub'
+export type AdminSettingsVariant = 'super' | 'sub' | 'responder'
 
 const TAB_ICON_MAP: Record<SettingsTabItem['icon'], ComponentType<{ className?: string }>> = {
   user: User,
@@ -159,13 +160,18 @@ export function AdminSettingsContent({ variant }: { variant: AdminSettingsVarian
         router.replace('/super-admin-dashboard')
         return
       }
-    } else {
+    } else if (variant === 'sub') {
       if (role === 'super-admin') {
         router.replace('/settings')
         return
       }
       if (role !== 'sub-admin') {
         router.replace('/admin-dashboard')
+        return
+      }
+    } else if (variant === 'responder') {
+      if (role !== 'responder') {
+        router.replace('/login')
         return
       }
     }
@@ -190,12 +196,21 @@ export function AdminSettingsContent({ variant }: { variant: AdminSettingsVarian
     ;(async () => {
       setNotificationsLoading(true)
 
-      const [profileRes, notifRes, dispatchRes, securityRes] = await Promise.all([
+      const fetches = [
         fetch('/api/user/profile', { credentials: 'same-origin' }),
-        fetch('/api/user/notification-preferences', { credentials: 'same-origin' }),
-        fetch('/api/admin/dispatch-settings', { credentials: 'same-origin' }),
-        fetch('/api/user/security', { credentials: 'same-origin' }),
-      ])
+      ]
+      
+      if (variant !== 'responder') {
+        fetches.push(fetch('/api/user/notification-preferences', { credentials: 'same-origin' }))
+        fetches.push(fetch('/api/admin/dispatch-settings', { credentials: 'same-origin' }))
+      } else {
+        fetches.push(Promise.resolve(new Response(JSON.stringify({}), { status: 200 })))
+        fetches.push(Promise.resolve(new Response(JSON.stringify({}), { status: 200 })))
+      }
+      
+      fetches.push(fetch('/api/user/security', { credentials: 'same-origin' }))
+
+      const [profileRes, notifRes, dispatchRes, securityRes] = await Promise.all(fetches)
 
       if (cancelled) return
 
@@ -662,11 +677,7 @@ export function AdminSettingsContent({ variant }: { variant: AdminSettingsVarian
   }
 
   if (!isAuthorized) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-      </div>
-    )
+    return <AdminPageLoader layout="fullscreen" />
   }
 
   return (
@@ -691,7 +702,7 @@ export function AdminSettingsContent({ variant }: { variant: AdminSettingsVarian
 
         <Tabs value={activeTab} onValueChange={handleSettingsTabChange} className="space-y-6">
         <TabsList className="bg-card shadow-card h-auto p-1.5 rounded-2xl flex-wrap">
-          {SETTINGS_TABS.map((tab) => {
+          {SETTINGS_TABS.filter((tab) => variant !== 'responder' || (tab.key !== 'dispatch' && tab.key !== 'notifications')).map((tab) => {
             const Icon = TAB_ICON_MAP[tab.icon]
             return (
               <TabsTrigger key={tab.key} value={tab.key} className="rounded-xl px-4 py-2 gap-2">

@@ -1,17 +1,20 @@
 'use client'
 
-import React, { useState } from "react"
-import { useRouter } from 'next/navigation'
+import React, { Suspense, useEffect, useState } from "react"
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import { Eye, EyeOff, User, Mail, Lock, MapPin, Navigation, Map, Shield } from 'lucide-react'
-import Link from 'next/link'
+import { Eye, EyeOff, User, Mail, Lock, MapPin, Navigation } from 'lucide-react'
 import Image from 'next/image'
 import logo from '../../public/logo.png'
 import { useJsApiLoader, Autocomplete, GoogleMap, MarkerF } from '@react-google-maps/api'
 import { GOOGLE_MAPS_API_KEY, GOOGLE_MAPS_LIBRARIES, GOOGLE_MAPS_LOADER_ID } from '@/lib/constants/google-maps-config'
+import { useUser } from '@/lib/store/user-store'
 
-export default function SignupPage() {
+function SignupPageInner() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const responderInviteToken = searchParams.get('responderInvite')?.trim() ?? ''
+  const { refresh: refreshUserProfile } = useUser()
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -29,6 +32,30 @@ export default function SignupPage() {
   const [map, setMap] = useState<google.maps.Map | null>(null)
 
   const [autocompleteInfo, setAutocompleteInfo] = useState<any>(null)
+  const [inviteRoleLabel, setInviteRoleLabel] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!responderInviteToken) return
+    let cancelled = false
+    void (async () => {
+      try {
+        const res = await fetch(
+          `/api/responder-invite/preview?token=${encodeURIComponent(responderInviteToken)}`,
+        )
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok || cancelled) return
+        setEmail(String(data.email || ''))
+        setInviteRoleLabel(
+          [data.responderFunction, data.responderVertical].filter(Boolean).join(' · ') || 'Responder',
+        )
+      } catch {
+        /* ignore */
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [responderInviteToken])
 
   const { isLoaded } = useJsApiLoader({
     id: GOOGLE_MAPS_LOADER_ID,
@@ -143,7 +170,18 @@ export default function SignupPage() {
       const response = await fetch('/api/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password, isSafe, role, country, state, city, zipcode }),
+        body: JSON.stringify({
+          name,
+          email,
+          password,
+          isSafe,
+          role,
+          country,
+          state,
+          city,
+          zipcode,
+          ...(responderInviteToken ? { responderInviteToken } : {}),
+        }),
       })
 
       const data = await response.json()
@@ -159,9 +197,13 @@ export default function SignupPage() {
         localStorage.setItem('userState', data.user.state || '')
         localStorage.setItem('userCountry', data.user.country || '')
 
+        await refreshUserProfile()
+
         if (data.user.accountStatus === 'pending') {
           router.push('/pending-approval')
         } else if (data.user.role === 'super-admin' || data.user.role === 'admin' || data.user.role === 'sub-admin') {
+          router.push('/')
+        } else if (data.user.role === 'responder') {
           router.push('/')
         } else if (!data.user.isSafe) {
           router.push('/virtual-eoc')
@@ -227,6 +269,11 @@ export default function SignupPage() {
             <div className="mb-10 text-center lg:text-left">
               <h2 className="text-3xl font-black text-[#33375D] mb-3 tracking-tighter uppercase">Create Account</h2>
               <p className="text-slate-400 font-bold uppercase text-[10px] tracking-[0.2em]">Enter your details</p>
+              {responderInviteToken && inviteRoleLabel && (
+                <p className="mt-4 text-xs font-semibold text-slate-600 normal-case tracking-normal">
+                  You are completing signup as an invited responder: <span className="text-[#33375D]">{inviteRoleLabel}</span>
+                </p>
+              )}
             </div>
 
             <form onSubmit={handleSignup} className="space-y-6 overflow-y-auto max-h-[70vh] px-1 pr-3 scrollbar-hide">
@@ -262,39 +309,42 @@ export default function SignupPage() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="name@company.com"
-                    className="w-full font-semibold pl-16 pr-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-[#33375D]/5 focus:border-[#33375D] transition-all text-[#33375D]"
+                    disabled={!!responderInviteToken}
+                    className="w-full font-semibold pl-16 pr-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-[#33375D]/5 focus:border-[#33375D] transition-all text-[#33375D] disabled:opacity-70 disabled:cursor-not-allowed"
                     required
                   />
                 </div>
               </div>
 
-              <div className="space-y-4">
-                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">
-                  Select Your Role
-                </label>
-                <div className="grid grid-cols-2 gap-4 mt-1">
-                  <button
-                    type="button"
-                    onClick={() => setRole('user')}
-                    className={`py-4 px-6 rounded-2xl border text-[11px] font-black uppercase tracking-widest transition-all ${role === 'user'
-                      ? 'bg-[#33375D] border-[#33375D] text-white shadow-lg'
-                      : 'bg-slate-50 border-slate-200 text-slate-500 hover:border-[#33375D]/30'
-                      }`}
-                  >
-                    Responder
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setRole('sub-admin')}
-                    className={`py-4 px-6 rounded-2xl border text-[11px] font-black uppercase tracking-widest transition-all ${role === 'sub-admin'
-                      ? 'bg-[#33375D] border-[#33375D] text-white shadow-lg'
-                      : 'bg-slate-50 border-slate-200 text-slate-500 hover:border-[#33375D]/30'
-                      }`}
-                  >
-                    Agency Admin
-                  </button>
+              {!responderInviteToken && (
+                <div className="space-y-4">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">
+                    Select Your Role
+                  </label>
+                  <div className="grid grid-cols-2 gap-4 mt-1">
+                    <button
+                      type="button"
+                      onClick={() => setRole('user')}
+                      className={`py-4 px-6 rounded-2xl border text-[11px] font-black uppercase tracking-widest transition-all ${role === 'user'
+                        ? 'bg-[#33375D] border-[#33375D] text-white shadow-lg'
+                        : 'bg-slate-50 border-slate-200 text-slate-500 hover:border-[#33375D]/30'
+                        }`}
+                    >
+                      Responder
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRole('sub-admin')}
+                      className={`py-4 px-6 rounded-2xl border text-[11px] font-black uppercase tracking-widest transition-all ${role === 'sub-admin'
+                        ? 'bg-[#33375D] border-[#33375D] text-white shadow-lg'
+                        : 'bg-slate-50 border-slate-200 text-slate-500 hover:border-[#33375D]/30'
+                        }`}
+                    >
+                      Authorized Admin
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Location Fields */}
               <div className="space-y-5 p-6 bg-[#33375D]/5 border border-[#33375D]/10 rounded-3xl animate-in fade-in slide-in-from-top-2 duration-500 shadow-inner">
@@ -470,5 +520,19 @@ export default function SignupPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function SignupPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC] text-slate-500 text-sm font-semibold">
+          Loading signup…
+        </div>
+      }
+    >
+      <SignupPageInner />
+    </Suspense>
   )
 }

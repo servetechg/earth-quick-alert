@@ -1,11 +1,10 @@
 'use client'
 
 import { useState, useRef, useEffect, useMemo } from 'react'
-import { Bell, Search, LogOut, Menu, X, Users, User, Settings, ChevronDown } from 'lucide-react'
+import { Bell, LogOut, Menu, X, Users, User, Settings, ChevronDown } from 'lucide-react'
 import { menuItems } from '@/components/sidebar'
 import { menuItems as userMenuItems } from '@/components/user-sidebar'
 import Link from 'next/link'
-import { Input } from '@/components/ui/input'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
 import { useUser } from '@/lib/store/user-store'
@@ -15,9 +14,16 @@ interface HeaderProps {
   onLogout?: () => void
   /** When true, the top search field is hidden (e.g. super-admin layout). */
   hideSearch?: boolean
+  /** Strip demo notification bell (e.g. hospital responder minimal shell). */
+  hideNotificationBell?: boolean
 }
 
-export function Header({ userName = 'Admin User', onLogout, hideSearch = false }: HeaderProps) {
+export function Header({
+  userName = 'Admin User',
+  onLogout,
+  hideSearch: _hideSearch = false,
+  hideNotificationBell = false,
+}: HeaderProps) {
   const [showDropdown, setShowDropdown] = useState(false)
   const [showSidebar, setShowSidebar] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -64,6 +70,7 @@ export function Header({ userName = 'Admin User', onLogout, hideSearch = false }
   const editProfileHref = useMemo(() => {
     if (userRole === 'super-admin') return '/settings?tab=profile'
     if (userRole === 'sub-admin') return '/sub-admin-settings?tab=profile'
+    if (userRole === 'responder') return '/responder-settings'
     return '/user/settings'
   }, [userRole])
 
@@ -88,6 +95,7 @@ export function Header({ userName = 'Admin User', onLogout, hideSearch = false }
           <Menu className="w-5 h-5" />
         </button>
 
+        {/* Search bar — commented out per product request
         {!hideSearch && (
           <div className="flex-1 max-w-sm hidden md:block">
             <div className="relative group">
@@ -99,15 +107,20 @@ export function Header({ userName = 'Admin User', onLogout, hideSearch = false }
             </div>
           </div>
         )}
+        */}
       </div>
 
       <div className="flex items-center gap-2 ">
-        <div className="flex items-center gap-4 border-r border-slate-100 pr-4 mr-1">
-          <div className="relative p-2 hover:bg-slate-50 rounded-xl transition-colors cursor-pointer group">
-            <Bell fill='#33375D' size={22} className="text-slate-900 transition-colors" />
-            <span className="absolute top-1.5 right-1.5 h-4 w-4 bg-rose-600 text-[9px] font-black text-white flex items-center justify-center rounded-full border-2 border-white">3</span>
+        {!hideNotificationBell && (
+          <div className="flex items-center gap-4 border-r border-slate-100 pr-4 mr-1">
+            <div className="relative p-2 hover:bg-slate-50 rounded-xl transition-colors cursor-pointer group">
+              <Bell fill="#33375D" size={22} className="text-slate-900 transition-colors" />
+              <span className="absolute top-1.5 right-1.5 h-4 w-4 bg-rose-600 text-[9px] font-black text-white flex items-center justify-center rounded-full border-2 border-white">
+                3
+              </span>
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="relative" ref={dropdownRef}>
           <button
@@ -134,7 +147,7 @@ export function Header({ userName = 'Admin User', onLogout, hideSearch = false }
               <Link
                 href={editProfileHref}
                 onClick={() => setShowDropdown(false)}
-                className="flex items-center gap-3 px-4 py-3 mx-2 rounded-2xl text-sm font-black text-slate-600 hover:bg-slate-50 hover:text-blue-600 transition-all"
+                className="flex items-center gap-3 px-4 py-3 mx-2 rounded-2xl text-sm font-bold text-slate-600 hover:bg-slate-50 hover:text-blue-600 transition-all"
               >
                 <div className="w-8 h-8 rounded-xl bg-blue-50 flex items-center justify-center text-blue-500">
                   <User className="w-4 h-4" />
@@ -149,7 +162,7 @@ export function Header({ userName = 'Admin User', onLogout, hideSearch = false }
                   setShowDropdown(false)
                   onLogout?.()
                 }}
-                className="flex items-center gap-3 px-4 py-3 mx-2 rounded-2xl text-sm font-black text-red-600 hover:bg-red-50 transition-all w-[calc(100%-16px)] text-left"
+                className="flex items-center gap-3 px-4 py-3 mx-2 rounded-2xl text-sm font-bold text-red-600 hover:bg-red-50 transition-all w-[calc(100%-16px)] text-left"
               >
                 <div className="w-8 h-8 rounded-xl bg-red-50 flex items-center justify-center text-red-500">
                   <LogOut className="w-4 h-4" />

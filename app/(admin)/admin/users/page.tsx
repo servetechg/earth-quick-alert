@@ -15,7 +15,6 @@ import {
     User,
     Search,
     Filter,
-    RefreshCw,
     MoreVertical,
     Mail,
     Calendar,
@@ -36,6 +35,7 @@ import {
 import { toast } from "sonner"
 import { GrantLicenseModal } from "@/components/modals/grant-license-modal"
 import { AddUserModal } from "@/components/modals/add-user-modal"
+import { AdminPageLoader } from '@/components/admin-page-loader'
 import { cn } from "@/lib/utils"
 import { AdminPageHeader } from '@/components/admin-page-header'
 import { AdminPageShell } from '@/components/admin-page-shell'
@@ -53,6 +53,7 @@ interface IUser {
     zipcode?: string;
     country?: string;
     responderFunction?: string;
+    responderVertical?: string;
     createdAt: string;
 }
 
@@ -191,14 +192,7 @@ export default function AdminUsersPage() {
 
     if (!mounted) return null;
 
-    if (loading && users.length === 0) return (
-        <div className="flex items-center justify-center min-h-screen bg-slate-50/50">
-            <div className="flex flex-col items-center gap-4">
-                <RefreshCw className="w-12 h-12 text-[#33375D] animate-spin" />
-                <p className="text-[#33375D] font-black uppercase tracking-widest text-xs">Accessing Personnel Matrix...</p>
-            </div>
-        </div>
-    )
+    if (loading && users.length === 0) return <AdminPageLoader />
 
     return (
         <>
@@ -457,7 +451,14 @@ export default function AdminUsersPage() {
                                                             </div>
                                                         </td>
                                                         <td className="px-8 py-6">
-                                                            <span className="text-[10px] font-black uppercase text-slate-500 tracking-widest bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100">{user.responderFunction || 'General Support'}</span>
+                                                            <div className="flex flex-col gap-2">
+                                                            <span className="text-[10px] font-black uppercase text-slate-500 tracking-widest bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100 w-fit">{user.responderFunction || 'General Support'}</span>
+                                                            {user.role === 'responder' && user.responderVertical ? (
+                                                                <span className="text-[9px] font-bold uppercase text-[#33375D] tracking-wide bg-[#FFD75E]/25 px-2 py-1 rounded-md border border-[#FFD75E]/40 w-fit">
+                                                                    {user.responderVertical.replace(/-/g, ' ')}
+                                                                </span>
+                                                            ) : null}
+                                                            </div>
                                                         </td>
                                                         <td className="px-8 py-6">
                                                             <Badge className={cn("text-[8px] font-black uppercase px-3 py-1 rounded-full border-none shadow-sm", user.accountStatus === 'approved' ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600")}>

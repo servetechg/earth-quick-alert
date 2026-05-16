@@ -8,7 +8,6 @@ import SystemStatus from '@/models/SystemStatus';
 import { recordActivity, ACTIVITY_ACTIONS } from '@/lib/activity-log';
 
 export async function POST(req: NextRequest) {
-    console.log('Login API request received at', new Date().toISOString());
     try {
         await connectDB();
 
@@ -26,11 +25,12 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Email and password are required' }, { status: 400 });
         }
 
+        const normalizedEmail = String(email).toLowerCase().trim();
+
         // Find user and include password field
-        const user = await User.findOne({ email }).select('+password');
+        const user = await User.findOne({ email: normalizedEmail }).select('+password');
 
         if (!user) {
-            console.log('User not found:', email);
             return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 });
         }
 
@@ -67,6 +67,8 @@ export async function POST(req: NextRequest) {
                 role: user.role,
                 accountStatus: user.accountStatus,
                 licenseId: user.licenseId?.toString() || null,
+                responderVertical: user.responderVertical || '',
+                responderFunction: user.responderFunction || '',
             },
             expires
         });
@@ -83,6 +85,8 @@ export async function POST(req: NextRequest) {
                 city: user.city || '',
                 state: user.state || '',
                 country: user.country || '',
+                responderVertical: user.responderVertical || '',
+                responderFunction: user.responderFunction || '',
             },
             systemMode: systemStatus.emergencyMode
         });

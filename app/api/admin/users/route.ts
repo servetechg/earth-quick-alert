@@ -3,6 +3,11 @@ import connectDB from '@/lib/mongodb';
 import User from '@/models/User';
 import { getSession } from '@/lib/auth';
 import { getSubAdminUserFilter } from '@/lib/admin-filters';
+import { isResponderVertical } from '@/lib/responder-verticals';
+import ResponderHospitalCapacity from '@/models/ResponderHospitalCapacity';
+import ResponderPoliceDeployment from '@/models/ResponderPoliceDeployment';
+import ResponderPharmacyDeployment from '@/models/ResponderPharmacyDeployment';
+import ResponderTransitDeployment from '@/models/ResponderTransitDeployment';
 
 export async function GET(req: NextRequest) {
     try {
@@ -12,6 +17,9 @@ export async function GET(req: NextRequest) {
         const roleFilter = searchParams.get('role');
         const requestedLicenseFilter = searchParams.get('requestedLicense');
         const licenseIdFilter = searchParams.get('licenseId');
+        const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
+        const limit = Math.max(1, parseInt(searchParams.get('limit') || '50', 10));
+        const skip = (page - 1) * limit;
 
         if (!session || (session.user.role !== 'super-admin' && session.user.role !== 'sub-admin' && session.user.role !== 'admin')) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -29,7 +37,12 @@ export async function GET(req: NextRequest) {
             } else {
                 leaderQuery._id = session.user.id;
             }
-            const users = await User.find(leaderQuery).sort({ createdAt: -1 });
+            const total = await User.countDocuments(leaderQuery);
+            const users = await User.find(leaderQuery)
+                .select('_id name email responderFunction responderVertical accountStatus city state role requestedLicense licenseId createdBy createdAt')
+                .sort({ createdAt: -1 })
+                .skip(skip)
+                .limit(limit);
             const userStats = {
                 totalUsers: await User.countDocuments({}),
                 pendingSubAdmins: await User.countDocuments({ role: 'sub-admin', accountStatus: 'pending' }),
@@ -44,7 +57,7 @@ export async function GET(req: NextRequest) {
                     requestedLicense: !!user.requestedLicense,
                 };
             }
-            return NextResponse.json({ users, currentUser, userStats });
+            return NextResponse.json({ users, total, currentUser, userStats });
         }
 
         let baseQuery: any = {};
@@ -64,8 +77,14 @@ export async function GET(req: NextRequest) {
         // 1. If explicit role filter is provided
         if (roleFilter && roleFilter !== 'all') {
             // Security: Sub-admins can't filter for roles they are not allowed to manage
-            if (session.user.role === 'sub-admin' && (roleFilter !== 'user' && !roleFilter.split(',').every(r => r === 'user'))) {
-                return NextResponse.json({ error: 'Unauthorized role access' }, { status: 403 });
+            if (session.user.role === 'sub-admin') {
+                const roles = roleFilter.includes(',')
+                    ? roleFilter.split(',').map((r) => r.trim())
+                    : [roleFilter.trim()];
+                const allowed = roles.every((r) => r === 'user' || r === 'responder');
+                if (!allowed) {
+                    return NextResponse.json({ error: 'Unauthorized role access' }, { status: 403 });
+                }
             }
 
             if (roleFilter.includes(',')) {
@@ -85,7 +104,12 @@ export async function GET(req: NextRequest) {
             query.licenseId = licenseIdFilter;
         }
 
-        const users = await User.find(query).sort({ createdAt: -1 });
+        const total = await User.countDocuments(query);
+        const users = await User.find(query)
+            .select('_id name email responderFunction responderVertical accountStatus city state role requestedLicense licenseId createdBy createdAt')
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limit);
 
         // Calculate stats for the dashboard cards (Requested by User)
         const userStats = {
@@ -107,7 +131,7 @@ export async function GET(req: NextRequest) {
             }
         }
 
-        return NextResponse.json({ users, currentUser, userStats });
+        return NextResponse.json({ users, total, currentUser, userStats });
     } catch (error) {
         console.error('Fetch users error:', error);
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
@@ -123,7 +147,7 @@ export async function PATCH(req: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const { userId, accountStatus, role, requestedLicense } = await req.json();
+        const { userId, accountStatus, role, requestedLicense, responderVertical, name, responderFunction } = await req.json();
 
         if (!userId) {
             return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
@@ -141,6 +165,8 @@ export async function PATCH(req: NextRequest) {
         }
 
         const updateData: any = {};
+        if (name) updateData.name = name;
+        if (responderFunction !== undefined) updateData.responderFunction = responderFunction;
         if (accountStatus) updateData.accountStatus = accountStatus;
         if (typeof requestedLicense === 'boolean') updateData.requestedLicense = requestedLicense;
         if (role) {
@@ -149,6 +175,21 @@ export async function PATCH(req: NextRequest) {
                 return NextResponse.json({ error: 'Unauthorized role promotion' }, { status: 403 });
             }
             updateData.role = role;
+            if (role !== 'responder') {
+                updateData.responderVertical = '';
+            } else if (responderVertical === undefined) {
+                updateData.responderVertical =
+                    targetUser.responderVertical || 'general-responder';
+            }
+        }
+        if (responderVertical !== undefined && session.user.role !== 'sub-admin') {
+            const raw = responderVertical === null || responderVertical === '' ? '' : String(responderVertical).trim();
+            if (raw && !isResponderVertical(raw)) {
+                return NextResponse.json({ error: 'Invalid responder vertical' }, { status: 400 });
+            }
+            if (targetUser.role === 'responder' || updateData.role === 'responder') {
+                updateData.responderVertical = raw || 'general-responder';
+            }
         }
 
         const updatedUser = await User.findByIdAndUpdate(
@@ -200,12 +241,26 @@ export async function POST(req: NextRequest) {
         const results = [];
 
         for (const userData of usersToCreate) {
-            const { name, email, password, role, responderFunction } = userData;
+            const { name, email, password, role, responderFunction, responderVertical } = userData;
 
             if (!name || !email || !password || !role) {
                 if (!isBulk) return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
                 results.push({ email, error: 'Missing required fields', success: false });
                 continue;
+            }
+
+            let verticalField = '';
+            if (role === 'responder') {
+                const raw =
+                    responderVertical !== undefined && responderVertical !== null
+                        ? String(responderVertical).trim()
+                        : '';
+                if (raw && !isResponderVertical(raw)) {
+                    if (!isBulk) return NextResponse.json({ error: 'Invalid responder vertical' }, { status: 400 });
+                    results.push({ email, error: 'Invalid responder vertical', success: false });
+                    continue;
+                }
+                verticalField = raw || 'general-responder';
             }
 
             const userExists = await User.findOne({ email });
@@ -224,6 +279,7 @@ export async function POST(req: NextRequest) {
                 password: hashedPassword,
                 role,
                 responderFunction: responderFunction || '',
+                responderVertical: verticalField,
                 licenseId: creator.licenseId || null,
                 city: creator.city || '',
                 country: creator.country || '',
@@ -257,3 +313,45 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
     }
 }
+
+export async function DELETE(req: NextRequest) {
+    try {
+        await connectDB();
+        const session = await getSession();
+
+        if (!session || (session.user.role !== 'super-admin' && session.user.role !== 'sub-admin' && session.user.role !== 'admin')) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        const { searchParams } = new URL(req.url);
+        const userId = searchParams.get('userId');
+
+        if (!userId) {
+            return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
+        }
+
+        const targetUser = await User.findById(userId);
+        if (!targetUser) {
+            return NextResponse.json({ error: 'User not found' }, { status: 404 });
+        }
+
+        if (session.user.role === 'sub-admin' && targetUser.role !== 'user' && targetUser.role !== 'responder') {
+            return NextResponse.json({ error: 'Sub-Admins can only delete regular users or responders' }, { status: 403 });
+        }
+
+        await Promise.all([
+            ResponderHospitalCapacity.deleteMany({ ownerUserId: userId }),
+            ResponderPoliceDeployment.deleteMany({ ownerUserId: userId }),
+            ResponderPharmacyDeployment.deleteMany({ ownerUserId: userId }),
+            ResponderTransitDeployment.deleteMany({ ownerUserId: userId }),
+        ]);
+
+        await User.findByIdAndDelete(userId);
+
+        return NextResponse.json({ success: true });
+    } catch (error) {
+        console.error('Delete user error:', error);
+        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    }
+}
+
