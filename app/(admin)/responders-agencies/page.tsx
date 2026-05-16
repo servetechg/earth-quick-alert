@@ -91,6 +91,7 @@ export default function RespondersAgenciesPage() {
     const [inviteEmail, setInviteEmail] = useState('')
     const [inviteOptionId, setInviteOptionId] = useState('')
     const [submitting, setSubmitting] = useState(false)
+    const [inviteError, setInviteError] = useState<string | null>(null)
 
     const [usersPage, setUsersPage] = useState(1);
     const [usersTotal, setUsersTotal] = useState(0);
@@ -147,8 +148,9 @@ export default function RespondersAgenciesPage() {
 
     const sendInvite = async (e: React.FormEvent) => {
         e.preventDefault()
+        setInviteError(null)
         if (!inviteEmail.trim() || !inviteOptionId) {
-            toast.error('Email and role/function are required')
+            setInviteError('Email and role/function are required')
             return
         }
         setSubmitting(true)
@@ -160,7 +162,7 @@ export default function RespondersAgenciesPage() {
             })
             const data = await res.json().catch(() => ({}))
             if (!res.ok) {
-                toast.error(data.error || 'Invite failed')
+                setInviteError(data.error || 'Invite failed')
                 return
             }
             if (data.emailSent) {
@@ -547,7 +549,10 @@ export default function RespondersAgenciesPage() {
                 </div>
             </Card>
 
-            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <Dialog open={dialogOpen} onOpenChange={(val) => {
+                setDialogOpen(val)
+                if (!val) setInviteError(null)
+            }}>
                 <DialogContent className="sm:max-w-md">
                     <DialogHeader>
                         <DialogTitle>Add responder</DialogTitle>
@@ -556,6 +561,11 @@ export default function RespondersAgenciesPage() {
                         </DialogDescription>
                     </DialogHeader>
                     <form onSubmit={sendInvite} className="space-y-4">
+                        {inviteError && (
+                            <div className="p-3 rounded-md bg-rose-50 border border-rose-200 text-rose-600 text-sm">
+                                {inviteError}
+                            </div>
+                        )}
                         <div className="space-y-2">
                             <Label htmlFor="invite-email">Email</Label>
                             <Input
