@@ -70,7 +70,7 @@ export function Header({
   const editProfileHref = useMemo(() => {
     if (userRole === 'super-admin') return '/settings?tab=profile'
     if (userRole === 'sub-admin') return '/sub-admin-settings?tab=profile'
-    if (userRole === 'responder') return '/virtual-eoc-settings'
+    if (userRole === 'responder') return '/responder-settings'
     return '/user/settings'
   }, [userRole])
 

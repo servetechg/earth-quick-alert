@@ -60,7 +60,7 @@ export default function ResponderDashboardPage() {
     ? `Could not load this dashboard: ${err}`
     : bundle
       ? bundle.kind === 'hospital'
-        ? `${vLabel}${bundle.responderFunction ? ` · ${bundle.responderFunction}` : ''} (demo).`
+        ? `${vLabel}${bundle.responderFunction ? ` · ${bundle.responderFunction}` : ''}`
         : bundle.kind === 'police'
           ? `${vLabel}${bundle.responderFunction ? ` · ${bundle.responderFunction}` : ''}. Track incident teams, operations, and staging (mock).`
           : bundle.kind === 'pharmacy'

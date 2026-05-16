@@ -20,6 +20,7 @@ export const RESPONDER_VERTICALS = [
     'telecom',
     'national-guard',
     'federal',
+    'state-government',
     'nonprofit',
 ] as const;
 
@@ -42,6 +43,7 @@ export const RESPONDER_VERTICAL_LABELS: Record<ResponderVertical, string> = {
     telecom: 'Broadband / cellular',
     'national-guard': 'National Guard',
     federal: 'Federal staging',
+    'state-government': 'State government',
     nonprofit: 'Nonprofit / VOAD',
 };
 

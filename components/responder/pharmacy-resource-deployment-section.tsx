@@ -124,7 +124,7 @@ export function PharmacyResourceDeploymentSection({ compact }: Props) {
         throw new Error((err as { error?: string }).error || 'Save failed')
       }
       setData(await res.json())
-      toast.success('Pharmacy resource list updated (mock)')
+      toast.success('Pharmacy resource list updated.')
       return true
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : 'Save failed'
@@ -494,7 +494,7 @@ export function PharmacyResourceDeploymentSection({ compact }: Props) {
             <AlertDialogTitle>Remove this site?</AlertDialogTitle>
             <AlertDialogDescription>
               {deleteIndex !== null && data.sites[deleteIndex]
-                ? `Remove “${data.sites[deleteIndex].name}” from the deployment list (mock store).`
+                ? `Remove “${data.sites[deleteIndex].name}” from the deployment list.`
                 : 'Remove this row from the deployment list.'}
             </AlertDialogDescription>
           </AlertDialogHeader>
