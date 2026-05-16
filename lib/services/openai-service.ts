@@ -140,8 +140,6 @@ const PLAIN_ENGLISH_STYLE_RULES = `WRITING STYLE — this report is read by ordi
 export class OpenAIService {
     private apiKey = process.env.OPENAI_API_KEY || '';
     private model = process.env.OPENAI_MODEL || 'gpt-4o-mini';
-    /** Stronger model for the public-facing Historical Context narrative (plain-English summarization). */
-    private historicalModel = process.env.OPENAI_HISTORICAL_MODEL || 'gpt-4o';
 
     private canUseOpenAI(): boolean {
         return Boolean(this.apiKey);
@@ -153,20 +151,12 @@ export class OpenAIService {
         options?: { max_tokens?: number; model?: string; temperature?: number }
     ): Promise<T> {
         if (!this.canUseOpenAI()) {
-            console.log('⚠️ [OpenAI Service] Bypassed API call: OPENAI_API_KEY is missing. Using fallback heuristic data.');
             return fallback;
         }
 
         const effectiveModel = options?.model || this.model;
 
         try {
-            // --- NEW LOGGING ADDED HERE ---
-            console.log('\n================ OPENAI API REQUEST START ================');
-            console.log(`[Target Model]: ${effectiveModel}`);
-            console.log(`[System Prompt]:\n`, messages.find(m => m.role === 'system')?.content);
-            console.log(`[User Payload / Data Sent]:\n`, messages.find(m => m.role === 'user')?.content);
-            console.log('==========================================================\n');
-
             const response = await fetch('https://api.openai.com/v1/chat/completions', {
                 method: 'POST',
                 headers: {
@@ -177,28 +167,23 @@ export class OpenAIService {
                     model: effectiveModel,
                     messages,
                     response_format: { type: 'json_object' },
-                    ...(typeof options?.max_tokens === 'number' ? { max_tokens: options.max_tokens } : {}),
                     ...(typeof options?.temperature === 'number' ? { temperature: options.temperature } : {}),
                 }),
             });
 
             if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                console.error('❌ [OpenAI Service] Request Failed with status:', response.status, errorData);
-                throw new Error(errorData?.error?.message || `OpenAI request failed: ${response.status}`);
+                throw new Error(`OpenAI request failed: ${response.status}`);
             }
 
             const data = await response.json();
             const content = data?.choices?.[0]?.message?.content;
+
             if (!content) {
-                console.log('⚠️ [OpenAI Service] Response came back empty. Using fallback.');
                 return fallback;
             }
 
-            console.log('✅ [OpenAI Service] Successfully received structured JSON response.');
             return JSON.parse(content) as T;
         } catch (error) {
-            console.error('❌ [OpenAI Service] request failed, using fallback:', error);
             return fallback;
         }
     }
@@ -775,7 +760,7 @@ ${(bundle.narrative ?? '').slice(0, 8000)}`;
                 { role: 'user', content: user },
             ],
             { rollup: draftRollup, by_incident: draftByIncident },
-            { model: this.historicalModel, max_tokens: 1800, temperature: 0.3 },
+            { model: this.model, max_tokens: 1800, temperature: 0.3 },
         );
 
         const historical_analysis = this.normalizeHistoricalAnalysis(
