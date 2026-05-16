@@ -159,18 +159,22 @@ export function middleware(request: NextRequest) {
             return NextResponse.redirect(new URL('/admin-dashboard', request.url))
         }
 
-        // 2b. AI Risk Assessment — super-admin, admin, sub-admin (EOC roles use Virtual EOC)
+        // 2b. AI Risk Assessment — same operational roles as other admin tools (not EOC-exclusive portal)
         if (pathname.startsWith('/ai-risk-assessment')) {
             if (isEOCRole) {
                 return NextResponse.redirect(new URL('/virtual-eoc', request.url))
             }
-            if (userRole !== 'super-admin') {
+            const canAccessAiRisk =
+                userRole === 'super-admin' ||
+                userRole === 'admin' ||
+                userRole === 'sub-admin' ||
+                userRole === 'observer' ||
+                userRole === 'manager'
+            if (!canAccessAiRisk) {
                 const dest =
-                    userRole === 'admin' || userRole === 'sub-admin' || userRole === 'observer' || userRole === 'manager'
-                        ? '/admin-dashboard'
-                        : userRole === 'responder'
-                          ? '/responder-dashboard'
-                          : '/user-dashboard'
+                    userRole === 'responder'
+                        ? '/responder-dashboard'
+                        : '/user-dashboard'
                 return NextResponse.redirect(new URL(dest, request.url))
             }
         }

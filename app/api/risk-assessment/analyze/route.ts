@@ -7,6 +7,7 @@ import { countReady2GoReachableUsers } from '@/lib/services/ready2go-reachable-u
 import { recordActivity, ACTIVITY_ACTIONS } from '@/lib/activity-log';
 import { fetchAlignedAlertCommunicationFeed } from '@/lib/services/alert-communication-aligned-feed';
 import { applyRiskReportToAlignedAlertFeed } from '@/lib/services/risk-report-alert-alignment';
+import { resolveRiskIngestScopeForSession } from '@/lib/risk-assessment/resolve-ingest-scope';
 
 /** Roles allowed to run Dashboard A fusion (aligned with admin operational tooling). */
 const ALLOWED_ROLES = new Set([
@@ -43,20 +44,19 @@ export async function POST(req: Request) {
             /* empty body */
         }
 
-        /** Default true — NWS / sampled USGS-NWPS parity with Alerts & Communication. Set `nationwide:false` + 2-letter `stateCd` for legacy single-state AOI. */
-        const useNationwide = body.nationwide !== false;
-        const stateCd =
-            useNationwide
-                ? undefined
-                : typeof body.stateCd === 'string' && body.stateCd.length === 2
-                  ? body.stateCd.toLowerCase()
-                  : 'ca';
+        const scope = await resolveRiskIngestScopeForSession(
+            role,
+            session.user.id as string | undefined,
+            body,
+        );
+        const useNationwide = scope.nationwide;
+        const stateCd = scope.stateCd;
         const nwpsGaugeId =
             typeof body.nwpsGaugeId === 'string' && body.nwpsGaugeId.length > 0 ? body.nwpsGaugeId : 'SACC1';
         const usgsSite = typeof body.usgsSite === 'string' && body.usgsSite.length > 0 ? body.usgsSite : undefined;
 
         const bundle = await runDashboardIngest({
-            ...(stateCd != null ? { stateCd } : {}),
+            stateCd,
             nwpsGaugeId,
             usgsSite,
             nationwide: useNationwide,

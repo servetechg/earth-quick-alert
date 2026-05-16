@@ -3,7 +3,52 @@
  * Uses incident_distribution (+ active incident totals), not prose line counts.
  */
 
-import type { DashboardIngestBundle, HistoricalAnalysis, RiskReport } from '@/lib/types/risk-assessment';
+import {
+    INCIDENT_HISTORY_TAB_KEYS,
+    type DashboardIngestBundle,
+    type HistoricalAnalysis,
+    type IncidentHistoryCategory,
+    type DistroPoint,
+    type RiskReport,
+} from '@/lib/types/risk-assessment';
+import {
+    classifyNwsIncidentDistributionBucket,
+    isFloodRelatedEvent,
+} from '@/lib/services/risk-ingest-service';
+
+/**
+ * Heuristic / “no signals” ingest lines — must not spawn historical tabs or drown chart alignment.
+ */
+export function isNoiseIngestFindingLine(line: string): boolean {
+    const t = line.trim().toLowerCase();
+    if (!t) return true;
+    if (/^hydrological ingest incomplete\b/.test(t)) return true;
+    if (/^wildfire layer signals sparse or unavailable\b/.test(t)) return true;
+    if (/^no notable earthquake or flood\b/.test(t)) return true;
+    if (/no earthquakes in m2\.5\+\b/.test(t)) return true;
+    if (/no nasa viirs hotspots\b/.test(t)) return true;
+    if (/^no inciweb wildfire rss items\b/.test(t)) return true;
+    if (/firms json ok but no hotspot rows\b/.test(t)) return true;
+    if (/csv parsed but no coordinate rows\b/.test(t)) return true;
+    if (/\bno wfigs perimeter features\b/.test(t)) return true;
+    if (/returned no features for this pull\b/.test(t)) return true;
+    if (/interagency perimeter layer returned no features\b/.test(t)) return true;
+    if (/empty window or outside current aoi\b/.test(t)) return true;
+    return false;
+}
+
+/** Met findings bucketed for incident tabs (excludes earthquake — handled separately). */
+const NWS_SURFACE_TABS: IncidentHistoryCategory[] = [
+    'tornado',
+    'storm',
+    'hazardous',
+    'coastal_surf',
+    'marine',
+];
+
+function isKnownIncidentCategory(cat: string): cat is IncidentHistoryCategory {
+    return (INCIDENT_HISTORY_TAB_KEYS as readonly string[]).includes(cat);
+}
 
 type HazardArchetype =
     | 'flood'
@@ -23,18 +68,44 @@ function distroCounts(report: RiskReport): {
     coastal_surf: number;
     marine: number;
 } {
-    const d = report.incident_distribution ?? [];
-    const get = (cat: string) => Math.max(0, Math.floor(d.find((x) => x.category === cat)?.count ?? 0));
-    return {
-        flood: get('flood'),
-        wildfire: get('wildfire'),
-        earthquake: get('earthquake'),
-        tornado: get('tornado'),
-        storm: get('storm'),
-        hazardous: get('hazardous'),
-        coastal_surf: get('coastal_surf'),
-        marine: get('marine'),
+    /** Sum counts across duplicate rows so totals match stacked bar-chart expectations. */
+    const totals = {
+        flood: 0,
+        wildfire: 0,
+        earthquake: 0,
+        tornado: 0,
+        storm: 0,
+        hazardous: 0,
+        coastal_surf: 0,
+        marine: 0,
     };
+
+    for (const row of report.incident_distribution ?? []) {
+        const cat = String(row.category ?? '').trim().toLowerCase();
+        if (!isKnownIncidentCategory(cat)) continue;
+        const parsed = Number(row.count);
+        const n = Number.isFinite(parsed) ? Math.max(0, Math.floor(parsed)) : 0;
+        totals[cat] += n;
+    }
+
+    return totals;
+}
+
+/** Incident types with strictly positive aggregated bar-chart count (single source for tabs + rollup). */
+export function incidentCategoriesWithPositiveChartCount(report: RiskReport): IncidentHistoryCategory[] {
+    const c = distroCounts(report);
+    return INCIDENT_HISTORY_TAB_KEYS.filter((k) => (c[k] ?? 0) > 0);
+}
+
+/** One row per bar-chart bucket; counts match {@link distroCounts} (aggregated + lowercase keys). */
+export function incidentDistributionRowsAligned(report: RiskReport): DistroPoint[] {
+    const c = distroCounts(report);
+    return INCIDENT_HISTORY_TAB_KEYS.map((category) => ({ category, count: c[category] ?? 0 }));
+}
+
+/** Bar-chart / `incident_distribution` count — drives which historical subtabs appear. */
+function distroCountForCategory(report: RiskReport, cat: IncidentHistoryCategory): number {
+    return distroCounts(report)[cat];
 }
 
 function nwsSurfaceTotal(c: ReturnType<typeof distroCounts>): number {
@@ -58,7 +129,11 @@ function pickArchetype(report: RiskReport): HazardArchetype {
     return 'baseline';
 }
 
-function matchConfidence(report: RiskReport, archetype: HazardArchetype, bundle: DashboardIngestBundle): number {
+function matchConfidence(
+    report: RiskReport,
+    archetype: HazardArchetype | IncidentHistoryCategory,
+    bundle: DashboardIngestBundle,
+): number {
     const c = distroCounts(report);
     const n =
         c.flood +
@@ -197,6 +272,111 @@ function copyForEarthquake(state: string): HistoricalAnalysis {
     };
 }
 
+function copyForTornado(state: string): HistoricalAnalysis {
+    const s = ST(state);
+    return {
+        matched_event: `Tornado-focused warning episode — ${s}`,
+        similarity_summary: `Short-fuse tornado and severe-convective polygons in ${s} historically compress warning lead time, stress spotter nets, and drive shelter-in-place messaging load on PSAPs and schools.`,
+        past_damages: [
+            'Structural / roof loss and debris fields when mesocyclones track across subdivisions or industrial parks.',
+            'Downed power distribution and blocked ingress for EMS when tree falls align with road grids.',
+        ],
+        past_procedures: [
+            'Polygon-targeted alerting with shelter mapping; Skywarn net activation ahead of mesoscale discussion windows.',
+            'Pre-positioning damage assessment and utility aviation after initial rotation signals.',
+        ],
+        current_procedures: [],
+        future_measures: [
+            'Radar gap infill and lightning-density thresholds tied to push templates for outdoor venues.',
+            'Tabletop reverse-911 saturation and multilingual shelter routing in dense metro counties.',
+        ],
+    };
+}
+
+function copyForStorm(state: string): HistoricalAnalysis {
+    const s = ST(state);
+    return {
+        matched_event: `Severe thunderstorm / convective tropical episode — ${s}`,
+        similarity_summary: `Hail, wind, lightning, and tropical-cyclone precursor products in ${s} correlate with aviation holds, ground-stop windows, and cascading power-line trips across broad warning areas.`,
+        past_damages: [
+            'Hail losses to exposed aircraft, solar, and vehicles; wind-thrown signage and partial roof lifts.',
+            'Flashy rain rates overwhelming urban drainage when convection trains over the same corridors.',
+        ],
+        past_procedures: [
+            'Coordinated ground stops and ramp holds with NWS updates each operational period.',
+            'Utility mutual-aid staging for wire-down surges after MCS or bow-echo passages.',
+        ],
+        current_procedures: [],
+        future_measures: [
+            'Probabilistic briefing templates for probabilistic severe outlooks + asset pre-positioning.',
+            'Hardened METAR/ASOS cross-checks inside Virtual EOC overlays.',
+        ],
+    };
+}
+
+function copyForHazardousSurface(state: string): HistoricalAnalysis {
+    const s = ST(state);
+    return {
+        matched_event: `Hazardous weather / winter–wind / air-quality episode — ${s}`,
+        similarity_summary: `Winter storm, ice, extreme temperature, dense smoke, and high-wind products for ${s} align with historical multi-day utility restoration, cooling/warming center demand, and evacuation timing friction.`,
+        past_damages: [
+            'Cold-related infrastructure failures, heat-illness surges, and smoke-inhalation presentations at clinics.',
+            'Multi-county road treatment and tree-trim backlogs when icing stacks with wind gusts.',
+        ],
+        past_procedures: [
+            'Warming/cooling center pre-activation; roadway treatment priority lists with hospital access routes.',
+            'Air-quality health messaging coordination with schools and elder-care networks.',
+        ],
+        current_procedures: [],
+        future_measures: [
+            'Fuel and generator cache programs for extended grid-stress windows.',
+            'Post-event attribution studies on warning polygon accuracy vs. preventable injuries.',
+        ],
+    };
+}
+
+function copyForCoastalSurf(state: string): HistoricalAnalysis {
+    const s = ST(state);
+    return {
+        matched_event: `Coastal surf / beach-hazard episode — ${s}`,
+        similarity_summary: `High surf, rip-current, and coastal flood-adjacent signage in ${s} mirror past surf rescue surges, inundation of low boardwalks, and tourist-heavy beach closures during long-period swell.`,
+        past_damages: [
+            'Rip-current drownings or near-misses when lifeguard coverage thins at dusk or during king tides.',
+            'Erosion and structure undermining at vulnerable reaches during stacked high-tide cycles.',
+        ],
+        past_procedures: [
+            'Beach closure boards, flag systems, and multilingual shore-access messaging.',
+            'Coordinated USCG / lifeguard briefings when long-period swell overlaps holiday weekends.',
+        ],
+        current_procedures: [],
+        future_measures: [
+            'Annual update of inundation graphics and pier / promenade closure SOPs.',
+            'Public education campaigns keyed to tide tables and NOAA surf products.',
+        ],
+    };
+}
+
+function copyForMarine(state: string): HistoricalAnalysis {
+    const s = ST(state);
+    return {
+        matched_event: `Marine / offshore hazard episode — ${s}`,
+        similarity_summary: `Gale, small-craft, freezing-spray, and special marine contexts for ${s} historically stress port logistics, fisheries safety, and small-vessel egress timing ahead of sharpening gradients.`,
+        past_damages: [
+            'Vessel distress and marine SAR tasking when inexperienced operators underestimate building seas.',
+            'Port slowdowns during gale windows and berth scheduling conflicts.',
+        ],
+        past_procedures: [
+            'Harbor master coordination with NWS Marine Forecast Desk; PSC VHF guard monitoring.',
+            'Predeclaration of tug/escort posture for laden tankers and cruise movements.',
+        ],
+        current_procedures: [],
+        future_measures: [
+            'Investment in AIS correlation with NOAA marine zones for tighter Virtual EOC geofencing.',
+            'Seasonal small-craft education with bar-crossing hazards.',
+        ],
+    };
+}
+
 function copyForMulti(state: string): HistoricalAnalysis {
     const s = ST(state);
     return {
@@ -253,12 +433,302 @@ function copyForBaseline(state: string): HistoricalAnalysis {
     };
 }
 
+export const INCIDENT_HISTORY_TAB_LABELS: Record<IncidentHistoryCategory, string> = {
+    flood: 'Flood',
+    tornado: 'Tornado',
+    storm: 'Storm',
+    hazardous: 'Hazardous',
+    coastal_surf: 'Coastal surf',
+    marine: 'Marine',
+    wildfire: 'Wildfire',
+    earthquake: 'Earthquake',
+};
+
+export function isLikelyEarthquakeBullet(text: string): boolean {
+    const t = text.toLowerCase();
+    if (/\bearthquake\b|\bseismic\b|\bepicenter\b|\baftershock\b/.test(t)) return true;
+    if (/earthquake\s+magnitude|magnitude\s+m\d/i.test(text)) return true;
+    return /^earthquake\s+magnitude\s+m/i.test(text.trim());
+}
+
+/** Classify meteorological ingest line to a surface tab (not earthquake — use {@link isLikelyEarthquakeBullet}). */
+export function classifyMeteorologicalLineToTab(line: string): IncidentHistoryCategory | null {
+    if (!line.trim()) return null;
+    if (isLikelyEarthquakeBullet(line)) return null;
+    if (isFloodRelatedEvent(line)) return 'flood';
+
+    const b = classifyNwsIncidentDistributionBucket(line);
+    if (b === 'tornado') return 'tornado';
+    if (b === 'storm') return 'storm';
+    if (b === 'hazardous') return 'hazardous';
+    if (b === 'coastal_surf') return 'coastal_surf';
+    if (b === 'marine') return 'marine';
+
+    const t = line.toLowerCase();
+    if (/\btornado\b|\btor\b/.test(t)) return 'tornado';
+    if (/\bthunderstorm\b|\bhurricane\b|\btropical storm\b|\btropical depression\b|\bhail\b|\bsquall line\b/.test(t)) {
+        return 'storm';
+    }
+    if (/\brip current\b|\bhigh surf\b|\bbeach hazards?\b|\bcoastal flood\b|\bsneaker wave\b/.test(t)) {
+        return 'coastal_surf';
+    }
+    if (
+        /\bgale warning\b|\bgale watch\b|\bsmall craft\b|\bmarine weather\b|\btsunami\b|\brough bar\b|\bheavy freezing spray\b/.test(
+            t,
+        ) ||
+        (/\bmarine\b/.test(t) && !/\bmarine thunderstorm\b/.test(t))
+    ) {
+        return 'marine';
+    }
+    if (/\bwarning\b|\bwatch\b|\badvisory\b/.test(t)) return 'hazardous';
+    return null;
+}
+
+function dedupePreserveOrder(xs: string[]): string[] {
+    const seen = new Set<string>();
+    return xs.filter((x) => {
+        if (seen.has(x)) return false;
+        seen.add(x);
+        return true;
+    });
+}
+
+/** Same buckets as {@link deriveEventBasedIncidentDistribution} / bar chart, from raw NWS GeoJSON. */
+function nwsBriefLinesForCategory(bundle: DashboardIngestBundle, cat: IncidentHistoryCategory): string[] {
+    const nws = bundle.sources.find((s) => s.source === 'NWS_FLOOD_ALERTS');
+    if (!nws?.ok || !nws.data) return [];
+    const feats = (nws.data as { features?: { properties?: Record<string, unknown> }[] })?.features;
+    if (!Array.isArray(feats)) return [];
+    const lines: string[] = [];
+    for (const f of feats) {
+        const p = f?.properties ?? {};
+        const event = String(p.event ?? p.headline ?? '').trim();
+        if (!event) continue;
+        const area = String(p.areaDesc ?? '').trim();
+        const sent = String(p.sent ?? p.effective ?? '').trim();
+        const seg = [event, area, sent].filter(Boolean).join(' — ').trim();
+        if (!seg || isNoiseIngestFindingLine(seg)) continue;
+
+        if (cat === 'flood') {
+            if (isFloodRelatedEvent(event)) lines.push(seg.slice(0, 520));
+            continue;
+        }
+        if (isFloodRelatedEvent(event)) continue;
+        const bucket = classifyNwsIncidentDistributionBucket(event);
+        const match =
+            (cat === 'tornado' && bucket === 'tornado') ||
+            (cat === 'storm' && bucket === 'storm') ||
+            (cat === 'hazardous' && bucket === 'hazardous') ||
+            (cat === 'coastal_surf' && bucket === 'coastal_surf') ||
+            (cat === 'marine' && bucket === 'marine');
+        if (match) lines.push(seg.slice(0, 520));
+    }
+    return dedupePreserveOrder(lines).slice(0, 24);
+}
+
+function eqBriefLinesFromBundle(bundle: DashboardIngestBundle): string[] {
+    const summary = bundle.sources.find((s) => s.source === 'USGS_EARTHQUAKES')?.summary;
+    if (typeof summary !== 'string' || !summary.trim()) return [];
+    const parts = summary
+        .split(/\r?\n/)
+        .map((l) => l.trim())
+        .filter((l) => l.length && !isNoiseIngestFindingLine(l));
+    return dedupePreserveOrder(parts).slice(0, 24);
+}
+
+export function deriveRealtimeProceduresForIncident(
+    report: RiskReport,
+    cat: IncidentHistoryCategory,
+    bundle?: DashboardIngestBundle | null,
+): string[] {
+    const metNoiseOk = (report.meteorological_findings ?? []).filter((l) => !isNoiseIngestFindingLine(l));
+
+    const fromReport = (): string[] => {
+        switch (cat) {
+            case 'flood': {
+                const hydro = (report.hydrological_findings ?? []).filter((l) => !isNoiseIngestFindingLine(l));
+                const metFlood = metNoiseOk.filter((l) => !isLikelyEarthquakeBullet(l) && isFloodRelatedEvent(l));
+                return dedupePreserveOrder([...hydro, ...metFlood]);
+            }
+            case 'wildfire':
+                return (report.fire_findings ?? []).filter((l) => !isNoiseIngestFindingLine(l));
+            case 'earthquake':
+                return metNoiseOk.filter(isLikelyEarthquakeBullet);
+            case 'tornado':
+            case 'storm':
+            case 'hazardous':
+            case 'coastal_surf':
+            case 'marine':
+                return metNoiseOk.filter((l) => classifyMeteorologicalLineToTab(l) === cat);
+            default:
+                return [];
+        }
+    };
+
+    const primary = fromReport();
+    if (primary.length || !bundle) return primary;
+
+    if (cat === 'flood' || NWS_SURFACE_TABS.includes(cat)) {
+        const nws = nwsBriefLinesForCategory(bundle, cat);
+        if (nws.length) return nws;
+    }
+    if (cat === 'earthquake') return eqBriefLinesFromBundle(bundle);
+    return [];
+}
+
+function categoriesWithLiveFindings(
+    report: RiskReport,
+    bundle?: DashboardIngestBundle | null,
+): IncidentHistoryCategory[] {
+    return INCIDENT_HISTORY_TAB_KEYS.filter((k) => {
+        if (distroCountForCategory(report, k) <= 0) return false;
+        return deriveRealtimeProceduresForIncident(report, k, bundle).length > 0;
+    });
+}
+
+function realtimePlaceholder(cat: IncidentHistoryCategory): string {
+    switch (cat) {
+        case 'flood':
+            return 'No live hydrological findings in this ingest (USGS/NWPS/FEMA may be quiet or filtered for your scope).';
+        case 'wildfire':
+            return 'No live wildfire findings in this ingest (FIRMS/InciWeb/WFIGS may be sparse or unavailable).';
+        case 'earthquake':
+            return "No live seismic lines in this report's meteorological ingest for this pull.";
+        case 'tornado':
+        case 'storm':
+        case 'hazardous':
+        case 'coastal_surf':
+        case 'marine':
+            return `No live ${INCIDENT_HISTORY_TAB_LABELS[cat].toLowerCase()} lines in meteorological ingest for this pull.`;
+        default:
+            return 'No matching live findings for this category in this report.';
+    }
+}
+
+function playbookForIncident(state: string, cat: IncidentHistoryCategory): Omit<HistoricalAnalysis, 'match_confidence'> {
+    switch (cat) {
+        case 'flood':
+            return copyForFlood(state);
+        case 'wildfire':
+            return copyForWildfire(state);
+        case 'earthquake':
+            return copyForEarthquake(state);
+        case 'tornado':
+            return copyForTornado(state);
+        case 'storm':
+            return copyForStorm(state);
+        case 'hazardous':
+            return copyForHazardousSurface(state);
+        case 'coastal_surf':
+            return copyForCoastalSurf(state);
+        case 'marine':
+            return copyForMarine(state);
+    }
+}
+
+function singleCategoryLiveProcedures(
+    report: RiskReport,
+    cat: IncidentHistoryCategory,
+    bundle?: DashboardIngestBundle | null,
+): string[] {
+    const raw = deriveRealtimeProceduresForIncident(report, cat, bundle);
+    if (raw.length) return raw;
+    return [realtimePlaceholder(cat)];
+}
+
+function liveLineWithTabPrefix(cat: IncidentHistoryCategory, bullet: string): string {
+    return `[${INCIDENT_HISTORY_TAB_LABELS[cat]}] ${bullet}`;
+}
+
+function buildRollupCurrentProcedures(
+    report: RiskReport,
+    archetype: HazardArchetype,
+    bundle: DashboardIngestBundle,
+): string[] {
+    if (archetype === 'flood') return singleCategoryLiveProcedures(report, 'flood', bundle);
+    if (archetype === 'wildfire') return singleCategoryLiveProcedures(report, 'wildfire', bundle);
+    if (archetype === 'earthquake') return singleCategoryLiveProcedures(report, 'earthquake', bundle);
+
+    if (archetype === 'severe_weather') {
+        const tabs = NWS_SURFACE_TABS.filter((k) => {
+            if (distroCountForCategory(report, k) <= 0) return false;
+            return deriveRealtimeProceduresForIncident(report, k, bundle).length > 0;
+        });
+        if (!tabs.length) {
+            return ['No live NWS / surface-hazard lines in meteorological ingest for this pull.'];
+        }
+        if (tabs.length === 1) return deriveRealtimeProceduresForIncident(report, tabs[0], bundle);
+        const lines: string[] = [];
+        for (const cat of tabs) {
+            for (const bullet of deriveRealtimeProceduresForIncident(report, cat, bundle)) {
+                lines.push(liveLineWithTabPrefix(cat, bullet));
+            }
+        }
+        return dedupePreserveOrder(lines).slice(0, 28);
+    }
+
+    const liveCats = categoriesWithLiveFindings(report, bundle);
+    const cats =
+        archetype === 'multi'
+            ? liveCats.length > 0
+                ? liveCats
+                : [...INCIDENT_HISTORY_TAB_KEYS]
+            : [...INCIDENT_HISTORY_TAB_KEYS];
+
+    const lines: string[] = [];
+    for (const cat of cats) {
+        if (distroCountForCategory(report, cat) <= 0) continue;
+        const raw = deriveRealtimeProceduresForIncident(report, cat, bundle);
+        if (!raw.length) continue;
+        const prefixMulti = archetype === 'multi' || archetype === 'baseline' || cats.length > 1;
+        for (const bullet of raw) {
+            lines.push(prefixMulti ? liveLineWithTabPrefix(cat, bullet) : bullet);
+        }
+    }
+    const trimmed = dedupePreserveOrder(lines).slice(0, 28);
+    if (trimmed.length) return trimmed;
+    return ['No category-specific live lines in this ingest — check upstream feeds or scope.'];
+}
+
+/** Prefer highest bar-chart count among categories that qualify for a historical subtab. */
+export function pickDefaultHistoricalTab(
+    report: RiskReport,
+    bundle?: DashboardIngestBundle | null,
+): IncidentHistoryCategory | null {
+    const withLive = categoriesWithLiveFindings(report, bundle);
+    if (!withLive.length) return null;
+    const d = report.incident_distribution ?? [];
+    const n = (cat: string) => Math.max(0, Math.floor(d.find((x) => x.category === cat)?.count ?? 0));
+    return [...withLive].sort((a, b) => n(b) - n(a))[0] ?? withLive[0];
+}
+
+/** Playbook + live lines: only categories with bar-chart count ({@link RiskReport.incident_distribution}) & ingest lines. */
+export function buildHistoricalAnalysisByIncident(
+    bundle: DashboardIngestBundle,
+    report: RiskReport,
+): Partial<Record<IncidentHistoryCategory, HistoricalAnalysis>> {
+    const state = bundle.stateCd || 'us';
+    const out: Partial<Record<IncidentHistoryCategory, HistoricalAnalysis>> = {};
+    for (const cat of INCIDENT_HISTORY_TAB_KEYS) {
+        if (distroCountForCategory(report, cat) <= 0) continue;
+        const live = deriveRealtimeProceduresForIncident(report, cat, bundle);
+        if (!live.length) continue;
+        const playbook = playbookForIncident(state, cat);
+        out[cat] = {
+            ...playbook,
+            current_procedures: live,
+            match_confidence: matchConfidence(report, cat, bundle),
+        };
+    }
+    return out;
+}
+
 /**
  * Populate `historical_analysis` quadrant bullets from dominant hazard archetype derived from {@link RiskReport.incident_distribution}.
  */
 export function buildHistoricalAnalysisFromReport(
     bundle: DashboardIngestBundle,
-    report: RiskReport
+    report: RiskReport,
 ): HistoricalAnalysis {
     const state = bundle.stateCd || 'us';
     const archetype = pickArchetype(report);
@@ -277,7 +747,43 @@ export function buildHistoricalAnalysisFromReport(
 
     return {
         ...body,
+        current_procedures: buildRollupCurrentProcedures(report, archetype, bundle),
         match_confidence: matchConfidence(report, archetype, bundle),
+    };
+}
+
+/**
+ * Live-data-only historical scaffold. Supplies `current_procedures` (from live ingest)
+ * and the computed `match_confidence` ONLY — no static playbook prose. The OpenAI pass
+ * fills matched_event / similarity_summary / past_damages / past_procedures / future_measures.
+ *
+ * Use this instead of {@link applyHistoricalContextToReport} so the displayed Historical
+ * Context never shows the static copyFor* templates — only AI-generated analysis.
+ */
+export function buildLiveHistoricalContext(
+    bundle: DashboardIngestBundle,
+    report: RiskReport,
+): Pick<RiskReport, 'historical_analysis' | 'historical_analysis_by_incident'> {
+    const archetype = pickArchetype(report);
+    const historical_analysis: HistoricalAnalysis = {
+        current_procedures: buildRollupCurrentProcedures(report, archetype, bundle),
+        match_confidence: matchConfidence(report, archetype, bundle),
+    };
+
+    const byIncident: Partial<Record<IncidentHistoryCategory, HistoricalAnalysis>> = {};
+    for (const cat of INCIDENT_HISTORY_TAB_KEYS) {
+        if (distroCountForCategory(report, cat) <= 0) continue;
+        const live = deriveRealtimeProceduresForIncident(report, cat, bundle);
+        if (!live.length) continue;
+        byIncident[cat] = {
+            current_procedures: live,
+            match_confidence: matchConfidence(report, cat, bundle),
+        };
+    }
+
+    return {
+        historical_analysis,
+        historical_analysis_by_incident: Object.keys(byIncident).length ? byIncident : undefined,
     };
 }
 
@@ -285,5 +791,6 @@ export function applyHistoricalContextToReport(bundle: DashboardIngestBundle, re
     return {
         ...report,
         historical_analysis: buildHistoricalAnalysisFromReport(bundle, report),
+        historical_analysis_by_incident: buildHistoricalAnalysisByIncident(bundle, report),
     };
 }
