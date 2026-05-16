@@ -11,23 +11,28 @@ export interface IncidentOverviewCardProps {
   description?: string
   date?: string
   status?: 'Active' | 'Resolved' | 'Monitoring'
+  /** When true, show a compact loading state instead of placeholder copy. */
+  loading?: boolean
 }
 
-const MOCK_DATA: Required<Omit<IncidentOverviewCardProps, 'className'>> = {
+/** Neutral copy when live ingest has not loaded yet (avoid stale demo geographies). */
+const PLACEHOLDER_DATA: Required<Omit<IncidentOverviewCardProps, 'className'>> = {
   title: 'Incident Overview',
-  eventType: 'Severe Weather Event',
-  description: 'Tornadoes, Heavy Rain & Flooding\nPine Bluff, Jefferson County, AR',
-  date: 'May 20, 2025',
-  status: 'Active',
+  eventType: 'Live situational picture',
+  description:
+    'This card reflects the same live feed fusion as AI Risk Assessment. Open AI Risk Assessment to run a full analysis and export the PDF.',
+  date: '—',
+  status: 'Monitoring',
 }
 
 export function IncidentOverviewCard({
   className,
-  title = MOCK_DATA.title,
-  eventType = MOCK_DATA.eventType,
-  description = MOCK_DATA.description,
-  date = MOCK_DATA.date,
-  status = MOCK_DATA.status,
+  title = PLACEHOLDER_DATA.title,
+  eventType = PLACEHOLDER_DATA.eventType,
+  description = PLACEHOLDER_DATA.description,
+  date = PLACEHOLDER_DATA.date,
+  status = PLACEHOLDER_DATA.status,
+  loading = false,
 }: IncidentOverviewCardProps) {
   return (
     <div
@@ -44,12 +49,12 @@ export function IncidentOverviewCard({
           strokeWidth={2}
         />
         <div className="flex flex-col gap-2.5 leading-tight min-w-0 flex-1">
-          <p className="text-[13px] font-bold text-white">{eventType}</p>
+          <p className="text-[13px] font-bold text-white">{loading ? 'Loading live snapshot…' : eventType}</p>
           <p className="text-[11px] font-medium text-white/85 whitespace-pre-line leading-snug">
-            {description}
+            {loading ? 'Pulling NWS / USGS / FIRMS and aligning to your role scope…' : description}
           </p>
           <div className="flex items-center gap-2 text-[11px] font-medium text-white/90 mt-auto pt-2">
-            <span>{date}</span>
+            <span>{loading ? '…' : date}</span>
             <span className="w-0.5 h-0.5 rounded-full bg-white/70" />
             <span className="font-semibold">{status}</span>
           </div>
