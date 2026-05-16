@@ -2,7 +2,6 @@ import mongoose from 'mongoose';
 import connectDB from '@/lib/mongodb';
 import ResponderHospitalCapacity from '@/models/ResponderHospitalCapacity';
 import type { HospitalCapacityPayload, HospitalUnitRow } from './types';
-import { seedHospital } from './mock-seeds';
 import { recomputeHospitalSummary } from './hospital-summary';
 
 function newFacilityId(): string {
@@ -84,20 +83,18 @@ export async function getHospitalCapacityForUser(
     let doc = await ResponderHospitalCapacity.findOne({ ownerUserId: oid }).lean();
 
     if (!doc) {
-        const seed = seedHospital();
         const created = await ResponderHospitalCapacity.create({
             ownerUserId: oid,
             licenseId: licenseId ? new mongoose.Types.ObjectId(licenseId) : null,
-            facilityId: seed.facilityId.startsWith('mock-') ? newFacilityId() : seed.facilityId,
-            facilityName: seed.facilityName,
-            notes: seed.notes || '',
-            units: seed.units.map((u) => ({
-                id: u.id,
-                name: u.name,
-                capacity: u.capacity,
-                occupied: u.occupied,
-                unitType: u.name.toLowerCase().includes('icu') ? ('icu' as const) : ('medsurg' as const),
-            })),
+            facilityId: newFacilityId(),
+            facilityName: 'Regional Medical Center',
+            notes: '',
+            units: [
+                { id: 'u1', name: 'Med/Surg', capacity: 0, occupied: 0, unitType: 'medsurg' },
+                { id: 'u2', name: 'ICU', capacity: 0, occupied: 0, unitType: 'icu' },
+                { id: 'u3', name: 'Pediatric', capacity: 0, occupied: 0 },
+                { id: 'u4', name: 'Observation', capacity: 0, occupied: 0 },
+            ],
             source: 'api',
         });
         doc = created.toObject();

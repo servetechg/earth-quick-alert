@@ -15,13 +15,18 @@ function canInvite(role: string | undefined) {
     return role === 'super-admin' || role === 'sub-admin' || role === 'admin';
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
     try {
         await connectDB();
         const session = await getSession();
         if (!session?.user?.id || !canInvite(session.user.role)) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
+
+        const { searchParams } = new URL(req.url);
+        const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
+        const limit = Math.max(1, parseInt(searchParams.get('limit') || '10', 10));
+        const skip = (page - 1) * limit;
 
         const me = await User.findById(session.user.id).select('licenseId role').lean();
         const licenseId = me?.licenseId?.toString() || null;
@@ -34,7 +39,8 @@ export async function GET() {
             query.licenseId = me!.licenseId;
         }
 
-        const invites = await ResponderInvite.find(query).sort({ createdAt: -1 }).limit(50).lean();
+        const total = await ResponderInvite.countDocuments(query);
+        const invites = await ResponderInvite.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).lean();
 
         return NextResponse.json({
             invites: invites.map((i) => ({
@@ -45,11 +51,12 @@ export async function GET() {
                 expiresAt: i.expiresAt,
                 createdAt: i.createdAt,
             })),
+            total,
             options: RESPONDER_INVITE_OPTIONS,
         });
     } catch (e) {
         console.error('responder-invites GET', e);
-        return NextResponse.json({ error: 'Failed to list invites' }, { status: 500 });
+        return NextResponse.json({ error: 'Failed to list invites', details: (e as any).message }, { status: 500 });
     }
 }
 

@@ -9,9 +9,9 @@ import {
   Hotel,
   Pill,
   Bus,
-  HelpCircle,
   LogOut,
   X,
+  Settings,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import logo from '../public/logo.png'
@@ -136,12 +136,11 @@ export function ResponderSidebar() {
 
       <div className="shrink-0 p-4 mb-4">
         <div className="bg-[#44496B] rounded-2xl p-4 space-y-1 shadow-inner">
-          {/*
           <Link
-            href="/virtual-eoc-settings"
+            href="/responder-settings"
             className={cn(
               'w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-colors',
-              pathname && pathname === '/virtual-eoc-settings'
+              pathname && pathname === '/responder-settings'
                 ? 'bg-[#FFD75E] text-[#33375D]'
                 : 'text-slate-300 hover:bg-white/10 hover:text-white',
             )}
@@ -149,7 +148,6 @@ export function ResponderSidebar() {
             <Settings className="w-5 h-5 flex-shrink-0" />
             <span className="text-sm font-bold">Settings</span>
           </Link>
-          */}
           {/* <button
             type="button"
             onClick={() => setShowHelpModal(true)}

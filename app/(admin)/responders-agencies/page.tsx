@@ -14,6 +14,10 @@ import {
     Info,
     Users,
     Clock,
+    Edit,
+    Trash2,
+    ChevronLeft,
+    ChevronRight,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
@@ -24,6 +28,15 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog'
+import {
+    AlertDialog,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import {
@@ -34,6 +47,7 @@ import {
     SelectValue,
 } from '@/components/ui/select'
 import { RESPONDER_VERTICAL_LABELS, type ResponderVertical } from '@/lib/responder-verticals'
+import { RESPONDER_INVITE_OPTIONS } from '@/lib/responder-invite-options'
 
 type ResponderRow = {
     _id: string
@@ -78,11 +92,21 @@ export default function RespondersAgenciesPage() {
     const [inviteOptionId, setInviteOptionId] = useState('')
     const [submitting, setSubmitting] = useState(false)
 
+    const [usersPage, setUsersPage] = useState(1);
+    const [usersTotal, setUsersTotal] = useState(0);
+    const [invitesPage, setInvitesPage] = useState(1);
+    const [invitesTotal, setInvitesTotal] = useState(0);
+
+    const [editOpen, setEditOpen] = useState(false);
+    const [editResponder, setEditResponder] = useState<ResponderRow | null>(null);
+    const [deleteOpen, setDeleteOpen] = useState(false);
+    const [deleteId, setDeleteId] = useState<string | null>(null);
+
     const loadData = useCallback(async () => {
         try {
             const [usersRes, invRes] = await Promise.all([
-                fetch('/api/admin/users?role=responder'),
-                fetch('/api/admin/responder-invites'),
+                fetch(`/api/admin/users?role=responder&page=${usersPage}&limit=10`),
+                fetch(`/api/admin/responder-invites?page=${invitesPage}&limit=10`),
             ])
             if (usersRes.ok) {
                 const data = await usersRes.json()
@@ -97,17 +121,19 @@ export default function RespondersAgenciesPage() {
                     state: u.state,
                 }))
                 setResponders(list)
+                setUsersTotal(data.total || 0)
             }
             if (invRes.ok) {
                 const data = await invRes.json()
                 setInvites(data.invites || [])
+                setInvitesTotal(data.total || 0)
                 setInviteOptions((data.options || []).map((o: { id: string; label: string }) => ({ id: o.id, label: o.label })))
                 setInviteOptionId((prev) => prev || (data.options?.[0]?.id as string) || '')
             }
         } catch {
             toast.error('Could not load responders or invites')
         }
-    }, [])
+    }, [usersPage, invitesPage])
 
     useEffect(() => {
         void loadData()
@@ -163,6 +189,91 @@ export default function RespondersAgenciesPage() {
         } finally {
             setSubmitting(false)
         }
+    }
+
+    const openEdit = (user: ResponderRow) => {
+        setEditResponder({ ...user });
+        setEditOpen(true);
+    };
+
+    const handleEditSave = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!editResponder) return;
+        setSubmitting(true);
+        try {
+            const res = await fetch('/api/admin/users', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    userId: editResponder._id,
+                    name: editResponder.name,
+                    responderFunction: editResponder.responderFunction,
+                    responderVertical: editResponder.responderVertical,
+                    accountStatus: editResponder.accountStatus
+                }),
+            });
+            if (!res.ok) throw new Error('Failed to update responder');
+            toast.success('Responder updated');
+            setEditOpen(false);
+            void loadData();
+        } catch (e: any) {
+            toast.error(e.message);
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const handleDelete = async () => {
+        if (!deleteId) return;
+        setSubmitting(true);
+        try {
+            const res = await fetch(`/api/admin/users?userId=${deleteId}`, {
+                method: 'DELETE',
+            });
+            if (!res.ok) throw new Error('Failed to delete responder');
+            toast.success('Responder deleted');
+            setDeleteOpen(false);
+            void loadData();
+        } catch (e: any) {
+            toast.error(e.message);
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const renderPagination = (page: number, total: number, setPage: (p: number) => void) => {
+        const totalPages = Math.ceil(total / 10);
+        if (totalPages <= 1) return null;
+        return (
+            <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between">
+                <p className="text-[11px] font-medium text-slate-500">
+                    Showing {(page - 1) * 10 + 1} to {Math.min(page * 10, total)} of {total}
+                </p>
+                <div className="flex items-center gap-1">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setPage(Math.max(1, page - 1))}
+                        disabled={page === 1}
+                        className="h-7 px-2 text-[11px]"
+                    >
+                        <ChevronLeft size={14} />
+                        Prev
+                    </Button>
+                    <span className="text-[11px] font-bold text-slate-700 px-2">{page} / {totalPages}</span>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setPage(Math.min(totalPages, page + 1))}
+                        disabled={page === totalPages}
+                        className="h-7 px-2 text-[11px]"
+                    >
+                        Next
+                        <ChevronRight size={14} />
+                    </Button>
+                </div>
+            </div>
+        );
     }
 
     return (
@@ -243,7 +354,8 @@ export default function RespondersAgenciesPage() {
                                 <th className="px-6 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Role / function</th>
                                 <th className="px-6 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Vertical</th>
                                 <th className="px-6 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Area</th>
-                                <th className="px-6 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider text-right">Status</th>
+                                <th className="px-6 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Status</th>
+                                <th className="px-6 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider text-right">Actions</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50">
@@ -273,7 +385,7 @@ export default function RespondersAgenciesPage() {
                                                 {[user.city, user.state].filter(Boolean).join(', ') || '—'}
                                             </span>
                                         </td>
-                                        <td className="px-6 py-5 text-right">
+                                        <td className="px-6 py-5">
                                             <Badge
                                                 className={cn(
                                                     'px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border-none shadow-none',
@@ -285,12 +397,38 @@ export default function RespondersAgenciesPage() {
                                                 {user.accountStatus || 'approved'}
                                             </Badge>
                                         </td>
+                                        <td className="px-6 py-5 text-right">
+                                            <div className="flex justify-end gap-2">
+                                                <Button
+                                                    type="button"
+                                                    title="Edit responder"
+                                                    size="icon"
+                                                    onClick={() => openEdit(user)}
+                                                    className="h-8 w-8 bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-900 rounded-lg transition-colors"
+                                                >
+                                                    <Edit size={14} />
+                                                </Button>
+                                                <Button
+                                                    type="button"
+                                                    title="Delete responder"
+                                                    size="icon"
+                                                    onClick={() => {
+                                                        setDeleteId(user._id);
+                                                        setDeleteOpen(true);
+                                                    }}
+                                                    className="h-8 w-8 bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white rounded-lg transition-colors"
+                                                >
+                                                    <Trash2 size={14} />
+                                                </Button>
+                                            </div>
+                                        </td>
                                     </tr>
                                 ))
                             )}
                         </tbody>
                     </table>
                 </div>
+                {renderPagination(usersPage, usersTotal, setUsersPage)}
             </Card>
 
             {invites.length > 0 && (
@@ -321,6 +459,7 @@ export default function RespondersAgenciesPage() {
                             </tbody>
                         </table>
                     </div>
+                    {renderPagination(invitesPage, invitesTotal, setInvitesPage)}
                 </Card>
             )}
 
@@ -413,7 +552,7 @@ export default function RespondersAgenciesPage() {
                     <DialogHeader>
                         <DialogTitle>Add responder</DialogTitle>
                         <DialogDescription>
-                            Send an email with a secure signup link. The invitee must sign up using the same address they were invited with. Requires SMTP env vars (<code className="text-[11px]">RESPONDER_INVITE_SMTP_URL</code> and <code className="text-[11px]">RESPONDER_INVITE_SMTP_FROM</code>, or host-based <code className="text-[11px]">SMTP_*</code>).
+                            Send an email with a secure signup link. The invitee must sign up using the same address they were invited with.
                         </DialogDescription>
                     </DialogHeader>
                     <form onSubmit={sendInvite} className="space-y-4">
@@ -455,6 +594,99 @@ export default function RespondersAgenciesPage() {
                     </form>
                 </DialogContent>
             </Dialog>
+
+            <Dialog open={editOpen} onOpenChange={setEditOpen}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Edit responder</DialogTitle>
+                        <DialogDescription>Update the details and permissions for this responder.</DialogDescription>
+                    </DialogHeader>
+                    {editResponder && (
+                        <form onSubmit={handleEditSave} className="space-y-4">
+                            <div className="space-y-2">
+                                <Label>Name</Label>
+                                <Input
+                                    value={editResponder.name || ''}
+                                    onChange={(e) => setEditResponder({ ...editResponder, name: e.target.value })}
+                                    required
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Function / Role</Label>
+                                <Select
+                                    value={
+                                        RESPONDER_INVITE_OPTIONS.find(
+                                            (o) => o.responderFunction === editResponder.responderFunction
+                                        )?.id || ''
+                                    }
+                                    onValueChange={(val) => {
+                                        const opt = RESPONDER_INVITE_OPTIONS.find((o) => o.id === val)
+                                        if (opt) {
+                                            setEditResponder({
+                                                ...editResponder,
+                                                responderFunction: opt.responderFunction,
+                                                responderVertical: opt.responderVertical,
+                                            })
+                                        }
+                                    }}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select role" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {RESPONDER_INVITE_OPTIONS.map((o) => (
+                                            <SelectItem key={o.id} value={o.id}>
+                                                {o.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Account Status</Label>
+                                <Select
+                                    value={editResponder.accountStatus || 'approved'}
+                                    onValueChange={(val) => setEditResponder({ ...editResponder, accountStatus: val })}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="approved">Approved</SelectItem>
+                                        <SelectItem value="pending">Pending</SelectItem>
+                                        <SelectItem value="suspended">Suspended</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <DialogFooter>
+                                <Button type="button" variant="outline" onClick={() => setEditOpen(false)}>
+                                    Cancel
+                                </Button>
+                                <Button type="submit" disabled={submitting} className="bg-[#33375D] hover:bg-[#44496B]">
+                                    {submitting ? 'Saving…' : 'Save changes'}
+                                </Button>
+                            </DialogFooter>
+                        </form>
+                    )}
+                </DialogContent>
+            </Dialog>
+
+            <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Delete responder?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Are you sure you want to permanently delete this responder account? This action cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <Button type="button" className="bg-rose-600 hover:bg-rose-700 text-white" disabled={submitting} onClick={() => void handleDelete()}>
+                            {submitting ? 'Deleting…' : 'Yes, delete'}
+                        </Button>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
 
             <div className="fixed bottom-10 right-10 flex flex-col gap-4 z-50">
                 <Button
