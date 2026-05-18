@@ -64,9 +64,9 @@ export default function ResponderDashboardPage() {
         : bundle.kind === 'police'
           ? `${vLabel}${bundle.responderFunction ? ` · ${bundle.responderFunction}` : ''}. Track incident teams, operations, and staging.`
           : bundle.kind === 'pharmacy'
-            ? `${vLabel}${bundle.responderFunction ? ` · ${bundle.responderFunction}` : ''}. Update pop-up pharmacy sites and coordinates for GIS resource deployment (mock).`
+            ? `${vLabel}${bundle.responderFunction ? ` · ${bundle.responderFunction}` : ''}. Update pop-up pharmacy sites and coordinates for GIS resource deployment.`
             : bundle.kind === 'transit'
-              ? `${vLabel}${bundle.responderFunction ? ` · ${bundle.responderFunction}` : ''}. Mass transit locations and vehicles deployed per site (mock).`
+              ? `${vLabel}${bundle.responderFunction ? ` · ${bundle.responderFunction}` : ''}. Mass transit locations and vehicles deployed per site.`
               : `${vLabel}${bundle.responderFunction ? ` · ${bundle.responderFunction}` : ''}. This overview uses the same layout as other admin tools; metrics are mock until external APIs are connected.`
       : 'Loading your operational summary…'
 
@@ -77,7 +77,7 @@ export default function ResponderDashboardPage() {
         titleUppercase={false}
         description={description}
       />
-      {bundle && !err && bundle.kind !== 'hospital' && bundle.kind !== 'police' && (
+      {bundle && !err && bundle.kind !== 'hospital' && bundle.kind !== 'police' && bundle.kind !== 'pharmacy' && bundle.kind !== 'transit' && (
         <ResponderInfoBar>
           Figures below refresh from the in-app mock service on save. Connect state or agency feeds when you move past demo.
         </ResponderInfoBar>

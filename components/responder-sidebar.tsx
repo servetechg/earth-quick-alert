@@ -46,11 +46,7 @@ function navForVertical(v: string): NavItem[] {
     ]
   }
   if (kind === 'pharmacy') {
-    return [
-      common[0],
-      { icon: Pill, label: 'Pharmacy sites & map', href: '/responder-pharmacy-sites' },
-      ...common.slice(1),
-    ]
+    return common
   }
   if (kind === 'transit') {
     return [
