@@ -25,7 +25,7 @@ export interface HistoricalAnalysis {
   future_measures?: string[];
 }
 
-/** Tabs under Historical Context — one per bar-chart incident family; only categories with live ingest lines are emitted in `historical_analysis_by_incident`. */
+/** Tabs under Historical Context — one per bar-chart incident family. */
 export const INCIDENT_HISTORY_TAB_KEYS = [
   'flood',
   'tornado',
@@ -38,6 +38,63 @@ export const INCIDENT_HISTORY_TAB_KEYS = [
 ] as const;
 
 export type IncidentHistoryCategory = (typeof INCIDENT_HISTORY_TAB_KEYS)[number];
+
+/** Past hazard context for external AI (no live `current_procedures`). */
+export interface RiskAiPastBlock {
+  matched_event?: string;
+  similarity_summary?: string;
+  past_damages?: string[];
+  past_procedures?: string[];
+  future_measures?: string[];
+}
+
+/** Nationwide or state AOI for AI context packs. */
+export type RiskAiContextScope = 'nationwide' | 'state';
+
+export interface RiskAiPastContext {
+  scope: RiskAiContextScope;
+  state_cd: string;
+  ingested_at: string;
+  /** FEMA OpenFEMA flood declaration lines from this ingest pull (grounded past signal). */
+  fema_flood_declarations?: string[];
+  rollup: RiskAiPastBlock;
+  by_incident: Partial<Record<IncidentHistoryCategory, RiskAiPastBlock>>;
+}
+
+/** Exactly what we send to OpenAI before the executive report is generated. */
+export interface RiskAiOpenAiInput {
+  past: RiskAiPastContext;
+  current: RiskAiCurrentContext;
+}
+
+/** Live operational picture for external AI (findings, ingest, current procedures). */
+export interface RiskAiCurrentContext {
+  scope: RiskAiContextScope;
+  state_cd: string;
+  ingested_at: string;
+  /** Multi-feed ingest text (same family as internal LLM input). */
+  ingest_narrative: string;
+  rollup: { current_procedures?: string[] };
+  by_incident: Partial<Record<IncidentHistoryCategory, { current_procedures?: string[] }>>;
+  findings: {
+    meteorological: string[];
+    hydrological: string[];
+    fire: string[];
+  };
+  summaries: {
+    meteorological: string;
+    hydrological: string;
+    fire: string;
+    recommendations: string;
+  };
+  incident_distribution: DistroPoint[];
+  alerts_count: number;
+  domain_severities: DomainSeverities;
+  overall_risk_level: string;
+  recommendations_list: RecommendationItem[];
+  populations_at_risk: number;
+  ready2go_users_reachable: number;
+}
 
 /** County / parish ACS resolution used for population estimate (see `risk-exposure-service`). */
 export interface RiskExposureCountyRow {

@@ -435,7 +435,11 @@ const NWS_FLOOD_SUMMARY_CAP = 48;
  */
 async function ingestNwsFloodAlertsNationwide(): Promise<IngestSourceResult> {
   try {
-    const raw = await weatherAPI.fetchActiveNwsRawFeaturesNationwide();
+    const riskMaxPages = Math.min(
+      500,
+      Math.max(1, parseInt(process.env.RISK_NWS_MAX_PAGES ?? '20', 10)),
+    );
+    const raw = await weatherAPI.fetchActiveNwsRawFeaturesNationwide({ maxPages: riskMaxPages });
     const fullJson = { type: 'FeatureCollection' as const, features: raw };
     const floodFeats = raw.filter((f) => {
       const ev = (f as { properties?: { event?: string } })?.properties?.event;
@@ -689,6 +693,36 @@ function parseRssWildfires(xml: string, max = 12): string {
   return lines.length ? lines.join('\n') : 'No RSS items parsed.';
 }
 
+async function tryInciwebWildfireUrl(
+  url: string,
+  stateCd: string,
+  rssHeaders: HeadersInit,
+): Promise<{ ok: true; result: IngestSourceResult } | { ok: false; status: number }> {
+  const res = await fetchWithTimeout(url, { headers: rssHeaders, timeoutMs: 18000 });
+  if (!res.ok) return { ok: false, status: res.status };
+  const xml = await res.text();
+  if (!xml.includes('<rss') && !xml.includes('<feed') && !xml.includes('<item')) {
+    return { ok: false, status: res.status };
+  }
+  let summary = parseRssWildfires(xml, 12);
+  const usps = uspsFromRiskStateCd(stateCd);
+  if (usps) {
+    const filtered = filterTextLinesForState(summary.split('\n').filter(Boolean), usps);
+    summary = filtered.length
+      ? filtered.join('\n')
+      : `No InciWeb wildfire RSS items referencing ${usps} in this pull.`;
+  }
+  return {
+    ok: true,
+    result: {
+      ok: true,
+      source: 'INCIWEB_RSS',
+      data: { itemCount: summary.split('\n').filter(Boolean).length, feedUrl: url },
+      summary,
+    },
+  };
+}
+
 async function ingestInciwebWildfire(stateCd: string): Promise<IngestSourceResult> {
   const urls = [
     `${INCIWEB_BASE}/feeds/rss/incidents/type/wildfire/`,
@@ -703,27 +737,18 @@ async function ingestInciwebWildfire(stateCd: string): Promise<IngestSourceResul
     'Cache-Control': 'no-cache',
   };
   try {
+    const attempts = await Promise.all(
+      urls.map((url) =>
+        tryInciwebWildfireUrl(url, stateCd, rssHeaders).catch(() => ({ ok: false as const, status: 0 })),
+      ),
+    );
     let lastStatus = 0;
-    for (const url of urls) {
-      const res = await fetchWithTimeout(url, { headers: rssHeaders, timeoutMs: 18000 });
-      lastStatus = res.status;
-      if (!res.ok) continue;
-      const xml = await res.text();
-      if (!xml.includes('<rss') && !xml.includes('<feed') && !xml.includes('<item')) continue;
-      let summary = parseRssWildfires(xml, 12);
-      const usps = uspsFromRiskStateCd(stateCd);
-      if (usps) {
-        const filtered = filterTextLinesForState(summary.split('\n').filter(Boolean), usps);
-        summary = filtered.length
-          ? filtered.join('\n')
-          : `No InciWeb wildfire RSS items referencing ${usps} in this pull.`;
+    for (const attempt of attempts) {
+      if (!attempt.ok) {
+        if (attempt.status) lastStatus = attempt.status;
+        continue;
       }
-      return {
-        ok: true,
-        source: 'INCIWEB_RSS',
-        data: { itemCount: summary.split('\n').filter(Boolean).length, feedUrl: url },
-        summary,
-      };
+      return attempt.result;
     }
     return {
       ok: false,

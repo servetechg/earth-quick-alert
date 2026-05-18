@@ -12,6 +12,16 @@ interface OpenWeatherAlert {
     tags: string[];
 }
 
+/** Dedupes concurrent nationwide NWS pagination (risk ingest + alert sync in one request). */
+type NwsNationwideFeaturesCache = { at: number; features: unknown[]; maxPages: number };
+let nwsNationwideFeaturesCache: NwsNationwideFeaturesCache | null = null;
+let nwsNationwideFeaturesInflight: Promise<unknown[]> | null = null;
+let nwsNationwideInflightMaxPages = 0;
+
+function nwsNationwideCacheTtlMs(): number {
+    return Math.max(0, parseInt(process.env.NWS_NATIONWIDE_CACHE_MS ?? '90000', 10));
+}
+
 interface OpenWeatherResponse {
     lat: number;
     lon: number;
@@ -136,17 +146,54 @@ export class WeatherAPIService {
      * Raw GeoJSON features from nationwide paginated `GET /alerts/active?status=actual`.
      * Used by AI risk ingest for flood/hydro filtering (parity with Alerts & Communication NWS scope).
      */
-    async fetchActiveNwsRawFeaturesNationwide(): Promise<unknown[]> {
+    async fetchActiveNwsRawFeaturesNationwide(options?: { maxPages?: number }): Promise<unknown[]> {
         try {
-            const maxPages = Math.min(
-                500,
-                Math.max(1, parseInt(process.env.NWS_ALERTS_MAX_PAGES ?? '100', 10))
-            );
+            return await this.fetchNationwideNwsRawFeaturesCached(options?.maxPages);
+        } catch (error) {
+            console.error('[weather-api] fetchActiveNwsRawFeaturesNationwide', error);
+            return [];
+        }
+    }
+
+    private resolveNationwideNwsMaxPages(override?: number): number {
+        if (override != null && Number.isFinite(override)) {
+            return Math.min(500, Math.max(1, Math.floor(override)));
+        }
+        return Math.min(
+            500,
+            Math.max(1, parseInt(process.env.NWS_ALERTS_MAX_PAGES ?? '100', 10)),
+        );
+    }
+
+    /**
+     * Paginated nationwide active alerts with in-flight dedupe + short TTL cache so
+     * risk ingest and alert DB sync do not each walk every NWS page in one API call.
+     */
+    private async fetchNationwideNwsRawFeaturesCached(requestedMaxPages?: number): Promise<unknown[]> {
+        const maxPages = this.resolveNationwideNwsMaxPages(requestedMaxPages);
+        const ttlMs = nwsNationwideCacheTtlMs();
+        const now = Date.now();
+        if (
+            ttlMs > 0 &&
+            nwsNationwideFeaturesCache &&
+            now - nwsNationwideFeaturesCache.at < ttlMs &&
+            nwsNationwideFeaturesCache.maxPages >= maxPages
+        ) {
+            return nwsNationwideFeaturesCache.features;
+        }
+        if (nwsNationwideFeaturesInflight) {
+            nwsNationwideInflightMaxPages = Math.max(nwsNationwideInflightMaxPages, maxPages);
+            return nwsNationwideFeaturesInflight;
+        }
+
+        nwsNationwideInflightMaxPages = maxPages;
+        nwsNationwideFeaturesInflight = (async () => {
+            const pagesToFetch = nwsNationwideInflightMaxPages;
             let nextUrl: string | null = `${this.nwsBaseURL}/alerts/active?status=actual`;
             const features: unknown[] = [];
             let pages = 0;
 
-            while (nextUrl && pages < maxPages) {
+            while (nextUrl && pages < pagesToFetch) {
                 pages += 1;
                 const response = await fetch(nextUrl, {
                     method: 'GET',
@@ -166,11 +213,20 @@ export class WeatherAPIService {
                         : null;
             }
 
+            if (ttlMs > 0) {
+                nwsNationwideFeaturesCache = {
+                    at: Date.now(),
+                    features,
+                    maxPages: pagesToFetch,
+                };
+            }
             return features;
-        } catch (error) {
-            console.error('[weather-api] fetchActiveNwsRawFeaturesNationwide', error);
-            return [];
-        }
+        })().finally(() => {
+            nwsNationwideFeaturesInflight = null;
+            nwsNationwideInflightMaxPages = 0;
+        });
+
+        return nwsNationwideFeaturesInflight;
     }
 
     private nwsRequestHeaders(): HeadersInit {
@@ -277,40 +333,11 @@ export class WeatherAPIService {
      * Paginated nationwide active alerts (`status=actual` omits test/exercise products).
      */
     private async fetchAllActiveNWSAlertsPaginated(): Promise<APIWeatherAlert[]> {
-        const maxPages = Math.min(
-            500,
-            Math.max(1, parseInt(process.env.NWS_ALERTS_MAX_PAGES ?? '100', 10))
-        );
-
-        let nextUrl: string | null = `${this.nwsBaseURL}/alerts/active?status=actual`;
+        const features = await this.fetchNationwideNwsRawFeaturesCached();
         const alerts: APIWeatherAlert[] = [];
-        let pages = 0;
-
-        while (nextUrl && pages < maxPages) {
-            pages += 1;
-            const response = await fetch(nextUrl, {
-                method: 'GET',
-                headers: this.nwsRequestHeaders(),
-            });
-
-            if (!response.ok) {
-                throw new Error(`NWS API error: ${response.status} ${response.statusText}`);
-            }
-
-            const data = await response.json();
-            const features = Array.isArray(data.features) ? data.features : [];
-            for (const feature of features) {
-                alerts.push(this.mapNwsGeoJsonFeature(feature));
-            }
-
-            const pagination = data.pagination as { next?: string } | undefined;
-            const next = pagination?.next;
-            nextUrl =
-                typeof next === 'string' && (next.startsWith('http://') || next.startsWith('https://'))
-                    ? next
-                    : null;
+        for (const feature of features) {
+            alerts.push(this.mapNwsGeoJsonFeature(feature));
         }
-
         return alerts;
     }
 

@@ -39,8 +39,12 @@ async function subAdminHomeStateRaw(userId: string | undefined): Promise<string 
 export async function fetchAlignedAlertCommunicationFeed(options: {
     userId?: string;
     role: string;
+    /** When true, read Mongo only (no NWS/multi-source refresh). Use on hot paths like risk analyze. */
+    skipUpstreamSync?: boolean;
 }): Promise<any[]> {
-    await syncAlertCommunicationFeedsGate();
+    if (!options.skipUpstreamSync) {
+        await syncAlertCommunicationFeedsGate();
+    }
     const feedFilter = alertCommunicationFeedFilter();
     const data = await AlertCommunication.find(feedFilter).sort({ createdAt: -1 }).lean();
     const hydrated = hydrateAlertCommunicationRows(data as any[]);

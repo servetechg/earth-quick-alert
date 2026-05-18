@@ -4,6 +4,7 @@ import type {
     HistoricalAnalysis,
     IncidentHistoryCategory,
     RecommendationItem,
+    RiskAiOpenAiInput,
     RiskReport,
 } from '@/lib/types/risk-assessment';
 import { INCIDENT_HISTORY_TAB_KEYS } from '@/lib/types/risk-assessment';
@@ -167,6 +168,7 @@ export class OpenAIService {
                     model: effectiveModel,
                     messages,
                     response_format: { type: 'json_object' },
+                    ...(typeof options?.max_tokens === 'number' ? { max_tokens: options.max_tokens } : {}),
                     ...(typeof options?.temperature === 'number' ? { temperature: options.temperature } : {}),
                 }),
             });
@@ -595,17 +597,121 @@ export class OpenAIService {
         return { ...r, alerts_count, major_incidents, minor_incidents };
     }
 
-    async synthesizeDashboardRiskReport(bundle: DashboardIngestBundle): Promise<RiskReport> {
+    /** Set `OPENAI_RISK_DUAL_PASS=true` to restore the slower two-request OpenAI flow. */
+    private riskUsesDualOpenAiPass(): boolean {
+        return process.env.OPENAI_RISK_DUAL_PASS === 'true';
+    }
+
+    private applyHistoricalAiShape(
+        bundle: DashboardIngestBundle,
+        report: RiskReport,
+        aiShape:
+            | {
+                  rollup?: Partial<HistoricalAnalysis>;
+                  by_incident?: Partial<Record<string, Partial<HistoricalAnalysis>>>;
+              }
+            | undefined,
+    ): Pick<RiskReport, 'historical_analysis' | 'historical_analysis_by_incident'> {
+        const draftRollup: HistoricalAnalysis = report.historical_analysis ?? {};
+        const draftByIncident: Partial<Record<IncidentHistoryCategory, HistoricalAnalysis>> =
+            report.historical_analysis_by_incident ?? {};
+        const scope: 'state' | 'nationwide' = bundle.ingestScope === 'state' ? 'state' : 'nationwide';
+        const rollupCap = scope === 'state' ? 4 : 3;
+        const incidentCap = 3;
+
+        const historical_analysis = this.normalizeHistoricalAnalysis(aiShape?.rollup, draftRollup, rollupCap);
+
+        const incidentKeys = Object.keys(draftByIncident).filter((k): k is IncidentHistoryCategory =>
+            (INCIDENT_HISTORY_TAB_KEYS as readonly string[]).includes(k),
+        );
+        let historical_analysis_by_incident: RiskReport['historical_analysis_by_incident'] =
+            report.historical_analysis_by_incident;
+        if (incidentKeys.length) {
+            const out: Partial<Record<IncidentHistoryCategory, HistoricalAnalysis>> = {};
+            for (const k of incidentKeys) {
+                out[k] = this.normalizeHistoricalAnalysis(
+                    aiShape?.by_incident?.[k],
+                    draftByIncident[k] ?? {},
+                    incidentCap,
+                );
+            }
+            historical_analysis_by_incident = out;
+        }
+
+        return { historical_analysis, historical_analysis_by_incident };
+    }
+
+    private buildCombinedHistoricalSchemaSection(
+        bundle: DashboardIngestBundle,
+        activeKeys: string[],
+    ): string {
+        const scope: 'state' | 'nationwide' = bundle.ingestScope === 'state' ? 'state' : 'nationwide';
+        const rollupCap = scope === 'state' ? 4 : 3;
+        const incidentCap = 3;
+        const stateLabel =
+            scope === 'state'
+                ? (bundle.stateCd || '').toUpperCase() || 'the licensed state'
+                : 'the United States (nationwide)';
+        const lengthRules =
+            scope === 'state'
+                ? `rollup at most ${rollupCap} bullets per list; each by_incident block at most ${incidentCap} bullets; focus on ${stateLabel} only.`
+                : `rollup at most ${rollupCap} bullets per list; each by_incident block at most ${incidentCap} bullets; national/regional summary only.`;
+
+        return `historical_context: {
+  "rollup": BLOCK,
+  "by_incident": { one BLOCK per key in ACTIVE_HAZARDS — use these exact keys only: ${JSON.stringify(activeKeys)} }
+}
+Each BLOCK: matched_event (string), similarity_summary (1-2 plain sentences), past_damages (string[]), past_procedures (string[]), current_procedures (string[] — rewrite your executive findings for that hazard into plain sentences grounded in DATA), future_measures (string[] practical household steps). No match_confidence. Use **bold** for place names, dates, magnitudes. Friendly dates only. ${lengthRules}`;
+    }
+
+    /** Deterministic pre-OpenAI report (live ingest only) — used to build `past` / `current` input packs. */
+    buildHeuristicPreOpenAi(bundle: DashboardIngestBundle): RiskReport {
+        const heuristic = this.alignAlertsToDistribution(this.heuristicDashboardRiskReport(bundle), bundle);
+        return applyDynamicExecutiveKpis(bundle, heuristic);
+    }
+
+    private formatRiskAiOpenAiInputForPrompt(aiInput: RiskAiOpenAiInput): string {
+        const pastJson = JSON.stringify(aiInput.past, null, 2).slice(0, 7000);
+        const currentForPrompt = {
+            ...aiInput.current,
+            ingest_narrative: (aiInput.current.ingest_narrative ?? '').slice(0, 10000),
+        };
+        const currentJson = JSON.stringify(currentForPrompt, null, 2).slice(0, 10000);
+        return `Analyze PAST_CONTEXT and CURRENT_CONTEXT together.
+
+RULES
+- Historical fields (matched_event, similarity_summary, past_damages, past_procedures, future_measures): use PAST_CONTEXT only. Prefer lines tagged [FEMA declaration]. Do NOT invent disasters, states, or years that are not in PAST_CONTEXT.
+- Live fields (findings, summaries, current_procedures in historical_context): use CURRENT_CONTEXT only.
+- Executive KPIs: derive from CURRENT_CONTEXT incident_distribution and findings.
+
+PAST_CONTEXT (historical reference — includes FEMA declarations when present):
+${pastJson}
+
+CURRENT_CONTEXT (live operational ingest — ground all "now" findings here):
+${currentJson}`;
+    }
+
+    async synthesizeDashboardRiskReport(
+        bundle: DashboardIngestBundle,
+        aiInput?: RiskAiOpenAiInput,
+    ): Promise<RiskReport> {
         const fallbackHeuristic = this.alignAlertsToDistribution(this.heuristicDashboardRiskReport(bundle), bundle);
         const fallbackKpis = applyDynamicExecutiveKpis(bundle, fallbackHeuristic);
+        const liveScaffold = buildLiveHistoricalContext(bundle, fallbackKpis);
         // Live-data-only historical scaffold — never the static copyFor* playbook prose.
         const fallback: RiskReport = {
             ...fallbackKpis,
-            ...buildLiveHistoricalContext(bundle, fallbackKpis),
+            ...liveScaffold,
         };
         if (!this.canUseOpenAI()) return fallback;
 
-        const narrative = bundle.narrative.slice(0, 16000);
+        const narrative = bundle.narrative.slice(0, 12000);
+        const activeKeys = Object.keys(
+            aiInput?.past.by_incident ?? liveScaffold.historical_analysis_by_incident ?? {},
+        );
+        const historicalSection = this.buildCombinedHistoricalSchemaSection(bundle, activeKeys);
+        const dualContextBlock = aiInput ? this.formatRiskAiOpenAiInputForPrompt(aiInput) : '';
+
         const schemaHint = `Return ONE JSON object at the root with these keys exactly:
 id (string), generated_at (ISO string), overall_risk_level (one of: LOW, MODERATE, ELEVATED, HIGH, SEVERE, CRITICAL),
 ai_confidence (0-100), populations_at_risk (number estimate),
@@ -615,7 +721,7 @@ hydrological_findings (string array — river/gauge-centric sentences; cfs, floo
 fire_findings (string array — named incidents, acres, containment; satellite cues as sectors—avoid bare lat/lon lists),
 recommendations_list: array of { priority: IMMEDIATE|URGENT|STANDARD exactly (never URGENCY or other synonyms), action: string, deployable: boolean },
 incident_distribution: optional — server recomputes unique event counts per category from ingest (you may omit),
-historical_analysis: omit — the server generates the Historical Context section in a separate dedicated pass,
+${historicalSection},
 sources_count (number, successful feeds was ${bundle.successfulSources}),
 alerts_count: optional — server sets from incident_distribution,
 meteorological_summary, hydrological_risk, fire_threats, recommendations (short paragraph strings),
@@ -626,33 +732,76 @@ major_incidents, minor_incidents (numbers for KPI breakdown).`;
                 ? ` Jurisdiction is single-state (${bundle.stateCd?.toUpperCase() ?? 'state AOI'}): cite only hazards inside that state from the ingest summaries; do not mention Alaska, California, or other states unless explicitly in the data for this AOI.`
                 : '';
 
-        const result = await this.callOpenAI<RiskReport>(
+        if (this.riskUsesDualOpenAiPass()) {
+            const dualSchemaHint = schemaHint.replace(
+                historicalSection,
+                'historical_analysis: omit — the server generates the Historical Context section in a separate dedicated pass',
+            );
+            const result = await this.callOpenAI<RiskReport>(
+                [
+                    {
+                        role: 'system',
+                        content:
+                            `You are Ready2Go emergency intelligence. Output only valid JSON matching the user schema at the root (no wrapper keys). Ground every finding in the ingested data; mark uncertainty where feeds conflict or are missing, and never invent specific incidents not supported by the summaries.
+
+${PLAIN_ENGLISH_STYLE_RULES}${stateOnly}`,
+                    },
+                    {
+                        role: 'user',
+                        content: aiInput
+                            ? `${dualSchemaHint}\n\nINGEST_SCOPE=${bundle.ingestScope ?? 'nationwide'}\nCONTEXT_STATE_OR_US=${bundle.stateCd}\nINGESTED_AT=${bundle.ingestedAt}\n\n${dualContextBlock}`
+                            : `${dualSchemaHint}\n\nINGEST_SCOPE=${bundle.ingestScope ?? 'nationwide'}\nCONTEXT_STATE_OR_US=${bundle.stateCd}\nNWPS_PRIMARY_OR_SAMPLE_LID=${bundle.nwpsGaugeId}\nUSGS_SITE_OR_EMPTY_FOR_SAMPLE=${bundle.usgsSite ?? ''}\nINGESTED_AT=${bundle.ingestedAt}\n\nDATA:\n${narrative}`,
+                    },
+                ],
+                fallback,
+            );
+            const merged = this.mergeRiskReport(fallback, result);
+            const aligned = this.alignAlertsToDistribution(merged, bundle);
+            const withKpis = applyDynamicExecutiveKpis(bundle, aligned);
+            const withHistory: RiskReport = {
+                ...withKpis,
+                ...buildLiveHistoricalContext(bundle, withKpis),
+            };
+            const aiHistory = await this.generateHistoricalContext(bundle, withHistory);
+            return { ...withHistory, ...aiHistory };
+        }
+
+        type CombinedRiskAi = RiskReport & {
+            historical_context?: {
+                rollup?: Partial<HistoricalAnalysis>;
+                by_incident?: Partial<Record<string, Partial<HistoricalAnalysis>>>;
+            };
+        };
+
+        const result = await this.callOpenAI<CombinedRiskAi>(
             [
                 {
                     role: 'system',
                     content:
-                        `You are Ready2Go emergency intelligence. Output only valid JSON matching the user schema at the root (no wrapper keys). Ground every finding in the ingested data; mark uncertainty where feeds conflict or are missing, and never invent specific incidents not supported by the summaries.
+                        `You are Ready2Go emergency intelligence. Output only valid JSON matching the user schema at the root (no wrapper keys). Ground every finding in the ingested data; mark uncertainty where feeds conflict or are missing, and never invent specific incidents not supported by the summaries. Write the executive report and historical_context in one pass so they stay consistent.
 
 ${PLAIN_ENGLISH_STYLE_RULES}${stateOnly}`,
                 },
                 {
                     role: 'user',
-                    content: `${schemaHint}\n\nINGEST_SCOPE=${bundle.ingestScope ?? 'nationwide'}\nCONTEXT_STATE_OR_US=${bundle.stateCd}\nNWPS_PRIMARY_OR_SAMPLE_LID=${bundle.nwpsGaugeId}\nUSGS_SITE_OR_EMPTY_FOR_SAMPLE=${bundle.usgsSite ?? ''}\nINGESTED_AT=${bundle.ingestedAt}\n\nDATA:\n${narrative}`,
+                    content: aiInput
+                        ? `${schemaHint}\n\nINGEST_SCOPE=${bundle.ingestScope ?? 'nationwide'}\nCONTEXT_STATE_OR_US=${bundle.stateCd}\nINGESTED_AT=${bundle.ingestedAt}\n\n${dualContextBlock}`
+                        : `${schemaHint}\n\nINGEST_SCOPE=${bundle.ingestScope ?? 'nationwide'}\nCONTEXT_STATE_OR_US=${bundle.stateCd}\nNWPS_PRIMARY_OR_SAMPLE_LID=${bundle.nwpsGaugeId}\nUSGS_SITE_OR_EMPTY_FOR_SAMPLE=${bundle.usgsSite ?? ''}\nINGESTED_AT=${bundle.ingestedAt}\n\nDATA:\n${narrative}`,
                 },
             ],
-            fallback,
+            { ...fallback, historical_context: { rollup: fallback.historical_analysis, by_incident: fallback.historical_analysis_by_incident } },
+            { max_tokens: 4200, temperature: 0.35 },
         );
 
-        const merged = this.mergeRiskReport(fallback, result);
+        const { historical_context: historicalAi, ...executiveAi } = result;
+        const merged = this.mergeRiskReport(fallback, executiveAi);
         const aligned = this.alignAlertsToDistribution(merged, bundle);
         const withKpis = applyDynamicExecutiveKpis(bundle, aligned);
-        // Live-data-only scaffold: current procedures + confidence only. Every narrative field
-        // is written by the AI below — the static copyFor* templates are never shown to users.
         const withHistory: RiskReport = {
             ...withKpis,
             ...buildLiveHistoricalContext(bundle, withKpis),
         };
-        const aiHistory = await this.generateHistoricalContext(bundle, withHistory);
+        const aiHistory = this.applyHistoricalAiShape(bundle, withHistory, historicalAi);
         return { ...withHistory, ...aiHistory };
     }
 
@@ -763,30 +912,7 @@ ${(bundle.narrative ?? '').slice(0, 8000)}`;
             { model: this.model, max_tokens: 1800, temperature: 0.3 },
         );
 
-        const historical_analysis = this.normalizeHistoricalAnalysis(
-            result.rollup,
-            draftRollup,
-            rollupCap,
-        );
-
-        const incidentKeys = Object.keys(draftByIncident).filter((k): k is IncidentHistoryCategory =>
-            (INCIDENT_HISTORY_TAB_KEYS as readonly string[]).includes(k),
-        );
-        let historical_analysis_by_incident: RiskReport['historical_analysis_by_incident'] =
-            report.historical_analysis_by_incident;
-        if (incidentKeys.length) {
-            const out: Partial<Record<IncidentHistoryCategory, HistoricalAnalysis>> = {};
-            for (const k of incidentKeys) {
-                out[k] = this.normalizeHistoricalAnalysis(
-                    result.by_incident?.[k],
-                    draftByIncident[k] ?? {},
-                    incidentCap,
-                );
-            }
-            historical_analysis_by_incident = out;
-        }
-
-        return { historical_analysis, historical_analysis_by_incident };
+        return this.applyHistoricalAiShape(bundle, report, result);
     }
 
     /** Merge an AI-rewritten historical block over the deterministic draft, with array caps. */

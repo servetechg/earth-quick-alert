@@ -8,6 +8,8 @@ import { recordActivity, ACTIVITY_ACTIONS } from '@/lib/activity-log';
 import { fetchAlignedAlertCommunicationFeed } from '@/lib/services/alert-communication-aligned-feed';
 import { applyRiskReportToAlignedAlertFeed } from '@/lib/services/risk-report-alert-alignment';
 import { resolveRiskIngestScopeForSession } from '@/lib/risk-assessment/resolve-ingest-scope';
+import { buildRiskAiContextPack } from '@/lib/risk-assessment/build-ai-context-pack';
+import { buildRiskAiOpenAiInput } from '@/lib/risk-assessment/build-ai-input-from-bundle';
 
 /** Roles allowed to run Dashboard A fusion (aligned with admin operational tooling). */
 const ALLOWED_ROLES = new Set([
@@ -61,25 +63,33 @@ export async function POST(req: Request) {
             usgsSite,
             nationwide: useNationwide,
         });
-        const reachable = await countReady2GoReachableUsers(bundle.riskExposure ?? undefined);
-        let report = await openaiService.synthesizeDashboardRiskReport(bundle);
+
+        const heuristic = openaiService.buildHeuristicPreOpenAi(bundle);
+        const ai_input = buildRiskAiOpenAiInput(bundle, heuristic);
+
+        const [reportBase, reachable, alignedAlerts] = await Promise.all([
+            openaiService.synthesizeDashboardRiskReport(bundle, ai_input),
+            countReady2GoReachableUsers(bundle.riskExposure ?? undefined),
+            fetchAlignedAlertCommunicationFeed({
+                userId: session.user.id as string | undefined,
+                role,
+                skipUpstreamSync: true,
+            }),
+        ]);
 
         const pop =
             bundle.riskExposure != null
                 ? bundle.riskExposure.populationAffectedEstimate
-                : report.populations_at_risk;
+                : reportBase.populations_at_risk;
 
-        report = {
-            ...report,
-            populations_at_risk: pop,
-            ready2go_users_reachable: reachable,
-        };
-
-        const alignedAlerts = await fetchAlignedAlertCommunicationFeed({
-            userId: session.user.id as string | undefined,
-            role,
-        });
-        report = applyRiskReportToAlignedAlertFeed(report, alignedAlerts);
+        let report = applyRiskReportToAlignedAlertFeed(
+            {
+                ...reportBase,
+                populations_at_risk: pop,
+                ready2go_users_reachable: reachable,
+            },
+            alignedAlerts,
+        );
 
         if (body.recordActivity === true) {
             void recordActivity({
@@ -94,8 +104,14 @@ export async function POST(req: Request) {
             });
         }
 
+        const { past, current } = buildRiskAiContextPack(report, bundle);
+
         return NextResponse.json({
             report,
+            /** Exact `past` + `current` JSON sent to OpenAI before the report was generated. */
+            ai_input,
+            past,
+            current,
             ingest: {
                 successfulSources: bundle.successfulSources,
                 totalSignals: bundle.totalSignals,

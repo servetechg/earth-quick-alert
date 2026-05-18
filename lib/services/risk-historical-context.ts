@@ -605,6 +605,21 @@ function realtimePlaceholder(cat: IncidentHistoryCategory): string {
     }
 }
 
+/** Playbook past/historical fields only (no live `current_procedures`) — for pre-OpenAI `past` input. */
+export function playbookPastBlockForCategory(
+    stateCd: string,
+    cat: IncidentHistoryCategory,
+): import('@/lib/types/risk-assessment').RiskAiPastBlock {
+    const body = playbookForIncident(stateCd || 'us', cat);
+    return {
+        matched_event: body.matched_event,
+        similarity_summary: body.similarity_summary,
+        past_damages: body.past_damages,
+        past_procedures: body.past_procedures,
+        future_measures: body.future_measures,
+    };
+}
+
 function playbookForIncident(state: string, cat: IncidentHistoryCategory): Omit<HistoricalAnalysis, 'match_confidence'> {
     switch (cat) {
         case 'flood':
