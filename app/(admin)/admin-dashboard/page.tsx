@@ -187,15 +187,9 @@ export default function Dashboard() {
         <div className="flex-1 min-w-0 flex flex-col gap-4">
           {/* Top 4 cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2">
-            <IncidentOverviewCard
-              loading={riskLoading}
-              eventType={incidentLive?.eventType}
-              description={incidentLive?.description}
-              date={incidentLive?.date}
-              status={incidentLive?.status}
-            />
+            <IncidentOverviewCard loading={false} />
             <AIRiskPredictionCard
-              loading={riskLoading}
+              loading={false}
               score={riskReport?.ai_confidence}
               riskLabel={
                 riskReport ? mapOverallRiskToGaugeLabel(riskReport.overall_risk_level) : undefined

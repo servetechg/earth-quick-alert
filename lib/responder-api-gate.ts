@@ -7,13 +7,27 @@ type ResponderGate =
     | { ok: false; response: NextResponse };
 
 export async function gateResponder(
-    allowedKind?: 'hospital' | 'police' | 'hotel' | 'pharmacy' | 'transit' | 'energy' | 'gas' | 'electric' | 'water' | 'food-logistics' | 'national-guard',
+    allowedKind?:
+        | 'hospital'
+        | 'police'
+        | 'hotel'
+        | 'pharmacy'
+        | 'transit'
+        | 'energy'
+        | 'gas'
+        | 'electric'
+        | 'water'
+        | 'food-logistics'
+        | 'national-guard'
+        | 'public-official'
+        | 'federal'
+        | 'general',
 ): Promise<ResponderGate> {
     const session = await getSession();
     if (!session?.user?.id) {
         return { ok: false, response: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
     }
-    if (session.user.role !== 'responder') {
+    if (session.user.role !== 'responder' && session.user.role !== 'public_official') {
         return { ok: false, response: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
     }
     const vertical = String(session.user.responderVertical || '');

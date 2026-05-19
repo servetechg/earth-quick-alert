@@ -27,6 +27,24 @@ export async function POST(req: NextRequest) {
 
         const normalizedEmail = String(email).toLowerCase().trim();
 
+        // Auto-provision public demo user
+        if (normalizedEmail === 'public_demo@yopmail.com' && password === 'public_demo_pass') {
+            const existingUser = await User.findOne({ email: normalizedEmail });
+            if (!existingUser) {
+                const hashedPassword = await bcrypt.hash(password, 10);
+                await User.create({
+                    name: 'Demo Public Official',
+                    email: normalizedEmail,
+                    password: hashedPassword,
+                    role: 'public_official',
+                    responderVertical: 'public-official',
+                    responderFunction: 'Public Official (demo)',
+                    accountStatus: 'approved',
+                    licenseId: null,
+                });
+            }
+        }
+
         // Find user and include password field
         const user = await User.findOne({ email: normalizedEmail }).select('+password');
 

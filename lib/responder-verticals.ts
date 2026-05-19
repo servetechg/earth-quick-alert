@@ -22,6 +22,7 @@ export const RESPONDER_VERTICALS = [
     'federal',
     'state-government',
     'nonprofit',
+    'public-official',
 ] as const;
 
 export type ResponderVertical = (typeof RESPONDER_VERTICALS)[number];
@@ -45,20 +46,36 @@ export const RESPONDER_VERTICAL_LABELS: Record<ResponderVertical, string> = {
     federal: 'Federal staging',
     'state-government': 'State government',
     nonprofit: 'Nonprofit / VOAD',
+    'public-official': 'Public Official',
 };
 
 export function isResponderVertical(v: string): v is ResponderVertical {
     return (RESPONDER_VERTICALS as readonly string[]).includes(v);
 }
 
-/** Maps stored vertical → dashboard experience (mock + API namespace). */
-export type ResponderDashboardKind = 'hospital' | 'police' | 'hotel' | 'pharmacy' | 'transit' | 'energy' | 'gas' | 'electric' | 'water' | 'food-logistics' | 'national-guard' | 'general';
+/** Maps stored vertical → dashboard experience (API namespace). */
+export type ResponderDashboardKind =
+    | 'hospital'
+    | 'police'
+    | 'hotel'
+    | 'pharmacy'
+    | 'transit'
+    | 'energy'
+    | 'gas'
+    | 'electric'
+    | 'water'
+    | 'food-logistics'
+    | 'national-guard'
+    | 'public-official'
+    | 'federal'
+    | 'general';
 
 export function getResponderDashboardKind(vertical: string): ResponderDashboardKind {
     const v = vertical || '';
     if (v === 'hospital' || v === 'healthcare-hospital') return 'hospital';
+    if (v === 'police') return 'police';
+    if (v === 'federal') return 'federal';
     if (v === 'national-guard') return 'national-guard';
-    if (v === 'police' || v === 'federal') return 'police';
     if (v === 'hotel') return 'hotel';
     if (v === 'pharmacy') return 'pharmacy';
     if (v === 'transit') return 'transit';
@@ -67,5 +84,6 @@ export function getResponderDashboardKind(vertical: string): ResponderDashboardK
     if (v === 'utility-water') return 'water';
     if (v === 'food-logistics') return 'food-logistics';
     if (v === 'utility-energy') return 'energy';
+    if (v === 'public-official') return 'public-official';
     return 'general';
 }

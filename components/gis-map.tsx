@@ -30,8 +30,10 @@ import {
   AlertOctagon,
   X,
 } from 'lucide-react'
-import { GoogleMap } from '@/components/google-map'
+import { GoogleMap, type MapStateBounds } from '@/components/google-map'
 import { cn } from '@/lib/utils'
+import { getUsStateBbox } from '@/lib/constants/us-state-bounding-boxes'
+import { normalizeStateToUsps } from '@/lib/utils/us-state-usps'
 import { ShieldCheck, Truck, Siren, Building2, MapPin } from 'lucide-react'
 import { geocodeAddress, calculateDistance } from '@/lib/services/mock-map-service'
 import { Switch } from '@/components/ui/switch'
@@ -90,6 +92,17 @@ export function GISMap({
     Object.fromEntries(DEFAULT_MAP_LAYERS.map((layer) => [layer.id, true])),
   )
   const [layersPanelOpen, setLayersPanelOpen] = useState(true)
+
+  const stateBoundsRestriction = useMemo((): MapStateBounds | null => {
+    const st = (focusState || '').trim()
+    if (!st) return null
+    const usps = normalizeStateToUsps(st)
+    if (!usps) return null
+    const bbox = getUsStateBbox(usps)
+    if (!bbox) return null
+    const [west, south, east, north] = bbox
+    return { west, south, east, north }
+  }, [focusState])
 
   useEffect(() => {
     async function fetchData() {
@@ -189,6 +202,15 @@ export function GISMap({
     let cancelled = false
 
     async function applyCenter() {
+      // Sub-admin: full state view is handled by GoogleMap fitBounds — do not zoom to city/metro
+      if (stateBoundsRestriction) {
+        const { west, south, east, north } = stateBoundsRestriction
+        if (!cancelled) {
+          setMapCenter({ lat: (south + north) / 2, lng: (west + east) / 2 })
+        }
+        return
+      }
+
       if (selectedLocation === 'All') {
         const stAll = (focusState || '').trim()
         if (stAll) {
@@ -201,7 +223,7 @@ export function GISMap({
             !(geo.lat === 37.0902 && geo.lng === -95.7129)
           ) {
             setMapCenter(geo)
-            setMapZoom(6)
+            setMapZoom(8)
             return
           }
         }
@@ -213,8 +235,8 @@ export function GISMap({
       const rawAdmin = subAdmins.find((u) => u.title === selectedLocation)
       const adminPos =
         rawAdmin?.position &&
-        Number.isFinite(rawAdmin.position.lat) &&
-        Number.isFinite(rawAdmin.position.lng)
+          Number.isFinite(rawAdmin.position.lat) &&
+          Number.isFinite(rawAdmin.position.lng)
           ? rawAdmin.position
           : null
 
@@ -255,7 +277,7 @@ export function GISMap({
           !(geo.lat === 37.0902 && geo.lng === -95.7129)
         ) {
           setMapCenter(geo)
-          setMapZoom(6)
+          setMapZoom(8)
           return
         }
       }
@@ -270,7 +292,7 @@ export function GISMap({
     return () => {
       cancelled = true
     }
-  }, [selectedLocation, focusState, subAdmins, impactedUsers])
+  }, [selectedLocation, focusState, subAdmins, impactedUsers, stateBoundsRestriction])
 
   // Fetch Infrastructure when the "Infrastructure" tab is activated
   useEffect(() => {
@@ -471,8 +493,16 @@ export function GISMap({
         )}
       </div>
 
-      <div className="flex-1 relative">
-        <GoogleMap markers={markers} zoom={mapZoom} center={mapCenter} heatPoints={heatPoints} showHeatmap={showHeatmap} />
+      <div className="flex-1 flex flex-col min-h-0">
+        <div className="flex-1 relative min-h-0">
+        <GoogleMap
+          markers={markers}
+          zoom={mapZoom}
+          center={mapCenter}
+          heatPoints={heatPoints}
+          showHeatmap={showHeatmap}
+          stateBounds={stateBoundsRestriction}
+        />
 
         {showLayersPanel && layersPanelOpen && (
           <div className="absolute left-4 top-16 z-40 w-[210px] rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-xl backdrop-blur-sm sm:top-20">
@@ -557,6 +587,7 @@ export function GISMap({
             <span className="text-[10px] font-black uppercase tracking-widest text-slate-600">Locating Facilities...</span>
           </div>
         )}
+        </div>
       </div>
     </div>
   )

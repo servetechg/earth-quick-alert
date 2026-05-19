@@ -63,7 +63,7 @@ export function Sidebar({ className }: { className?: string }) {
     setRoleReady(true)
   }, [])
 
-  const isResponderRole = userRole === 'responder'
+  const isResponderRole = userRole === 'responder' || userRole === 'public_official'
   const isOperationalAdmin =
     userRole === 'admin' ||
     userRole === 'sub-admin' ||

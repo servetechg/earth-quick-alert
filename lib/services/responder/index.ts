@@ -11,10 +11,14 @@ import { getElectricResourceDeploymentForUser } from './electric-resource-db';
 import { getWaterResourceDeploymentForUser } from './water-resource-db';
 import { getFoodLogisticsResourceDeploymentForUser } from './food-logistics-resource-db';
 import { getNationalGuardResourceDeploymentForUser } from './national-guard-resource-db';
+import {
+    getFederalResourceDeploymentForUser,
+    mergeFederalResourceDeploymentForUser,
+} from './federal-deployment-db';
 
 export * from './types';
 export { recomputeHospitalSummary } from './hospital-summary';
-export { getHotelAvailability, setHotelAvailability } from './store';
+export { getHotelAvailability, setHotelAvailability, getPublicOfficialSummary } from './store';
 export { getHospitalCapacityForUser, mergeHospitalCapacityForUser, normalizeHospitalUnitsFromPartial } from './hospital-capacity-db';
 export { getPoliceDeploymentForUser, mergePoliceDeploymentForUser } from './police-deployment-db';
 export {
@@ -46,6 +50,10 @@ export {
     getNationalGuardResourceDeploymentForUser,
     mergeNationalGuardResourceDeploymentForUser,
 } from './national-guard-resource-db';
+export {
+    getFederalResourceDeploymentForUser,
+    mergeFederalResourceDeploymentForUser,
+} from './federal-deployment-db';
 
 export function dashboardKindForUser(vertical: string): ResponderDashboardKind {
     return getResponderDashboardKind(vertical || '');
@@ -96,6 +104,7 @@ export async function getResponderDashboardBundle(
         hotel: kind === 'hotel' ? getHotelAvailability() : null,
         pharmacy: kind === 'pharmacy' ? await getPharmacyResourceDeploymentForUser(userId, lic, fn) : null,
         transit: kind === 'transit' ? await getTransitResourceDeploymentForUser(userId, lic, fn) : null,
+        federal: kind === 'federal' ? await getFederalResourceDeploymentForUser(userId, lic, fn) : null,
         energy: kind === 'energy' ? await getEnergyResourceDeploymentForUser(userId, lic, fn) : null,
         gas: kind === 'gas' ? await getGasResourceDeploymentForUser(userId, lic, fn) : null,
         electric: kind === 'electric' ? await getElectricResourceDeploymentForUser(userId, lic, fn) : null,

@@ -20,7 +20,7 @@ const UserSchema = new Schema({
     },
     role: {
         type: String,
-        enum: ['super-admin', 'sub-admin', 'admin', 'observer', 'responder', 'manager', 'user', 'eoc-manager', 'eoc-observer'],
+        enum: ['super-admin', 'sub-admin', 'admin', 'observer', 'responder', 'manager', 'user', 'eoc-manager', 'eoc-observer', 'public_official'],
         default: 'user',
     },
     licenseId: {

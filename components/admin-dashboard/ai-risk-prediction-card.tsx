@@ -15,8 +15,8 @@ const LABELS = ['Low', 'Moderate', 'High', 'Extreme'] as const
 
 export function AIRiskPredictionCard({
   className,
-  score,
-  riskLabel,
+  score = 85,
+  riskLabel = 'High Risk',
   loading = false,
 }: AIRiskPredictionCardProps) {
   const hasLive = typeof score === 'number' && Number.isFinite(score) && riskLabel != null && riskLabel !== ''

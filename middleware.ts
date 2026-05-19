@@ -23,7 +23,7 @@ export function middleware(request: NextRequest) {
             if (isEOC) {
                 return NextResponse.redirect(new URL('/virtual-eoc', request.url))
             }
-            if (userRole === 'responder') {
+            if (userRole === 'responder' || userRole === 'public_official') {
                 return NextResponse.redirect(new URL('/responder-dashboard', request.url))
             }
             if (
@@ -79,7 +79,7 @@ export function middleware(request: NextRequest) {
         ]
 
         const isAdminRoute = adminRoutes.some(route => pathname.startsWith(route))
-        const isAdminRole = userRole === 'admin' || userRole === 'super-admin' || userRole === 'sub-admin' || userRole === 'observer' || userRole === 'responder' || userRole === 'manager' || userRole === 'eoc-manager' || userRole === 'eoc-observer'
+        const isAdminRole = userRole === 'admin' || userRole === 'super-admin' || userRole === 'sub-admin' || userRole === 'observer' || userRole === 'responder' || userRole === 'public_official' || userRole === 'manager' || userRole === 'eoc-manager' || userRole === 'eoc-observer'
         const isEOCRole = userRole === 'eoc-manager' || userRole === 'eoc-observer'
 
         const responderAllowedRoutes = [
@@ -114,7 +114,7 @@ export function middleware(request: NextRequest) {
         const isResponderExclusivePage = responderExclusiveRoutes.some(
             (r) => pathname === r || pathname.startsWith(`${r}/`),
         )
-        if (isResponderExclusivePage && userRole !== 'responder') {
+        if (isResponderExclusivePage && userRole !== 'responder' && userRole !== 'public_official') {
             if (userRole === 'super-admin') {
                 return NextResponse.redirect(new URL('/super-admin-dashboard', request.url))
             }
@@ -132,7 +132,7 @@ export function middleware(request: NextRequest) {
             return NextResponse.redirect(new URL('/user-dashboard', request.url))
         }
 
-        if (userRole === 'responder') {
+        if (userRole === 'responder' || userRole === 'public_official') {
             if (pathname === '/admin-dashboard' || pathname === '/user-dashboard') {
                 return NextResponse.redirect(new URL('/responder-dashboard', request.url))
             }
@@ -172,11 +172,9 @@ export function middleware(request: NextRequest) {
                 userRole === 'manager'
             if (!canAccessAiRisk) {
                 const dest =
-                    userRole === 'admin' || userRole === 'sub-admin' || userRole === 'observer' || userRole === 'manager'
-                        ? '/admin-dashboard'
-                        : userRole === 'responder'
-                          ? '/responder-dashboard'
-                          : '/user-dashboard'
+                    userRole === 'responder' || userRole === 'public_official'
+                        ? '/responder-dashboard'
+                        : '/user-dashboard'
                 return NextResponse.redirect(new URL(dest, request.url))
             }
         }
@@ -193,7 +191,7 @@ export function middleware(request: NextRequest) {
         }
 
         // 5. Restriction: If on user dashboard but IS an admin (and not EOC), go to admin dashboard
-        if (pathname === '/user-dashboard' && isAdminRole && !isEOCRole && userRole !== 'responder') {
+        if (pathname === '/user-dashboard' && isAdminRole && !isEOCRole && userRole !== 'responder' && userRole !== 'public_official') {
             return NextResponse.redirect(new URL('/admin-dashboard', request.url))
         }
 

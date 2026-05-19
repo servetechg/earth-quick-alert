@@ -77,7 +77,7 @@ export function buildIncidentOverviewFromReport(
     }`;
     const summary = [report.meteorological_summary, report.hydrological_risk].filter(Boolean).join(' ').trim();
     const description =
-        (summary.length > 240 ? `${summary.slice(0, 237)}…` : summary) ||
+        (summary.length > 110 ? `${summary.slice(0, 107)}…` : summary) ||
         `${scope}. ${report.alerts_count ?? 0} aligned incident-class signals — open AI Risk Assessment for the full report and PDF export.`;
     const date = new Date(report.generated_at).toLocaleString(undefined, {
         dateStyle: 'medium',
