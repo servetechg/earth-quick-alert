@@ -97,10 +97,13 @@ export function incidentCategoriesWithPositiveChartCount(report: RiskReport): In
     return INCIDENT_HISTORY_TAB_KEYS.filter((k) => (c[k] ?? 0) > 0);
 }
 
-/** One row per bar-chart bucket; counts match {@link distroCounts} (aggregated + lowercase keys). */
+/** Bar-chart rows with positive counts only; order matches {@link INCIDENT_HISTORY_TAB_KEYS}. */
 export function incidentDistributionRowsAligned(report: RiskReport): DistroPoint[] {
     const c = distroCounts(report);
-    return INCIDENT_HISTORY_TAB_KEYS.map((category) => ({ category, count: c[category] ?? 0 }));
+    return incidentCategoriesWithPositiveChartCount(report).map((category) => ({
+        category,
+        count: c[category] ?? 0,
+    }));
 }
 
 /** Bar-chart / `incident_distribution` count — drives which historical subtabs appear. */
