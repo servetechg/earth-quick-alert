@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Button } from '@/components/ui/button'
@@ -9,14 +9,31 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-import { Shield, Users, Truck, MapPin, Plus, Edit } from 'lucide-react'
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { Shield, Users, Truck, MapPin, Plus, Edit, Trash2, Loader2 } from 'lucide-react'
 import type { FederalResourceDeploymentPayload, FederalStagingArea, FederalSiteStatus } from '@/lib/services/responder/types'
+import { RESPONDER_PANEL_CARD, RESPONDER_STAT_CARD } from '@/components/responder/responder-panel-styles'
+
+function actionIconButtonClass(kind: 'edit' | 'delete') {
+  if (kind === 'edit')
+    return 'h-9 w-9 bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-900 rounded-lg transition-colors'
+  return 'h-9 w-9 bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white rounded-lg transition-colors'
+}
 
 export function FederalResourceDeploymentSection({ compact }: { compact?: boolean }) {
   const [data, setData] = useState<FederalResourceDeploymentPayload | null>(null)
   const [loading, setLoading] = useState(true)
   const [editingArea, setEditingArea] = useState<FederalStagingArea | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
 
   const [formLocation, setFormLocation] = useState('')
   const [formPersonnel, setFormPersonnel] = useState(0)
@@ -101,6 +118,14 @@ export function FederalResourceDeploymentSection({ compact }: { compact?: boolea
     saveData({ ...data, stagingAreas: newAreas, totalPersonnelDeployed: newTotal })
   }
 
+  const confirmDelete = () => {
+    if (!data || !deleteTargetId) return
+    const newAreas = data.stagingAreas.filter(a => a.id !== deleteTargetId)
+    const newTotal = newAreas.reduce((sum, area) => sum + area.personnelCount, 0)
+    saveData({ ...data, stagingAreas: newAreas, totalPersonnelDeployed: newTotal })
+    setDeleteTargetId(null)
+  }
+
   if (loading) return <div className="p-8 animate-pulse text-slate-500">Loading federal resource deployment...</div>
   if (!data) return <div className="p-8 text-red-500">Failed to load data.</div>
 
@@ -116,112 +141,162 @@ export function FederalResourceDeploymentSection({ compact }: { compact?: boolea
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="shadow-sm border-slate-200">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-bold text-slate-600 flex items-center justify-between">
-              Jurisdiction
-              <Shield className="w-4 h-4 text-slate-400" />
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-xl font-black text-slate-900 tracking-tighter line-clamp-1 mt-2">
-              {data.jurisdictionName}
-            </div>
-            <p className="text-[10px] font-bold text-slate-500 mt-2 uppercase tracking-wider">OVERSIGHT REGION</p>
-          </CardContent>
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+        <Card className={RESPONDER_STAT_CARD}>
+          <div className="mb-4 flex items-start justify-between">
+            <h3 className="text-lg font-bold leading-tight text-slate-900">Standby Sites</h3>
+            <Shield className="text-[#33375D]" size={18} aria-hidden />
+          </div>
+          <div className="mb-4 flex items-baseline gap-3">
+            <span className="text-5xl font-black tracking-tighter text-[#33375D] tabular-nums">
+              {data.stagingAreas.filter(a => a.status === 'standby').length}
+            </span>
+            <span className="text-xs font-bold uppercase tracking-widest text-slate-500">In Reserve</span>
+          </div>
         </Card>
 
-        <Card className="shadow-sm border-slate-200">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-bold text-slate-600 flex items-center justify-between">
-              Personnel Deployed
-              <Users className="w-4 h-4 text-blue-500" />
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-4xl font-black text-blue-600 tracking-tighter">
+        <Card className={RESPONDER_STAT_CARD}>
+          <div className="mb-4 flex items-start justify-between">
+            <h3 className="text-lg font-bold leading-tight text-slate-900">Personnel Deployed</h3>
+            <Users className="text-blue-500" size={18} aria-hidden />
+          </div>
+          <div className="mb-4 flex items-baseline gap-3">
+            <span className="text-5xl font-black tracking-tighter text-blue-600 tabular-nums">
               {data.totalPersonnelDeployed.toLocaleString()}
-            </div>
-            <p className="text-[10px] font-bold text-slate-500 mt-1 uppercase tracking-wider">ACROSS ALL SITES</p>
-          </CardContent>
+            </span>
+            <span className="text-xs font-bold uppercase tracking-widest text-slate-500">Across Sites</span>
+          </div>
         </Card>
 
-        <Card className="shadow-sm border-slate-200">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-bold text-slate-600 flex items-center justify-between">
-              Staging Areas
-              <MapPin className="w-4 h-4 text-orange-500" />
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-4xl font-black text-orange-600 tracking-tighter">
-              {activeStagingAreas} <span className="text-xl text-slate-400">/ {data.stagingAreas.length}</span>
-            </div>
-            <p className="text-[10px] font-bold text-slate-500 mt-1 uppercase tracking-wider">ACTIVE SITES</p>
-          </CardContent>
+        <Card className={RESPONDER_STAT_CARD}>
+          <div className="mb-4 flex items-start justify-between">
+            <h3 className="text-lg font-bold leading-tight text-slate-900">Staging Areas</h3>
+            <MapPin className="text-orange-500" size={18} aria-hidden />
+          </div>
+          <div className="mb-4 flex items-baseline gap-3">
+            <span className="text-5xl font-black tracking-tighter text-orange-600 tabular-nums">
+              {activeStagingAreas}
+              <span className="ml-1 text-2xl font-black tracking-tighter text-slate-400">
+                /{data.stagingAreas.length}
+              </span>
+            </span>
+            <span className="text-xs font-bold uppercase tracking-widest text-slate-500">Active Sites</span>
+          </div>
         </Card>
 
-        <Card className="shadow-sm border-slate-200">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-bold text-slate-600 flex items-center justify-between">
-              Fleet Vehicles
-              <Truck className="w-4 h-4 text-emerald-500" />
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-4xl font-black text-emerald-600 tracking-tighter">
+        <Card className={RESPONDER_STAT_CARD}>
+          <div className="mb-4 flex items-start justify-between">
+            <h3 className="text-lg font-bold leading-tight text-slate-900">Fleet Vehicles</h3>
+            <Truck className="text-emerald-500" size={18} aria-hidden />
+          </div>
+          <div className="mb-4 flex items-baseline gap-3">
+            <span className="text-5xl font-black tracking-tighter text-emerald-600 tabular-nums">
               {totalVehicles}
-            </div>
-            <p className="text-[10px] font-bold text-slate-500 mt-1 uppercase tracking-wider">HEAVY EQUIPMENT & TRANSPORT</p>
-          </CardContent>
+            </span>
+            <span className="text-xs font-bold uppercase tracking-widest text-slate-500">Heavy/Transport</span>
+          </div>
         </Card>
       </div>
 
-      <Card className="shadow-sm border-slate-200">
-        <CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-lg font-bold text-slate-800">Staging Area Management</CardTitle>
-              <p className="text-sm text-slate-500 font-medium">Source: {data.source.toUpperCase()} · Last updated {new Date(data.updatedAt).toLocaleString()}</p>
-            </div>
-            <Button onClick={() => handleOpenDialog()} className="bg-[#FFD75E] text-[#33375D] hover:bg-[#FFD75E]/90 font-bold gap-2">
-              <Plus className="w-4 h-4" />
-              Add Detail
-            </Button>
+      <Card className={RESPONDER_PANEL_CARD}>
+        <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between px-0">
+          <div>
+            <CardTitle>{data.jurisdictionName} Staging Management</CardTitle>
+            <CardDescription>
+              Source: {data.source.toUpperCase()} · Last update {new Date(data.updatedAt).toLocaleString()}
+            </CardDescription>
           </div>
         </CardHeader>
         <CardContent className="p-0">
-          <ScrollArea className="h-[400px]">
-            <div className="p-6 space-y-4">
-              {data.stagingAreas.map(area => (
-                <div key={area.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-slate-200 bg-white shadow-sm hover:shadow-md transition-shadow gap-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-1">
-                      <h4 className="font-bold text-slate-900 text-lg">{area.location}</h4>
-                      <Badge variant="outline" className={`font-bold uppercase tracking-wider text-[10px] ${
-                        area.status === 'active' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 
-                        area.status === 'standby' ? 'bg-orange-50 text-orange-700 border-orange-200' : 
-                        'bg-slate-100 text-slate-600 border-slate-200'
-                      }`}>
-                        {area.status}
-                      </Badge>
-                    </div>
-                    <div className="flex items-center gap-4 text-sm font-medium text-slate-500 mt-2">
-                      <span className="flex items-center gap-1"><Users className="w-4 h-4 text-blue-500" /> {area.personnelCount} Personnel</span>
-                      <span className="flex items-center gap-1"><Truck className="w-4 h-4 text-emerald-500" /> {area.vehicleCount} Vehicles</span>
-                    </div>
-                    {area.notes && (
-                      <p className="text-sm text-slate-600 mt-2 bg-slate-50 p-2 rounded-md">{area.notes}</p>
-                    )}
-                  </div>
-                  <Button variant="outline" size="sm" onClick={() => handleOpenDialog(area)} className="font-bold gap-2">
-                    <Edit className="w-4 h-4" /> Edit
-                  </Button>
-                </div>
-              ))}
+          <div className="space-y-3">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <h4 className="text-sm font-black uppercase tracking-widest text-slate-500">Staging areas</h4>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="gap-2 rounded-sm border-slate-200 font-bold"
+                onClick={() => handleOpenDialog()}
+              >
+                <Plus className="h-4 w-4" />
+                Add Staging Area
+              </Button>
             </div>
-          </ScrollArea>
+            <div className="overflow-x-auto overflow-y-auto max-h-[560px]">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-slate-50/50 border-b border-slate-100">
+                    <th className="px-6 py-4 text-left text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                      Location
+                    </th>
+                    <th className="px-6 py-4 text-left text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                      Status
+                    </th>
+                    <th className="px-6 py-4 text-left text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                      Personnel
+                    </th>
+                    <th className="px-6 py-4 text-left text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                      Vehicles
+                    </th>
+                    <th className="px-6 py-4 text-left text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                      Notes
+                    </th>
+                    <th className="px-6 py-4 text-right text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {data.stagingAreas.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="px-6 py-12 text-center text-sm font-medium text-slate-500">
+                        No staging areas logged.
+                      </td>
+                    </tr>
+                  ) : (
+                    data.stagingAreas.map(area => (
+                      <tr key={area.id} className="group hover:bg-blue-50/30 transition-colors">
+                        <td className="px-6 py-5 font-medium text-slate-900">{area.location}</td>
+                        <td className="px-6 py-5">
+                          <Badge variant="outline" className={`font-bold uppercase tracking-wider text-[10px] ${area.status === 'active' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                            area.status === 'standby' ? 'bg-orange-50 text-orange-700 border-orange-200' :
+                              'bg-slate-100 text-slate-600 border-slate-200'
+                            }`}>
+                            {area.status}
+                          </Badge>
+                        </td>
+                        <td className="px-6 py-5 tabular-nums text-slate-700">{area.personnelCount}</td>
+                        <td className="px-6 py-5 tabular-nums text-slate-700">{area.vehicleCount}</td>
+                        <td className="px-6 py-5 text-slate-600 text-sm max-w-[200px] truncate">{area.notes || '—'}</td>
+                        <td className="px-6 py-5 text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              type="button"
+                              title="Edit"
+                              size="icon"
+                              onClick={() => handleOpenDialog(area)}
+                              className={actionIconButtonClass('edit')}
+                            >
+                              <Edit size={15} />
+                            </Button>
+                            <Button
+                              type="button"
+                              title="Delete"
+                              size="icon"
+                              onClick={() => setDeleteTargetId(area.id)}
+                              className={actionIconButtonClass('delete')}
+                            >
+                              <Trash2 size={15} />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
@@ -269,6 +344,29 @@ export function FederalResourceDeploymentSection({ compact }: { compact?: boolea
           </div>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={deleteTargetId !== null} onOpenChange={(o) => !o && setDeleteTargetId(null)}>
+        <AlertDialogContent className="border-slate-200 bg-white text-slate-900">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-black tracking-tight text-slate-900">Remove this area?</AlertDialogTitle>
+            <AlertDialogDescription className="text-slate-500 text-sm leading-relaxed">
+              This removes <strong className="text-slate-900">{data?.stagingAreas.find(a => a.id === deleteTargetId)?.location ?? 'this area'}</strong> from the deployment board.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900">
+              Cancel
+            </AlertDialogCancel>
+            <Button
+              type="button"
+              className="bg-rose-600 text-white hover:bg-rose-700"
+              onClick={() => void confirmDelete()}
+            >
+              Delete
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
