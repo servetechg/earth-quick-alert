@@ -45,24 +45,6 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        // Auto-provision federal demo user
-        if (normalizedEmail === 'federal_demo@yopmail.com' && password === 'federal_demo_pass') {
-            const existingUser = await User.findOne({ email: normalizedEmail });
-            if (!existingUser) {
-                const hashedPassword = await bcrypt.hash(password, 10);
-                await User.create({
-                    name: 'Demo Federal Responder',
-                    email: normalizedEmail,
-                    password: hashedPassword,
-                    role: 'responder',
-                    responderVertical: 'federal',
-                    responderFunction: 'Federal Response Coordinator (demo)',
-                    accountStatus: 'approved',
-                    licenseId: null,
-                });
-            }
-        }
-
         // Find user and include password field
         const user = await User.findOne({ email: normalizedEmail }).select('+password');
 
