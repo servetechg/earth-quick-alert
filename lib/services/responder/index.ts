@@ -1,4 +1,5 @@
 import { getResponderDashboardKind, type ResponderDashboardKind } from '@/lib/responder-verticals';
+import { stripDemoSuffix } from '@/lib/utils/strip-demo-suffix';
 import { getHotelAvailability } from './store';
 import type { GeneralResponderSummary } from './types';
 import { getHospitalCapacityForUser } from './hospital-capacity-db';
@@ -57,7 +58,7 @@ export function getGeneralResponderSummary(
     displayName: string,
 ): GeneralResponderSummary {
     const org =
-        responderFunction?.trim() ||
+        stripDemoSuffix(responderFunction || '') ||
         (displayName?.trim() && !displayName.includes('@') ? displayName.trim() : '') ||
         'Your organization';
     return {
@@ -84,7 +85,7 @@ export async function getResponderDashboardBundle(
     userId: string,
     licenseId?: string | null,
 ) {
-    const fn = responderFunction || '';
+    const fn = stripDemoSuffix(responderFunction || '');
     const lic = licenseId ?? null;
     const kind = dashboardKindForUser(vertical);
     return {

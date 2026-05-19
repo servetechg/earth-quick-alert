@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { toast } from 'sonner'
-import { Loader2, Save, MapPin, Zap, Plus, Trash2, Edit, HardHat } from 'lucide-react'
+import { Loader2, Save, MapPin, Zap, Plus, Trash2, Edit, HardHat, Navigation } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -32,12 +32,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { useJsApiLoader, Autocomplete, GoogleMap, MarkerF } from '@react-google-maps/api'
+import { GOOGLE_MAPS_API_KEY, GOOGLE_MAPS_LIBRARIES, GOOGLE_MAPS_LOADER_ID } from '@/lib/constants/google-maps-config'
 import type {
   EnergyCrewAsset,
   EnergyResourceDeploymentPayload,
   EnergyCrewStatus,
 } from '@/lib/services/responder'
 import { RESPONDER_PANEL_CARD, RESPONDER_STAT_CARD } from '@/components/responder/responder-panel-styles'
+import { stripDemoSuffix } from '@/lib/utils/strip-demo-suffix'
 
 const LeafletMap = dynamic(() => import('@/components/leaflet-map'), {
   ssr: false,
@@ -52,6 +55,13 @@ type Props = { compact?: boolean }
 
 function newId() {
   return `en-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
+}
+
+function normalizePayload(payload: EnergyResourceDeploymentPayload): EnergyResourceDeploymentPayload {
+  return {
+    ...payload,
+    networkName: payload.networkName ? stripDemoSuffix(payload.networkName) : payload.networkName,
+  }
 }
 
 function actionIconButtonClass(kind: 'edit' | 'delete') {
@@ -78,6 +88,64 @@ export function EnergyResourceDeploymentSection({ compact }: Props) {
   const [fStatus, setFStatus] = useState<EnergyCrewStatus>('active')
   const [fNotes, setFNotes] = useState('')
 
+  const [mapCenterMap, setMapCenterMap] = useState({ lat: 34.7465, lng: -92.2896 })
+  const [markerPosition, setMarkerPosition] = useState<{ lat: number; lng: number } | null>(null)
+  const [mapObj, setMapObj] = useState<google.maps.Map | null>(null)
+  const [autocompleteInfo, setAutocompleteInfo] = useState<google.maps.places.Autocomplete | null>(null)
+
+  const { isLoaded } = useJsApiLoader({
+    id: GOOGLE_MAPS_LOADER_ID,
+    googleMapsApiKey: GOOGLE_MAPS_API_KEY,
+    libraries: GOOGLE_MAPS_LIBRARIES,
+  })
+
+  const onPlaceLoaded = (autocomplete: google.maps.places.Autocomplete) => {
+    setAutocompleteInfo(autocomplete)
+  }
+
+  const onPlaceChanged = () => {
+    if (!autocompleteInfo) return
+    const place = autocompleteInfo.getPlace()
+    if (!place.geometry?.location) return
+
+    const lat = place.geometry.location.lat()
+    const lng = place.geometry.location.lng()
+    const newPos = { lat, lng }
+    setMapCenterMap(newPos)
+    setMarkerPosition(newPos)
+    mapObj?.panTo(newPos)
+    setFLat(lat.toString())
+    setFLng(lng.toString())
+    if (place.formatted_address) setFAddress(place.formatted_address)
+  }
+
+  const handleLocateMe = () => {
+    if (!navigator.geolocation) {
+      toast.error('Geolocation is not supported by your browser.')
+      return
+    }
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords
+        const newPos = { lat: latitude, lng: longitude }
+        setMapCenterMap(newPos)
+        setMarkerPosition(newPos)
+        mapObj?.panTo(newPos)
+        setFLat(latitude.toString())
+        setFLng(longitude.toString())
+        if (typeof google !== 'undefined') {
+          const geocoder = new google.maps.Geocoder()
+          geocoder.geocode({ location: newPos }, (results, status) => {
+            if (status === 'OK' && results?.[0]?.formatted_address) {
+              setFAddress(results[0].formatted_address)
+            }
+          })
+        }
+      },
+      () => toast.error('Unable to retrieve location. Please check browser permissions.'),
+    )
+  }
+
   const load = useCallback(async () => {
     setLoading(true)
     try {
@@ -86,7 +154,7 @@ export function EnergyResourceDeploymentSection({ compact }: Props) {
         const err = await res.json().catch(() => ({}))
         throw new Error((err as { error?: string }).error || 'Failed to load')
       }
-      setData(await res.json())
+      setData(normalizePayload(await res.json()))
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : 'Load failed'
       toast.error(message)
@@ -112,7 +180,7 @@ export function EnergyResourceDeploymentSection({ compact }: Props) {
         const err = await res.json().catch(() => ({}))
         throw new Error((err as { error?: string }).error || 'Save failed')
       }
-      setData(await res.json())
+      setData(normalizePayload(await res.json()))
       toast.success('Energy deployment updated (mock)')
       return true
     } catch (e: unknown) {
@@ -127,13 +195,15 @@ export function EnergyResourceDeploymentSection({ compact }: Props) {
   const openCreateSite = () => {
     setFName('')
     setFAddress('')
-    setFLat('40.758')
-    setFLng('-111.888')
+    setFLat('')
+    setFLng('')
     setFCrews('0')
     setFStatus('active')
     setFNotes('')
     setSiteDialogMode('create')
     setSiteEditIndex(null)
+    setMapCenterMap({ lat: 34.7465, lng: -92.2896 })
+    setMarkerPosition(null)
     setSiteDialogOpen(true)
   }
 
@@ -149,6 +219,9 @@ export function EnergyResourceDeploymentSection({ compact }: Props) {
     setFNotes(s.notes || '')
     setSiteDialogMode('edit')
     setSiteEditIndex(index)
+    const pos = { lat: s.lat, lng: s.lng }
+    setMapCenterMap(pos)
+    setMarkerPosition(pos)
     setSiteDialogOpen(true)
   }
 
@@ -158,7 +231,7 @@ export function EnergyResourceDeploymentSection({ compact }: Props) {
     const lng = Number(fLng)
     const crewsDeployed = Math.max(0, Math.floor(Number(fCrews) || 0))
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-      toast.error('Latitude and longitude must be valid numbers')
+      toast.error('Please select a location on the map or search for an address')
       return
     }
     const row: EnergyCrewAsset = {
@@ -193,7 +266,7 @@ export function EnergyResourceDeploymentSection({ compact }: Props) {
   }
 
   const mapCenter = useMemo(() => {
-    if (!data?.sites.length) return { lat: 40.758, lng: -111.888 }
+    if (!data?.sites.length) return { lat: 34.7465, lng: -92.2896 }
     let lat = 0
     let lng = 0
     for (const s of data.sites) {
@@ -288,10 +361,9 @@ export function EnergyResourceDeploymentSection({ compact }: Props) {
       <Card className={RESPONDER_PANEL_CARD}>
         <CardHeader className="flex flex-col gap-2 px-0 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <CardTitle>{data.networkName}</CardTitle>
+            <CardTitle>{stripDemoSuffix(data.networkName)}</CardTitle>
             <CardDescription>
-              Source: <span className="font-semibold uppercase">{data.source}</span> · Last update{' '}
-              {new Date(data.updatedAt).toLocaleString()}
+              Last update {new Date(data.updatedAt).toLocaleString()}
             </CardDescription>
           </div>
           {!compact && (
@@ -330,11 +402,6 @@ export function EnergyResourceDeploymentSection({ compact }: Props) {
               </div>
             </div>
           )}
-
-          <p className="text-sm text-slate-600">
-            Each row is a power outage area or staging point with <strong>crews deployed</strong> at
-            that location. Map markers use the same coordinates for GIS pop-ups when the main map is wired to this feed.
-          </p>
 
           <div className={`grid gap-6 ${compact ? '' : 'lg:grid-cols-2'}`}>
             <div className="space-y-3">
@@ -425,34 +492,76 @@ export function EnergyResourceDeploymentSection({ compact }: Props) {
       </Card>
 
       <Dialog open={siteDialogOpen} onOpenChange={(o) => !o && setSiteDialogOpen(false)}>
-        <DialogContent className="border-slate-200 bg-white text-slate-900 sm:max-w-lg">
+        <DialogContent
+          className="border-slate-200 bg-white text-slate-900 sm:max-w-xl max-h-[90vh] overflow-y-auto"
+          onInteractOutside={(e) => {
+            const target = e.target as HTMLElement
+            if (target.closest('.pac-container')) e.preventDefault()
+          }}
+        >
           <DialogHeader>
             <DialogTitle className="font-black text-lg tracking-tight text-slate-900">
               {siteDialogMode === 'create' ? 'Add outage location' : 'Edit outage location'}
             </DialogTitle>
             <DialogDescription className="text-xs text-slate-500">
-              Set crews deployed at this location; coordinates drive GIS markers.
+              Search or click the map to set this site&apos;s coordinates for GIS markers.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-3 py-1">
+          <div className="grid gap-4 py-2">
             <div className="space-y-1.5">
               <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Name</label>
               <Input value={fName} onChange={(e) => setFName(e.target.value)} className="rounded-lg" />
             </div>
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Address</label>
-              <Input value={fAddress} onChange={(e) => setFAddress(e.target.value)} className="rounded-lg" />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Latitude</label>
-                <Input value={fLat} onChange={(e) => setFLat(e.target.value)} className="rounded-lg font-mono text-sm" />
+            {isLoaded && (
+              <div className="space-y-4 mb-2 pb-6 border-b border-slate-100">
+                <div className="flex items-center justify-between px-1">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                    <MapPin size={12} /> Location
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleLocateMe}
+                    className="text-[10px] font-black text-white flex items-center gap-2 bg-[#33375D] hover:bg-[#44496B] px-3 py-1.5 rounded-lg transition-all shadow-sm active:scale-95"
+                  >
+                    <Navigation size={10} /> Find My Location
+                  </button>
+                </div>
+                <Autocomplete onLoad={onPlaceLoaded} onPlaceChanged={onPlaceChanged}>
+                  <input
+                    type="text"
+                    placeholder="Search for an address..."
+                    className="w-full px-4 py-3 bg-white border border-slate-200 shadow-sm rounded-lg focus:outline-none focus:ring-2 focus:ring-[#33375D]/10 focus:border-[#33375D] transition-all text-sm placeholder:text-slate-400"
+                  />
+                </Autocomplete>
+                <div className="w-full h-48 rounded-xl overflow-hidden border border-slate-200 shadow-inner relative">
+                  <GoogleMap
+                    mapContainerStyle={{ width: '100%', height: '100%' }}
+                    center={mapCenterMap}
+                    zoom={12}
+                    onLoad={(m) => setMapObj(m)}
+                    onClick={(e) => {
+                      if (!e.latLng) return
+                      const lat = e.latLng.lat()
+                      const lng = e.latLng.lng()
+                      setMapCenterMap({ lat, lng })
+                      setMarkerPosition({ lat, lng })
+                      setFLat(lat.toString())
+                      setFLng(lng.toString())
+                    }}
+                    options={{
+                      disableDefaultUI: true,
+                      zoomControl: true,
+                      styles: [
+                        { featureType: 'all', elementType: 'labels.text.fill', stylers: [{ color: '#33375D' }] },
+                        { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#E2E8F0' }] },
+                      ],
+                    }}
+                  >
+                    {markerPosition && <MarkerF position={markerPosition} />}
+                  </GoogleMap>
+                </div>
               </div>
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Longitude</label>
-                <Input value={fLng} onChange={(e) => setFLng(e.target.value)} className="rounded-lg font-mono text-sm" />
-              </div>
-            </div>
+            )}
             <div className="space-y-1.5">
               <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">
                 Power Crews Deployed

@@ -42,6 +42,7 @@ import type {
 } from '@/lib/services/responder'
 import type { EmergencyResource } from '@/lib/types/emergency'
 import { RESPONDER_PANEL_CARD, RESPONDER_STAT_CARD } from '@/components/responder/responder-panel-styles'
+import { stripDemoSuffix } from '@/lib/utils/strip-demo-suffix'
 
 const LeafletMap = dynamic(() => import('@/components/leaflet-map'), {
   ssr: false,
@@ -379,7 +380,7 @@ export function TransitResourceDeploymentSection({ compact }: Props) {
       <Card className={RESPONDER_PANEL_CARD}>
         <CardHeader className="flex flex-col gap-2 px-0 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <CardTitle>{data.networkName}</CardTitle>
+            <CardTitle>{stripDemoSuffix(data.networkName)}</CardTitle>
             <CardDescription>
               Last update{' '}
               {new Date(data.updatedAt).toLocaleString()}

@@ -37,6 +37,7 @@ import type {
   NationalGuardSiteStatus,
 } from '@/lib/services/responder'
 import { RESPONDER_PANEL_CARD, RESPONDER_STAT_CARD } from '@/components/responder/responder-panel-styles'
+import { stripDemoSuffix } from '@/lib/utils/strip-demo-suffix'
 
 type Props = { compact?: boolean }
 
@@ -297,7 +298,7 @@ export function NationalGuardResourceDeploymentSection({ compact }: Props) {
       <Card className={RESPONDER_PANEL_CARD}>
         <CardHeader className="flex flex-col gap-2 px-0 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <CardTitle>{data.networkName}</CardTitle>
+            <CardTitle>{stripDemoSuffix(data.networkName)}</CardTitle>
             <CardDescription>
               Source: <span className="font-semibold uppercase">{data.source}</span> · Last update{' '}
               {new Date(data.updatedAt).toLocaleString()}
