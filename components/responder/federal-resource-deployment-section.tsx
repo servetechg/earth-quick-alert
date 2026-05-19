@@ -44,7 +44,7 @@ export function FederalResourceDeploymentSection({ compact }: { compact?: boolea
   const saveData = async (updatedData: FederalResourceDeploymentPayload) => {
     try {
       const res = await fetch('/api/responder/federal/resource-deployment', {
-        method: 'POST',
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatedData),
       })

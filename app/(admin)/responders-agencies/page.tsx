@@ -579,7 +579,7 @@ export default function RespondersAgenciesPage() {
                             />
                         </div>
                         <div className="space-y-2">
-                            <Label>Role / function</Label>
+                            <Label>Role</Label>
                             <Select value={inviteOptionId} onValueChange={setInviteOptionId}>
                                 <SelectTrigger className="w-full">
                                     <SelectValue placeholder="Select role" />

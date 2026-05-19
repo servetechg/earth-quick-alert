@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { Loader2, Save, MapPin, Bus, Plus, Trash2, Edit, Navigation, Layers } from 'lucide-react'
+import { Loader2, Save, MapPin, Zap, Plus, Trash2, Edit, ExternalLink, HardHat, Flame } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -33,14 +33,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { useJsApiLoader, Autocomplete, GoogleMap, MarkerF } from '@react-google-maps/api'
-import { GOOGLE_MAPS_API_KEY, GOOGLE_MAPS_LIBRARIES, GOOGLE_MAPS_LOADER_ID } from '@/lib/constants/google-maps-config'
 import type {
-  TransitMassTransitAsset,
-  TransitResourceDeploymentPayload,
-  TransitAssetStatus,
+  GasCrewAsset,
+  GasResourceDeploymentPayload,
+  GasCrewStatus,
 } from '@/lib/services/responder'
-import type { EmergencyResource } from '@/lib/types/emergency'
 import { RESPONDER_PANEL_CARD, RESPONDER_STAT_CARD } from '@/components/responder/responder-panel-styles'
 
 const LeafletMap = dynamic(() => import('@/components/leaflet-map'), {
@@ -55,17 +52,7 @@ const LeafletMap = dynamic(() => import('@/components/leaflet-map'), {
 type Props = { compact?: boolean }
 
 function newId() {
-  return `tr-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
-}
-
-function assetsToResources(assets: TransitMassTransitAsset[]): EmergencyResource[] {
-  return assets.map((s) => ({
-    id: s.id,
-    type: 'other' as const,
-    name: s.name,
-    location: { lat: s.lat, lng: s.lng, address: s.address },
-    status: s.status === 'active' ? 'available' : s.status === 'limited' ? 'limited' : 'closed',
-  }))
+  return `gas-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
 }
 
 function actionIconButtonClass(kind: 'edit' | 'delete') {
@@ -74,8 +61,8 @@ function actionIconButtonClass(kind: 'edit' | 'delete') {
   return 'h-9 w-9 bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white rounded-lg transition-colors'
 }
 
-export function TransitResourceDeploymentSection({ compact }: Props) {
-  const [data, setData] = useState<TransitResourceDeploymentPayload | null>(null)
+export function GasResourceDeploymentSection({ compact }: Props) {
+  const [data, setData] = useState<GasResourceDeploymentPayload | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
@@ -88,80 +75,14 @@ export function TransitResourceDeploymentSection({ compact }: Props) {
   const [fAddress, setFAddress] = useState('')
   const [fLat, setFLat] = useState('')
   const [fLng, setFLng] = useState('')
-  const [fVehicles, setFVehicles] = useState('0')
-  const [fStatus, setFStatus] = useState<TransitAssetStatus>('active')
+  const [fCrews, setFCrews] = useState('0')
+  const [fStatus, setFStatus] = useState<GasCrewStatus>('active')
   const [fNotes, setFNotes] = useState('')
-
-  const [mapCenterMap, setMapCenterMap] = useState({ lat: 34.7465, lng: -92.2896 })
-  const [markerPosition, setMarkerPosition] = useState<{ lat: number, lng: number } | null>(null)
-  const [mapObj, setMapObj] = useState<google.maps.Map | null>(null)
-  const [autocompleteInfo, setAutocompleteInfo] = useState<any>(null)
-
-  const { isLoaded } = useJsApiLoader({
-    id: GOOGLE_MAPS_LOADER_ID,
-    googleMapsApiKey: GOOGLE_MAPS_API_KEY,
-    libraries: GOOGLE_MAPS_LIBRARIES,
-  })
-
-  const onPlaceLoaded = (autocomplete: any) => {
-    setAutocompleteInfo(autocomplete)
-  }
-
-  const onPlaceChanged = () => {
-    if (autocompleteInfo) {
-      const place = autocompleteInfo.getPlace()
-      if (!place.geometry || !place.geometry.location) return
-
-      const lat = place.geometry.location.lat()
-      const lng = place.geometry.location.lng()
-
-      const newPos = { lat, lng }
-      setMapCenterMap(newPos)
-      setMarkerPosition(newPos)
-      if (mapObj) mapObj.panTo(newPos)
-      setFLat(lat.toString())
-      setFLng(lng.toString())
-
-      if (!fAddress && place.formatted_address) {
-        setFAddress(place.formatted_address)
-      }
-    }
-  }
-
-  const handleLocateMe = () => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const { latitude, longitude } = position.coords
-          const newPos = { lat: latitude, lng: longitude }
-          setMapCenterMap(newPos)
-          setMarkerPosition(newPos)
-          if (mapObj) mapObj.panTo(newPos)
-          setFLat(latitude.toString())
-          setFLng(longitude.toString())
-
-          if (typeof google !== 'undefined') {
-            const geocoder = new google.maps.Geocoder()
-            geocoder.geocode({ location: newPos }, (results, status) => {
-              if (status === 'OK' && results?.[0]) {
-                 if (!fAddress) setFAddress(results[0].formatted_address)
-              }
-            })
-          }
-        },
-        () => {
-          toast.error('Unable to retrieve location. Please check browser permissions.')
-        }
-      )
-    } else {
-      toast.error('Geolocation is not supported by your browser.')
-    }
-  }
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch('/api/responder/transit/resource-deployment')
+      const res = await fetch('/api/responder/gas/resource-deployment')
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
         throw new Error((err as { error?: string }).error || 'Failed to load')
@@ -180,10 +101,10 @@ export function TransitResourceDeploymentSection({ compact }: Props) {
     void load()
   }, [load])
 
-  const persist = async (next: TransitResourceDeploymentPayload) => {
+  const persist = async (next: GasResourceDeploymentPayload) => {
     setSaving(true)
     try {
-      const res = await fetch('/api/responder/transit/resource-deployment', {
+      const res = await fetch('/api/responder/gas/resource-deployment', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(next),
@@ -193,7 +114,7 @@ export function TransitResourceDeploymentSection({ compact }: Props) {
         throw new Error((err as { error?: string }).error || 'Save failed')
       }
       setData(await res.json())
-      toast.success('Mass transit deployment updated.')
+      toast.success('Gas deployment updated (mock)')
       return true
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : 'Save failed'
@@ -207,15 +128,13 @@ export function TransitResourceDeploymentSection({ compact }: Props) {
   const openCreateSite = () => {
     setFName('')
     setFAddress('')
-    setFLat('34.7465')
-    setFLng('-92.2896')
-    setFVehicles('0')
+    setFLat('40.758')
+    setFLng('-111.888')
+    setFCrews('0')
     setFStatus('active')
     setFNotes('')
     setSiteDialogMode('create')
     setSiteEditIndex(null)
-    setMapCenterMap({ lat: 34.7465, lng: -92.2896 })
-    setMarkerPosition(null)
     setSiteDialogOpen(true)
   }
 
@@ -226,16 +145,11 @@ export function TransitResourceDeploymentSection({ compact }: Props) {
     setFAddress(s.address)
     setFLat(String(s.lat))
     setFLng(String(s.lng))
-    setFVehicles(String(s.vehiclesDeployed))
+    setFCrews(String(s.crewsDeployed))
     setFStatus(s.status)
     setFNotes(s.notes || '')
     setSiteDialogMode('edit')
     setSiteEditIndex(index)
-
-    const pos = { lat: s.lat, lng: s.lng }
-    setMapCenterMap(pos)
-    setMarkerPosition(pos)
-
     setSiteDialogOpen(true)
   }
 
@@ -243,25 +157,25 @@ export function TransitResourceDeploymentSection({ compact }: Props) {
     if (!data) return
     const lat = Number(fLat)
     const lng = Number(fLng)
-    const vehiclesDeployed = Math.max(0, Math.floor(Number(fVehicles) || 0))
+    const crewsDeployed = Math.max(0, Math.floor(Number(fCrews) || 0))
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
       toast.error('Latitude and longitude must be valid numbers')
       return
     }
-    const row: TransitMassTransitAsset = {
+    const row: GasCrewAsset = {
       id:
         siteDialogMode === 'edit' && siteEditIndex !== null && data.sites[siteEditIndex]
           ? data.sites[siteEditIndex].id
           : newId(),
-      name: fName.trim() || 'Mass transit asset',
+      name: fName.trim() || 'Gas leak / crew staging',
       address: fAddress.trim(),
       lat,
       lng,
-      vehiclesDeployed,
+      crewsDeployed,
       status: fStatus,
       notes: fNotes.trim() || undefined,
     }
-    let sites: TransitMassTransitAsset[]
+    let sites: GasCrewAsset[]
     if (siteDialogMode === 'create') {
       sites = [...data.sites, row]
     } else if (siteEditIndex !== null && data.sites[siteEditIndex]) {
@@ -279,8 +193,6 @@ export function TransitResourceDeploymentSection({ compact }: Props) {
     if (ok) setDeleteIndex(null)
   }
 
-  const mapResources = useMemo(() => (data ? assetsToResources(data.sites) : []), [data])
-
   const mapCenter = useMemo(() => {
     if (!data?.sites.length) return { lat: 40.758, lng: -111.888 }
     let lat = 0
@@ -293,7 +205,7 @@ export function TransitResourceDeploymentSection({ compact }: Props) {
   }, [data])
 
   const locationCount = data?.sites.length ?? 0
-  const vehiclesTotal = data?.sites.reduce((s, x) => s + x.vehiclesDeployed, 0) ?? 0
+  const crewsTotal = data?.sites.reduce((s, x) => s + x.crewsDeployed, 0) ?? 0
   const activeCount = data?.sites.filter((s) => s.status === 'active').length ?? 0
   const constrainedCount =
     data?.sites.filter((s) => s.status === 'limited' || s.status === 'suspended').length ?? 0
@@ -302,31 +214,31 @@ export function TransitResourceDeploymentSection({ compact }: Props) {
     ? ([
         {
           id: 'locations',
-          title: 'Mass Transit Locations',
+          title: 'Gas Leak Areas',
           caption: 'Listed',
           value: locationCount,
           accentClass: 'text-[#33375D]',
-          Icon: Bus,
+          Icon: Flame,
         },
         {
-          id: 'vehicles',
-          title: 'Vehicles Deployed',
+          id: 'crews',
+          title: 'Repair Crews Deployed',
           caption: 'Summed',
-          value: vehiclesTotal,
-          accentClass: 'text-emerald-600',
-          Icon: Layers,
+          value: crewsTotal,
+          accentClass: 'text-amber-600',
+          Icon: HardHat,
         },
         {
           id: 'active',
-          title: 'Active',
+          title: 'Active Repair',
           caption: 'Sites',
           value: activeCount,
-          accentClass: 'text-[#F59E0B]',
+          accentClass: 'text-emerald-600',
           Icon: MapPin,
         },
         {
           id: 'constrained',
-          title: 'Limited / suspended',
+          title: 'Awaiting Support',
           caption: 'Site',
           value: constrainedCount,
           accentClass: 'text-[#DC2626]',
@@ -341,7 +253,7 @@ export function TransitResourceDeploymentSection({ compact }: Props) {
         className={`flex items-center justify-center gap-2 py-20 font-medium text-slate-500 ${RESPONDER_PANEL_CARD}`}
       >
         <Loader2 className="h-5 w-5 animate-spin text-[#33375D]" />
-        Loading mass transit deployment…
+        Loading gas utility deployment…
       </div>
     )
   }
@@ -356,8 +268,6 @@ export function TransitResourceDeploymentSection({ compact }: Props) {
       </Card>
     )
   }
-
-  const mapHeight = compact ? 'min-h-[220px] h-[240px]' : 'min-h-[320px] h-[420px]'
 
   return (
     <div className="space-y-6">
@@ -381,11 +291,17 @@ export function TransitResourceDeploymentSection({ compact }: Props) {
           <div>
             <CardTitle>{data.networkName}</CardTitle>
             <CardDescription>
-              Last update{' '}
+              Source: <span className="font-semibold uppercase">{data.source}</span> · Last update{' '}
               {new Date(data.updatedAt).toLocaleString()}
             </CardDescription>
           </div>
           <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="outline" size="sm" className="gap-2 rounded-xl border-slate-200" asChild>
+              <Link href="/gis-mapping">
+                <ExternalLink className="h-4 w-4" />
+                Full GIS workspace
+              </Link>
+            </Button>
             {!compact && (
               <Button
                 type="button"
@@ -422,10 +338,15 @@ export function TransitResourceDeploymentSection({ compact }: Props) {
             </div>
           )}
 
+          <p className="text-sm text-slate-600">
+            Each row is a gas leak area or staging point with <strong>crews deployed</strong> at
+            that location. Map markers use the same coordinates for GIS pop-ups when the main map is wired to this feed.
+          </p>
+
           <div className={`grid gap-6 ${compact ? '' : 'lg:grid-cols-2'}`}>
             <div className="space-y-3">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <h4 className="text-sm font-black uppercase tracking-widest text-slate-500">Mass transit assets</h4>
+                <h4 className="text-sm font-black uppercase tracking-widest text-slate-500">Gas leak locations</h4>
                 <Button
                   type="button"
                   size="sm"
@@ -435,7 +356,7 @@ export function TransitResourceDeploymentSection({ compact }: Props) {
                   onClick={openCreateSite}
                 >
                   <Plus className="h-4 w-4" />
-                  Add asset
+                  Add location
                 </Button>
               </div>
               <div className="overflow-x-auto max-h-[480px] overflow-y-auto">
@@ -446,7 +367,7 @@ export function TransitResourceDeploymentSection({ compact }: Props) {
                         Asset
                       </th>
                       <th className="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-500">
-                        Vehicles
+                        Crews
                       </th>
                       <th className="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-500">
                         Status
@@ -460,17 +381,20 @@ export function TransitResourceDeploymentSection({ compact }: Props) {
                     {data.sites.length === 0 ? (
                       <tr>
                         <td colSpan={4} className="px-4 py-10 text-center text-slate-500">
-                          No assets yet. Add a location with coordinates and vehicles deployed for the map.
+                          No locations yet. Add a location with coordinates and crews deployed for the map.
                         </td>
                       </tr>
                     ) : (
                       data.sites.map((r, i) => (
-                        <tr key={r.id} className="hover:bg-blue-50/30">
+                        <tr key={r.id} className="hover:bg-amber-50/30">
                           <td className="px-4 py-4 align-top">
                             <div className="font-semibold text-slate-900">{r.name}</div>
                             <div className="text-xs text-slate-500">{r.address}</div>
+                            <div className="mt-1 font-mono text-[11px] text-slate-600">
+                              {r.lat.toFixed(4)}, {r.lng.toFixed(4)}
+                            </div>
                           </td>
-                          <td className="px-4 py-4 tabular-nums font-semibold text-slate-800">{r.vehiclesDeployed}</td>
+                          <td className="px-4 py-4 tabular-nums font-semibold text-slate-800">{r.crewsDeployed}</td>
                           <td className="px-4 py-4 capitalize text-slate-700">{r.status}</td>
                           <td className="px-4 py-4 text-right">
                             <div className="flex justify-end gap-2">
@@ -503,104 +427,54 @@ export function TransitResourceDeploymentSection({ compact }: Props) {
                 </table>
               </div>
             </div>
-
-            
           </div>
         </CardContent>
       </Card>
 
       <Dialog open={siteDialogOpen} onOpenChange={(o) => !o && setSiteDialogOpen(false)}>
-        <DialogContent 
-          className="border-slate-200 bg-white text-slate-900 sm:max-w-xl max-h-[90vh] overflow-y-auto"
-          onInteractOutside={(e) => {
-            const target = e.target as HTMLElement;
-            if (target.closest('.pac-container')) {
-              e.preventDefault();
-            }
-          }}
-        >
+        <DialogContent className="border-slate-200 bg-white text-slate-900 sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="font-black text-lg tracking-tight text-slate-900">
-              {siteDialogMode === 'create' ? 'Add mass transit asset' : 'Edit mass transit asset'}
+              {siteDialogMode === 'create' ? 'Add leak location' : 'Edit leak location'}
             </DialogTitle>
             <DialogDescription className="text-xs text-slate-500">
-              Set vehicles deployed at this location; coordinates drive GIS markers.
+              Set crews deployed at this location; coordinates drive GIS markers.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-2">
+          <div className="grid gap-3 py-1">
             <div className="space-y-1.5">
               <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Name</label>
               <Input value={fName} onChange={(e) => setFName(e.target.value)} className="rounded-lg" />
             </div>
-
-            {isLoaded && (
-              <div className="space-y-4 mb-2 pb-6 border-b border-slate-100">
-                <div className="flex items-center justify-between px-1">
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
-                    <MapPin size={12} /> Location
-                  </label>
-                  <button
-                    type="button"
-                    onClick={handleLocateMe}
-                    className="text-[10px] font-black text-white flex items-center gap-2 bg-[#33375D] hover:bg-[#44496B] px-3 py-1.5 rounded-lg transition-all shadow-sm active:scale-95"
-                  >
-                    <Navigation size={10} /> Find My Location
-                  </button>
-                </div>
-                <Autocomplete onLoad={onPlaceLoaded} onPlaceChanged={onPlaceChanged}>
-                  <input
-                    type="text"
-                    placeholder="Search for an address..."
-                    className="w-full px-4 py-3 bg-white border border-slate-200 shadow-sm rounded-lg focus:outline-none focus:ring-2 focus:ring-[#33375D]/10 focus:border-[#33375D] transition-all text-sm placeholder:text-slate-400"
-                  />
-                </Autocomplete>
-
-                {/* Interactive Map */}
-                <div className="w-full h-48 rounded-xl overflow-hidden border border-slate-200 shadow-inner relative group">
-                  <GoogleMap
-                    mapContainerStyle={{ width: '100%', height: '100%' }}
-                    center={mapCenterMap}
-                    zoom={12}
-                    onLoad={(m) => setMapObj(m)}
-                    onClick={(e) => {
-                      if (e.latLng) {
-                        const lat = e.latLng.lat()
-                        const lng = e.latLng.lng()
-                        setMapCenterMap({ lat, lng })
-                        setMarkerPosition({ lat, lng })
-                        setFLat(lat.toString())
-                        setFLng(lng.toString())
-                      }
-                    }}
-                    options={{
-                      disableDefaultUI: true,
-                      zoomControl: true,
-                      styles: [
-                        { "featureType": "all", "elementType": "labels.text.fill", "stylers": [{ "color": "#33375D" }] },
-                        { "featureType": "water", "elementType": "geometry", "stylers": [{ "color": "#E2E8F0" }] }
-                      ]
-                    }}
-                  >
-                    {markerPosition && <MarkerF position={markerPosition} />}
-                  </GoogleMap>
-                </div>
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Address</label>
+              <Input value={fAddress} onChange={(e) => setFAddress(e.target.value)} className="rounded-lg" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Latitude</label>
+                <Input value={fLat} onChange={(e) => setFLat(e.target.value)} className="rounded-lg font-mono text-sm" />
               </div>
-            )}
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Longitude</label>
+                <Input value={fLng} onChange={(e) => setFLng(e.target.value)} className="rounded-lg font-mono text-sm" />
+              </div>
+            </div>
             <div className="space-y-1.5">
               <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">
-                Vehicles Deployed
+                Repair Crews Deployed
               </label>
               <Input
                 type="number"
                 min={0}
-                value={fVehicles}
-                onChange={(e) => setFVehicles(e.target.value)}
+                value={fCrews}
+                onChange={(e) => setFCrews(e.target.value)}
                 className="rounded-lg tabular-nums"
               />
             </div>
             <div className="space-y-1.5">
               <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Status</label>
-              <Select value={fStatus} onValueChange={(v) => setFStatus(v as TransitAssetStatus)}>
+              <Select value={fStatus} onValueChange={(v) => setFStatus(v as GasCrewStatus)}>
                 <SelectTrigger className="rounded-lg">
                   <SelectValue />
                 </SelectTrigger>
@@ -633,7 +507,7 @@ export function TransitResourceDeploymentSection({ compact }: Props) {
             <AlertDialogTitle>Remove this asset?</AlertDialogTitle>
             <AlertDialogDescription>
               {deleteIndex !== null && data.sites[deleteIndex]
-                ? `Remove “${data.sites[deleteIndex].name}” from the deployment list.`
+                ? `Remove “${data.sites[deleteIndex].name}” from the deployment list (mock store).`
                 : 'Remove this row from the deployment list.'}
             </AlertDialogDescription>
           </AlertDialogHeader>

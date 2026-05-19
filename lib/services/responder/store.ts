@@ -1,22 +1,23 @@
 import type { HotelAvailabilityPayload } from './types';
 
-/** Dev/demo in-memory persistence (per server process) for hotel responder until a DB layer is added. */
+/** In-memory persistence (per server process) for hotel responder until a DB layer is added. */
 let hotel: HotelAvailabilityPayload | null = null;
 
+function emptyHotelAvailability(): HotelAvailabilityPayload {
+    return {
+        propertyId: '',
+        propertyName: '',
+        updatedAt: new Date().toISOString(),
+        source: 'api',
+        roomsTotal: 0,
+        roomsOccupied: 0,
+        roomsHeldForEm: 0,
+        adaRoomsAvailable: 0,
+    };
+}
+
 export function getHotelAvailability(): HotelAvailabilityPayload {
-    if (!hotel) {
-        hotel = {
-            propertyId: 'default-hotel',
-            propertyName: 'Unnamed Hotel',
-            updatedAt: new Date().toISOString(),
-            source: 'api',
-            roomsTotal: 0,
-            roomsOccupied: 0,
-            roomsHeldForEm: 0,
-            adaRoomsAvailable: 0,
-            checkInNotes: '',
-        };
-    }
+    if (!hotel) hotel = emptyHotelAvailability();
     return hotel;
 }
 
@@ -55,43 +56,4 @@ export function getPublicOfficialSummary(): PublicOfficialSummaryPayload {
         };
     }
     return publicOfficial;
-}
-
-import type { FederalResourceDeploymentPayload } from './types';
-
-let federalPayload: FederalResourceDeploymentPayload | null = null;
-
-export function getFederalResourceDeployment(): FederalResourceDeploymentPayload {
-    if (!federalPayload) {
-        federalPayload = {
-            jurisdictionName: 'FEMA Region IX',
-            updatedAt: new Date().toISOString(),
-            source: 'mock',
-            totalPersonnelDeployed: 1250,
-            stagingAreas: [
-                {
-                    id: 'fed-stage-1',
-                    location: 'Metropolis Expo Center',
-                    personnelCount: 450,
-                    vehicleCount: 85,
-                    status: 'active',
-                    notes: 'Primary staging for urban search and rescue teams.',
-                },
-                {
-                    id: 'fed-stage-2',
-                    location: 'State Fairgrounds',
-                    personnelCount: 800,
-                    vehicleCount: 210,
-                    status: 'standby',
-                    notes: 'Logistics and supply staging area.',
-                },
-            ],
-        };
-    }
-    return federalPayload;
-}
-
-export function setFederalResourceDeployment(next: FederalResourceDeploymentPayload): FederalResourceDeploymentPayload {
-    federalPayload = next;
-    return federalPayload;
 }

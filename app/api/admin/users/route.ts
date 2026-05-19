@@ -4,10 +4,7 @@ import User from '@/models/User';
 import { getSession } from '@/lib/auth';
 import { getSubAdminUserFilter } from '@/lib/admin-filters';
 import { isResponderVertical } from '@/lib/responder-verticals';
-import ResponderHospitalCapacity from '@/models/ResponderHospitalCapacity';
-import ResponderPoliceDeployment from '@/models/ResponderPoliceDeployment';
-import ResponderPharmacyDeployment from '@/models/ResponderPharmacyDeployment';
-import ResponderTransitDeployment from '@/models/ResponderTransitDeployment';
+import { deleteResponderOperationalDataForUser } from '@/lib/services/responder/delete-responder-operational-data';
 
 export async function GET(req: NextRequest) {
     try {
@@ -339,12 +336,7 @@ export async function DELETE(req: NextRequest) {
             return NextResponse.json({ error: 'Sub-Admins can only delete regular users or responders' }, { status: 403 });
         }
 
-        await Promise.all([
-            ResponderHospitalCapacity.deleteMany({ ownerUserId: userId }),
-            ResponderPoliceDeployment.deleteMany({ ownerUserId: userId }),
-            ResponderPharmacyDeployment.deleteMany({ ownerUserId: userId }),
-            ResponderTransitDeployment.deleteMany({ ownerUserId: userId }),
-        ]);
+        await deleteResponderOperationalDataForUser(userId);
 
         await User.findByIdAndDelete(userId);
 

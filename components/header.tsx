@@ -2,9 +2,11 @@
 
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { Bell, LogOut, Menu, X, Users, User, Settings, ChevronDown } from 'lucide-react'
-import { menuItems } from '@/components/sidebar'
-import { menuItems as userMenuItems } from '@/components/user-sidebar'
+import { Sidebar } from '@/components/sidebar'
+import { UserSidebar } from '@/components/user-sidebar'
+import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
 import { useUser } from '@/lib/store/user-store'
@@ -27,6 +29,7 @@ export function Header({
   const [showDropdown, setShowDropdown] = useState(false)
   const [showSidebar, setShowSidebar] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
+  const pathname = usePathname()
 
   // Server is the source of truth via UserProvider. localStorage is only used as a
   // first-paint fallback so the header doesn't flicker before /api/user/profile
@@ -42,6 +45,11 @@ export function Header({
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
+
+  // Auto-close sidebar on pathname change
+  useEffect(() => {
+    setShowSidebar(false)
+  }, [pathname])
 
   const displayName = useMemo(() => {
     if (me?.name) return me.name
@@ -95,19 +103,16 @@ export function Header({
           <Menu className="w-5 h-5" />
         </button>
 
-        {/* Search bar — commented out per product request
-        {!hideSearch && (
-          <div className="flex-1 max-w-sm hidden md:block">
-            <div className="relative group">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <Input
-                placeholder="Search ....."
-                className="pl-10 bg-white border-slate-200 rounded-lg h-10 w-full focus:ring-1 focus:ring-blue-100 transition-all shadow-none text-sm"
-              />
-            </div>
-          </div>
-        )}
-        */}
+        <Sheet open={showSidebar} onOpenChange={setShowSidebar}>
+          <SheetContent side="left" className="p-0 bg-[#33375D] border-r-0 w-[280px] sm:w-[300px]">
+            <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
+            {userRole === 'user' ? (
+              <UserSidebar className="flex w-full" />
+            ) : (
+              <Sidebar className="flex w-full" />
+            )}
+          </SheetContent>
+        </Sheet>
       </div>
 
       <div className="flex items-center gap-2 ">

@@ -31,8 +31,16 @@ export default function AdminLayout({
     useLayoutEffect(() => {
         const role = localStorage.getItem('userRole') || ''
         const storedName = localStorage.getItem('userName')
-        const isAuthorized = role === 'admin' || role === 'super-admin' || role === 'sub-admin' || role === 'observer' || role === 'responder' || role === 'manager' || role === 'eoc-manager' || role === 'eoc-observer' || role === 'public_official'
-        
+        const isAuthorized =
+            role === 'admin' ||
+            role === 'super-admin' ||
+            role === 'sub-admin' ||
+            role === 'observer' ||
+            role === 'responder' ||
+            role === 'manager' ||
+            role === 'eoc-manager' ||
+            role === 'eoc-observer' ||
+            role === 'public_official'
         if (!isAuthorized) {
             router.push('/login')
         } else {

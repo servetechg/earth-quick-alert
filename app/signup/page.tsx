@@ -104,7 +104,8 @@ function SignupPageInner() {
       if (newCity) setCity(newCity)
       if (newState) setState(newState)
       if (newCountry) setCountry(newCountry)
-      setZipcode('')
+      if (newZip) setZipcode(newZip)
+      else setZipcode('')
     }
   }
 
@@ -140,7 +141,8 @@ function SignupPageInner() {
                 if (newCity) setCity(newCity)
                 if (newState) setState(newState)
                 if (newCountry) setCountry(newCountry)
-                setZipcode('')
+                if (newZip) setZipcode(newZip)
+                else setZipcode('')
               }
             })
           }

@@ -7,7 +7,21 @@ type ResponderGate =
     | { ok: false; response: NextResponse };
 
 export async function gateResponder(
-    allowedKind?: 'hospital' | 'police' | 'hotel' | 'pharmacy' | 'transit' | 'energy' | 'gas' | 'electric' | 'water' | 'food-logistics' | 'national-guard' | 'public-official' | 'federal' | 'general' | ('public-official')[],
+    allowedKind?:
+        | 'hospital'
+        | 'police'
+        | 'hotel'
+        | 'pharmacy'
+        | 'transit'
+        | 'energy'
+        | 'gas'
+        | 'electric'
+        | 'water'
+        | 'food-logistics'
+        | 'national-guard'
+        | 'public-official'
+        | 'federal'
+        | 'general',
 ): Promise<ResponderGate> {
     const session = await getSession();
     if (!session?.user?.id) {

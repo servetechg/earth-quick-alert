@@ -182,7 +182,7 @@ export function middleware(request: NextRequest) {
         // 3. Allow admin and sub-admin to access their respective management pages if they are in adminRoutes
         const restrictedForSubAdmin = pathname.startsWith('/admin/licenses') || pathname.startsWith('/admin/sub-admins')
         if (restrictedForSubAdmin && (userRole !== 'super-admin' && userRole !== 'admin' && userRole !== 'sub-admin')) {
-             return NextResponse.redirect(new URL('/admin-dashboard', request.url))
+            return NextResponse.redirect(new URL('/admin-dashboard', request.url))
         }
 
         // 4. Restriction: If on admin route but NOT an admin, go to user dashboard
@@ -197,7 +197,7 @@ export function middleware(request: NextRequest) {
 
         // 6. Redirect EOC roles to EOC dashboard if they are on admin dashboard
         if (pathname === '/admin-dashboard' && isEOCRole) {
-             return NextResponse.redirect(new URL('/virtual-eoc', request.url))
+            return NextResponse.redirect(new URL('/virtual-eoc', request.url))
         }
     }
 
