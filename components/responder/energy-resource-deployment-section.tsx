@@ -2,9 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import dynamic from 'next/dynamic'
-import Link from 'next/link'
 import { toast } from 'sonner'
-import { Loader2, Save, MapPin, Zap, Plus, Trash2, Edit, ExternalLink, HardHat } from 'lucide-react'
+import { Loader2, Save, MapPin, Zap, Plus, Trash2, Edit, HardHat } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -295,14 +294,8 @@ export function EnergyResourceDeploymentSection({ compact }: Props) {
               {new Date(data.updatedAt).toLocaleString()}
             </CardDescription>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="outline" size="sm" className="gap-2 rounded-xl border-slate-200" asChild>
-              <Link href="/gis-mapping">
-                <ExternalLink className="h-4 w-4" />
-                Full GIS workspace
-              </Link>
-            </Button>
-            {!compact && (
+          {!compact && (
+            <div className="flex flex-wrap gap-2">
               <Button
                 type="button"
                 className="gap-2 rounded-xl bg-[#33375D]"
@@ -312,8 +305,8 @@ export function EnergyResourceDeploymentSection({ compact }: Props) {
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                 Save changes
               </Button>
-            )}
-          </div>
+            </div>
+          )}
         </CardHeader>
         <CardContent className="space-y-8 px-0">
           {!compact && (
