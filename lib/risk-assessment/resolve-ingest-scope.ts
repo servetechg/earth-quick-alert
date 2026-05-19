@@ -5,6 +5,8 @@ export type ResolvedRiskIngestScope = {
     nationwide: boolean;
     stateCd: string;
     stateRaw: string | null;
+    /** True when a sub-admin has no valid assigned state — route must return 400. */
+    unresolved?: boolean;
 };
 
 /**
@@ -22,13 +24,11 @@ export async function resolveRiskIngestScopeForSession(
         const u = await User.findById(userId).select('state').lean();
         const stateRaw = typeof u?.state === 'string' ? u.state.trim() : '';
         const usps = normalizeStateToUsps(stateRaw);
-        const stateCd =
-            usps && /^[A-Z]{2}$/i.test(usps)
-                ? usps.toLowerCase()
-                : typeof body.stateCd === 'string' && body.stateCd.length === 2
-                  ? body.stateCd.toLowerCase()
-                  : 'ca';
-        return { nationwide: false, stateCd, stateRaw: stateRaw || null };
+        if (!usps || !/^[A-Z]{2}$/i.test(usps)) {
+            // Sub-admin has no valid assigned state — signal the route to return 400
+            return { nationwide: false, stateCd: '', stateRaw: stateRaw || null, unresolved: true };
+        }
+        return { nationwide: false, stateCd: usps.toLowerCase(), stateRaw: stateRaw || null };
     }
 
     if (body.nationwide !== false) {

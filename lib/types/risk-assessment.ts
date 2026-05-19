@@ -15,6 +15,42 @@ export interface DistroPoint {
   count: number;
 }
 
+/**
+ * A single real past event resolved from a live historical API.
+ * The complete structured data is passed to OpenAI, which decides what statistics
+ * to extract and how to present them — no pre-formatting by the server.
+ */
+export interface PastHazardEvent {
+  category: IncidentHistoryCategory;
+  /** e.g. "M6.4 — Ridgecrest, California" or "SEVERE STORMS AND TORNADOES — Louisiana" */
+  eventName: string;
+  /** Friendly date string, e.g. "July 4, 2019" */
+  occurredAt: string;
+  location: string;
+  /** e.g. "M6.4", "EF3", "70 mph wind", "2.50 in hail" */
+  magnitude?: string;
+  source: 'USGS_ARCHIVE' | 'NCEI_STORM_EVENTS' | 'FEMA_OPENFEMA';
+  sourceUrl?: string;
+  /** All available statistics — AI extracts what is relevant for the report. */
+  stats: {
+    deathsDirect?: number;
+    injuriesDirect?: number;
+    /** Raw NCEI string like "2.90M" or "15.00K" */
+    propertyDamage?: string;
+    cropDamage?: string;
+    /** USGS PAGER alert level: green / yellow / orange / red */
+    alertLevel?: string;
+    /** FEMA: total federal assistance approved in USD */
+    federalAidApprovedUSD?: number;
+    /** FEMA: number of individual assistance applications approved */
+    individualApplicationsApproved?: number;
+    disasterNumber?: number;
+    programsActivated?: string[];
+    /** Truncated event narrative from NCEI (max 400 chars) */
+    narrative?: string;
+  };
+}
+
 export interface HistoricalAnalysis {
   matched_event?: string;
   match_confidence?: number;
@@ -46,6 +82,8 @@ export interface RiskAiPastBlock {
   past_damages?: string[];
   past_procedures?: string[];
   future_measures?: string[];
+  /** Real historical events (complete structured data) — OpenAI reads these to extract statistics. */
+  events?: PastHazardEvent[];
 }
 
 /** Nationwide or state AOI for AI context packs. */

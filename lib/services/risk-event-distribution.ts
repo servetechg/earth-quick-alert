@@ -4,7 +4,7 @@
  */
 
 import type { AlertLevel } from '@/lib/normalization/types';
-import type { DistroPoint } from '@/lib/types/risk-assessment';
+import type { DistroPoint, IncidentHistoryCategory } from '@/lib/types/risk-assessment';
 import type { DashboardIngestBundle } from '@/lib/types/risk-assessment';
 import { normalizeUSGS } from '@/lib/normalization/sources/normalize-usgs';
 import { normalizeFIRMS } from '@/lib/normalization/sources/normalize-firms';
@@ -108,19 +108,28 @@ function eqFeatureId(f: unknown): string {
     return `usgs-eq:${t}:${m}:${String(p.place ?? '').slice(0, 80)}`;
 }
 
+export interface IncidentEvidence {
+    category: IncidentHistoryCategory;
+    count: number;
+    /** One human-readable line per deduped event: numbers, names, and timing preserved. */
+    lines: string[];
+}
+
 /**
- * Unique event counts from the current dashboard ingest bundle (same raw payloads as `runDashboardIngest`).
- * Deduped by stable external-style keys aligned with AlertCommunication where applicable.
+ * Single source of truth for both the bar chart counts AND the live evidence lines
+ * shown under "Current Procedures" in the Historical Context tabs.
+ * Count and lines are derived from the same dedupe logic so they can never diverge.
  */
-export function deriveEventBasedIncidentDistribution(bundle: DashboardIngestBundle): DistroPoint[] {
-    const floodIds = new Set<string>();
-    const tornadoIds = new Set<string>();
-    const stormIds = new Set<string>();
-    const hazardousIds = new Set<string>();
-    const coastalSurfIds = new Set<string>();
-    const marineIds = new Set<string>();
-    const wildIds = new Set<string>();
-    const eqIds = new Set<string>();
+export function deriveIncidentEvidence(bundle: DashboardIngestBundle): IncidentEvidence[] {
+    // Maps from stable id → human-readable line (Map preserves insertion order)
+    const flood = new Map<string, string>();
+    const tornado = new Map<string, string>();
+    const storm = new Map<string, string>();
+    const hazardous = new Map<string, string>();
+    const coastal_surf = new Map<string, string>();
+    const marine = new Map<string, string>();
+    const wildfire = new Map<string, string>();
+    const earthquake = new Map<string, string>();
 
     const usgsAllowed = usgsAlertLevelsAllowed();
     const firmsAllowed = firmsAlertLevelsAllowed();
@@ -140,14 +149,21 @@ export function deriveEventBasedIncidentDistribution(bundle: DashboardIngestBund
             const ev = events[0];
             if (!ev || !usgsAllowed.includes(ev.alert_level)) continue;
             const site = ts.sourceInfo?.siteCode?.[0]?.value;
-            if (site) floodIds.add(`usgs:${site}`);
+            if (!site) continue;
+            const siteName = String((ts.sourceInfo as { siteName?: unknown })?.siteName ?? site);
+            const stageRaw = (ts as { values?: { value?: { value?: unknown }[] }[] })?.values?.[0]?.value?.[0]?.value;
+            const stagePart = stageRaw != null ? ` — stage ${stageRaw} ft` : '';
+            flood.set(`usgs:${site}`, `${siteName}${stagePart} (USGS site ${site})`.slice(0, 520));
         }
     }
 
     const nwps = bundle.sources.find((s) => s.source === 'NOAA_NWPS_GAUGE');
     if (nwps?.ok && nwps.data) {
         const summary = summarizeNwpsGauge(bundle.nwpsGaugeId, nwps.data);
-        if (summary) floodIds.add(`nwps:gauge:${bundle.nwpsGaugeId}`);
+        if (summary) {
+            const line = `${summary.placeLabel} — ${summary.cardTitle} — ${summary.detail}`.slice(0, 520);
+            flood.set(`nwps:gauge:${bundle.nwpsGaugeId}`, line);
+        }
     }
 
     const nws = bundle.sources.find((s) => s.source === 'NWS_FLOOD_ALERTS');
@@ -155,19 +171,23 @@ export function deriveEventBasedIncidentDistribution(bundle: DashboardIngestBund
         const feats = (nws.data as { features?: unknown[] })?.features;
         if (Array.isArray(feats)) {
             for (const f of feats) {
-                const p = (f as { properties?: { event?: string } })?.properties;
+                const p = (f as { properties?: Record<string, unknown> })?.properties;
                 if (!p) continue;
                 const fid = nwsFeatureId(f as { properties?: Record<string, unknown> });
-                if (isFloodRelatedEvent(p.event)) {
-                    floodIds.add(fid);
+                const event = String(p.event ?? '').trim();
+                const area = String(p.areaDesc ?? '').trim();
+                const sent = String(p.sent ?? p.effective ?? '').trim();
+                const line = [event, area, sent ? `sent ${sent}` : ''].filter(Boolean).join(' — ').slice(0, 520);
+                if (isFloodRelatedEvent(event)) {
+                    flood.set(fid, line);
                     continue;
                 }
-                const bucket = classifyNwsIncidentDistributionBucket(p.event);
-                if (bucket === 'tornado') tornadoIds.add(fid);
-                else if (bucket === 'storm') stormIds.add(fid);
-                else if (bucket === 'hazardous') hazardousIds.add(fid);
-                else if (bucket === 'coastal_surf') coastalSurfIds.add(fid);
-                else if (bucket === 'marine') marineIds.add(fid);
+                const bucket = classifyNwsIncidentDistributionBucket(event);
+                if (bucket === 'tornado') tornado.set(fid, line);
+                else if (bucket === 'storm') storm.set(fid, line);
+                else if (bucket === 'hazardous') hazardous.set(fid, line);
+                else if (bucket === 'coastal_surf') coastal_surf.set(fid, line);
+                else if (bucket === 'marine') marine.set(fid, line);
             }
         }
     }
@@ -179,8 +199,12 @@ export function deriveEventBasedIncidentDistribution(bundle: DashboardIngestBund
             (fema.data as { value?: OpenFemaDisasterRecord[] }).value ??
             [];
         if (Array.isArray(rows)) {
-            for (const r of rows.slice(0, 12)) {
-                floodIds.add(femaExternalId(r as OpenFemaDisasterRecord));
+            for (const r of rows.slice(0, 12) as OpenFemaDisasterRecord[]) {
+                const title = String(r.declarationTitle ?? 'FEMA Disaster').toUpperCase();
+                const disNo = r.disasterNumber;
+                const state = String(r.state ?? '');
+                const line = `${title} — declaration #${disNo} — ${state}`.slice(0, 520);
+                flood.set(femaExternalId(r), line);
             }
         }
     }
@@ -189,7 +213,7 @@ export function deriveEventBasedIncidentDistribution(bundle: DashboardIngestBund
     if (firms?.ok) {
         const { records, csvFallbackCount } = collectFirmsRecords(firms.data, firms.signalCount);
         if (csvFallbackCount > 0) {
-            for (let i = 0; i < csvFallbackCount; i++) wildIds.add(`firms-csv:${i}`);
+            for (let i = 0; i < csvFallbackCount; i++) wildfire.set(`firms-csv:${i}`, `FIRMS hotspot #${i + 1} (CSV feed)`);
         } else {
             const sorted = [...records].sort(
                 (a, b) => parseFloat(b.brightness ?? '0') - parseFloat(a.brightness ?? '0')
@@ -203,7 +227,9 @@ export function deriveEventBasedIncidentDistribution(bundle: DashboardIngestBund
                 }
                 const ev = events[0];
                 if (!ev || !firmsAllowed.includes(ev.alert_level)) continue;
-                wildIds.add(firmsExternalId(rec));
+                const bright = rec.brightness ? ` — brightness ${rec.brightness}` : '';
+                const line = `FIRMS hotspot ${rec.latitude}, ${rec.longitude}${bright} (${rec.acq_date ?? ''})`.slice(0, 520);
+                wildfire.set(firmsExternalId(rec), line);
             }
         }
     }
@@ -215,7 +241,7 @@ export function deriveEventBasedIncidentDistribution(bundle: DashboardIngestBund
             .map((l) => l.trim())
             .filter((l) => l.length > 0 && !/^no rss items parsed/i.test(l));
         for (let i = 0; i < lines.length; i++) {
-            wildIds.add(`inciweb:${hashDjb2(lines[i]!)}`);
+            wildfire.set(`inciweb:${hashDjb2(lines[i]!)}`, lines[i]!.slice(0, 520));
         }
     }
 
@@ -226,14 +252,18 @@ export function deriveEventBasedIncidentDistribution(bundle: DashboardIngestBund
             for (const f of feats) {
                 const a = f?.attributes ?? {};
                 const uid = a.UniqueFireIdentifier ?? a.OBJECTID ?? a.FIRE_ID;
-                const nm = a.IncidentName;
+                const nm = String(a.IncidentName ?? '');
                 const id =
                     typeof uid === 'string' || typeof uid === 'number'
                         ? `wfigs:${uid}`
-                        : typeof nm === 'string' && nm.length
+                        : nm.length
                           ? `wfigs:${nm}`
                           : null;
-                if (id) wildIds.add(id);
+                if (!id) continue;
+                const acres = a.GISAcres ?? a.DailyAcres;
+                const contain = a.PercentContained;
+                const parts = [nm || 'WFIGS fire', acres ? `${Number(acres).toFixed(0)} acres` : null, contain != null ? `${contain}% contained` : null];
+                wildfire.set(id, parts.filter(Boolean).join(' — ').slice(0, 520));
             }
         }
     }
@@ -243,21 +273,37 @@ export function deriveEventBasedIncidentDistribution(bundle: DashboardIngestBund
         const feats = (eq.data as { features?: unknown[] })?.features ?? [];
         if (Array.isArray(feats) && feats.length) {
             for (const f of pickEarthquakeFeatures(feats, bundle.stateCd)) {
-                eqIds.add(eqFeatureId(f));
+                const p = (f as { properties?: Record<string, unknown> })?.properties ?? {};
+                const mag = typeof p.mag === 'number' ? p.mag.toFixed(1) : '?';
+                const place = String(p.place ?? 'Unknown location');
+                const t = typeof p.time === 'number' ? new Date(p.time).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
+                const line = [`M${mag}`, place, t].filter(Boolean).join(' — ').slice(0, 520);
+                earthquake.set(eqFeatureId(f), line);
             }
         }
     }
 
+    const toEvidence = (category: IncidentHistoryCategory, m: Map<string, string>): IncidentEvidence =>
+        ({ category, count: m.size, lines: [...m.values()] });
+
     return [
-        { category: 'flood', count: floodIds.size },
-        { category: 'tornado', count: tornadoIds.size },
-        { category: 'storm', count: stormIds.size },
-        { category: 'hazardous', count: hazardousIds.size },
-        { category: 'coastal_surf', count: coastalSurfIds.size },
-        { category: 'marine', count: marineIds.size },
-        { category: 'wildfire', count: wildIds.size },
-        { category: 'earthquake', count: eqIds.size },
+        toEvidence('flood', flood),
+        toEvidence('tornado', tornado),
+        toEvidence('storm', storm),
+        toEvidence('hazardous', hazardous),
+        toEvidence('coastal_surf', coastal_surf),
+        toEvidence('marine', marine),
+        toEvidence('wildfire', wildfire),
+        toEvidence('earthquake', earthquake),
     ];
+}
+
+/**
+ * Unique event counts from the current dashboard ingest bundle.
+ * Thin wrapper over {@link deriveIncidentEvidence} — count and lines always match.
+ */
+export function deriveEventBasedIncidentDistribution(bundle: DashboardIngestBundle): DistroPoint[] {
+    return deriveIncidentEvidence(bundle).map(({ category, count }) => ({ category, count }));
 }
 
 function hashDjb2(s: string): string {

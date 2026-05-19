@@ -5,6 +5,7 @@ import type {
     IncidentHistoryCategory,
     RecommendationItem,
     RiskAiOpenAiInput,
+    RiskAiPastContext,
     RiskReport,
 } from '@/lib/types/risk-assessment';
 import { INCIDENT_HISTORY_TAB_KEYS } from '@/lib/types/risk-assessment';
@@ -661,7 +662,14 @@ export class OpenAIService {
   "rollup": BLOCK,
   "by_incident": { one BLOCK per key in ACTIVE_HAZARDS — use these exact keys only: ${JSON.stringify(activeKeys)} }
 }
-Each BLOCK: matched_event (string), similarity_summary (1-2 plain sentences), past_damages (string[]), past_procedures (string[]), current_procedures (string[] — rewrite your executive findings for that hazard into plain sentences grounded in DATA), future_measures (string[] practical household steps). No match_confidence. Use **bold** for place names, dates, magnitudes. Friendly dates only. ${lengthRules}`;
+Each BLOCK has these keys:
+- matched_event (string): a plain headline naming the real past event(s) today's situation most resembles — reference actual event names from PAST_CONTEXT events[].
+- similarity_summary (1-2 plain sentences): explain in plain words why the past events resemble today's situation. Reference specific event names, dates, and magnitudes from events[].
+- past_damages (string[]): extract exact statistics (dollar amounts, death/injury counts, dates, event names) from PAST_CONTEXT events[].stats. Each bullet: "[Event Name] | [Date] | [Extracted Statistics]". If a stat is absent write "Data unavailable". NEVER invent a number or date.
+- past_procedures (string[]): extract real response actions from events[].stats.narrative or events[].stats.programsActivated. Same format: "[Event Name] | [Date] | [Procedures]". "Data unavailable" if absent.
+- current_procedures (string[]): rewrite CURRENT_CONTEXT live findings for that hazard into plain sentences grounded in DATA only.
+- future_measures (string[]): concrete practical steps synthesizing past gaps against current trajectory.
+No match_confidence. Use **bold** for place names, dates, magnitudes. Friendly dates only. ${lengthRules}`;
     }
 
     /** Deterministic pre-OpenAI report (live ingest only) — used to build `past` / `current` input packs. */
@@ -671,7 +679,7 @@ Each BLOCK: matched_event (string), similarity_summary (1-2 plain sentences), pa
     }
 
     private formatRiskAiOpenAiInputForPrompt(aiInput: RiskAiOpenAiInput): string {
-        const pastJson = JSON.stringify(aiInput.past, null, 2).slice(0, 7000);
+        const pastJson = JSON.stringify(aiInput.past, null, 2).slice(0, 8000);
         const currentForPrompt = {
             ...aiInput.current,
             ingest_narrative: (aiInput.current.ingest_narrative ?? '').slice(0, 10000),
@@ -679,12 +687,28 @@ Each BLOCK: matched_event (string), similarity_summary (1-2 plain sentences), pa
         const currentJson = JSON.stringify(currentForPrompt, null, 2).slice(0, 10000);
         return `Analyze PAST_CONTEXT and CURRENT_CONTEXT together.
 
-RULES
-- Historical fields (matched_event, similarity_summary, past_damages, past_procedures, future_measures): use PAST_CONTEXT only. Prefer lines tagged [FEMA declaration]. Do NOT invent disasters, states, or years that are not in PAST_CONTEXT.
-- Live fields (findings, summaries, current_procedures in historical_context): use CURRENT_CONTEXT only.
+RULES — GROUNDING (strictly enforced)
+- PAST_CONTEXT contains real historical events in structured JSON (events[] arrays). Each event has
+  fields such as eventName, occurredAt, location, magnitude, and stats (deathsDirect, injuriesDirect,
+  propertyDamage, cropDamage, federalAidApprovedUSD, alertLevel, narrative, etc.).
+- For past_damages and past_procedures: extract and use ONLY the statistics, dates, dollar figures,
+  and casualty counts that appear verbatim in the events[] data. Do NOT invent numbers, dates, or
+  incident names. If a field is absent from the data, state "Data unavailable" — never substitute
+  a realistic-sounding placeholder.
+- NO VAGUE GENERALIZATIONS: do not write "many", "significant", "large amounts", or similar. Use
+  exact numbers and dates from the provided events data.
+- For matched_event and similarity_summary: explain in plain words why the past events resemble
+  the current situation. Reference specific event names and dates from events[].
+- For future_measures: synthesize the historical outcomes (damages, response gaps) against the
+  current live trajectory. Make them concrete and actionable.
+- For recommendations_list: translate future_measures into a step-by-step prioritized action plan.
+  IMMEDIATE = life-safety actions required within 0–2 hours.
+  URGENT = resource staging / mitigation required within 2–12 hours.
+  STANDARD = monitoring, tracking, logistics beyond 12 hours.
+- CURRENT_CONTEXT drives all "now" findings: current_procedures, findings, summaries, KPIs.
 - Executive KPIs: derive from CURRENT_CONTEXT incident_distribution and findings.
 
-PAST_CONTEXT (historical reference — includes FEMA declarations when present):
+PAST_CONTEXT (real historical events from USGS, FEMA, and NCEI — use events[] for all statistics):
 ${pastJson}
 
 CURRENT_CONTEXT (live operational ingest — ground all "now" findings here):
@@ -719,7 +743,7 @@ domain_severities: { meteorological, hydrological, fire } each short label like 
 meteorological_findings (string array — executive briefing sentences; prefer place names over raw lat/long; earthquakes as magnitude + location + time prose),
 hydrological_findings (string array — river/gauge-centric sentences; cfs, flood stage context; no coordinate dumps unless essential),
 fire_findings (string array — named incidents, acres, containment; satellite cues as sectors—avoid bare lat/lon lists),
-recommendations_list: array of { priority: IMMEDIATE|URGENT|STANDARD exactly (never URGENCY or other synonyms), action: string, deployable: boolean },
+recommendations_list: array of { priority: IMMEDIATE|URGENT|STANDARD exactly (never URGENCY or other synonyms), action: string (specific granular step — translate future_measures into a step-by-step prioritized plan; IMMEDIATE=0-2h life-safety, URGENT=2-12h staging/mitigation, STANDARD=monitoring/logistics >12h), deployable: boolean },
 incident_distribution: optional — server recomputes unique event counts per category from ingest (you may omit),
 ${historicalSection},
 sources_count (number, successful feeds was ${bundle.successfulSources}),
@@ -762,7 +786,7 @@ ${PLAIN_ENGLISH_STYLE_RULES}${stateOnly}`,
                 ...withKpis,
                 ...buildLiveHistoricalContext(bundle, withKpis),
             };
-            const aiHistory = await this.generateHistoricalContext(bundle, withHistory);
+            const aiHistory = await this.generateHistoricalContext(bundle, withHistory, aiInput?.past);
             return { ...withHistory, ...aiHistory };
         }
 
@@ -815,6 +839,7 @@ ${PLAIN_ENGLISH_STYLE_RULES}${stateOnly}`,
     async generateHistoricalContext(
         bundle: DashboardIngestBundle,
         report: RiskReport,
+        pastContext?: RiskAiPastContext,
     ): Promise<Pick<RiskReport, 'historical_analysis' | 'historical_analysis_by_incident'>> {
         const draftRollup: HistoricalAnalysis = report.historical_analysis ?? {};
         const draftByIncident: Partial<Record<IncidentHistoryCategory, HistoricalAnalysis>> =
@@ -874,7 +899,11 @@ LENGTH
 ${lengthRules}
 
 GROUNDING
-Base "current_procedures" ONLY on the LIVE_SITUATION lines for that hazard. Base "matched_event", "similarity_summary", "past_damages", and "past_procedures" on how this type of hazard has typically behaved — do not fabricate specific named past disasters or invented dates. Never invent a hazard category that is not in ACTIVE_HAZARDS.`;
+- current_procedures: base ONLY on the LIVE_SITUATION lines for that hazard.
+- past_damages / past_procedures: build ONLY from the HISTORICAL_EVENTS data provided for that hazard category. Each bullet MUST include [Event Name] | [Date] | [Exact Statistics from the data]. If events[] is empty or a stat field is absent, write "Data unavailable". Never invent an event name, date, or statistic.
+- matched_event / similarity_summary: reference actual event names and dates from HISTORICAL_EVENTS.
+- future_measures: synthesize historical outcomes against current live trajectory — practical, specific steps.
+- Never invent a hazard category that is not in ACTIVE_HAZARDS.`;
 
         const activeKeys = Object.keys(draftByIncident);
         const liveBlock = (label: string, lines?: string[]): string =>
@@ -886,11 +915,23 @@ Base "current_procedures" ONLY on the LIVE_SITUATION lines for that hazard. Base
             ),
         ].join('\n\n');
 
+        // Render real historical events per active category for the AI to extract statistics from
+        const historicalEventsBlock = activeKeys.length && pastContext
+            ? activeKeys.map((k) => {
+                const block = pastContext.by_incident[k as IncidentHistoryCategory];
+                if (!block?.events?.length) return `${k}: (no historical events retrieved)`;
+                return `${k}:\n${JSON.stringify(block.events, null, 2).slice(0, 2000)}`;
+            }).join('\n\n')
+            : '(no historical events available — use "Data unavailable" for past_damages and past_procedures)';
+
         const user = `INGEST_SCOPE=${scope}
 STATE=${bundle.stateCd ?? ''}
 
 ACTIVE_HAZARDS — produce one "by_incident" block for each of these category keys, and no others:
 ${JSON.stringify(activeKeys)}
+
+HISTORICAL_EVENTS — real past events from USGS/FEMA/NCEI; extract exact statistics from these for past_damages and past_procedures:
+${historicalEventsBlock}
 
 LIVE_SITUATION — what is happening or being tracked right now, grouped by hazard. Treat these as the ONLY current facts:
 ${liveSituation}

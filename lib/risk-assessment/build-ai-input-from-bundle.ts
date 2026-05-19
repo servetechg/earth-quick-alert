@@ -11,8 +11,8 @@ import {
 import {
     buildLiveHistoricalContext,
     incidentCategoriesWithPositiveChartCount,
-    playbookPastBlockForCategory,
 } from '@/lib/services/risk-historical-context';
+import type { HistoricalHazardEvents } from '@/lib/services/risk-historical-feed-service';
 
 function scopeFromBundle(bundle: DashboardIngestBundle): 'nationwide' | 'state' {
     return bundle.ingestScope === 'state' ? 'state' : 'nationwide';
@@ -29,37 +29,44 @@ function femaFloodLinesFromBundle(bundle: DashboardIngestBundle): string[] {
         .filter((l) => !/^no recent fema/i.test(l) && !/^no recent flood disaster/i.test(l));
 }
 
-function pastBlockForCategory(
-    stateCd: string,
+/**
+ * Builds a `RiskAiPastBlock` from real historical events fetched from live APIs.
+ * The full structured event data is placed in `events` and passed to OpenAI,
+ * which intelligently extracts statistics and formats the analysis.
+ */
+function pastBlockFromHistoricalEvents(
     cat: IncidentHistoryCategory,
+    historical: HistoricalHazardEvents,
     femaLines: string[],
 ): RiskAiPastBlock {
-    const playbook = playbookPastBlockForCategory(stateCd, cat);
-    if (cat === 'flood' && femaLines.length > 0) {
+    const events = historical.by_incident[cat] ?? [];
+
+    // For flood: augment events context with FEMA declaration lines from the live ingest
+    // so the AI has both structured past events and the current ingest's FEMA context.
+    if (cat === 'flood' && femaLines.length > 0 && events.length === 0) {
         return {
-            matched_event: `FEMA flood disaster declarations in ingest (${femaLines.length} record(s))`,
-            similarity_summary: playbook.similarity_summary,
-            past_damages: [
-                ...femaLines.map((l) => `[FEMA declaration] ${l}`),
-                ...(playbook.past_damages ?? []).map((l) => `[Typical hazard impact] ${l}`),
-            ].slice(0, 10),
-            past_procedures: playbook.past_procedures,
-            future_measures: playbook.future_measures,
+            events: [],
+            // Provide the FEMA declaration lines as a fallback context for the AI
+            past_damages: femaLines.map((l) => `[FEMA declaration] ${l}`).slice(0, 8),
         };
     }
+
     return {
-        ...playbook,
-        past_damages: (playbook.past_damages ?? []).map((l) => `[Typical hazard impact] ${l}`),
+        events: events.length ? events : undefined,
     };
 }
 
 /**
- * Builds grounded `past` + live `current` **before** OpenAI — sent as two explicit context blocks in the model prompt.
+ * Builds grounded `past` + live `current` **before** OpenAI.
+ * Now async because it receives pre-fetched `HistoricalHazardEvents` from live APIs.
+ * The `past` context carries real structured events; the model decides what statistics
+ * to extract and how to present them.
  */
-export function buildRiskAiOpenAiInput(
+export async function buildRiskAiOpenAiInput(
     bundle: DashboardIngestBundle,
     heuristicReport: RiskReport,
-): RiskAiOpenAiInput {
+    historical: HistoricalHazardEvents,
+): Promise<RiskAiOpenAiInput> {
     const scope = scopeFromBundle(bundle);
     const state_cd = bundle.stateCd ?? 'us';
     const ingested_at = bundle.ingestedAt ?? heuristicReport.generated_at;
@@ -70,16 +77,19 @@ export function buildRiskAiOpenAiInput(
     const by_incident: RiskAiPastContext['by_incident'] = {};
     for (const cat of INCIDENT_HISTORY_TAB_KEYS) {
         if (!activeCats.includes(cat)) continue;
-        by_incident[cat] = pastBlockForCategory(state_cd, cat, femaLines);
+        by_incident[cat] = pastBlockFromHistoricalEvents(cat, historical, femaLines);
     }
 
+    // Rollup uses the highest bar-chart-count active category
     const distro = heuristicReport.incident_distribution ?? [];
     const rollupCat = [...activeCats].sort((a, b) => {
         const n = (cat: string) =>
             Math.max(0, Math.floor(distro.find((x) => x.category === cat)?.count ?? 0));
         return n(b) - n(a);
     })[0];
-    const rollup = rollupCat ? pastBlockForCategory(state_cd, rollupCat, femaLines) : {};
+    const rollup: RiskAiPastBlock = rollupCat
+        ? pastBlockFromHistoricalEvents(rollupCat, historical, femaLines)
+        : {};
 
     const past: RiskAiPastContext = {
         scope,
@@ -93,8 +103,8 @@ export function buildRiskAiOpenAiInput(
     const byIncidentCurrent: RiskAiCurrentContext['by_incident'] = {};
     const liveBy = live.historical_analysis_by_incident ?? {};
     for (const cat of INCIDENT_HISTORY_TAB_KEYS) {
-        const lines = liveBy[cat]?.current_procedures;
-        if (lines?.length) byIncidentCurrent[cat] = { current_procedures: lines };
+        const lines = liveBy[cat as IncidentHistoryCategory]?.current_procedures;
+        if (lines?.length) byIncidentCurrent[cat as IncidentHistoryCategory] = { current_procedures: lines };
     }
 
     const current: RiskAiCurrentContext = {

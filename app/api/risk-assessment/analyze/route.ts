@@ -10,6 +10,8 @@ import { applyRiskReportToAlignedAlertFeed } from '@/lib/services/risk-report-al
 import { resolveRiskIngestScopeForSession } from '@/lib/risk-assessment/resolve-ingest-scope';
 import { buildRiskAiContextPack } from '@/lib/risk-assessment/build-ai-context-pack';
 import { buildRiskAiOpenAiInput } from '@/lib/risk-assessment/build-ai-input-from-bundle';
+import { extractCurrentHazardProfile } from '@/lib/risk-assessment/extract-current-hazard-profile';
+import { fetchHistoricalHazardEvents } from '@/lib/services/risk-historical-feed-service';
 
 /** Roles allowed to run Dashboard A fusion (aligned with admin operational tooling). */
 const ALLOWED_ROLES = new Set([
@@ -37,7 +39,7 @@ export async function POST(req: Request) {
             nwpsGaugeId?: string;
             usgsSite?: string;
             nationwide?: boolean;
-            /** When true, append an activity-log row (use only for explicit “Generate report” from AI Risk Assessment). */
+            /** When true, append an activity-log row (use only for explicit "Generate report" from AI Risk Assessment). */
             recordActivity?: boolean;
         } = {};
         try {
@@ -51,6 +53,12 @@ export async function POST(req: Request) {
             session.user.id as string | undefined,
             body,
         );
+        if (scope.unresolved) {
+            return NextResponse.json(
+                { error: 'Your account has no assigned state — contact an administrator.' },
+                { status: 400 },
+            );
+        }
         const useNationwide = scope.nationwide;
         const stateCd = scope.stateCd;
         const nwpsGaugeId =
@@ -64,8 +72,17 @@ export async function POST(req: Request) {
             nationwide: useNationwide,
         });
 
+        // Build deterministic heuristic report (no OpenAI) to drive similarity matching
         const heuristic = openaiService.buildHeuristicPreOpenAi(bundle);
-        const ai_input = buildRiskAiOpenAiInput(bundle, heuristic);
+
+        // Extract current hazard profile (magnitudes, severities, active categories)
+        const profile = extractCurrentHazardProfile(bundle, heuristic);
+
+        // Fetch real historical events from live APIs (USGS, FEMA, NCEI) in parallel per category
+        const historical = await fetchHistoricalHazardEvents(profile);
+
+        // Build AI input: past = real historical events, current = live ingest
+        const ai_input = await buildRiskAiOpenAiInput(bundle, heuristic, historical);
 
         const [reportBase, reachable, alignedAlerts] = await Promise.all([
             openaiService.synthesizeDashboardRiskReport(bundle, ai_input),
@@ -125,6 +142,8 @@ export async function POST(req: Request) {
                 riskExposureVintage: bundle.riskExposure?.censusVintageLabel ?? null,
                 /** Same live rows as Alerts & Communication after refresh + role filter (KPIs are aligned to this). */
                 aligned_alert_count: alignedAlerts.length,
+                /** Historical feed status — which past-data sources succeeded. */
+                historical_feed_status: historical.sourceStatus,
                 sources: bundle.sources.map((s) => ({
                     source: s.source,
                     ok: s.ok,
