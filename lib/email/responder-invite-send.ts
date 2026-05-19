@@ -1,6 +1,9 @@
 import nodemailer from 'nodemailer';
 
 export function getAppOrigin(): string {
+    if (process.env.NODE_ENV === 'production') {
+        return 'https://earthquickalert.vercel.app';
+    }
     const base = process.env.NEXT_PUBLIC_APP_URL;
     if (base) return base.replace(/\/$/, '');
     if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL.replace(/\/$/, '')}`;
