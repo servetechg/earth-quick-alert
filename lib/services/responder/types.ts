@@ -317,3 +317,28 @@ export interface NationalGuardResourceDeploymentPayload {
     sites: NationalGuardSite[];
     coordinatorNotes?: string;
 }
+
+/** Medical Logistics — resource deployment staging point. */
+export type MedicalLogisticsSiteStatus = 'active' | 'limited' | 'suspended';
+export type MedicalLogisticsAssetType = 'ambulance' | 'warehouse' | 'supply-route' | 'resource';
+
+export interface MedicalLogisticsSite {
+    id: string;
+    name: string;
+    address: string;
+    lat: number;
+    lng: number;
+    type: MedicalLogisticsAssetType;
+    status: MedicalLogisticsSiteStatus;
+    units: number;
+    notes?: string;
+}
+
+export interface MedicalLogisticsResourceDeploymentPayload {
+    networkId: string;
+    networkName: string;
+    updatedAt: string;
+    source: DataSourceBadge;
+    sites: MedicalLogisticsSite[];
+    coordinatorNotes?: string;
+}

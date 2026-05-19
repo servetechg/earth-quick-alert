@@ -18,7 +18,13 @@ import {
 
 export * from './types';
 export { recomputeHospitalSummary } from './hospital-summary';
-export { getHotelAvailability, setHotelAvailability, getPublicOfficialSummary } from './store';
+export {
+    getHotelAvailability,
+    setHotelAvailability,
+    getPublicOfficialSummary,
+    getMedicalLogisticsPayload,
+    setMedicalLogisticsPayload,
+} from './store';
 export { getHospitalCapacityForUser, mergeHospitalCapacityForUser, normalizeHospitalUnitsFromPartial } from './hospital-capacity-db';
 export { getPoliceDeploymentForUser, mergePoliceDeploymentForUser } from './police-deployment-db';
 export {

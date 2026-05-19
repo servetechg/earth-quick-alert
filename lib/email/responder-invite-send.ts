@@ -19,7 +19,7 @@ function buildInviteSubjectAndText(roleLabel: string, signupUrl: string) {
     const text = [
         'You have been invited to join the Ready2Go emergency portal as an external responder.',
         '',
-        `Role / function: ${roleLabel}`,
+        `Role: ${roleLabel}`,
         '',
         `Complete signup: ${signupUrl}`,
         '',
@@ -61,14 +61,14 @@ async function sendResponderInviteViaSmtp(params: {
         const transporter = url
             ? nodemailer.createTransport(url)
             : nodemailer.createTransport({
-                  host: process.env.SMTP_HOST!.trim(),
-                  port: Number(process.env.SMTP_PORT || '587'),
-                  secure: process.env.SMTP_SECURE === 'true' || Number(process.env.SMTP_PORT || '0') === 465,
-                  auth: {
-                      user: process.env.SMTP_USER!.trim(),
-                      pass: String(process.env.SMTP_PASS ?? ''),
-                  },
-              });
+                host: process.env.SMTP_HOST!.trim(),
+                port: Number(process.env.SMTP_PORT || '587'),
+                secure: process.env.SMTP_SECURE === 'true' || Number(process.env.SMTP_PORT || '0') === 465,
+                auth: {
+                    user: process.env.SMTP_USER!.trim(),
+                    pass: String(process.env.SMTP_PASS ?? ''),
+                },
+            });
 
         await transporter.sendMail({
             from,

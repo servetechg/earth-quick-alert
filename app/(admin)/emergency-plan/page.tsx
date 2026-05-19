@@ -199,7 +199,7 @@ export default function EmergencyPlanPage() {
     const fileRef = useRef<HTMLInputElement>(null)
 
     const [search, setSearch] = useState('')
-    const [selectedCategoryIdx, setSelectedCategoryIdx] = useState<number | null>(null)
+    const [selectedCategoryIdx, setSelectedCategoryIdx] = useState<number | null>(0)
 
     type AuditSummary = {
         summary: string

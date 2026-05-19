@@ -45,6 +45,24 @@ export async function POST(req: NextRequest) {
             }
         }
 
+        // Auto-provision medical logistics demo user
+        if (normalizedEmail === 'medical_demo@yopmail.com' && password === 'medical_demo_pass') {
+            const existingUser = await User.findOne({ email: normalizedEmail });
+            if (!existingUser) {
+                const hashedPassword = await bcrypt.hash(password, 10);
+                await User.create({
+                    name: 'Demo Medical Logistics',
+                    email: normalizedEmail,
+                    password: hashedPassword,
+                    role: 'responder',
+                    responderVertical: 'medical-logistics',
+                    responderFunction: 'Medical Logistics Coordinator (demo)',
+                    accountStatus: 'approved',
+                    licenseId: null,
+                });
+            }
+        }
+
         // Find user and include password field
         const user = await User.findOne({ email: normalizedEmail }).select('+password');
 

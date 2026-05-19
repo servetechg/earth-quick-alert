@@ -7,6 +7,7 @@ import { HospitalCapacitySection } from '@/components/responder/hospital-capacit
 import { PoliceDeploymentSection } from '@/components/responder/police-deployment-section'
 import { HotelAvailabilitySection } from '@/components/responder/hotel-availability-section'
 import { PharmacyResourceDeploymentSection } from '@/components/responder/pharmacy-resource-deployment-section'
+import { MedicalLogisticsSection } from '@/components/responder/medical-logistics-section'
 import { TransitResourceDeploymentSection } from '@/components/responder/transit-resource-deployment-section'
 import { EnergyResourceDeploymentSection } from '@/components/responder/energy-resource-deployment-section'
 import { GasResourceDeploymentSection } from '@/components/responder/gas-resource-deployment-section'
@@ -58,6 +59,8 @@ function descriptionForKind(bundle: Bundle, vLabel: string): string {
       return `${vLabel}${fn}. Track incident teams, operations, and staging.`
     case 'pharmacy':
       return `${vLabel}${fn}. Update pop-up pharmacy sites and coordinates for GIS resource deployment.`
+    case 'medical-logistics':
+      return `${vLabel}${fn}. Manage medical warehouses, supply routes, and deploy ambulances.`
     case 'transit':
       return `${vLabel}${fn}. Mass transit locations and vehicles deployed per site.`
     case 'energy':
@@ -139,6 +142,7 @@ export default function ResponderDashboardPage() {
       {bundle?.kind === 'police' && <PoliceDeploymentSection compact />}
       {bundle?.kind === 'hotel' && <HotelAvailabilitySection compact />}
       {bundle?.kind === 'pharmacy' && <PharmacyResourceDeploymentSection compact />}
+      {bundle?.kind === 'medical-logistics' && <MedicalLogisticsSection compact />}
       {bundle?.kind === 'transit' && <TransitResourceDeploymentSection compact />}
       {bundle?.kind === 'energy' && <EnergyResourceDeploymentSection compact />}
       {bundle?.kind === 'gas' && <GasResourceDeploymentSection compact />}

@@ -21,6 +21,7 @@ export async function gateResponder(
         | 'national-guard'
         | 'public-official'
         | 'federal'
+        | 'medical-logistics'
         | 'general',
 ): Promise<ResponderGate> {
     const session = await getSession();

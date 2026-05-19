@@ -315,7 +315,7 @@ export default function RespondersAgenciesPage() {
                                         <span className="text-slate-600 text-sm">{user.org}</span>
                                     </td>
                                     <td className="px-6 py-5">
-                                        <Switch checked={user.access} onCheckedChange={() => {}} className="data-[state=checked]:bg-[#33375D]" />
+                                        <Switch checked={user.access} onCheckedChange={() => { }} className="data-[state=checked]:bg-[#33375D]" />
                                     </td>
                                     <td className="px-6 py-5">
                                         <button type="button" className="text-slate-900 underline underline-offset-4 text-sm font-medium hover:text-blue-600 transition-colors">
@@ -353,7 +353,7 @@ export default function RespondersAgenciesPage() {
                             <tr>
                                 <th className="px-6 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Name</th>
                                 <th className="px-6 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Email</th>
-                                <th className="px-6 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Role / function</th>
+                                <th className="px-6 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Role</th>
                                 <th className="px-6 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Vertical</th>
                                 <th className="px-6 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Area</th>
                                 <th className="px-6 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Status</th>
@@ -444,7 +444,7 @@ export default function RespondersAgenciesPage() {
                             <thead className="bg-[#FAFBFC] border-b border-slate-100">
                                 <tr>
                                     <th className="px-6 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Email</th>
-                                    <th className="px-6 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Role / function</th>
+                                    <th className="px-6 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Role</th>
                                     <th className="px-6 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Expires</th>
                                 </tr>
                             </thead>
