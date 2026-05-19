@@ -120,3 +120,151 @@ export interface TransitResourceDeploymentPayload {
     sites: TransitMassTransitAsset[];
     coordinatorNotes?: string;
 }
+
+/** Energy Company power outage area / crew staging point with deployed crews (GIS + resource deployment). */
+export type EnergyCrewStatus = 'active' | 'limited' | 'suspended';
+
+export interface EnergyCrewAsset {
+    id: string;
+    name: string;
+    address: string;
+    lat: number;
+    lng: number;
+    /** Crews assigned or staged at this location. */
+    crewsDeployed: number;
+    status: EnergyCrewStatus;
+    notes?: string;
+}
+
+export interface EnergyResourceDeploymentPayload {
+    networkId: string;
+    networkName: string;
+    updatedAt: string;
+    source: DataSourceBadge;
+    sites: EnergyCrewAsset[];
+    coordinatorNotes?: string;
+}
+
+/** Gas Company leak area / crew staging point with deployed crews (GIS + resource deployment). */
+export type GasCrewStatus = 'active' | 'limited' | 'suspended';
+
+export interface GasCrewAsset {
+    id: string;
+    name: string;
+    address: string;
+    lat: number;
+    lng: number;
+    /** Crews assigned or staged at this location. */
+    crewsDeployed: number;
+    status: GasCrewStatus;
+    notes?: string;
+}
+
+export interface GasResourceDeploymentPayload {
+    networkId: string;
+    networkName: string;
+    updatedAt: string;
+    source: DataSourceBadge;
+    sites: GasCrewAsset[];
+    coordinatorNotes?: string;
+}
+
+/** Electric Company outage area / crew staging point with deployed crews (GIS + resource deployment). */
+export type ElectricCrewStatus = 'active' | 'limited' | 'suspended';
+
+export interface ElectricCrewAsset {
+    id: string;
+    name: string;
+    address: string;
+    lat: number;
+    lng: number;
+    /** Vehicles deployed at this location. */
+    vehiclesDeployed: number;
+    /** Crews assigned or staged at this location. */
+    crewsDeployed: number;
+    status: ElectricCrewStatus;
+    notes?: string;
+}
+
+export interface ElectricResourceDeploymentPayload {
+    networkId: string;
+    networkName: string;
+    updatedAt: string;
+    source: DataSourceBadge;
+    sites: ElectricCrewAsset[];
+    coordinatorNotes?: string;
+}
+
+/** Water Company crew staging point with deployed crews (GIS + resource deployment). */
+export type WaterCrewStatus = 'active' | 'limited' | 'suspended';
+
+export interface WaterCrewAsset {
+    id: string;
+    name: string;
+    address: string;
+    lat: number;
+    lng: number;
+    /** Water crews assigned or staged at this location. */
+    crewsDeployed: number;
+    status: WaterCrewStatus;
+    notes?: string;
+}
+
+export interface WaterResourceDeploymentPayload {
+    networkId: string;
+    networkName: string;
+    updatedAt: string;
+    source: DataSourceBadge;
+    sites: WaterCrewAsset[];
+    coordinatorNotes?: string;
+}
+
+/** Food & Supply Logistics — volunteer staging / distribution network point. */
+export type FoodLogisticsSiteStatus = 'active' | 'limited' | 'suspended';
+
+export interface FoodLogisticsSite {
+    id: string;
+    name: string;
+    address: string;
+    lat: number;
+    lng: number;
+    /** Volunteers assigned at this location. */
+    volunteersDeployed: number;
+    status: FoodLogisticsSiteStatus;
+    notes?: string;
+}
+
+export interface FoodLogisticsResourceDeploymentPayload {
+    networkId: string;
+    networkName: string;
+    updatedAt: string;
+    source: DataSourceBadge;
+    sites: FoodLogisticsSite[];
+    coordinatorNotes?: string;
+}
+
+/** National Guard — resource deployment staging point. */
+export type NationalGuardSiteStatus = 'active' | 'limited' | 'suspended';
+
+export interface NationalGuardSite {
+    id: string;
+    name: string;
+    address: string;
+    lat: number;
+    lng: number;
+    /** Personnel deployed at this location. */
+    personnelDeployed: number;
+    /** Vehicles / equipment units deployed. */
+    vehiclesDeployed: number;
+    status: NationalGuardSiteStatus;
+    notes?: string;
+}
+
+export interface NationalGuardResourceDeploymentPayload {
+    networkId: string;
+    networkName: string;
+    updatedAt: string;
+    source: DataSourceBadge;
+    sites: NationalGuardSite[];
+    coordinatorNotes?: string;
+}

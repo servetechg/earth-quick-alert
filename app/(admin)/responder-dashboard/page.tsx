@@ -8,6 +8,12 @@ import { PoliceDeploymentSection } from '@/components/responder/police-deploymen
 import { HotelAvailabilitySection } from '@/components/responder/hotel-availability-section'
 import { PharmacyResourceDeploymentSection } from '@/components/responder/pharmacy-resource-deployment-section'
 import { TransitResourceDeploymentSection } from '@/components/responder/transit-resource-deployment-section'
+import { EnergyResourceDeploymentSection } from '@/components/responder/energy-resource-deployment-section'
+import { GasResourceDeploymentSection } from '@/components/responder/gas-resource-deployment-section'
+import { ElectricResourceDeploymentSection } from '@/components/responder/electric-resource-deployment-section'
+import { WaterResourceDeploymentSection } from '@/components/responder/water-resource-deployment-section'
+import { FoodLogisticsResourceDeploymentSection } from '@/components/responder/food-logistics-resource-deployment-section'
+import { NationalGuardResourceDeploymentSection } from '@/components/responder/national-guard-resource-deployment-section'
 import { GeneralResponderSection } from '@/components/responder/general-responder-section'
 import { ResponderInfoBar } from '@/components/responder/responder-info-bar'
 import { RESPONDER_VERTICAL_LABELS, type ResponderVertical, type ResponderDashboardKind } from '@/lib/responder-verticals'
@@ -15,6 +21,12 @@ import type {
   GeneralResponderSummary,
   PharmacyResourceDeploymentPayload,
   TransitResourceDeploymentPayload,
+  EnergyResourceDeploymentPayload,
+  GasResourceDeploymentPayload,
+  ElectricResourceDeploymentPayload,
+  WaterResourceDeploymentPayload,
+  FoodLogisticsResourceDeploymentPayload,
+  NationalGuardResourceDeploymentPayload,
 } from '@/lib/services/responder'
 
 type Bundle = {
@@ -26,7 +38,41 @@ type Bundle = {
   hotel: unknown
   pharmacy: PharmacyResourceDeploymentPayload | null
   transit: TransitResourceDeploymentPayload | null
+  energy: EnergyResourceDeploymentPayload | null
+  gas: GasResourceDeploymentPayload | null
+  electric: ElectricResourceDeploymentPayload | null
+  water: WaterResourceDeploymentPayload | null
+  foodLogistics: FoodLogisticsResourceDeploymentPayload | null
+  nationalGuard: NationalGuardResourceDeploymentPayload | null
   general: GeneralResponderSummary | null
+}
+
+function descriptionForKind(bundle: Bundle, vLabel: string): string {
+  const fn = bundle.responderFunction ? ` · ${bundle.responderFunction}` : ''
+  switch (bundle.kind) {
+    case 'hospital':
+      return `${vLabel}${fn}`
+    case 'police':
+      return `${vLabel}${fn}. Track incident teams, operations, and staging.`
+    case 'pharmacy':
+      return `${vLabel}${fn}. Update pop-up pharmacy sites and coordinates for GIS resource deployment.`
+    case 'transit':
+      return `${vLabel}${fn}. Mass transit locations and vehicles deployed per site.`
+    case 'energy':
+      return `${vLabel}${fn}. Power outage areas and deployed power crews.`
+    case 'gas':
+      return `${vLabel}${fn}. Gas leak areas and deployed repair crews.`
+    case 'electric':
+      return `${vLabel}${fn}. Outage summary, vehicles deployed, and power crews.`
+    case 'water':
+      return `${vLabel}${fn}. Water crews and resource deployment.`
+    case 'food-logistics':
+      return `${vLabel}${fn}. Volunteers and distribution network.`
+    case 'national-guard':
+      return `${vLabel}${fn}. Personnel, vehicles, and staging areas.`
+    default:
+      return `${vLabel}${fn}. Shared responder links and checklist until a specialized vertical is assigned.`
+  }
 }
 
 export default function ResponderDashboardPage() {
@@ -42,8 +88,9 @@ export default function ResponderDashboardPage() {
         throw new Error(data.error || 'Failed to load dashboard')
       }
       setBundle(await res.json())
-    } catch (e: any) {
-      setErr(e.message || 'Error')
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : 'Error'
+      setErr(message)
       setBundle(null)
     }
   }, [])
@@ -59,15 +106,7 @@ export default function ResponderDashboardPage() {
   const description = err
     ? `Could not load this dashboard: ${err}`
     : bundle
-      ? bundle.kind === 'hospital'
-        ? `${vLabel}${bundle.responderFunction ? ` · ${bundle.responderFunction}` : ''}`
-        : bundle.kind === 'police'
-          ? `${vLabel}${bundle.responderFunction ? ` · ${bundle.responderFunction}` : ''}. Track incident teams, operations, and staging.`
-          : bundle.kind === 'pharmacy'
-            ? `${vLabel}${bundle.responderFunction ? ` · ${bundle.responderFunction}` : ''}. Update pop-up pharmacy sites and coordinates for GIS resource deployment.`
-            : bundle.kind === 'transit'
-              ? `${vLabel}${bundle.responderFunction ? ` · ${bundle.responderFunction}` : ''}. Mass transit locations and vehicles deployed per site.`
-              : `${vLabel}${bundle.responderFunction ? ` · ${bundle.responderFunction}` : ''}. This overview uses the same layout as other admin tools; metrics are mock until external APIs are connected.`
+      ? descriptionForKind(bundle, vLabel)
       : 'Loading your operational summary…'
 
   return (
@@ -77,9 +116,15 @@ export default function ResponderDashboardPage() {
         titleUppercase={false}
         description={description}
       />
-      {bundle && !err && bundle.kind !== 'hospital' && bundle.kind !== 'police' && bundle.kind !== 'pharmacy' && bundle.kind !== 'transit' && (
+      {bundle && !err && bundle.kind === 'hotel' && (
         <ResponderInfoBar>
-          Figures below refresh from the in-app mock service on save. Connect state or agency feeds when you move past demo.
+          Lodging data is session-scoped until a database layer is added. Other verticals save to your account in
+          MongoDB.
+        </ResponderInfoBar>
+      )}
+      {bundle && !err && bundle.kind === 'general' && (
+        <ResponderInfoBar>
+          Ask your administrator to assign a specialized vertical for tailored operational tools.
         </ResponderInfoBar>
       )}
       {bundle?.kind === 'hospital' && <HospitalCapacitySection compact />}
@@ -87,6 +132,12 @@ export default function ResponderDashboardPage() {
       {bundle?.kind === 'hotel' && <HotelAvailabilitySection compact />}
       {bundle?.kind === 'pharmacy' && <PharmacyResourceDeploymentSection compact />}
       {bundle?.kind === 'transit' && <TransitResourceDeploymentSection compact />}
+      {bundle?.kind === 'energy' && <EnergyResourceDeploymentSection compact />}
+      {bundle?.kind === 'gas' && <GasResourceDeploymentSection compact />}
+      {bundle?.kind === 'electric' && <ElectricResourceDeploymentSection compact />}
+      {bundle?.kind === 'water' && <WaterResourceDeploymentSection compact />}
+      {bundle?.kind === 'food-logistics' && <FoodLogisticsResourceDeploymentSection compact />}
+      {bundle?.kind === 'national-guard' && <NationalGuardResourceDeploymentSection compact />}
       {bundle?.kind === 'general' && bundle.general && <GeneralResponderSection general={bundle.general} />}
     </AdminPageShell>
   )

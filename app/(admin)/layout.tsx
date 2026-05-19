@@ -32,7 +32,7 @@ export default function AdminLayout({
         const role = localStorage.getItem('userRole') || ''
         const storedName = localStorage.getItem('userName')
         const isAuthorized = role === 'admin' || role === 'super-admin' || role === 'sub-admin' || role === 'observer' || role === 'responder' || role === 'manager' || role === 'eoc-manager' || role === 'eoc-observer'
-        
+
         if (!isAuthorized) {
             router.push('/login')
         } else {
