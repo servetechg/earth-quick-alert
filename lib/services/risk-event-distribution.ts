@@ -257,7 +257,7 @@ export function deriveEventBasedIncidentDistribution(bundle: DashboardIngestBund
         { category: 'marine', count: marineIds.size },
         { category: 'wildfire', count: wildIds.size },
         { category: 'earthquake', count: eqIds.size },
-    ];
+    ].filter((row) => row.count > 0);
 }
 
 function hashDjb2(s: string): string {

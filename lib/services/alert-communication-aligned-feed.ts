@@ -104,16 +104,18 @@ export function incidentDistributionFromAlignedAlerts(
     for (const row of rows) {
         z[categorizeAlertRow(row)] += 1;
     }
-    return [
-        { category: 'flood', count: z.flood },
-        { category: 'tornado', count: z.tornado },
-        { category: 'storm', count: z.storm },
-        { category: 'hazardous', count: z.hazardous },
-        { category: 'coastal_surf', count: z.coastal_surf },
-        { category: 'marine', count: z.marine },
-        { category: 'wildfire', count: z.wildfire },
-        { category: 'earthquake', count: z.earthquake },
-    ];
+    return (
+        [
+            { category: 'flood', count: z.flood },
+            { category: 'tornado', count: z.tornado },
+            { category: 'storm', count: z.storm },
+            { category: 'hazardous', count: z.hazardous },
+            { category: 'coastal_surf', count: z.coastal_surf },
+            { category: 'marine', count: z.marine },
+            { category: 'wildfire', count: z.wildfire },
+            { category: 'earthquake', count: z.earthquake },
+        ] satisfies DistroPoint[]
+    ).filter((row) => row.count > 0);
 }
 
 export function majorMinorFromAlignedAlerts(rows: any[]): { major: number; minor: number } {
