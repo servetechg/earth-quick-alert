@@ -9,6 +9,8 @@ import { HotelAvailabilitySection } from '@/components/responder/hotel-availabil
 import { PharmacyResourceDeploymentSection } from '@/components/responder/pharmacy-resource-deployment-section'
 import { TransitResourceDeploymentSection } from '@/components/responder/transit-resource-deployment-section'
 import { GeneralResponderSection } from '@/components/responder/general-responder-section'
+import { PublicOfficialDashboardSection } from '@/components/responder/public-official-dashboard-section'
+import { FederalResourceDeploymentSection } from '@/components/responder/federal-resource-deployment-section'
 import { ResponderInfoBar } from '@/components/responder/responder-info-bar'
 import { RESPONDER_VERTICAL_LABELS, type ResponderVertical, type ResponderDashboardKind } from '@/lib/responder-verticals'
 import type {
@@ -67,7 +69,11 @@ export default function ResponderDashboardPage() {
             ? `${vLabel}${bundle.responderFunction ? ` · ${bundle.responderFunction}` : ''}. Update pop-up pharmacy sites and coordinates for GIS resource deployment (mock).`
             : bundle.kind === 'transit'
               ? `${vLabel}${bundle.responderFunction ? ` · ${bundle.responderFunction}` : ''}. Mass transit locations and vehicles deployed per site (mock).`
-              : `${vLabel}${bundle.responderFunction ? ` · ${bundle.responderFunction}` : ''}. This overview uses the same layout as other admin tools; metrics are mock until external APIs are connected.`
+              : bundle.kind === 'public-official'
+                ? `${vLabel}${bundle.responderFunction ? ` · ${bundle.responderFunction}` : ''}. Read-only executive view of emergency declarations and EOC status (mock).`
+              : bundle.kind === 'federal'
+                ? `${vLabel}${bundle.responderFunction ? ` · ${bundle.responderFunction}` : ''}. Manage federal personnel deployments and staging areas.`
+                : `${vLabel}${bundle.responderFunction ? ` · ${bundle.responderFunction}` : ''}. This overview uses the same layout as other admin tools; metrics are mock until external APIs are connected.`
       : 'Loading your operational summary…'
 
   return (
@@ -87,6 +93,8 @@ export default function ResponderDashboardPage() {
       {bundle?.kind === 'hotel' && <HotelAvailabilitySection compact />}
       {bundle?.kind === 'pharmacy' && <PharmacyResourceDeploymentSection compact />}
       {bundle?.kind === 'transit' && <TransitResourceDeploymentSection compact />}
+      {bundle?.kind === 'federal' && <FederalResourceDeploymentSection compact />}
+      {bundle?.kind === 'public-official' && <PublicOfficialDashboardSection />}
       {bundle?.kind === 'general' && bundle.general && <GeneralResponderSection general={bundle.general} />}
     </AdminPageShell>
   )

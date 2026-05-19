@@ -22,6 +22,7 @@ export const RESPONDER_VERTICALS = [
     'federal',
     'state-government',
     'nonprofit',
+    'public-official',
 ] as const;
 
 export type ResponderVertical = (typeof RESPONDER_VERTICALS)[number];
@@ -45,6 +46,7 @@ export const RESPONDER_VERTICAL_LABELS: Record<ResponderVertical, string> = {
     federal: 'Federal staging',
     'state-government': 'State government',
     nonprofit: 'Nonprofit / VOAD',
+    'public-official': 'Public Official',
 };
 
 export function isResponderVertical(v: string): v is ResponderVertical {
@@ -52,14 +54,22 @@ export function isResponderVertical(v: string): v is ResponderVertical {
 }
 
 /** Maps stored vertical → dashboard experience (mock + API namespace). */
-export type ResponderDashboardKind = 'hospital' | 'police' | 'hotel' | 'pharmacy' | 'transit' | 'general';
+export type ResponderDashboardKind = 'hospital' | 'police' | 'hotel' | 'pharmacy' | 'transit' | 'energy' | 'gas' | 'electric' | 'water' | 'food-logistics' | 'national-guard' | 'public-official' | 'federal' | 'general';
 
 export function getResponderDashboardKind(vertical: string): ResponderDashboardKind {
     const v = vertical || '';
     if (v === 'hospital' || v === 'healthcare-hospital') return 'hospital';
-    if (v === 'police' || v === 'national-guard' || v === 'federal') return 'police';
+    if (v === 'police') return 'police';
+    if (v === 'federal') return 'federal';
+    if (v === 'national-guard') return 'national-guard';
     if (v === 'hotel') return 'hotel';
     if (v === 'pharmacy') return 'pharmacy';
     if (v === 'transit') return 'transit';
+    if (v === 'utility-gas') return 'gas';
+    if (v === 'utility-electric') return 'electric';
+    if (v === 'utility-water') return 'water';
+    if (v === 'food-logistics') return 'food-logistics';
+    if (v === 'utility-energy') return 'energy';
+    if (v === 'public-official') return 'public-official';
     return 'general';
 }

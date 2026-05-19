@@ -120,3 +120,53 @@ export interface TransitResourceDeploymentPayload {
     sites: TransitMassTransitAsset[];
     coordinatorNotes?: string;
 }
+
+/** Public Official Read-Only Executive Summary */
+export type PublicOfficialEocLevel = '1-full' | '2-partial' | '3-monitoring' | '4-normal';
+export type PublicOfficialDeclarationStatus = 'active' | 'pending' | 'resolved';
+
+export interface PublicOfficialEocStatus {
+    level: PublicOfficialEocLevel;
+    operatingCondition: string;
+    personnelActive: number;
+}
+
+export interface PublicOfficialDeclaration {
+    id: string;
+    title: string;
+    jurisdiction: string;
+    status: PublicOfficialDeclarationStatus;
+    issuedAt: string;
+    notes?: string;
+}
+
+export interface PublicOfficialSummaryPayload {
+    jurisdictionId: string;
+    jurisdictionName: string;
+    updatedAt: string;
+    source: DataSourceBadge;
+    eoc: PublicOfficialEocStatus;
+    declarations: PublicOfficialDeclaration[];
+    executiveNotes?: string;
+}
+
+/** Federal Staging / Resource Deployment Payload */
+export type FederalSiteStatus = 'active' | 'standby' | 'demobilized';
+
+export interface FederalStagingArea {
+    id: string;
+    location: string;
+    personnelCount: number;
+    vehicleCount: number;
+    status: FederalSiteStatus;
+    notes?: string;
+}
+
+export interface FederalResourceDeploymentPayload {
+    jurisdictionName: string;
+    updatedAt: string;
+    source: DataSourceBadge;
+    totalPersonnelDeployed: number;
+    stagingAreas: FederalStagingArea[];
+}
+

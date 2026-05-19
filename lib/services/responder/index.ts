@@ -1,5 +1,5 @@
 import { getResponderDashboardKind, type ResponderDashboardKind } from '@/lib/responder-verticals';
-import { getHotelAvailability } from './store';
+import { getHotelAvailability, getFederalResourceDeployment } from './store';
 import type { GeneralResponderSummary } from './types';
 import { getHospitalCapacityForUser } from './hospital-capacity-db';
 import { getPoliceDeploymentForUser } from './police-deployment-db';
@@ -8,7 +8,7 @@ import { getTransitResourceDeploymentForUser } from './transit-resource-db';
 
 export * from './types';
 export { recomputeHospitalSummary } from './hospital-summary';
-export { getHotelAvailability, setHotelAvailability } from './store';
+export { getHotelAvailability, setHotelAvailability, getPublicOfficialSummary, getFederalResourceDeployment, setFederalResourceDeployment } from './store';
 export { getHospitalCapacityForUser, mergeHospitalCapacityForUser, normalizeHospitalUnitsFromPartial } from './hospital-capacity-db';
 export { getPoliceDeploymentForUser, mergePoliceDeploymentForUser } from './police-deployment-db';
 export {
@@ -69,6 +69,7 @@ export async function getResponderDashboardBundle(
         hotel: kind === 'hotel' ? getHotelAvailability() : null,
         pharmacy: kind === 'pharmacy' ? await getPharmacyResourceDeploymentForUser(userId, lic, fn) : null,
         transit: kind === 'transit' ? await getTransitResourceDeploymentForUser(userId, lic, fn) : null,
+        federal: kind === 'federal' ? getFederalResourceDeployment() : null,
         general: kind === 'general' ? getGeneralResponderSummary(vertical, responderFunction, displayName) : null,
     };
 }

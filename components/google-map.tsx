@@ -21,6 +21,13 @@ interface MapMarker {
     category?: string
 }
 
+export interface MapStateBounds {
+    west: number
+    south: number
+    east: number
+    north: number
+}
+
 interface GoogleMapProps {
     address?: string
     markers?: MapMarker[]
@@ -28,6 +35,8 @@ interface GoogleMapProps {
     zoom?: number
     heatPoints?: { lat: number; lng: number; weight?: number }[]
     showHeatmap?: boolean
+    /** When set, pan/zoom are limited to this US state envelope. */
+    stateBounds?: MapStateBounds | null
 }
 
 const containerStyle = {
@@ -53,7 +62,36 @@ const makeGlyphMarker = (bg: string, glyph: string, size: number) => {
     }
 }
 
-export function GoogleMap({ address, markers = [], center, zoom = 10, heatPoints = [], showHeatmap = false }: GoogleMapProps) {
+function toLatLngBounds(bounds: MapStateBounds) {
+    return new google.maps.LatLngBounds(
+        { lat: bounds.south, lng: bounds.west },
+        { lat: bounds.north, lng: bounds.east },
+    )
+}
+
+function viewportExceedsStateBounds(map: google.maps.Map, bounds: MapStateBounds): boolean {
+    const viewport = map.getBounds()
+    if (!viewport) return false
+    const ne = viewport.getNorthEast()
+    const sw = viewport.getSouthWest()
+    const { west, south, east, north } = bounds
+    return (
+        ne.lat() > north + 1e-6 ||
+        sw.lat() < south - 1e-6 ||
+        ne.lng() > east + 1e-6 ||
+        sw.lng() < west - 1e-6
+    )
+}
+
+export function GoogleMap({
+    address,
+    markers = [],
+    center,
+    zoom = 10,
+    heatPoints = [],
+    showHeatmap = false,
+    stateBounds = null,
+}: GoogleMapProps) {
     const { isLoaded } = useJsApiLoader({
         id: GOOGLE_MAPS_LOADER_ID,
         googleMapsApiKey: GOOGLE_MAPS_API_KEY,
@@ -68,6 +106,9 @@ export function GoogleMap({ address, markers = [], center, zoom = 10, heatPoints
     const [selectedMarker, setSelectedMarker] = useState<MapMarker | null>(null)
     const [map, setMap] = React.useState<google.maps.Map | null>(null)
     const heatLayerRef = useRef<google.maps.visualization.HeatmapLayer | null>(null)
+    const stateBoundsFittedRef = useRef(false)
+    const stateMinZoomRef = useRef<number | null>(null)
+    const lastZoomRef = useRef<number | null>(null)
 
     const onLoad = useCallback(function callback(map: google.maps.Map) {
         setMap(map)
@@ -77,12 +118,112 @@ export function GoogleMap({ address, markers = [], center, zoom = 10, heatPoints
         setMap(null)
     }, [])
 
-    // Smooth pan when center changes
+    // Smooth pan when center changes (skip when locked to state — fitBounds owns the view)
     React.useEffect(() => {
-        if (map && center) {
-            map.panTo(center)
+        if (!map || !center || stateBounds) return
+        map.panTo(center)
+    }, [map, center, stateBounds])
+
+    const applyStateMinZoom = useCallback((targetMap: google.maps.Map, bounds: MapStateBounds) => {
+        const tighten = (attempt: number) => {
+            const z = targetMap.getZoom() ?? 6
+            if (!viewportExceedsStateBounds(targetMap, bounds) || attempt >= 5) {
+                stateMinZoomRef.current = z
+                lastZoomRef.current = z
+                targetMap.setOptions({ minZoom: z })
+                return
+            }
+            targetMap.setZoom(z + 1)
+            google.maps.event.addListenerOnce(targetMap, 'idle', () => tighten(attempt + 1))
         }
-    }, [map, center])
+        tighten(0)
+    }, [])
+
+    const fitStateView = useCallback(
+        (targetMap: google.maps.Map, bounds: MapStateBounds) => {
+            const latLngBounds = toLatLngBounds(bounds)
+            const { west, south, east, north } = bounds
+            targetMap.setCenter({ lat: (south + north) / 2, lng: (west + east) / 2 })
+            targetMap.fitBounds(latLngBounds, 8)
+            google.maps.event.addListenerOnce(targetMap, 'idle', () => {
+                applyStateMinZoom(targetMap, bounds)
+            })
+        },
+        [applyStateMinZoom],
+    )
+
+    // Apply state boundary restriction; warn only on zoom-out past full-state view
+    React.useEffect(() => {
+        if (!map) return
+
+        if (!stateBounds) {
+            stateBoundsFittedRef.current = false
+            stateMinZoomRef.current = null
+            lastZoomRef.current = null
+            map.setOptions({ restriction: null, minZoom: undefined })
+            return
+        }
+
+        const latLngBounds = toLatLngBounds(stateBounds)
+        map.setOptions({
+            restriction: {
+                latLngBounds,
+                strictBounds: true,
+            },
+        })
+
+        if (!stateBoundsFittedRef.current) {
+            fitStateView(map, stateBounds)
+            stateBoundsFittedRef.current = true
+        }
+
+        const resetToStateView = () => {
+            fitStateView(map, stateBounds)
+        }
+
+        const onDragEnd = () => {
+            if (viewportExceedsStateBounds(map, stateBounds)) {
+                resetToStateView()
+            }
+        }
+
+        const onZoomChanged = () => {
+            const current = map.getZoom()
+            if (current == null) return
+            const minZoom = stateMinZoomRef.current
+            const prev = lastZoomRef.current
+
+            const zoomedOut = prev != null && current < prev
+            const belowMin = minZoom != null && current < minZoom
+            const viewportTooWide = viewportExceedsStateBounds(map, stateBounds)
+
+            if (zoomedOut && (belowMin || viewportTooWide)) {
+                if (minZoom != null) {
+                    map.setZoom(minZoom)
+                } else {
+                    resetToStateView()
+                }
+            } else if (viewportTooWide) {
+                resetToStateView()
+            }
+
+            lastZoomRef.current = map.getZoom() ?? current
+        }
+
+        const zoomListener = map.addListener('zoom_changed', onZoomChanged)
+        const dragEndListener = map.addListener('dragend', onDragEnd)
+
+        return () => {
+            google.maps.event.removeListener(zoomListener)
+            google.maps.event.removeListener(dragEndListener)
+        }
+    }, [map, stateBounds, fitStateView])
+
+    React.useEffect(() => {
+        stateBoundsFittedRef.current = false
+        stateMinZoomRef.current = null
+        lastZoomRef.current = null
+    }, [stateBounds?.west, stateBounds?.south, stateBounds?.east, stateBounds?.north])
 
     // Clear selected marker if it's no longer in the markers list (e.g. when switching tabs)
     React.useEffect(() => {
@@ -150,7 +291,7 @@ export function GoogleMap({ address, markers = [], center, zoom = 10, heatPoints
             <GoogleMapComponent
                 mapContainerStyle={containerStyle}
                 center={mapCenter}
-                zoom={zoom}
+                zoom={stateBounds ? undefined : zoom}
                 onLoad={onLoad}
                 onUnmount={onUnmount}
                 options={{

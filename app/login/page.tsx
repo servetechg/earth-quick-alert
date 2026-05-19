@@ -59,7 +59,7 @@ export default function LoginPage() {
           router.push('/super-admin-dashboard')
         } else if (data.user.role === 'admin' || data.user.role === 'sub-admin') {
           router.push('/admin-dashboard')
-        } else if (data.user.role === 'responder') {
+        } else if (data.user.role === 'responder' || data.user.role === 'public_official') {
           router.push('/responder-dashboard')
         } else if (data.user.role === 'eoc-manager' || data.user.role === 'eoc-observer') {
           router.push('/virtual-eoc')
