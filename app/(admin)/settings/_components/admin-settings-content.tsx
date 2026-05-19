@@ -283,33 +283,35 @@ export function AdminSettingsContent({ variant }: { variant: AdminSettingsVarian
 
       if (cancelled) return
 
-      try {
-        if (!dispatchRes.ok || !dispatchPayload?.success || !dispatchPayload?.data) {
-          throw new Error(
-            typeof dispatchPayload?.error === 'string'
-              ? dispatchPayload.error
-              : 'Failed to load dispatch settings',
-          )
-        }
-        if (!cancelled) {
-          setDispatch({
-            autoDispatchMajor: Boolean(dispatchPayload.data.autoDispatchMajor),
-            autoEscalateMinutes: String(
-              dispatchPayload.data.autoEscalateMinutes ?? INITIAL_DISPATCH.autoEscalateMinutes,
-            ),
-            defaultChannel: String(dispatchPayload.data.defaultChannel ?? INITIAL_DISPATCH.defaultChannel),
-            region: String(dispatchPayload.data.region ?? INITIAL_DISPATCH.region),
-            messageTemplate: String(
-              dispatchPayload.data.messageTemplate ?? INITIAL_DISPATCH.messageTemplate,
-            ),
-          })
-        }
-      } catch (error: unknown) {
-        if (!cancelled) {
-          toast({
-            title: 'Dispatch settings',
-            description: error instanceof Error ? error.message : 'Failed to load dispatch settings.',
-          })
+      if (variant !== 'responder') {
+        try {
+          if (!dispatchRes.ok || !dispatchPayload?.success || !dispatchPayload?.data) {
+            throw new Error(
+              typeof dispatchPayload?.error === 'string'
+                ? dispatchPayload.error
+                : 'Failed to load dispatch settings',
+            )
+          }
+          if (!cancelled) {
+            setDispatch({
+              autoDispatchMajor: Boolean(dispatchPayload.data.autoDispatchMajor),
+              autoEscalateMinutes: String(
+                dispatchPayload.data.autoEscalateMinutes ?? INITIAL_DISPATCH.autoEscalateMinutes,
+              ),
+              defaultChannel: String(dispatchPayload.data.defaultChannel ?? INITIAL_DISPATCH.defaultChannel),
+              region: String(dispatchPayload.data.region ?? INITIAL_DISPATCH.region),
+              messageTemplate: String(
+                dispatchPayload.data.messageTemplate ?? INITIAL_DISPATCH.messageTemplate,
+              ),
+            })
+          }
+        } catch (error: unknown) {
+          if (!cancelled) {
+            toast({
+              title: 'Dispatch settings',
+              description: error instanceof Error ? error.message : 'Failed to load dispatch settings.',
+            })
+          }
         }
       }
 

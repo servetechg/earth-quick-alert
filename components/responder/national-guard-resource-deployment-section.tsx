@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
-import { Loader2, Save, MapPin, Shield, Plus, Trash2, Edit, Users, Truck } from 'lucide-react'
+import { Loader2, Save, MapPin, Shield, Plus, Trash2, Edit, Users, Truck, Navigation } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -31,6 +31,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { useJsApiLoader, Autocomplete, GoogleMap, MarkerF } from '@react-google-maps/api'
+import { GOOGLE_MAPS_API_KEY, GOOGLE_MAPS_LIBRARIES, GOOGLE_MAPS_LOADER_ID } from '@/lib/constants/google-maps-config'
 import type {
   NationalGuardSite,
   NationalGuardResourceDeploymentPayload,
@@ -82,6 +84,72 @@ export function NationalGuardResourceDeploymentSection({ compact }: Props) {
   const [fNotes, setFNotes] = useState('')
   const [formError, setFormError] = useState('')
 
+  const [mapCenterMap, setMapCenterMap] = useState({ lat: 34.7465, lng: -92.2896 })
+  const [markerPosition, setMarkerPosition] = useState<{ lat: number, lng: number } | null>(null)
+  const [mapObj, setMapObj] = useState<google.maps.Map | null>(null)
+  const [autocompleteInfo, setAutocompleteInfo] = useState<any>(null)
+
+  const { isLoaded } = useJsApiLoader({
+    id: GOOGLE_MAPS_LOADER_ID,
+    googleMapsApiKey: GOOGLE_MAPS_API_KEY,
+    libraries: GOOGLE_MAPS_LIBRARIES,
+  })
+
+  const onPlaceLoaded = (autocomplete: any) => {
+    setAutocompleteInfo(autocomplete)
+  }
+
+  const onPlaceChanged = () => {
+    if (autocompleteInfo) {
+      const place = autocompleteInfo.getPlace()
+      if (!place.geometry || !place.geometry.location) return
+
+      const lat = place.geometry.location.lat()
+      const lng = place.geometry.location.lng()
+
+      const newPos = { lat, lng }
+      setMapCenterMap(newPos)
+      setMarkerPosition(newPos)
+      if (mapObj) mapObj.panTo(newPos)
+      setFLat(lat.toString())
+      setFLng(lng.toString())
+
+      if (!fAddress && place.formatted_address) {
+        setFAddress(place.formatted_address)
+      }
+    }
+  }
+
+  const handleLocateMe = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords
+          const newPos = { lat: latitude, lng: longitude }
+          setMapCenterMap(newPos)
+          setMarkerPosition(newPos)
+          if (mapObj) mapObj.panTo(newPos)
+          setFLat(latitude.toString())
+          setFLng(longitude.toString())
+
+          if (typeof google !== 'undefined') {
+            const geocoder = new google.maps.Geocoder()
+            geocoder.geocode({ location: newPos }, (results, status) => {
+              if (status === 'OK' && results?.[0]) {
+                 if (!fAddress) setFAddress(results[0].formatted_address)
+              }
+            })
+          }
+        },
+        () => {
+          toast.error('Unable to retrieve location. Please check browser permissions.')
+        }
+      )
+    } else {
+      toast.error('Geolocation is not supported by your browser.')
+    }
+  }
+
   const load = useCallback(async () => {
     setLoading(true)
     try {
@@ -131,8 +199,8 @@ export function NationalGuardResourceDeploymentSection({ compact }: Props) {
   const openCreateSite = () => {
     setFName('')
     setFAddress('')
-    setFLat('40.758')
-    setFLng('-111.888')
+    setFLat('34.7465')
+    setFLng('-92.2896')
     setFPersonnel('0')
     setFVehicles('0')
     setFStatus('active')
@@ -140,6 +208,8 @@ export function NationalGuardResourceDeploymentSection({ compact }: Props) {
     setFormError('')
     setSiteDialogMode('create')
     setSiteEditIndex(null)
+    setMapCenterMap({ lat: 34.7465, lng: -92.2896 })
+    setMarkerPosition(null)
     setSiteDialogOpen(true)
   }
 
@@ -157,6 +227,9 @@ export function NationalGuardResourceDeploymentSection({ compact }: Props) {
     setFormError('')
     setSiteDialogMode('edit')
     setSiteEditIndex(index)
+    const pos = { lat: s.lat, lng: s.lng }
+    setMapCenterMap(pos)
+    setMarkerPosition(pos)
     setSiteDialogOpen(true)
   }
 
@@ -300,7 +373,7 @@ export function NationalGuardResourceDeploymentSection({ compact }: Props) {
           <div>
             <CardTitle>{stripDemoSuffix(data.networkName)}</CardTitle>
             <CardDescription>
-              Source: <span className="font-semibold uppercase">{data.source}</span> · Last update{' '}
+              Last update{' '}
               {new Date(data.updatedAt).toLocaleString()}
             </CardDescription>
           </div>
@@ -340,10 +413,6 @@ export function NationalGuardResourceDeploymentSection({ compact }: Props) {
               </div>
             </div>
           )}
-
-          <p className="text-sm text-slate-600">
-            Each row is a staging area or forward operating base with <strong>personnel</strong> and <strong>vehicles/equipment</strong> deployed at that location.
-          </p>
 
           {/* Deployment table */}
           <div className="space-y-3">
@@ -397,9 +466,6 @@ export function NationalGuardResourceDeploymentSection({ compact }: Props) {
                         <td className="px-4 py-4 align-top">
                           <div className="font-semibold text-slate-900">{r.name}</div>
                           <div className="text-xs text-slate-500">{r.address}</div>
-                          <div className="mt-1 font-mono text-[11px] text-slate-600">
-                            {r.lat.toFixed(4)}, {r.lng.toFixed(4)}
-                          </div>
                         </td>
                         <td className="px-4 py-4 tabular-nums font-semibold text-green-700">{r.personnelDeployed}</td>
                         <td className="px-4 py-4 tabular-nums font-semibold text-blue-700">{r.vehiclesDeployed}</td>
@@ -445,7 +511,15 @@ export function NationalGuardResourceDeploymentSection({ compact }: Props) {
 
       {/* Create / Edit dialog */}
       <Dialog open={siteDialogOpen} onOpenChange={(o) => !o && setSiteDialogOpen(false)}>
-        <DialogContent className="border-slate-200 bg-white text-slate-900 sm:max-w-lg">
+        <DialogContent 
+          className="border-slate-200 bg-white text-slate-900 sm:max-w-xl max-h-[90vh] overflow-y-auto"
+          onInteractOutside={(e) => {
+            const target = e.target as HTMLElement;
+            if (target.closest('.pac-container')) {
+              e.preventDefault();
+            }
+          }}
+        >
           <DialogHeader>
             <DialogTitle className="font-black text-lg tracking-tight text-slate-900">
               {siteDialogMode === 'create' ? 'Add staging area' : 'Edit staging area'}
@@ -454,37 +528,63 @@ export function NationalGuardResourceDeploymentSection({ compact }: Props) {
               Set personnel and vehicles deployed at this location; coordinates drive GIS markers.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-3 py-1">
+          <div className="grid gap-4 py-2">
             <div className="space-y-1.5">
               <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Name</label>
               <Input value={fName} onChange={(e) => setFName(e.target.value)} className="rounded-lg" />
             </div>
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Address</label>
-              <Input value={fAddress} onChange={(e) => setFAddress(e.target.value)} className="rounded-lg" />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Latitude</label>
-                <Input
-                  value={fLat}
-                  onChange={(e) => { setFLat(e.target.value); setFormError('') }}
-                  placeholder="e.g. 40.758"
-                  className={`rounded-lg font-mono text-sm ${formError && !Number.isFinite(Number(fLat)) ? 'border-rose-400 ring-1 ring-rose-300' : ''}`}
-                />
+            {isLoaded && (
+              <div className="space-y-4 mb-2 pb-6 border-b border-slate-100">
+                <div className="flex items-center justify-between px-1">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                    <MapPin size={12} /> Location
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleLocateMe}
+                    className="text-[10px] font-black text-white flex items-center gap-2 bg-[#33375D] hover:bg-[#44496B] px-3 py-1.5 rounded-lg transition-all shadow-sm active:scale-95"
+                  >
+                    <Navigation size={10} /> Find My Location
+                  </button>
+                </div>
+                <Autocomplete onLoad={onPlaceLoaded} onPlaceChanged={onPlaceChanged}>
+                  <input
+                    type="text"
+                    placeholder="Search for an address..."
+                    className="w-full px-4 py-3 bg-white border border-slate-200 shadow-sm rounded-lg focus:outline-none focus:ring-2 focus:ring-[#33375D]/10 focus:border-[#33375D] transition-all text-sm placeholder:text-slate-400"
+                  />
+                </Autocomplete>
+
+                {/* Interactive Map */}
+                <div className="w-full h-48 rounded-xl overflow-hidden border border-slate-200 shadow-inner relative group">
+                  <GoogleMap
+                    mapContainerStyle={{ width: '100%', height: '100%' }}
+                    center={mapCenterMap}
+                    zoom={12}
+                    onLoad={(m) => setMapObj(m)}
+                    onClick={(e) => {
+                      if (e.latLng) {
+                        const lat = e.latLng.lat()
+                        const lng = e.latLng.lng()
+                        setMapCenterMap({ lat, lng })
+                        setMarkerPosition({ lat, lng })
+                        setFLat(lat.toString())
+                        setFLng(lng.toString())
+                      }
+                    }}
+                    options={{
+                      disableDefaultUI: true,
+                      zoomControl: true,
+                      styles: [
+                        { "featureType": "all", "elementType": "labels.text.fill", "stylers": [{ "color": "#33375D" }] },
+                        { "featureType": "water", "elementType": "geometry", "stylers": [{ "color": "#E2E8F0" }] }
+                      ]
+                    }}
+                  >
+                    {markerPosition && <MarkerF position={markerPosition} />}
+                  </GoogleMap>
+                </div>
               </div>
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Longitude</label>
-                <Input
-                  value={fLng}
-                  onChange={(e) => { setFLng(e.target.value); setFormError('') }}
-                  placeholder="e.g. -111.888"
-                  className={`rounded-lg font-mono text-sm ${formError && !Number.isFinite(Number(fLng)) ? 'border-rose-400 ring-1 ring-rose-300' : ''}`}
-                />
-              </div>
-            </div>
-            {formError && (
-              <p className="text-xs font-bold text-rose-600 -mt-1">{formError}</p>
             )}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">

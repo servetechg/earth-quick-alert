@@ -18,7 +18,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { Shield, Users, Truck, MapPin, Plus, Edit, Trash2, Loader2 } from 'lucide-react'
+import { Shield, Users, Truck, MapPin, Plus, Edit, Trash2, Loader2, Navigation } from 'lucide-react'
+import { useJsApiLoader, Autocomplete, GoogleMap, MarkerF } from '@react-google-maps/api'
+import { GOOGLE_MAPS_API_KEY, GOOGLE_MAPS_LIBRARIES, GOOGLE_MAPS_LOADER_ID } from '@/lib/constants/google-maps-config'
 import type { FederalResourceDeploymentPayload, FederalStagingArea, FederalSiteStatus } from '@/lib/services/responder/types'
 import { RESPONDER_PANEL_CARD, RESPONDER_STAT_CARD } from '@/components/responder/responder-panel-styles'
 
@@ -40,6 +42,64 @@ export function FederalResourceDeploymentSection({ compact }: { compact?: boolea
   const [formVehicles, setFormVehicles] = useState(0)
   const [formStatus, setFormStatus] = useState<FederalSiteStatus>('standby')
   const [formNotes, setFormNotes] = useState('')
+
+  const [mapCenterMap, setMapCenterMap] = useState({ lat: 38.9072, lng: -77.0369 })
+  const [markerPosition, setMarkerPosition] = useState<{ lat: number, lng: number } | null>(null)
+  const [mapObj, setMapObj] = useState<google.maps.Map | null>(null)
+  const [autocompleteInfo, setAutocompleteInfo] = useState<any>(null)
+
+  const { isLoaded } = useJsApiLoader({
+    id: GOOGLE_MAPS_LOADER_ID,
+    googleMapsApiKey: GOOGLE_MAPS_API_KEY,
+    libraries: GOOGLE_MAPS_LIBRARIES,
+  })
+
+  const onPlaceLoaded = (autocomplete: any) => setAutocompleteInfo(autocomplete)
+
+  const onPlaceChanged = () => {
+    if (autocompleteInfo) {
+      const place = autocompleteInfo.getPlace()
+      if (!place.geometry || !place.geometry.location) return
+
+      const lat = place.geometry.location.lat()
+      const lng = place.geometry.location.lng()
+
+      const newPos = { lat, lng }
+      setMapCenterMap(newPos)
+      setMarkerPosition(newPos)
+      if (mapObj) mapObj.panTo(newPos)
+
+      if (place.formatted_address) {
+        setFormLocation(place.formatted_address)
+      } else if (place.name) {
+        setFormLocation(place.name)
+      }
+    }
+  }
+
+  const handleLocateMe = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords
+          const newPos = { lat: latitude, lng: longitude }
+          setMapCenterMap(newPos)
+          setMarkerPosition(newPos)
+          if (mapObj) mapObj.panTo(newPos)
+
+          if (typeof google !== 'undefined') {
+            const geocoder = new google.maps.Geocoder()
+            geocoder.geocode({ location: newPos }, (results, status) => {
+              if (status === 'OK' && results?.[0]) {
+                 if (!formLocation) setFormLocation(results[0].formatted_address)
+              }
+            })
+          }
+        },
+        () => {}
+      )
+    }
+  }
 
   const loadData = async () => {
     try {
@@ -82,6 +142,7 @@ export function FederalResourceDeploymentSection({ compact }: { compact?: boolea
       setFormVehicles(area.vehicleCount)
       setFormStatus(area.status)
       setFormNotes(area.notes || '')
+      setMarkerPosition(null)
     } else {
       setEditingArea(null)
       setFormLocation('')
@@ -89,6 +150,8 @@ export function FederalResourceDeploymentSection({ compact }: { compact?: boolea
       setFormVehicles(0)
       setFormStatus('standby')
       setFormNotes('')
+      setMapCenterMap({ lat: 38.9072, lng: -77.0369 })
+      setMarkerPosition(null)
     }
     setIsDialogOpen(true)
   }
@@ -201,9 +264,9 @@ export function FederalResourceDeploymentSection({ compact }: { compact?: boolea
       <Card className={RESPONDER_PANEL_CARD}>
         <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between px-0">
           <div>
-            <CardTitle>{data.jurisdictionName} Staging Management</CardTitle>
+          <CardTitle>{data.jurisdictionName} Staging Management</CardTitle>
             <CardDescription>
-              Source: {data.source.toUpperCase()} · Last update {new Date(data.updatedAt).toLocaleString()}
+              Last update {new Date(data.updatedAt).toLocaleString()}
             </CardDescription>
           </div>
         </CardHeader>
@@ -301,14 +364,61 @@ export function FederalResourceDeploymentSection({ compact }: { compact?: boolea
       </Card>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent 
+          className="sm:max-w-[425px]"
+          onInteractOutside={(e) => {
+            const target = e.target as HTMLElement;
+            if (target.closest('.pac-container')) {
+              e.preventDefault();
+            }
+          }}
+        >
           <DialogHeader>
             <DialogTitle>{editingArea ? 'Edit Staging Area' : 'Add New Staging Area'}</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <Label>Location / Name</Label>
-              <Input value={formLocation} onChange={(e) => setFormLocation(e.target.value)} placeholder="e.g., Fairgrounds" />
+              <div className="flex items-center justify-between">
+                <Label>Location / Name</Label>
+                {isLoaded && (
+                  <button
+                    type="button"
+                    onClick={handleLocateMe}
+                    className="text-[10px] font-black text-white flex items-center gap-2 bg-[#33375D] hover:bg-[#44496B] px-3 py-1 rounded-lg transition-all shadow-sm active:scale-95"
+                  >
+                    <Navigation size={10} /> Find My Location
+                  </button>
+                )}
+              </div>
+              
+              {isLoaded ? (
+                <div className="space-y-3">
+                  <Autocomplete onLoad={onPlaceLoaded} onPlaceChanged={onPlaceChanged}>
+                    <Input value={formLocation} onChange={(e) => setFormLocation(e.target.value)} placeholder="Search for an address or place..." />
+                  </Autocomplete>
+                  <div className="w-full h-40 rounded-xl overflow-hidden border border-slate-200 shadow-inner relative">
+                    <GoogleMap
+                      mapContainerStyle={{ width: '100%', height: '100%' }}
+                      center={mapCenterMap}
+                      zoom={12}
+                      onLoad={(m) => setMapObj(m)}
+                      onClick={(e) => {
+                        if (e.latLng) {
+                          const lat = e.latLng.lat()
+                          const lng = e.latLng.lng()
+                          setMapCenterMap({ lat, lng })
+                          setMarkerPosition({ lat, lng })
+                        }
+                      }}
+                      options={{ disableDefaultUI: true, zoomControl: true }}
+                    >
+                      {markerPosition && <MarkerF position={markerPosition} />}
+                    </GoogleMap>
+                  </div>
+                </div>
+              ) : (
+                <Input value={formLocation} onChange={(e) => setFormLocation(e.target.value)} placeholder="e.g., Fairgrounds" />
+              )}
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
