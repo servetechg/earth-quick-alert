@@ -66,6 +66,7 @@ export type ResponderDashboardKind =
     | 'water'
     | 'food-logistics'
     | 'national-guard'
+    | 'nonprofit'
     | 'public-official'
     | 'federal'
     | 'general';
@@ -83,6 +84,7 @@ export function getResponderDashboardKind(vertical: string): ResponderDashboardK
     if (v === 'utility-electric') return 'electric';
     if (v === 'utility-water') return 'water';
     if (v === 'food-logistics') return 'food-logistics';
+    if (v === 'nonprofit') return 'nonprofit';
     if (v === 'utility-energy') return 'energy';
     if (v === 'public-official') return 'public-official';
     return 'general';

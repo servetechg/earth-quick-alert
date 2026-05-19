@@ -14,6 +14,7 @@ import { ElectricResourceDeploymentSection } from '@/components/responder/electr
 import { WaterResourceDeploymentSection } from '@/components/responder/water-resource-deployment-section'
 import { FoodLogisticsResourceDeploymentSection } from '@/components/responder/food-logistics-resource-deployment-section'
 import { NationalGuardResourceDeploymentSection } from '@/components/responder/national-guard-resource-deployment-section'
+import { NonprofitResourceDeploymentSection } from '@/components/responder/nonprofit-resource-deployment-section'
 import { GeneralResponderSection } from '@/components/responder/general-responder-section'
 import { PublicOfficialDashboardSection } from '@/components/responder/public-official-dashboard-section'
 import { FederalResourceDeploymentSection } from '@/components/responder/federal-resource-deployment-section'
@@ -74,6 +75,8 @@ function descriptionForKind(bundle: Bundle, vLabel: string): string {
       return `${vLabel}${fn}. Volunteers and distribution network.`
     case 'national-guard':
       return `${vLabel}${fn}. Personnel, vehicles, and staging areas.`
+    case 'nonprofit':
+      return `${vLabel}${fn}. Disaster response network, volunteers, and shelters.`
     case 'public-official':
       return `${vLabel}${fn}. Read-only executive view of emergency declarations and EOC status.`
     case 'federal':
@@ -148,6 +151,7 @@ export default function ResponderDashboardPage() {
       {bundle?.kind === 'water' && <WaterResourceDeploymentSection compact />}
       {bundle?.kind === 'food-logistics' && <FoodLogisticsResourceDeploymentSection compact />}
       {bundle?.kind === 'national-guard' && <NationalGuardResourceDeploymentSection compact />}
+      {bundle?.kind === 'nonprofit' && <NonprofitResourceDeploymentSection compact />}
       {bundle?.kind === 'federal' && <FederalResourceDeploymentSection compact />}
       {bundle?.kind === 'public-official' && <PublicOfficialDashboardSection />}
       {bundle?.kind === 'general' && bundle.general && <GeneralResponderSection general={bundle.general} />}

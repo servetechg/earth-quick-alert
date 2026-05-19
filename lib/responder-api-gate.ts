@@ -19,6 +19,7 @@ export async function gateResponder(
         | 'water'
         | 'food-logistics'
         | 'national-guard'
+        | 'nonprofit'
         | 'public-official'
         | 'federal'
         | 'general',

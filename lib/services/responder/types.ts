@@ -317,3 +317,31 @@ export interface NationalGuardResourceDeploymentPayload {
     sites: NationalGuardSite[];
     coordinatorNotes?: string;
 }
+
+/** Nonprofit / VOAD — disaster response network, volunteers, and shelters. */
+export type NonprofitSiteStatus = 'active' | 'limited' | 'suspended';
+export type NonprofitSiteKind = 'network' | 'shelter' | 'volunteer';
+
+export interface NonprofitSite {
+    id: string;
+    name: string;
+    address: string;
+    lat: number;
+    lng: number;
+    siteKind: NonprofitSiteKind;
+    /** Volunteers assigned at this location (network / volunteer hubs). */
+    volunteersDeployed: number;
+    /** Shelter beds or units available at shelter locations. */
+    shelterCapacity: number;
+    status: NonprofitSiteStatus;
+    notes?: string;
+}
+
+export interface NonprofitResourceDeploymentPayload {
+    networkId: string;
+    networkName: string;
+    updatedAt: string;
+    source: DataSourceBadge;
+    sites: NonprofitSite[];
+    coordinatorNotes?: string;
+}
