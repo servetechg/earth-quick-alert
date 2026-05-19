@@ -1,5 +1,6 @@
 import mongoose, { type Model } from 'mongoose';
 import connectDB from '@/lib/mongodb';
+import { stripDemoSuffix } from '@/lib/utils/strip-demo-suffix';
 import type { DataSourceBadge } from './types';
 
 export type SiteNetworkPayloadBase = {
@@ -34,7 +35,7 @@ export function createSiteNetworkResourceDb<TPayload extends SiteNetworkPayloadB
     function docToPayload(doc: SiteNetworkDoc): TPayload {
         return {
             networkId: doc.networkId || newNetworkId(),
-            networkName: doc.networkName || '',
+            networkName: stripDemoSuffix(doc.networkName || ''),
             updatedAt: (doc.updatedAt || new Date()).toISOString(),
             source: doc.source === 'mock' ? 'mock' : 'api',
             sites: Array.isArray(doc.sites) ? config.normalizeSites(doc.sites as unknown[]) : [],
@@ -52,7 +53,7 @@ export function createSiteNetworkResourceDb<TPayload extends SiteNetworkPayloadB
         let doc = await config.Model.findOne({ ownerUserId: oid }).lean();
 
         if (!doc) {
-            const label = defaultNetworkName?.trim() || config.defaultNetworkName;
+            const label = stripDemoSuffix(defaultNetworkName?.trim() || config.defaultNetworkName);
             const created = await config.Model.create({
                 ownerUserId: oid,
                 licenseId:
@@ -93,8 +94,9 @@ export function createSiteNetworkResourceDb<TPayload extends SiteNetworkPayloadB
         const merged = {
             ...cur,
             networkId,
-            networkName:
+            networkName: stripDemoSuffix(
                 typeof body.networkName === 'string' ? body.networkName.slice(0, 200) : cur.networkName,
+            ),
             sites,
             coordinatorNotes:
                 typeof body.coordinatorNotes === 'string'

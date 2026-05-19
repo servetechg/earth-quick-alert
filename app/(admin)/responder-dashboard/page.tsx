@@ -19,6 +19,7 @@ import { PublicOfficialDashboardSection } from '@/components/responder/public-of
 import { FederalResourceDeploymentSection } from '@/components/responder/federal-resource-deployment-section'
 import { ResponderInfoBar } from '@/components/responder/responder-info-bar'
 import { RESPONDER_VERTICAL_LABELS, type ResponderVertical, type ResponderDashboardKind } from '@/lib/responder-verticals'
+import { stripDemoSuffix } from '@/lib/utils/strip-demo-suffix'
 import type {
   GeneralResponderSummary,
   PharmacyResourceDeploymentPayload,
@@ -50,7 +51,8 @@ type Bundle = {
 }
 
 function descriptionForKind(bundle: Bundle, vLabel: string): string {
-  const fn = bundle.responderFunction ? ` · ${bundle.responderFunction}` : ''
+  const role = stripDemoSuffix(bundle.responderFunction || '')
+  const fn = role ? ` · ${role}` : ''
   switch (bundle.kind) {
     case 'hospital':
       return `${vLabel}${fn}`

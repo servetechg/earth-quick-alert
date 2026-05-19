@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import connectDB from '@/lib/mongodb';
 import ResponderPharmacyDeployment from '@/models/ResponderPharmacyDeployment';
+import { stripDemoSuffix } from '@/lib/utils/strip-demo-suffix';
 import type {
     PharmacyPopUpSite,
     PharmacyResourceDeploymentPayload,
@@ -38,7 +39,7 @@ function docToPayload(doc: {
 }): PharmacyResourceDeploymentPayload {
     return {
         networkId: doc.networkId || newNetworkId(),
-        networkName: doc.networkName || '',
+        networkName: stripDemoSuffix(doc.networkName || ''),
         updatedAt: (doc.updatedAt || new Date()).toISOString(),
         source: doc.source === 'mock' ? 'mock' : 'api',
         sites: Array.isArray(doc.sites) ? normalizeSites(doc.sites as unknown[]) : [],
@@ -56,7 +57,7 @@ export async function getPharmacyResourceDeploymentForUser(
     let doc = await ResponderPharmacyDeployment.findOne({ ownerUserId: oid }).lean();
 
     if (!doc) {
-        const label = defaultNetworkName?.trim() || 'Pharmacy resource network';
+        const label = stripDemoSuffix(defaultNetworkName?.trim() || 'Pharmacy resource network');
         const created = await ResponderPharmacyDeployment.create({
             ownerUserId: oid,
             licenseId: licenseId && mongoose.Types.ObjectId.isValid(licenseId)
@@ -101,8 +102,9 @@ export async function mergePharmacyResourceDeploymentForUser(
     const merged: PharmacyResourceDeploymentPayload = {
         ...cur,
         networkId,
-        networkName:
+        networkName: stripDemoSuffix(
             typeof body.networkName === 'string' ? body.networkName.slice(0, 200) : cur.networkName,
+        ),
         sites,
         coordinatorNotes:
             typeof body.coordinatorNotes === 'string'
