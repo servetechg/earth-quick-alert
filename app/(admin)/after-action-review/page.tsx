@@ -337,7 +337,7 @@ export default function AfterActionReviewPage() {
                     </div>
 
                     <Card className="bg-white border border-slate-200 rounded-2xl p-8 lg:p-10 shadow-sm relative overflow-hidden">
-                        <div className="absolute left-[42px] lg:left-[50px] top-10 bottom-10 w-px bg-gradient-to-b from-[#33375D]/30 via-slate-200 to-transparent" />
+                        <div className="absolute left-[42px] lg:left-[46.5px] top-10 bottom-10 w-px bg-gradient-to-b from-[#33375D]/30 via-slate-200 to-transparent" />
 
                         <div className="space-y-10">
                             {displayData.events.map((event: any, i: number) => (
@@ -345,12 +345,12 @@ export default function AfterActionReviewPage() {
                                     {/* Connector Dot */}
                                     <div
                                         className={cn(
-                                            'absolute left-0 top-1.5 w-3 h-3 rounded-full ring-4 ring-white z-10 transition-transform group-hover:scale-150',
+                                            'absolute left-0 top-1.5 w-3 h-3 rounded-full ring-4 ring-white z-10 transition-transform scale-150',
                                             event.color === 'red'
                                                 ? 'bg-red-500 shadow-[0_0_0_4px_rgba(239,68,68,0.15)]'
                                                 : event.color === 'blue'
-                                                  ? 'bg-blue-500 shadow-[0_0_0_4px_rgba(59,130,246,0.15)]'
-                                                  : 'bg-emerald-500 shadow-[0_0_0_4px_rgba(16,185,129,0.15)]',
+                                                    ? 'bg-blue-500 shadow-[0_0_0_4px_rgba(59,130,246,0.15)]'
+                                                    : 'bg-emerald-500 shadow-[0_0_0_4px_rgba(16,185,129,0.15)]',
                                         )}
                                     />
 
@@ -366,8 +366,8 @@ export default function AfterActionReviewPage() {
                                                         event.color === 'red'
                                                             ? 'bg-red-50 text-red-600 border-red-100'
                                                             : event.color === 'blue'
-                                                              ? 'bg-blue-50 text-blue-600 border-blue-100'
-                                                              : 'bg-emerald-50 text-emerald-600 border-emerald-100',
+                                                                ? 'bg-blue-50 text-blue-600 border-blue-100'
+                                                                : 'bg-emerald-50 text-emerald-600 border-emerald-100',
                                                     )}
                                                 >
                                                     {event.type}

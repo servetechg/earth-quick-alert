@@ -27,7 +27,7 @@ export async function GET(req: Request) {
 
         if (!response.ok) {
             return NextResponse.json(
-                { error: `Geocoding service returned ${response.status}` }, 
+                { error: `Geocoding service returned ${response.status}` },
                 { status: response.status === 404 ? 404 : 502 }
             );
         }

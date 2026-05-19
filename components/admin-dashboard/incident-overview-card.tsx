@@ -19,8 +19,7 @@ export interface IncidentOverviewCardProps {
 const PLACEHOLDER_DATA: Required<Omit<IncidentOverviewCardProps, 'className'>> = {
   title: 'Incident Overview',
   eventType: 'Live situational picture',
-  description:
-    'This card reflects the same live feed fusion as AI Risk Assessment. Open AI Risk Assessment to run a full analysis and export the PDF.',
+  description: 'Live situational data synchronized with AI Risk Assessment.',
   date: '—',
   status: 'Monitoring',
 }

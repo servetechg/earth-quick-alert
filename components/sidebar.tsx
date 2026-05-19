@@ -51,7 +51,7 @@ export const bottomItems = [
   { icon: LogOut, label: 'Log out', href: '#' },
 ]
 
-export function Sidebar() {
+export function Sidebar({ className }: { className?: string }) {
   const router = useRouter()
   const pathname = usePathname()
   const [showHelpModal, setShowHelpModal] = useState(false)
@@ -63,7 +63,7 @@ export function Sidebar() {
     setRoleReady(true)
   }, [])
 
-  const isResponderRole = userRole === 'responder'
+  const isResponderRole = userRole === 'responder' || userRole === 'public_official'
   const isOperationalAdmin =
     userRole === 'admin' ||
     userRole === 'sub-admin' ||
@@ -73,7 +73,7 @@ export function Sidebar() {
   if (!roleReady) {
     return (
       <div
-        className="hidden md:flex min-h-0 w-70 shrink-0 flex-col bg-[#33375D] text-white h-full border-r border-slate-700/50"
+        className={cn("hidden md:flex min-h-0 w-70 shrink-0 flex-col bg-[#33375D] text-white h-full border-r border-slate-700/50", className)}
         aria-hidden
       >
         <div className="p-8 flex flex-col items-center shrink-0 animate-pulse">
@@ -90,7 +90,7 @@ export function Sidebar() {
   }
 
   if (isResponderRole) {
-    return <ResponderSidebar />
+    return <ResponderSidebar className={className} />
   }
 
   const isSuperAdminRole = userRole === 'super-admin'
@@ -144,7 +144,7 @@ export function Sidebar() {
       : bottomItems
 
   return (
-    <div className="hidden md:flex min-h-0 w-70 shrink-0 flex-col bg-[#33375D] text-white h-full border-r border-slate-700/50">
+    <div className={cn("hidden md:flex min-h-0 w-70 shrink-0 flex-col bg-[#33375D] text-white h-full border-r border-slate-700/50", className)}>
       {/* Logo Section */}
       <Link href="/" className="p-8 flex flex-col items-center shrink-0 hover:bg-white/5 transition-colors">
         <Image
