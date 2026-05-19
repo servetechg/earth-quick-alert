@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
-import { Loader2, Save, BedDouble, Users, CircleCheck, Stethoscope, Trash2, Edit, Download } from 'lucide-react'
+import { Loader2, Save, BedDouble, Users, CircleCheck, Stethoscope, Trash2, Edit, Download, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -85,7 +85,7 @@ export function HospitalCapacitySection({ compact }: Props) {
         throw new Error((err as { error?: string }).error || 'Save failed')
       }
       setData(await res.json())
-      toast.success('Bed grid updated (mock persistence)')
+      toast.success('Bed grid updated.')
       return true
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : 'Save failed'
@@ -126,11 +126,21 @@ export function HospitalCapacitySection({ compact }: Props) {
       toast.error('Occupied cannot exceed capacity.')
       return
     }
-    const units = data.units.map((u, i) =>
-      i === editIndex
-        ? { ...u, name: name.slice(0, 120), capacity, occupied }
-        : u,
-    )
+    let units = [...data.units]
+    if (editIndex === -1) {
+      units.push({
+        id: `u-${Date.now()}`,
+        name: name.slice(0, 120),
+        capacity,
+        occupied
+      })
+    } else {
+      units = units.map((u, i) =>
+        i === editIndex
+          ? { ...u, name: name.slice(0, 120), capacity, occupied }
+          : u,
+      )
+    }
     const ok = await persistUnits(units)
     if (ok) closeEdit()
   }
@@ -142,29 +152,17 @@ export function HospitalCapacitySection({ compact }: Props) {
     if (ok) setDeleteIndex(null)
   }
 
-  const downloadUnitRow = (u: HospitalUnitRow) => {
-    if (!data) return
-    const payload = {
-      facilityName: data.facilityName,
-      facilityId: data.facilityId,
-      unit: u,
-      available: Math.max(0, u.capacity - u.occupied),
-      exportedAt: new Date().toISOString(),
-    }
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `hospital-bed-${u.id}.json`
-    a.click()
-    URL.revokeObjectURL(url)
-    toast.message('Download started', { description: `Saved as hospital-bed-${u.id}.json` })
+  const openAdd = () => {
+    setEditIndex(-1)
+    setEditName('')
+    setEditCapacity('0')
+    setEditOccupied('0')
+    setEditOpen(true)
   }
 
-  const editAvailable =
-    editIndex !== null && data?.units[editIndex]
-      ? Math.max(0, (Number(editCapacity) || 0) - (Number(editOccupied) || 0))
-      : 0
+
+
+  const editAvailable = Math.max(0, (Number(editCapacity) || 0) - (Number(editOccupied) || 0))
 
   if (loading) {
     return (
@@ -252,16 +250,21 @@ export function HospitalCapacitySection({ compact }: Props) {
           <div>
             <CardTitle>{data.facilityName}</CardTitle>
             <CardDescription>
-              Source: <span className="font-semibold uppercase">{data.source}</span> · Last update{' '}
-              {new Date(data.updatedAt).toLocaleString()}
+              Last update {new Date(data.updatedAt).toLocaleString()}
             </CardDescription>
           </div>
-          {!compact && (
-            <Button type="button" className="gap-2 rounded-xl bg-[#33375D]" onClick={() => void save()} disabled={saving}>
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-              Save changes
+          <div className="flex items-center gap-2">
+            <Button type="button" variant="outline" className="gap-2 rounded-xl" onClick={openAdd} disabled={saving}>
+              <Plus className="h-4 w-4" />
+              Add unit
             </Button>
-          )}
+            {!compact && (
+              <Button type="button" className="gap-2 rounded-xl bg-[#33375D]" onClick={() => void save()} disabled={saving}>
+                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                Save changes
+              </Button>
+            )}
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           {!compact && (
@@ -320,15 +323,6 @@ export function HospitalCapacitySection({ compact }: Props) {
                         <div className="flex justify-end gap-2">
                           <Button
                             type="button"
-                            title="Download / view row"
-                            size="icon"
-                            onClick={() => downloadUnitRow(u)}
-                            className="h-9 w-9 bg-[#33375D]/10 text-[#33375D] hover:bg-[#33375D] hover:text-white rounded-lg transition-colors"
-                          >
-                            <Download size={15} />
-                          </Button>
-                          <Button
-                            type="button"
                             title="Edit unit"
                             size="icon"
                             onClick={() => openEdit(i)}
@@ -362,8 +356,8 @@ export function HospitalCapacitySection({ compact }: Props) {
         <DialogContent className="border-slate-200 bg-white text-slate-900 sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="tracking-tight font-black text-lg text-slate-900">
-              Edit bed unit
-              {editIndex !== null && data.units[editIndex] ? ` — ${data.units[editIndex].name}` : ''}
+              {editIndex === -1 ? 'Add bed unit' : 'Edit bed unit'}
+              {editIndex !== null && editIndex !== -1 && data.units[editIndex] ? ` — ${data.units[editIndex].name}` : ''}
             </DialogTitle>
             <DialogDescription className="text-slate-500 text-xs">
               Update capacity and census for this unit. Changes save to the responder hospital store immediately.
@@ -432,7 +426,7 @@ export function HospitalCapacitySection({ compact }: Props) {
             <AlertDialogTitle className="font-black tracking-tight text-slate-900">Remove bed unit?</AlertDialogTitle>
             <AlertDialogDescription className="text-slate-500 text-sm leading-relaxed">
               This removes <strong className="text-slate-900">{deleteTarget?.name ?? 'this unit'}</strong> from the
-              bed grid. You can restore counts later only by re-adding data in the mock store (or contact an admin).
+              bed grid. You can update counts anytime from this screen.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

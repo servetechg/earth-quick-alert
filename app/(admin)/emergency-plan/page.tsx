@@ -590,6 +590,9 @@ export default function EmergencyPlanPage() {
                                     Resource Identifier
                                 </th>
                                 <th className="px-6 py-4 text-left text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                                    Category
+                                </th>
+                                <th className="px-6 py-4 text-left text-[10px] font-black text-slate-500 uppercase tracking-widest">
                                     File Type
                                 </th>
                                 <th className="px-6 py-4 text-left text-[10px] font-black text-slate-500 uppercase tracking-widest">
@@ -606,7 +609,7 @@ export default function EmergencyPlanPage() {
                         <tbody className="divide-y divide-slate-100">
                             {visibleRows.length === 0 ? (
                                 <tr>
-                                    <td colSpan={5} className="px-6 py-16 text-center text-sm font-medium text-slate-500">
+                                    <td colSpan={6} className="px-6 py-16 text-center text-sm font-medium text-slate-500">
                                         No continuity protocols indexed for this lens.
                                         {planIdsSorted.length === 0
                                             ? ' Click “Add Plans” to upload files — the AI will create plans for them.'
@@ -624,6 +627,11 @@ export default function EmergencyPlanPage() {
                                     }
                                     const attachmentId =
                                         typeof doc._id === 'string' ? doc._id : String((doc as { _id?: unknown })._id ?? '')
+                                    
+                                    const plan = plans[doc.planId]
+                                    const categoryKey = resolveCategory(plan, doc.planId)
+                                    const categoryMeta = DOCUMENT_CATEGORY_META.find(c => c.key === categoryKey)
+
                                     return (
                                         <tr key={`${doc.planId}-${attachmentId}`} className="group hover:bg-blue-50/30 transition-colors">
                                             <td className="px-6 py-5">
@@ -640,6 +648,14 @@ export default function EmergencyPlanPage() {
                                                         </p>
                                                     </div>
                                                 </div>
+                                            </td>
+                                            <td className="px-6 py-5">
+                                                <span className={cn(
+                                                    "h-7 px-3 rounded-md border inline-flex items-center w-fit text-[10px] font-black uppercase tracking-widest border-transparent",
+                                                    categoryMeta?.color, categoryMeta?.bg
+                                                )}>
+                                                    {categoryMeta?.name || 'Unknown'}
+                                                </span>
                                             </td>
                                             <td className="px-6 py-5">
                                                 <span className="h-7 px-3 rounded-md bg-slate-100 border border-slate-200 inline-flex items-center w-fit text-[10px] font-black text-slate-600 uppercase tracking-widest">

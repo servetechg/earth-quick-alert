@@ -122,7 +122,7 @@ export function PoliceDeploymentSection({ compact }: Props) {
         throw new Error((err as { error?: string }).error || 'Save failed')
       }
       setData(await res.json())
-      toast.success('Deployment updated (mock persistence)')
+      toast.success('Deployment updated.')
       return true
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : 'Save failed'
@@ -340,8 +340,7 @@ export function PoliceDeploymentSection({ compact }: Props) {
           <div>
             <CardTitle>{data.agencyName}</CardTitle>
             <CardDescription>
-              Source: <span className="font-semibold uppercase">{data.source}</span> · Last update{' '}
-              {new Date(data.updatedAt).toLocaleString()}
+              Last update {new Date(data.updatedAt).toLocaleString()}
             </CardDescription>
           </div>
           {!compact && (
@@ -350,16 +349,7 @@ export function PoliceDeploymentSection({ compact }: Props) {
               Save changes
             </Button>
           )}
-          {compact && (
-            <Button
-              type="button"
-              variant="outline"
-              className="gap-2 rounded-sm border-slate-200 font-bold text-slate-800"
-              onClick={openAgencyDialog}
-            >
-              Edit Agency & Fleet Totals
-            </Button>
-          )}
+          {/* Edit Agency button removed per request */}
         </CardHeader>
         <CardContent className="space-y-8 px-0">
           {!compact && (
@@ -562,7 +552,7 @@ export function PoliceDeploymentSection({ compact }: Props) {
           <DialogHeader>
             <DialogTitle className="tracking-tight font-black text-lg text-slate-900">Agency &amp; fleet totals</DialogTitle>
             <DialogDescription className="text-slate-500 text-xs">
-              Update agency name, fleet-wide counts, and commander notes. Saves immediately to the mock store.
+              Update agency name, fleet-wide counts, and commander notes. Changes sync to your account.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-1">
@@ -637,7 +627,7 @@ export function PoliceDeploymentSection({ compact }: Props) {
                 (rowDialog.mode === 'create' ? 'Add staging area' : 'Edit staging area')}
             </DialogTitle>
             <DialogDescription className="text-slate-500 text-xs">
-              Headquarters can update deployment records. Changes save to the mock responder store immediately.
+              Headquarters can update deployment records. Changes save to the database immediately.
             </DialogDescription>
           </DialogHeader>
           {rowDialog?.kind === 'incident' && (
@@ -733,8 +723,7 @@ export function PoliceDeploymentSection({ compact }: Props) {
           <AlertDialogHeader>
             <AlertDialogTitle className="font-black tracking-tight text-slate-900">Remove this row?</AlertDialogTitle>
             <AlertDialogDescription className="text-slate-500 text-sm leading-relaxed">
-              This removes <strong className="text-slate-900">{deleteLabel()}</strong> from the deployment board (mock
-              store).
+              This removes <strong className="text-slate-900">{deleteLabel()}</strong> from the deployment board.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

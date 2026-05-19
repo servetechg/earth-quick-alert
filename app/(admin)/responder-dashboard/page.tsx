@@ -47,6 +47,34 @@ type Bundle = {
   general: GeneralResponderSummary | null
 }
 
+function descriptionForKind(bundle: Bundle, vLabel: string): string {
+  const fn = bundle.responderFunction ? ` · ${bundle.responderFunction}` : ''
+  switch (bundle.kind) {
+    case 'hospital':
+      return `${vLabel}${fn}`
+    case 'police':
+      return `${vLabel}${fn}. Track incident teams, operations, and staging.`
+    case 'pharmacy':
+      return `${vLabel}${fn}. Update pop-up pharmacy sites and coordinates for GIS resource deployment.`
+    case 'transit':
+      return `${vLabel}${fn}. Mass transit locations and vehicles deployed per site.`
+    case 'energy':
+      return `${vLabel}${fn}. Power outage areas and deployed power crews.`
+    case 'gas':
+      return `${vLabel}${fn}. Gas leak areas and deployed repair crews.`
+    case 'electric':
+      return `${vLabel}${fn}. Outage summary, vehicles deployed, and power crews.`
+    case 'water':
+      return `${vLabel}${fn}. Water crews and resource deployment.`
+    case 'food-logistics':
+      return `${vLabel}${fn}. Volunteers and distribution network.`
+    case 'national-guard':
+      return `${vLabel}${fn}. Personnel, vehicles, and staging areas.`
+    default:
+      return `${vLabel}${fn}. Shared responder links and checklist until a specialized vertical is assigned.`
+  }
+}
+
 export default function ResponderDashboardPage() {
   const [bundle, setBundle] = useState<Bundle | null>(null)
   const [err, setErr] = useState<string | null>(null)
@@ -60,8 +88,9 @@ export default function ResponderDashboardPage() {
         throw new Error(data.error || 'Failed to load dashboard')
       }
       setBundle(await res.json())
-    } catch (e: any) {
-      setErr(e.message || 'Error')
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : 'Error'
+      setErr(message)
       setBundle(null)
     }
   }, [])
@@ -77,27 +106,7 @@ export default function ResponderDashboardPage() {
   const description = err
     ? `Could not load this dashboard: ${err}`
     : bundle
-      ? bundle.kind === 'hospital'
-        ? `${vLabel}${bundle.responderFunction ? ` · ${bundle.responderFunction}` : ''} (demo).`
-        : bundle.kind === 'police'
-          ? `${vLabel}${bundle.responderFunction ? ` · ${bundle.responderFunction}` : ''}. Track incident teams, operations, and staging (mock).`
-          : bundle.kind === 'pharmacy'
-            ? `${vLabel}${bundle.responderFunction ? ` · ${bundle.responderFunction}` : ''}. Update pop-up pharmacy sites and coordinates for GIS resource deployment (mock).`
-            : bundle.kind === 'transit'
-              ? `${vLabel}${bundle.responderFunction ? ` · ${bundle.responderFunction}` : ''}. Mass transit locations and vehicles deployed per site (mock).`
-              : bundle.kind === 'energy'
-                ? `${vLabel}${bundle.responderFunction ? ` · ${bundle.responderFunction}` : ''}. Power outage areas and deployed power crews (mock).`
-                : bundle.kind === 'gas'
-                  ? `${vLabel}${bundle.responderFunction ? ` · ${bundle.responderFunction}` : ''}. Gas leak areas and deployed repair crews (mock).`
-                  : bundle.kind === 'electric'
-                    ? `${vLabel}${bundle.responderFunction ? ` · ${bundle.responderFunction}` : ''}. Power outage summary, vehicles deployed, outage map, and power crews (mock).`
-                    : bundle.kind === 'water'
-                      ? `${vLabel}${bundle.responderFunction ? ` · ${bundle.responderFunction}` : ''}. Water crews and resource deployment (mock).`
-                      : bundle.kind === 'food-logistics'
-                        ? `${vLabel}${bundle.responderFunction ? ` · ${bundle.responderFunction}` : ''}. Volunteers, dashboard response network (mock).`
-                        : bundle.kind === 'national-guard'
-                          ? `${vLabel}${bundle.responderFunction ? ` · ${bundle.responderFunction}` : ''}. Resource deployment — personnel, vehicles, staging areas (mock).`
-                          : `${vLabel}${bundle.responderFunction ? ` · ${bundle.responderFunction}` : ''}. This overview uses the same layout as other admin tools; metrics are mock until external APIs are connected.`
+      ? descriptionForKind(bundle, vLabel)
       : 'Loading your operational summary…'
 
   return (
@@ -107,9 +116,15 @@ export default function ResponderDashboardPage() {
         titleUppercase={false}
         description={description}
       />
-      {bundle && !err && bundle.kind !== 'hospital' && (
+      {bundle && !err && bundle.kind === 'hotel' && (
         <ResponderInfoBar>
-          Figures below refresh from the in-app mock service on save. Connect state or agency feeds when you move past demo.
+          Lodging data is session-scoped until a database layer is added. Other verticals save to your account in
+          MongoDB.
+        </ResponderInfoBar>
+      )}
+      {bundle && !err && bundle.kind === 'general' && (
+        <ResponderInfoBar>
+          Ask your administrator to assign a specialized vertical for tailored operational tools.
         </ResponderInfoBar>
       )}
       {bundle?.kind === 'hospital' && <HospitalCapacitySection compact />}

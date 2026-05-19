@@ -41,7 +41,7 @@ export async function PUT(req: NextRequest) {
         adaRoomsAvailable,
         checkInNotes: typeof body.checkInNotes === 'string' ? body.checkInNotes.slice(0, 2000) : cur.checkInNotes,
         updatedAt: new Date().toISOString(),
-        source: 'mock',
+        source: 'api',
     };
 
     setHotelAvailability(next);

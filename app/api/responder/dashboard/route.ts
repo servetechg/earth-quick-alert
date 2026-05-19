@@ -8,6 +8,13 @@ export async function GET() {
 
     const responderFunction = String(g.session.user.responderFunction || '');
     const displayName = String(g.session.user.name || '');
-    const bundle = getResponderDashboardBundle(g.vertical, responderFunction, displayName);
+    const licenseId = g.session.user.licenseId ?? null;
+    const bundle = await getResponderDashboardBundle(
+        g.vertical,
+        responderFunction,
+        displayName,
+        g.session.user.id,
+        licenseId,
+    );
     return NextResponse.json(bundle);
 }

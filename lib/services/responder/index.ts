@@ -1,46 +1,51 @@
 import { getResponderDashboardKind, type ResponderDashboardKind } from '@/lib/responder-verticals';
-import {
-    getHospitalCapacity,
-    getPoliceDeployment,
-    getHotelAvailability,
-    getPharmacyResourceDeployment,
-    getTransitResourceDeployment,
-    getEnergyResourceDeployment,
-    getGasResourceDeployment,
-    getElectricResourceDeployment,
-    getWaterResourceDeployment,
-    getFoodLogisticsResourceDeployment,
-    getNationalGuardResourceDeployment,
-    recomputeHospitalSummary,
-} from './store';
+import { getHotelAvailability } from './store';
 import type { GeneralResponderSummary } from './types';
+import { getHospitalCapacityForUser } from './hospital-capacity-db';
+import { getPoliceDeploymentForUser } from './police-deployment-db';
+import { getPharmacyResourceDeploymentForUser } from './pharmacy-resource-db';
+import { getTransitResourceDeploymentForUser } from './transit-resource-db';
+import { getEnergyResourceDeploymentForUser } from './energy-resource-db';
+import { getGasResourceDeploymentForUser } from './gas-resource-db';
+import { getElectricResourceDeploymentForUser } from './electric-resource-db';
+import { getWaterResourceDeploymentForUser } from './water-resource-db';
+import { getFoodLogisticsResourceDeploymentForUser } from './food-logistics-resource-db';
+import { getNationalGuardResourceDeploymentForUser } from './national-guard-resource-db';
 
 export * from './types';
+export { recomputeHospitalSummary } from './hospital-summary';
+export { getHotelAvailability, setHotelAvailability } from './store';
+export { getHospitalCapacityForUser, mergeHospitalCapacityForUser, normalizeHospitalUnitsFromPartial } from './hospital-capacity-db';
+export { getPoliceDeploymentForUser, mergePoliceDeploymentForUser } from './police-deployment-db';
 export {
-    getHospitalCapacity,
-    setHospitalCapacity,
-    getPoliceDeployment,
-    setPoliceDeployment,
-    getHotelAvailability,
-    setHotelAvailability,
-    getPharmacyResourceDeployment,
-    setPharmacyResourceDeployment,
-    getTransitResourceDeployment,
-    setTransitResourceDeployment,
-    getEnergyResourceDeployment,
-    setEnergyResourceDeployment,
-    getGasResourceDeployment,
-    setGasResourceDeployment,
-    getElectricResourceDeployment,
-    setElectricResourceDeployment,
-    getWaterResourceDeployment,
-    setWaterResourceDeployment,
-    getFoodLogisticsResourceDeployment,
-    setFoodLogisticsResourceDeployment,
-    getNationalGuardResourceDeployment,
-    setNationalGuardResourceDeployment,
-    recomputeHospitalSummary,
-} from './store';
+    getPharmacyResourceDeploymentForUser,
+    mergePharmacyResourceDeploymentForUser,
+} from './pharmacy-resource-db';
+export {
+    getTransitResourceDeploymentForUser,
+    mergeTransitResourceDeploymentForUser,
+} from './transit-resource-db';
+export {
+    getEnergyResourceDeploymentForUser,
+    mergeEnergyResourceDeploymentForUser,
+} from './energy-resource-db';
+export { getGasResourceDeploymentForUser, mergeGasResourceDeploymentForUser } from './gas-resource-db';
+export {
+    getElectricResourceDeploymentForUser,
+    mergeElectricResourceDeploymentForUser,
+} from './electric-resource-db';
+export {
+    getWaterResourceDeploymentForUser,
+    mergeWaterResourceDeploymentForUser,
+} from './water-resource-db';
+export {
+    getFoodLogisticsResourceDeploymentForUser,
+    mergeFoodLogisticsResourceDeploymentForUser,
+} from './food-logistics-resource-db';
+export {
+    getNationalGuardResourceDeploymentForUser,
+    mergeNationalGuardResourceDeploymentForUser,
+} from './national-guard-resource-db';
 
 export function dashboardKindForUser(vertical: string): ResponderDashboardKind {
     return getResponderDashboardKind(vertical || '');
@@ -58,7 +63,7 @@ export function getGeneralResponderSummary(
     return {
         title: `${org} — responder portal`,
         message:
-            'You are on the general responder dashboard. Ask your administrator to assign a specific vertical (hospital, police, hotel, pharmacy, transit) for tailored tools. Until then, use shared links below.',
+            'You are on the general responder dashboard. Ask your administrator to assign a specific vertical (hospital, police, hotel, pharmacy, transit, utilities, food logistics, National Guard) for tailored tools. Until then, use shared links below.',
         checklist: [
             { id: 'c1', label: 'Verify alert notification settings', done: false },
             { id: 'c2', label: 'Confirm staging channel with EOC', done: false },
@@ -72,23 +77,33 @@ export function getGeneralResponderSummary(
     };
 }
 
-export function getResponderDashboardBundle(vertical: string, responderFunction: string, displayName: string) {
+export async function getResponderDashboardBundle(
+    vertical: string,
+    responderFunction: string,
+    displayName: string,
+    userId: string,
+    licenseId?: string | null,
+) {
+    const fn = responderFunction || '';
+    const lic = licenseId ?? null;
     const kind = dashboardKindForUser(vertical);
     return {
         kind,
         vertical,
-        responderFunction: responderFunction || '',
-        hospital: kind === 'hospital' ? getHospitalCapacity() : null,
-        police: kind === 'police' ? getPoliceDeployment() : null,
+        responderFunction: fn,
+        hospital: kind === 'hospital' ? await getHospitalCapacityForUser(userId, lic) : null,
+        police: kind === 'police' ? await getPoliceDeploymentForUser(userId, lic, fn) : null,
         hotel: kind === 'hotel' ? getHotelAvailability() : null,
-        pharmacy: kind === 'pharmacy' ? getPharmacyResourceDeployment() : null,
-        transit: kind === 'transit' ? getTransitResourceDeployment() : null,
-        energy: kind === 'energy' ? getEnergyResourceDeployment() : null,
-        gas: kind === 'gas' ? getGasResourceDeployment() : null,
-        electric: kind === 'electric' ? getElectricResourceDeployment() : null,
-        water: kind === 'water' ? getWaterResourceDeployment() : null,
-        foodLogistics: kind === 'food-logistics' ? getFoodLogisticsResourceDeployment() : null,
-        nationalGuard: kind === 'national-guard' ? getNationalGuardResourceDeployment() : null,
+        pharmacy: kind === 'pharmacy' ? await getPharmacyResourceDeploymentForUser(userId, lic, fn) : null,
+        transit: kind === 'transit' ? await getTransitResourceDeploymentForUser(userId, lic, fn) : null,
+        energy: kind === 'energy' ? await getEnergyResourceDeploymentForUser(userId, lic, fn) : null,
+        gas: kind === 'gas' ? await getGasResourceDeploymentForUser(userId, lic, fn) : null,
+        electric: kind === 'electric' ? await getElectricResourceDeploymentForUser(userId, lic, fn) : null,
+        water: kind === 'water' ? await getWaterResourceDeploymentForUser(userId, lic, fn) : null,
+        foodLogistics:
+            kind === 'food-logistics' ? await getFoodLogisticsResourceDeploymentForUser(userId, lic, fn) : null,
+        nationalGuard:
+            kind === 'national-guard' ? await getNationalGuardResourceDeploymentForUser(userId, lic, fn) : null,
         general: kind === 'general' ? getGeneralResponderSummary(vertical, responderFunction, displayName) : null,
     };
 }
