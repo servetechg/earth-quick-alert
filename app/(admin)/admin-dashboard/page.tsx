@@ -44,6 +44,13 @@ export default function Dashboard() {
     ingestScope?: string
     stateCd?: string
   } | null>(null)
+  const [alertsCount, setAlertsCount] = useState<number | null>(null)
+  const [alertsLoading, setAlertsLoading] = useState(true)
+
+  const handleAlertsLoaded = useCallback((count: number) => {
+    setAlertsCount(count)
+    setAlertsLoading(false)
+  }, [])
 
   const riskCtx = useMemo(() => getRiskAnalyzeContextFromBrowser(me), [me?.role, me?.state])
 
@@ -187,7 +194,26 @@ export default function Dashboard() {
         <div className="flex-1 min-w-0 flex flex-col gap-4">
           {/* Top 4 cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2">
-            <IncidentOverviewCard loading={false} />
+            <IncidentOverviewCard
+              loading={alertsLoading}
+              incidentCount={alertsCount}
+              eventType={
+                alertsCount != null && alertsCount > 0
+                  ? `${alertsCount} active alert${alertsCount === 1 ? '' : 's'}`
+                  : incidentLive?.eventType
+              }
+              description={
+                alertsCount != null
+                  ? `Same alerts as Alerts & Communication — severity heat shown on the map.`
+                  : incidentLive?.description
+              }
+              date={incidentLive?.date}
+              status={
+                alertsCount != null && alertsCount > 0
+                  ? 'Active'
+                  : incidentLive?.status ?? 'Monitoring'
+              }
+            />
             <AIRiskPredictionCard
               loading={false}
               score={riskReport?.ai_confidence}
@@ -206,6 +232,7 @@ export default function Dashboard() {
             showLayersPanel
             selectedLocation={gisSelectedLocation}
             focusState={gisFocusState}
+            onAlertsLoaded={handleAlertsLoaded}
           />
         </div>
 

@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -37,6 +37,12 @@ import { normalizeStateToUsps } from '@/lib/utils/us-state-usps'
 import { ShieldCheck, Truck, Siren, Building2, MapPin } from 'lucide-react'
 import { geocodeAddress, calculateDistance } from '@/lib/services/mock-map-service'
 import { Switch } from '@/components/ui/switch'
+import { geocodeAlertForMap } from '@/lib/utils/geocode-alert-for-map'
+import {
+  severityToHeatWeight,
+  severityToMapColor,
+  severityToMapRadiusMeters,
+} from '@/lib/utils/alert-severity-map'
 
 interface MapLayerDef {
   id: string
@@ -68,6 +74,8 @@ interface GISMapProps {
   hideTabs?: boolean
   /** Show the floating Map Layers panel on the left of the map. */
   showLayersPanel?: boolean
+  /** Called when alerts are loaded from `/api/alerts-communication` (for incident count card). */
+  onAlertsLoaded?: (count: number) => void
 }
 
 export function GISMap({
@@ -76,6 +84,7 @@ export function GISMap({
   title = 'GIS Impact Map',
   hideTabs = false,
   showLayersPanel = false,
+  onAlertsLoaded,
 }: GISMapProps) {
   const [activeEmergencies, setActiveEmergencies] = useState<any[]>([])
   const [impactedUsers, setImpactedUsers] = useState<any[]>([])
@@ -92,6 +101,10 @@ export function GISMap({
     Object.fromEntries(DEFAULT_MAP_LAYERS.map((layer) => [layer.id, true])),
   )
   const [layersPanelOpen, setLayersPanelOpen] = useState(true)
+  const [communicationAlerts, setCommunicationAlerts] = useState<any[]>([])
+  const [alertMapMarkers, setAlertMapMarkers] = useState<any[]>([])
+  const [alertsGeocoding, setAlertsGeocoding] = useState(false)
+  const geocodeCacheRef = useRef(new Map<string, { lat: number; lng: number }>())
 
   const stateBoundsRestriction = useMemo((): MapStateBounds | null => {
     const st = (focusState || '').trim()
@@ -196,6 +209,76 @@ export function GISMap({
     }
     fetchData()
   }, [])
+
+  const geocodeAlertsForMap = useCallback(
+    async (alerts: any[]) => {
+      if (!alerts.length) {
+        setAlertMapMarkers([])
+        return
+      }
+      setAlertsGeocoding(true)
+      const markers: any[] = []
+      const max = Math.min(alerts.length, 48)
+      for (let i = 0; i < max; i++) {
+        const alert = alerts[i]
+        const cacheKey = `${alert._id || alert.id || i}`
+        let pos = geocodeCacheRef.current.get(cacheKey)
+        if (!pos) {
+          const geocoded = await geocodeAlertForMap(alert, focusState)
+          if (geocoded) {
+            pos = geocoded
+            geocodeCacheRef.current.set(cacheKey, pos)
+          }
+        }
+        if (!pos) continue
+        const severity = alert.severity || 'Moderate'
+        markers.push({
+          id: `alert-${alert._id || alert.id || i}`,
+          position: pos,
+          title: alert.name || 'Weather alert',
+          type: 'weather',
+          status: severity,
+          severity,
+          color: severityToMapColor(severity),
+          radius: severityToMapRadiusMeters(severity),
+          description: alert.locationSummary || alert.location || '',
+          location: alert.locationSummary || alert.location,
+          timestamp: alert.createdAt,
+        })
+      }
+      setAlertMapMarkers(markers)
+      setAlertsGeocoding(false)
+    },
+    [focusState],
+  )
+
+  useEffect(() => {
+    let cancelled = false
+    async function loadAlerts() {
+      try {
+        const res = await fetch('/api/alerts-communication')
+        if (!res.ok) return
+        const data = await res.json()
+        if (cancelled || !Array.isArray(data)) return
+        setCommunicationAlerts(data)
+        onAlertsLoaded?.(data.length)
+        await geocodeAlertsForMap(data)
+      } catch (e) {
+        console.warn('Failed to load alerts for map heat', e)
+        if (!cancelled) {
+          setCommunicationAlerts([])
+          setAlertMapMarkers([])
+          onAlertsLoaded?.(0)
+        }
+      }
+    }
+    void loadAlerts()
+    const interval = setInterval(() => void loadAlerts(), 60_000)
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+    }
+  }, [geocodeAlertsForMap, onAlertsLoaded])
 
   // Auto-zoom and center when selection changes (USA vs sub-admin state / metro)
   useEffect(() => {
@@ -444,10 +527,20 @@ export function GISMap({
       )
     }
 
-    return currentFiltered
-  }, [activeTab, impactedUsers, responders, subAdmins, dynamicInfra, selectedLocation])
+    const withAlerts =
+      showLayersPanel && mapLayers.incidents !== false ? [...currentFiltered, ...alertMapMarkers] : currentFiltered
+
+    return withAlerts
+  }, [activeTab, impactedUsers, responders, subAdmins, dynamicInfra, selectedLocation, showLayersPanel, mapLayers.incidents, alertMapMarkers])
 
   const heatPoints = useMemo(() => {
+    if (alertMapMarkers.length > 0) {
+      return alertMapMarkers.map((m: any) => ({
+        lat: m.position.lat,
+        lng: m.position.lng,
+        weight: severityToHeatWeight(m.severity),
+      }))
+    }
     const base = [...impactedUsers, ...responders, ...dynamicInfra]
       .filter((m: any) => m?.position && Number.isFinite(m.position.lat) && Number.isFinite(m.position.lng))
       .map((m: any, i: number) => ({
@@ -462,9 +555,10 @@ export function GISMap({
                 ? 0.55
                 : 0.45 + ((i % 4) * 0.08),
       }))
-    // Keep count close to the reference panel value.
     return base.slice(0, 24)
-  }, [impactedUsers, responders, dynamicInfra])
+  }, [alertMapMarkers, impactedUsers, responders, dynamicInfra])
+
+  const alertHeatCount = communicationAlerts.length
 
   return (
     <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm h-[700px] flex flex-col">
@@ -562,9 +656,9 @@ export function GISMap({
                 className="flex flex-1 cursor-pointer items-center gap-2 text-xs font-bold text-slate-700"
               >
                 <span className="text-amber-500">🔥</span>
-                Incident Heatmap
+                Alert heatmap
                 <span className="ml-auto rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-black text-slate-500">
-                  {heatPoints.length}
+                  {alertHeatCount}
                 </span>
               </label>
               <Switch id="incident-heatmap" checked={showHeatmap} onCheckedChange={setShowHeatmap} />
@@ -581,10 +675,12 @@ export function GISMap({
             )}
           </div>
         </div>
-        {isSearchingInfra && (
+        {(isSearchingInfra || alertsGeocoding) && (
           <div className="absolute right-4 top-4 bg-white/90 backdrop-blur-md px-4 py-2 rounded-2xl shadow-2xl border border-slate-100 flex items-center gap-2 z-50 animate-in fade-in slide-in-from-top-2 duration-300">
             <Loader2 className="w-4 h-4 text-[#33375D] animate-spin" />
-            <span className="text-[10px] font-black uppercase tracking-widest text-slate-600">Locating Facilities...</span>
+            <span className="text-[10px] font-black uppercase tracking-widest text-slate-600">
+              {alertsGeocoding ? 'Plotting alert areas…' : 'Locating Facilities…'}
+            </span>
           </div>
         )}
         </div>

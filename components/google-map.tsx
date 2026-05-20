@@ -360,11 +360,17 @@ export function GoogleMap({
                                 radius={marker.radius}
                                 onClick={() => setSelectedMarker(marker)}
                                 options={{
-                                    strokeColor: marker.type === 'earthquake' ? '#FF8C00' : '#4169E1',
-                                    strokeOpacity: 0.8,
+                                    strokeColor:
+                                        marker.type === 'earthquake'
+                                            ? '#FF8C00'
+                                            : marker.color || '#4169E1',
+                                    strokeOpacity: 0.85,
                                     strokeWeight: 2,
-                                    fillColor: marker.type === 'earthquake' ? '#FF8C00' : '#4169E1',
-                                    fillOpacity: 0.35,
+                                    fillColor:
+                                        marker.type === 'earthquake'
+                                            ? '#FF8C00'
+                                            : marker.color || '#4169E1',
+                                    fillOpacity: marker.type === 'weather' ? 0.42 : 0.35,
                                 }}
                             />
                         )}
