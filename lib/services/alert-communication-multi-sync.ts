@@ -24,13 +24,13 @@ import {
     summarizeNwpsStreamflow,
     type NwpsMappedSummary,
 } from '@/lib/services/nwps-reach-mapper';
-import type { AnyBulkWriteOperation } from 'mongoose';
 import {
     DEFAULT_NWPS_GAUGE_LIDS_NATIONWIDE,
     DEFAULT_USGS_SITES_NATIONWIDE,
 } from '@/lib/constants/nationwide-alert-feed-defaults';
-import AlertCommunication from '@/models/AlertCommunication';
 import { buildNwsInstructionBullets } from '@/lib/services/alert-communication-nws-sync';
+import { buildUnifiedEventFromMappedDoc } from '@/lib/unified-event/build-from-mapped';
+import { upsertAndPruneUnifiedEvents } from '@/lib/unified-event/repository';
 
 type Source = 'usgs' | 'firms' | 'inciweb' | 'nwps' | 'fema';
 
@@ -225,51 +225,13 @@ function mapInciWeb(incident: InciWebIncident): MappedDoc | null {
 // ─── Upsert helper ─────────────────────────────────────────────────────
 
 async function upsertAndPrune(source: Source, docs: MappedDoc[]): Promise<SyncStats> {
-    const activeIds = new Set<string>();
-    const ops: AnyBulkWriteOperation<Record<string, unknown>>[] = [];
-
-    for (const d of docs) {
-        activeIds.add(d.externalId);
-        ops.push({
-            updateOne: {
-                filter: { externalId: d.externalId },
-                update: {
-                    $set: {
-                        source,
-                        externalId: d.externalId,
-                        name: d.name,
-                        type: d.type,
-                        iconType: d.iconType,
-                        location: d.location,
-                        issuedAt: d.issuedAt,
-                        expiresAt: d.expiresAt,
-                        description: d.description,
-                        severity: d.severity,
-                        instructions: buildNwsInstructionBullets(undefined, d.description, d.name),
-                    },
-                    $setOnInsert: {
-                        status: d.status,
-                    },
-                },
-                upsert: true,
-            },
-        });
-    }
-
-    if (ops.length > 0) {
-        await AlertCommunication.bulkWrite(ops, { ordered: false });
-    }
-
-    const removeResult = await AlertCommunication.deleteMany({
-        source,
-        externalId: { $exists: true, $nin: [...activeIds] },
-    });
-
-    return {
-        upserted: ops.length,
-        removed: removeResult.deletedCount ?? 0,
-        skipped: 0,
-    };
+    const events = docs.map((d) =>
+        buildUnifiedEventFromMappedDoc(source, d, {
+            instructions: buildNwsInstructionBullets(undefined, d.description, d.name),
+        }),
+    );
+    const stats = await upsertAndPruneUnifiedEvents(source, events);
+    return { ...stats, skipped: 0 };
 }
 
 // ─── Public sync API ───────────────────────────────────────────────────
