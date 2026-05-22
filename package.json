@@ -11,6 +11,9 @@
     "worker:stream": "npx tsx server/workers/stream-worker.ts"
   },
   "dependencies": {
+    "@deck.gl/aggregation-layers": "^9.3.2",
+    "@deck.gl/core": "^9.3.2",
+    "@deck.gl/google-maps": "^9.3.2",
     "@hookform/resolvers": "^3.10.0",
     "@radix-ui/react-accordion": "1.2.2",
     "@radix-ui/react-alert-dialog": "1.1.4",
@@ -59,8 +62,8 @@
     "mammoth": "^1.12.0",
     "mongoose": "^8.9.5",
     "next": "15.1.9",
-    "nodemailer": "^6.9.16",
     "next-themes": "^0.4.6",
+    "nodemailer": "^6.9.16",
     "pdf-parse": "^2.4.5",
     "react": "19.2.0",
     "react-day-picker": "9.8.0",

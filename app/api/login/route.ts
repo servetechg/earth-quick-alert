@@ -45,6 +45,24 @@ export async function POST(req: NextRequest) {
             }
         }
 
+        // Auto-provision non-profit responder demo user
+        if (normalizedEmail === 'nonprofit_demo@yopmail.com' && password === 'nonprofit_demo_pass') {
+            const existingUser = await User.findOne({ email: normalizedEmail });
+            if (!existingUser) {
+                const hashedPassword = await bcrypt.hash(password, 10);
+                await User.create({
+                    name: 'Demo Non-Profit Partner',
+                    email: normalizedEmail,
+                    password: hashedPassword,
+                    role: 'responder',
+                    responderVertical: 'nonprofit',
+                    responderFunction: 'Non-Profits (demo)',
+                    accountStatus: 'approved',
+                    licenseId: null,
+                });
+            }
+        }
+
         // Find user and include password field
         const user = await User.findOne({ email: normalizedEmail }).select('+password');
 

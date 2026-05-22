@@ -10,6 +10,7 @@ import ResponderElectricDeployment from '@/models/ResponderElectricDeployment';
 import ResponderWaterDeployment from '@/models/ResponderWaterDeployment';
 import ResponderFoodLogisticsDeployment from '@/models/ResponderFoodLogisticsDeployment';
 import ResponderNationalGuardDeployment from '@/models/ResponderNationalGuardDeployment';
+import ResponderNonprofitDeployment from '@/models/ResponderNonprofitDeployment';
 import ResponderFederalDeployment from '@/models/ResponderFederalDeployment';
 
 /** Remove per-responder operational documents when a user account is deleted. */
@@ -27,6 +28,7 @@ export async function deleteResponderOperationalDataForUser(userId: string): Pro
         ResponderWaterDeployment.deleteMany({ ownerUserId: oid }),
         ResponderFoodLogisticsDeployment.deleteMany({ ownerUserId: oid }),
         ResponderNationalGuardDeployment.deleteMany({ ownerUserId: oid }),
+        ResponderNonprofitDeployment.deleteMany({ ownerUserId: oid }),
         ResponderFederalDeployment.deleteMany({ ownerUserId: oid }),
     ]);
 }

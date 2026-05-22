@@ -12,6 +12,7 @@ import { getElectricResourceDeploymentForUser } from './electric-resource-db';
 import { getWaterResourceDeploymentForUser } from './water-resource-db';
 import { getFoodLogisticsResourceDeploymentForUser } from './food-logistics-resource-db';
 import { getNationalGuardResourceDeploymentForUser } from './national-guard-resource-db';
+import { getNonprofitResourceDeploymentForUser } from './nonprofit-resource-db';
 import {
     getFederalResourceDeploymentForUser,
     mergeFederalResourceDeploymentForUser,
@@ -51,6 +52,10 @@ export {
     getNationalGuardResourceDeploymentForUser,
     mergeNationalGuardResourceDeploymentForUser,
 } from './national-guard-resource-db';
+export {
+    getNonprofitResourceDeploymentForUser,
+    mergeNonprofitResourceDeploymentForUser,
+} from './nonprofit-resource-db';
 export {
     getFederalResourceDeploymentForUser,
     mergeFederalResourceDeploymentForUser,
@@ -114,6 +119,7 @@ export async function getResponderDashboardBundle(
             kind === 'food-logistics' ? await getFoodLogisticsResourceDeploymentForUser(userId, lic, fn) : null,
         nationalGuard:
             kind === 'national-guard' ? await getNationalGuardResourceDeploymentForUser(userId, lic, fn) : null,
+        nonprofit: kind === 'nonprofit' ? await getNonprofitResourceDeploymentForUser(userId, lic, fn) : null,
         general: kind === 'general' ? getGeneralResponderSummary(vertical, responderFunction, displayName) : null,
     };
 }
