@@ -1,0 +1,1258 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "ready2go/unified-event-model/v1",
+  "title": "Ready2Go Unified Event Model",
+  "description": "Centralized schema merging AlertCommunications and RiskAssessmentSnapshots. Each document represents one discrete hazard event. The 'properties' field holds category-specific statistics and measurements that cannot be generalized across all event types.",
+  "version": "1.0.0",
+  "generatedAt": "2026-05-20",
+
+  "notes": {
+    "migration": "AlertCommunications and RiskAssessmentSnapshots are merged into this single collection. The 'dataStatus' field replaces the former 'status' field on RiskAssessmentSnapshots and tracks data freshness (current vs past). The 'intensity' field moves under 'properties' per category because not all event types carry a measurable intensity value.",
+    "dataStatus_rule": "dataStatus is set to 'current' on insert/update. A background job flips it to 'past' once 24 hours have elapsed since 'updatedAt' without a new update.",
+    "properties_rule": "The 'properties' object is keyed by category slug. Only the block matching the document's own 'category' field is populated; all others are omitted. Fields that are unknown or not applicable are set to null rather than omitted, so consumers can rely on the key existing."
+  },
+
+  "categories": [
+    "flood",
+    "earthquake",
+    "wildfire",
+    "storm",
+    "marine",
+    "coastal_surf",
+    "hazardous",
+    "hurricane_typhoon",
+    "tsunami",
+    "volcanic",
+    "landslide",
+    "winter_weather",
+    "air_quality",
+    "extreme_heat",
+    "fema_declaration"
+  ],
+
+  "schema": {
+
+    "_id": {
+      "type": "ObjectId",
+      "description": "MongoDB document identifier."
+    },
+
+    "externalId": {
+      "type": "string",
+      "description": "Namespaced identifier from the originating data source. Format: '<source>:<source-native-id>'. Examples: 'nws:urn:oid:2.49...', 'usgs:01073500', 'eq:us6000sxdg', 'fema:1973ca67-...', 'nwps:gauge:AACS2'."
+    },
+
+    "source": {
+      "type": "string",
+      "enum": ["nws", "usgs", "earthquake", "nwps", "fema", "nasa_firms", "inciweb", "noaa_nwis"],
+      "description": "Originating data feed."
+    },
+
+    "category": {
+      "type": "string",
+      "enum": [
+        "flood", "earthquake", "wildfire", "storm", "marine",
+        "coastal_surf", "hazardous", "hurricane_typhoon", "tsunami",
+        "volcanic", "landslide", "winter_weather", "air_quality",
+        "extreme_heat", "fema_declaration"
+      ],
+      "description": "Hazard category. Determines which block inside 'properties' is populated."
+    },
+
+    "name": {
+      "type": "string",
+      "description": "Human-readable event name shown in the UI. Examples: 'Flood Warning', 'Earthquake · M4.3', 'Super Typhoon Sinlaku'."
+    },
+
+    "description": {
+      "type": "string",
+      "description": "Short free-text summary generated or forwarded from the source."
+    },
+
+    "severity": {
+      "type": "string",
+      "enum": ["Low", "Moderate", "High", "Extreme"],
+      "description": "Unified severity tier used across all categories."
+    },
+
+    "type": {
+      "type": "string",
+      "enum": ["Warning", "Watch", "Advisory", "Statement", "Declaration"],
+      "description": "Alert classification level."
+    },
+
+    "iconType": {
+      "type": "string",
+      "enum": ["cloud", "triangle", "lightning", "flame", "wave", "snowflake", "wind"],
+      "description": "UI icon slug."
+    },
+
+    "status": {
+      "type": "string",
+      "enum": ["Take Action", "Monitor", "Info"],
+      "description": "Action prompt shown to the end user."
+    },
+
+    "dataStatus": {
+      "type": "string",
+      "enum": ["current", "past"],
+      "description": "Reflects data freshness. 'current' = updated within the last 24 hours. 'past' = more than 24 hours have elapsed since updatedAt with no new ingestion. Managed by a background TTL job."
+    },
+
+    "location": {
+      "type": "string",
+      "description": "Human-readable place name. Examples: 'Saipan (Municipality), MP', 'LAMPREY RIVER NEAR NEWMARKET, NH'."
+    },
+
+    "lat": {
+      "type": ["number", "null"],
+      "description": "WGS-84 latitude. Null when the event covers a zone rather than a point."
+    },
+
+    "lng": {
+      "type": ["number", "null"],
+      "description": "WGS-84 longitude. Null when the event covers a zone rather than a point."
+    },
+
+    "coordinates": {
+      "type": ["object", "null"],
+      "description": "Alternative coordinate object used by some sources (e.g. USGS gauges). Kept for backward compatibility.",
+      "properties": {
+        "lat": { "type": "number" },
+        "lng": { "type": "number" }
+      }
+    },
+
+    "geometry": {
+      "type": ["object", "null"],
+      "description": "GeoJSON geometry for polygon/multipolygon events (e.g. NWS zone alerts, wildfire perimeters). Null for point events.",
+      "properties": {
+        "type": { "type": "string", "enum": ["Point", "Polygon", "MultiPolygon"] },
+        "coordinates": { "type": "array" }
+      }
+    },
+
+    "issuedAt": {
+      "type": "string",
+      "description": "ISO-8601 timestamp or human-readable relative string from source. Stored as received; normalized form is in properties.<category>.issuedAtISO."
+    },
+
+    "expiresAt": {
+      "type": "string",
+      "description": "Expiry time as received from source (may be a clock time string, ISO date, or text like 'See USGS event page')."
+    },
+
+    "instruct ions": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "AI-generated or source-forwarded action instructions for the public."
+    },
+
+    "createdAt": {
+      "type": "date",
+      "description": "Document creation timestamp (MongoDB)."
+    },
+
+    "updatedAt": {
+      "type": "date",
+      "description": "Last modification timestamp (MongoDB). Used by the dataStatus TTL job."
+    },
+
+    "__v": {
+      "type": "integer",
+      "description": "Mongoose version key."
+    },
+
+    "properties": {
+      "type": "object",
+      "description": "Category-specific fields. Only the block matching the document's 'category' is populated. Contains all measurements, statistics, and data points that differ per event type — including intensity, which is category-dependent.",
+
+      "properties": {
+
+        "flood": {
+          "type": "object",
+          "description": "Populated when category = 'flood'. Sources: NWS flood alerts, USGS NWIS gauges, NWPS river gauges.",
+          "properties": {
+            "intensity": {
+              "type": ["object", "null"],
+              "description": "Primary measurement for this flood event.",
+              "properties": {
+                "metric": { "type": "string", "examples": ["stage", "gage_height", "discharge", "nws_alert_severity"] },
+                "value": { "type": "number" },
+                "unit": { "type": "string", "examples": ["ft", "ft3/s", "kcfs", "level"] },
+                "display": { "type": "string" },
+                "secondaryMetric": { "type": ["string", "null"], "examples": ["flood_category", "severity_score"] },
+                "secondaryValue": { "type": ["number", "null"] },
+                "secondaryUnit": { "type": ["string", "null"] }
+              }
+            },
+            "gageHeight": {
+              "type": ["number", "null"],
+              "description": "River or stream gage height in feet. From USGS NWIS 'gage height' parameter or NWPS observed primary."
+            },
+            "gageHeightUnit": { "type": "string", "default": "ft" },
+            "discharge": {
+              "type": ["number", "null"],
+              "description": "Stream discharge / flow rate. From USGS NWIS 'Discharge, cubic feet per second'."
+            },
+            "dischargeUnit": { "type": "string", "default": "ft3/s" },
+            "flowKcfs": {
+              "type": ["number", "null"],
+              "description": "Flow in thousand cubic feet per second. From NWPS secondary value."
+            },
+            "stage": {
+              "type": ["number", "null"],
+              "description": "NWPS river stage (primary observed value, may be in elevation ft like 3199.6 for reservoir-referenced gauges)."
+            },
+            "stageUnit": { "type": "string", "default": "ft" },
+            "forecastStage": {
+              "type": ["number", "null"],
+              "description": "NWPS forecast primary value."
+            },
+            "forecastFloodCategory": {
+              "type": ["string", "null"],
+              "enum": ["no_flooding", "action", "minor", "moderate", "major", "fcst_not_current", null],
+              "description": "NWPS forecast flood category."
+            },
+            "observedFloodCategory": {
+              "type": ["string", "null"],
+              "enum": ["no_flooding", "action", "minor", "moderate", "major", null],
+              "description": "NWPS observed flood category."
+            },
+            "floodThresholds": {
+              "type": ["object", "null"],
+              "description": "NWPS stage thresholds for each flood tier.",
+              "properties": {
+                "action": { "type": ["number", "null"] },
+                "minor": { "type": ["number", "null"] },
+                "moderate": { "type": ["number", "null"] },
+                "major": { "type": ["number", "null"] },
+                "unit": { "type": "string", "default": "ft" }
+              }
+            },
+            "gaugeLid": {
+              "type": ["string", "null"],
+              "description": "NWPS Local Identifier (LID) for the gauge station. Example: 'AACS2'."
+            },
+            "gaugeUsgsId": {
+              "type": ["string", "null"],
+              "description": "USGS site number. Example: '01073500'."
+            },
+            "gaugeRfc": {
+              "type": ["string", "null"],
+              "description": "River Forecast Center abbreviation. Example: 'MBRFC'."
+            },
+            "gaugeWfo": {
+              "type": ["string", "null"],
+              "description": "Weather Forecast Office abbreviation. Example: 'UNR'."
+            },
+            "affectedCounties": {
+              "type": ["array", "null"],
+              "items": { "type": "string" },
+              "description": "List of county or zone names from NWS areaDesc. Example: ['Clay, IL', 'Richland, IL']."
+            },
+            "urgency": {
+              "type": ["string", "null"],
+              "description": "NWS urgency field. Example: 'Immediate'."
+            },
+            "certainty": {
+              "type": ["string", "null"],
+              "description": "NWS certainty field. Example: 'Likely'."
+            },
+            "nwsEventCode": {
+              "type": ["string", "null"],
+              "description": "NWS event code. Example: 'FLW' (Flood Warning)."
+            },
+            "nwsVtec": {
+              "type": ["string", "null"],
+              "description": "NWS VTEC string. Example: '/O.NEW.KLOT.FL.W.0010.../'"
+            },
+            "senderName": {
+              "type": ["string", "null"],
+              "description": "NWS office name. Example: 'NWS Lincoln IL'."
+            },
+            "effectiveAt": {
+              "type": ["string", "null"],
+              "description": "ISO-8601 effective time from NWS alert."
+            },
+            "onsetAt": {
+              "type": ["string", "null"],
+              "description": "ISO-8601 onset time from NWS alert."
+            },
+            "endsAt": {
+              "type": ["string", "null"],
+              "description": "ISO-8601 end time from NWS alert (may differ from expiresAt)."
+            },
+            "observedAt": {
+              "type": ["string", "null"],
+              "description": "ISO-8601 timestamp of the gauge observation."
+            },
+            "upstreamGaugeLid": {
+              "type": ["string", "null"],
+              "description": "NWPS upstream linked gauge LID."
+            },
+            "downstreamGaugeLid": {
+              "type": ["string", "null"],
+              "description": "NWPS downstream linked gauge LID."
+            }
+          }
+        },
+
+        "earthquake": {
+          "type": "object",
+          "description": "Populated when category = 'earthquake'. Sources: USGS Earthquake Hazards Program.",
+          "properties": {
+            "intensity": {
+              "type": ["object", "null"],
+              "description": "Primary seismic intensity measurement.",
+              "properties": {
+                "metric": { "type": "string", "examples": ["magnitude"] },
+                "value": { "type": "number" },
+                "unit": { "type": "string", "examples": ["Mw", "ml", "mb"] },
+                "display": { "type": "string", "examples": ["M4.3"] }
+              }
+            },
+            "magnitude": {
+              "type": ["number", "null"],
+              "description": "Earthquake magnitude. From USGS 'mag' field."
+            },
+            "magnitudeType": {
+              "type": ["string", "null"],
+              "description": "Magnitude scale. Examples: 'ml' (local), 'mw' (moment), 'mb' (body-wave)."
+            },
+            "depth": {
+              "type": ["number", "null"],
+              "description": "Hypocenter depth in kilometers. From USGS geometry coordinates[2]."
+            },
+            "depthUnit": { "type": "string", "default": "km" },
+            "place": {
+              "type": ["string", "null"],
+              "description": "USGS descriptive location. Example: '5 km SW of Easington, Jamaica'."
+            },
+            "tsunami": {
+              "type": ["integer", "null"],
+              "description": "USGS tsunami flag. 1 = tsunami message issued, 0 = no message."
+            },
+            "sig": {
+              "type": ["integer", "null"],
+              "description": "USGS significance score (0–1000). Combines magnitude, felt reports, and media attention."
+            },
+            "cdi": {
+              "type": ["number", "null"],
+              "description": "Maximum Community Determined Intensity (USGS Did You Feel It). Scale 1–10."
+            },
+            "mmi": {
+              "type": ["number", "null"],
+              "description": "Maximum Modified Mercalli Intensity estimated from ShakeMap. Scale 1–10."
+            },
+            "felt": {
+              "type": ["integer", "null"],
+              "description": "Number of Did You Feel It reports submitted."
+            },
+            "alert": {
+              "type": ["string", "null"],
+              "enum": ["green", "yellow", "orange", "red", null],
+              "description": "USGS PAGER alert level for estimated impact."
+            },
+            "reviewStatus": {
+              "type": ["string", "null"],
+              "enum": ["automatic", "reviewed", "deleted", null],
+              "description": "USGS review status of the event."
+            },
+            "nst": {
+              "type": ["integer", "null"],
+              "description": "Number of seismic stations used to determine the magnitude."
+            },
+            "gap": {
+              "type": ["number", "null"],
+              "description": "Largest azimuthal gap between azimuthally adjacent stations (degrees). Smaller = better constrained."
+            },
+            "dmin": {
+              "type": ["number", "null"],
+              "description": "Horizontal distance in degrees from the epicenter to the nearest station."
+            },
+            "rms": {
+              "type": ["number", "null"],
+              "description": "RMS travel time residual in seconds."
+            },
+            "net": {
+              "type": ["string", "null"],
+              "description": "Contributing network identifier. Example: 'us', 'ak', 'ci'."
+            },
+            "usgsEventId": {
+              "type": ["string", "null"],
+              "description": "USGS event ID. Example: 'us6000sxdg'."
+            },
+            "usgsEventUrl": {
+              "type": ["string", "null"],
+              "description": "Link to USGS event detail page."
+            },
+            "occurredAt": {
+              "type": ["string", "null"],
+              "description": "ISO-8601 timestamp of the earthquake occurrence (from USGS 'time' epoch ms converted)."
+            }
+          }
+        },
+
+        "wildfire": {
+          "type": "object",
+          "description": "Populated when category = 'wildfire'. Sources: NASA FIRMS VIIRS, InciWeb RSS, ArcGIS WFIGS perimeters, FEMA Fire Management declarations.",
+          "properties": {
+            "intensity": {
+              "type": ["object", "null"],
+              "description": "Primary fire intensity measurement.",
+              "properties": {
+                "metric": { "type": "string", "examples": ["frp", "brightness", "disaster_declaration"] },
+                "value": { "type": "number" },
+                "unit": { "type": "string", "examples": ["MW", "K", "DR"] },
+                "display": { "type": "string" }
+              }
+            },
+            "fireName": {
+              "type": ["string", "null"],
+              "description": "Official fire name. Example: 'Pineland Road Wildfire'."
+            },
+            "containmentPct": {
+              "type": ["number", "null"],
+              "description": "Percentage of the fire perimeter contained. 0–100."
+            },
+            "areaAcres": {
+              "type": ["number", "null"],
+              "description": "Estimated total fire area in acres."
+            },
+            "areaHectares": {
+              "type": ["number", "null"],
+              "description": "Estimated total fire area in hectares."
+            },
+            "perimeterMiles": {
+              "type": ["number", "null"],
+              "description": "Perimeter length in miles from WFIGS."
+            },
+            "frp": {
+              "type": ["number", "null"],
+              "description": "NASA FIRMS Fire Radiative Power in megawatts — proxy for fire intensity."
+            },
+            "brightnessTi4": {
+              "type": ["number", "null"],
+              "description": "NASA VIIRS brightness temperature at band I-4 (Kelvin). Primary fire detection band."
+            },
+            "brightnessTi5": {
+              "type": ["number", "null"],
+              "description": "NASA VIIRS brightness temperature at band I-5 (Kelvin). Background / smoke band."
+            },
+            "viirsScanTrack": {
+              "type": ["object", "null"],
+              "description": "VIIRS pixel scan and track dimensions.",
+              "properties": {
+                "scan": { "type": "number" },
+                "track": { "type": "number" }
+              }
+            },
+            "firmsConfidence": {
+              "type": ["string", "null"],
+              "enum": ["low", "nominal", "high", null],
+              "description": "NASA FIRMS detection confidence category."
+            },
+            "dayNight": {
+              "type": ["string", "null"],
+              "enum": ["D", "N", null],
+              "description": "NASA FIRMS acquisition time of day. 'D' = day, 'N' = night."
+            },
+            "acquiredAt": {
+              "type": ["string", "null"],
+              "description": "NASA FIRMS acquisition date-time (ISO-8601)."
+            },
+            "satellite": {
+              "type": ["string", "null"],
+              "description": "Satellite platform. Example: 'Suomi-NPP', 'NOAA-20'."
+            },
+            "instrument": {
+              "type": ["string", "null"],
+              "description": "Sensor. Example: 'VIIRS'."
+            },
+            "incidentType": {
+              "type": ["string", "null"],
+              "description": "FEMA incident type. Example: 'Fire'."
+            },
+            "femaDeclarationString": {
+              "type": ["string", "null"],
+              "description": "FEMA declaration string. Example: 'FM-5629-GA'."
+            },
+            "femaDisasterNumber": {
+              "type": ["integer", "null"],
+              "description": "FEMA disaster number."
+            },
+            "incidentBeginDate": {
+              "type": ["string", "null"],
+              "description": "ISO-8601 fire start date."
+            },
+            "incidentEndDate": {
+              "type": ["string", "null"],
+              "description": "ISO-8601 fire end/containment date. Null if ongoing."
+            },
+            "iaProgram": { "type": ["boolean", "null"], "description": "FEMA Individual Assistance declared." },
+            "paProgram": { "type": ["boolean", "null"], "description": "FEMA Public Assistance declared." },
+            "hmProgram": { "type": ["boolean", "null"], "description": "FEMA Hazard Mitigation declared." },
+            "designatedArea": {
+              "type": ["string", "null"],
+              "description": "FEMA designated area. Example: 'Clinch (County), GA'."
+            },
+            "wfigsPerimeterSource": {
+              "type": ["string", "null"],
+              "description": "Source agency of the perimeter polygon from WFIGS."
+            }
+          }
+        },
+
+        "storm": {
+          "type": "object",
+          "description": "Populated when category = 'storm'. Sources: NWS severe thunderstorm, tornado, wind, and general storm alerts.",
+          "properties": {
+            "intensity": {
+              "type": ["object", "null"],
+              "properties": {
+                "metric": { "type": "string", "examples": ["nws_alert_severity", "wind_speed", "hail_size"] },
+                "value": { "type": "number" },
+                "unit": { "type": "string", "examples": ["level", "mph", "kt", "in"] },
+                "display": { "type": "string" }
+              }
+            },
+            "maxWindGust": {
+              "type": ["string", "null"],
+              "description": "Maximum expected wind gust from NWS parameters. Example: '60 MPH'."
+            },
+            "maxWindGustKts": {
+              "type": ["number", "null"],
+              "description": "Maximum wind gust in knots."
+            },
+            "windThreat": {
+              "type": ["string", "null"],
+              "enum": ["RADAR INDICATED", "OBSERVED", null],
+              "description": "NWS wind threat detection method."
+            },
+            "hailThreat": {
+              "type": ["string", "null"],
+              "enum": ["RADAR INDICATED", "OBSERVED", null]
+            },
+            "maxHailSize": {
+              "type": ["string", "null"],
+              "description": "Maximum hail size. Example: '1.75 IN'."
+            },
+            "thunderstormDamageThreat": {
+              "type": ["string", "null"],
+              "enum": ["CONSIDERABLE", "DESTRUCTIVE", "SIGNIFICANT", null]
+            },
+            "tornadoDetection": {
+              "type": ["string", "null"],
+              "enum": ["RADAR INDICATED", "OBSERVED", null]
+            },
+            "eventMotionDescription": {
+              "type": ["string", "null"],
+              "description": "NWS motion vector. Example: 'Moving NE at 25 mph'."
+            },
+            "urgency": { "type": ["string", "null"] },
+            "certainty": { "type": ["string", "null"] },
+            "nwsEventCode": { "type": ["string", "null"] },
+            "nwsVtec": { "type": ["string", "null"] },
+            "senderName": { "type": ["string", "null"] },
+            "affectedCounties": { "type": ["array", "null"], "items": { "type": "string" } },
+            "effectiveAt": { "type": ["string", "null"] },
+            "onsetAt": { "type": ["string", "null"] },
+            "endsAt": { "type": ["string", "null"] }
+          }
+        },
+
+        "marine": {
+          "type": "object",
+          "description": "Populated when category = 'marine'. Sources: NWS marine zone alerts (Small Craft Advisory, Gale Warning, Hazardous Seas, etc.).",
+          "properties": {
+            "intensity": {
+              "type": ["object", "null"],
+              "properties": {
+                "metric": { "type": "string", "examples": ["nws_alert_severity", "wind_speed"] },
+                "value": { "type": "number" },
+                "unit": { "type": "string" },
+                "display": { "type": "string" }
+              }
+            },
+            "windSpeed": {
+              "type": ["string", "null"],
+              "description": "Expected wind speed range. Example: '15 to 20 kt with gusts up to 30 kt'."
+            },
+            "waveHeight": {
+              "type": ["string", "null"],
+              "description": "Expected wave height range. Example: '8 to 12 ft'."
+            },
+            "waveHeightFt": {
+              "type": ["number", "null"],
+              "description": "Representative wave height in feet."
+            },
+            "windSpeedKts": {
+              "type": ["number", "null"],
+              "description": "Representative sustained wind speed in knots."
+            },
+            "gustKts": {
+              "type": ["number", "null"],
+              "description": "Peak gust in knots."
+            },
+            "marineZones": {
+              "type": ["array", "null"],
+              "items": { "type": "string" },
+              "description": "NWS UGC marine zone codes. Example: ['GMZ232', 'GMZ250']."
+            },
+            "affectedWaterArea": {
+              "type": ["string", "null"],
+              "description": "Descriptive name of affected water body. Example: 'St Joseph to South Haven, Michigan'."
+            },
+            "urgency": { "type": ["string", "null"] },
+            "certainty": { "type": ["string", "null"] },
+            "nwsEventCode": { "type": ["string", "null"] },
+            "nwsVtec": { "type": ["string", "null"] },
+            "senderName": { "type": ["string", "null"] },
+            "effectiveAt": { "type": ["string", "null"] },
+            "endsAt": { "type": ["string", "null"] }
+          }
+        },
+
+        "coastal_surf": {
+          "type": "object",
+          "description": "Populated when category = 'coastal_surf'. Sources: NWS coastal flood, beach hazard, and rip current alerts.",
+          "properties": {
+            "intensity": {
+              "type": ["object", "null"],
+              "properties": {
+                "metric": { "type": "string", "examples": ["nws_alert_severity", "wave_height"] },
+                "value": { "type": "number" },
+                "unit": { "type": "string" },
+                "display": { "type": "string" }
+              }
+            },
+            "surgeHeightFt": {
+              "type": ["number", "null"],
+              "description": "Expected storm surge or inundation height in feet."
+            },
+            "waveHeightFt": {
+              "type": ["number", "null"],
+              "description": "Surf wave height in feet."
+            },
+            "ripCurrentRisk": {
+              "type": ["string", "null"],
+              "enum": ["Low", "Moderate", "High", null],
+              "description": "Rip current risk level from NWS rip current statements."
+            },
+            "inundationDepthFt": {
+              "type": ["number", "null"],
+              "description": "Coastal flood inundation depth above ground in feet."
+            },
+            "tidalInfluence": {
+              "type": ["boolean", "null"],
+              "description": "True if tidal cycle is a contributing factor."
+            },
+            "affectedBeaches": {
+              "type": ["array", "null"],
+              "items": { "type": "string" },
+              "description": "Named beaches or coastal zones affected."
+            },
+            "affectedCounties": { "type": ["array", "null"], "items": { "type": "string" } },
+            "urgency": { "type": ["string", "null"] },
+            "certainty": { "type": ["string", "null"] },
+            "nwsEventCode": { "type": ["string", "null"] },
+            "nwsVtec": { "type": ["string", "null"] },
+            "senderName": { "type": ["string", "null"] },
+            "effectiveAt": { "type": ["string", "null"] },
+            "endsAt": { "type": ["string", "null"] }
+          }
+        },
+
+        "hazardous": {
+          "type": "object",
+          "description": "Populated when category = 'hazardous'. Covers winter weather (freeze, frost, ice, snow), extreme cold, dense fog, and other environmental hazards from NWS.",
+          "properties": {
+            "intensity": {
+              "type": ["object", "null"],
+              "properties": {
+                "metric": { "type": "string", "examples": ["nws_alert_severity", "temperature"] },
+                "value": { "type": "number" },
+                "unit": { "type": "string", "examples": ["level", "F", "C"] },
+                "display": { "type": "string" }
+              }
+            },
+            "hazardSubtype": {
+              "type": ["string", "null"],
+              "enum": [
+                "freeze_warning", "frost_advisory", "freeze_watch",
+                "winter_storm_warning", "ice_storm_warning", "blizzard_warning",
+                "wind_chill_warning", "wind_chill_advisory",
+                "dense_fog_advisory", "dust_storm_warning",
+                "extreme_cold_warning", "heat_advisory",
+                "air_quality_alert", "wind_advisory", "other"
+              ],
+              "description": "More specific classification within the 'hazardous' category."
+            },
+            "minTemperatureF": {
+              "type": ["number", "null"],
+              "description": "Minimum expected temperature in Fahrenheit. Example: 33 for frost advisory."
+            },
+            "windChillF": {
+              "type": ["number", "null"],
+              "description": "Wind chill temperature in Fahrenheit."
+            },
+            "snowAccumulationIn": {
+              "type": ["number", "null"],
+              "description": "Expected snow or ice accumulation in inches."
+            },
+            "iceAccumulationIn": {
+              "type": ["number", "null"],
+              "description": "Expected ice accumulation in inches."
+            },
+            "visibilityMiles": {
+              "type": ["number", "null"],
+              "description": "Minimum visibility in miles (for fog/dust events)."
+            },
+            "aqiValue": {
+              "type": ["integer", "null"],
+              "description": "Air Quality Index value (0–500)."
+            },
+            "aqiCategory": {
+              "type": ["string", "null"],
+              "enum": ["Good", "Moderate", "Unhealthy for Sensitive Groups", "Unhealthy", "Very Unhealthy", "Hazardous", null]
+            },
+            "dominantPollutant": {
+              "type": ["string", "null"],
+              "description": "Primary air quality pollutant. Examples: 'PM2.5', 'Ozone', 'CO'."
+            },
+            "windSpeedMph": {
+              "type": ["number", "null"],
+              "description": "Sustained wind speed in mph for wind advisory events."
+            },
+            "gustMph": {
+              "type": ["number", "null"],
+              "description": "Wind gust in mph."
+            },
+            "affectedCounties": { "type": ["array", "null"], "items": { "type": "string" } },
+            "urgency": { "type": ["string", "null"] },
+            "certainty": { "type": ["string", "null"] },
+            "nwsEventCode": { "type": ["string", "null"] },
+            "nwsVtec": { "type": ["string", "null"] },
+            "senderName": { "type": ["string", "null"] },
+            "effectiveAt": { "type": ["string", "null"] },
+            "endsAt": { "type": ["string", "null"] }
+          }
+        },
+
+        "hurricane_typhoon": {
+          "type": "object",
+          "description": "Populated when category = 'hurricane_typhoon'. Sources: NWS tropical alerts, FEMA major disaster declarations (DR-type) for hurricanes/typhoons.",
+          "properties": {
+            "intensity": {
+              "type": ["object", "null"],
+              "properties": {
+                "metric": { "type": "string", "examples": ["disaster_declaration", "wind_speed", "saffir_simpson"] },
+                "value": { "type": "number" },
+                "unit": { "type": "string", "examples": ["DR", "mph", "category"] },
+                "display": { "type": "string", "examples": ["DR-4910", "Cat 4"] }
+              }
+            },
+            "stormName": {
+              "type": ["string", "null"],
+              "description": "Official storm name. Example: 'Super Typhoon Sinlaku'."
+            },
+            "category": {
+              "type": ["integer", "null"],
+              "minimum": 1,
+              "maximum": 5,
+              "description": "Saffir-Simpson scale category (1–5). Null if below hurricane strength."
+            },
+            "maxSustainedWindMph": {
+              "type": ["number", "null"],
+              "description": "Maximum sustained wind speed in mph."
+            },
+            "maxSustainedWindKts": {
+              "type": ["number", "null"],
+              "description": "Maximum sustained wind speed in knots."
+            },
+            "centralPressureMb": {
+              "type": ["number", "null"],
+              "description": "Minimum central pressure in millibars."
+            },
+            "stormSurgeFt": {
+              "type": ["number", "null"],
+              "description": "Forecast storm surge in feet above normally dry ground."
+            },
+            "rainfallInches": {
+              "type": ["number", "null"],
+              "description": "Forecast or observed total rainfall in inches."
+            },
+            "femaDeclarationString": { "type": ["string", "null"] },
+            "femaDisasterNumber": { "type": ["integer", "null"] },
+            "femaDeclarationType": { "type": ["string", "null"], "examples": ["DR", "EM"] },
+            "declarationDate": { "type": ["string", "null"] },
+            "incidentBeginDate": { "type": ["string", "null"] },
+            "incidentEndDate": { "type": ["string", "null"] },
+            "iaProgram": { "type": ["boolean", "null"] },
+            "paProgram": { "type": ["boolean", "null"] },
+            "hmProgram": { "type": ["boolean", "null"] },
+            "designatedArea": { "type": ["string", "null"] },
+            "femaRegion": { "type": ["integer", "null"] },
+            "fipsStateCode": { "type": ["string", "null"] },
+            "fipsCountyCode": { "type": ["string", "null"] }
+          }
+        },
+
+        "fema_declaration": {
+          "type": "object",
+          "description": "Populated when category = 'fema_declaration' — for FEMA declarations that do not map to a more specific hazard category (e.g. multi-hazard 'Severe Storms, Straight-Line Winds, Flooding, Landslides').",
+          "properties": {
+            "intensity": {
+              "type": ["object", "null"],
+              "properties": {
+                "metric": { "type": "string", "examples": ["disaster_declaration"] },
+                "value": { "type": "number" },
+                "unit": { "type": "string", "examples": ["DR", "FM", "EM"] },
+                "display": { "type": "string" }
+              }
+            },
+            "femaDeclarationString": { "type": ["string", "null"] },
+            "femaDisasterNumber": { "type": ["integer", "null"] },
+            "declarationType": {
+              "type": ["string", "null"],
+              "enum": ["DR", "FM", "EM", "HM", null],
+              "description": "DR = Major Disaster, FM = Fire Management, EM = Emergency, HM = Hazard Mitigation."
+            },
+            "declarationTitle": { "type": ["string", "null"] },
+            "incidentType": {
+              "type": ["string", "null"],
+              "description": "FEMA incident type string. Examples: 'Flood', 'Fire', 'Hurricane', 'Severe Storm', 'Earthquake'."
+            },
+            "designatedIncidentTypes": {
+              "type": ["string", "null"],
+              "description": "Comma-separated FEMA program codes. Example: '2,M,W,F'."
+            },
+            "declarationDate": { "type": ["string", "null"] },
+            "incidentBeginDate": { "type": ["string", "null"] },
+            "incidentEndDate": { "type": ["string", "null"] },
+            "disasterCloseoutDate": { "type": ["string", "null"] },
+            "iaProgram": { "type": ["boolean", "null"] },
+            "paProgram": { "type": ["boolean", "null"] },
+            "hmProgram": { "type": ["boolean", "null"] },
+            "ihProgram": { "type": ["boolean", "null"] },
+            "designatedArea": { "type": ["string", "null"] },
+            "femaRegion": { "type": ["integer", "null"] },
+            "fipsStateCode": { "type": ["string", "null"] },
+            "fipsCountyCode": { "type": ["string", "null"] },
+            "tribalRequest": { "type": ["boolean", "null"] },
+            "lastIAFilingDate": { "type": ["string", "null"] },
+            "fyDeclared": { "type": ["integer", "null"] }
+          }
+        },
+
+        "earthquake_tsunami": {
+          "type": "object",
+          "description": "Populated when category = 'tsunami' (tsunami triggered by an earthquake or submarine event).",
+          "properties": {
+            "intensity": {
+              "type": ["object", "null"],
+              "properties": {
+                "metric": { "type": "string", "examples": ["wave_height", "run_up"] },
+                "value": { "type": "number" },
+                "unit": { "type": "string", "examples": ["ft", "m"] },
+                "display": { "type": "string" }
+              }
+            },
+            "triggeringMagnitude": { "type": ["number", "null"] },
+            "triggeringDepthKm": { "type": ["number", "null"] },
+            "estimatedWaveHeightFt": { "type": ["number", "null"] },
+            "warningSeries": {
+              "type": ["string", "null"],
+              "enum": ["Information Statement", "Watch", "Advisory", "Warning", null]
+            },
+            "travelTimeMins": {
+              "type": ["number", "null"],
+              "description": "Estimated tsunami travel time to nearest coast in minutes."
+            },
+            "ntwcBulletinNumber": { "type": ["string", "null"] }
+          }
+        },
+
+        "volcanic": {
+          "type": "object",
+          "description": "Populated when category = 'volcanic'.",
+          "properties": {
+            "intensity": {
+              "type": ["object", "null"],
+              "properties": {
+                "metric": { "type": "string", "examples": ["vei", "ash_column_height"] },
+                "value": { "type": "number" },
+                "unit": { "type": "string", "examples": ["VEI", "ft", "km"] },
+                "display": { "type": "string" }
+              }
+            },
+            "volcanoName": { "type": ["string", "null"] },
+            "vei": {
+              "type": ["integer", "null"],
+              "description": "Volcanic Explosivity Index (0–8)."
+            },
+            "aviationColorCode": {
+              "type": ["string", "null"],
+              "enum": ["Green", "Yellow", "Orange", "Red", null],
+              "description": "USGS/USFS aviation color code for ash hazard to aircraft."
+            },
+            "alertLevel": {
+              "type": ["string", "null"],
+              "enum": ["Normal", "Advisory", "Watch", "Warning", null]
+            },
+            "ashColumnHeightFt": { "type": ["number", "null"] },
+            "lavaFlowActive": { "type": ["boolean", "null"] },
+            "earthquakeSwarmCount": { "type": ["integer", "null"] }
+          }
+        },
+
+        "landslide": {
+          "type": "object",
+          "description": "Populated when category = 'landslide'.",
+          "properties": {
+            "intensity": {
+              "type": ["object", "null"],
+              "properties": {
+                "metric": { "type": "string", "examples": ["debris_flow_probability"] },
+                "value": { "type": "number" },
+                "unit": { "type": "string" },
+                "display": { "type": "string" }
+              }
+            },
+            "triggerType": {
+              "type": ["string", "null"],
+              "enum": ["rainfall", "earthquake", "erosion", "human_activity", "snow_melt", null]
+            },
+            "rainfallTriggerIn": { "type": ["number", "null"], "description": "Rainfall amount that triggered the event (inches)." },
+            "areaAffectedAcres": { "type": ["number", "null"] },
+            "roadImpact": { "type": ["boolean", "null"] }
+          }
+        },
+
+        "winter_weather": {
+          "type": "object",
+          "description": "Populated when category = 'winter_weather' (blizzard, ice storm, winter storm, heavy snow).",
+          "properties": {
+            "intensity": {
+              "type": ["object", "null"],
+              "properties": {
+                "metric": { "type": "string", "examples": ["snow_accumulation", "ice_accumulation", "nws_alert_severity"] },
+                "value": { "type": "number" },
+                "unit": { "type": "string", "examples": ["in", "level"] },
+                "display": { "type": "string" }
+              }
+            },
+            "snowAccumulationInMin": { "type": ["number", "null"] },
+            "snowAccumulationInMax": { "type": ["number", "null"] },
+            "iceAccumulationIn": { "type": ["number", "null"] },
+            "windChillF": { "type": ["number", "null"] },
+            "blizzardConditions": { "type": ["boolean", "null"] },
+            "affectedCounties": { "type": ["array", "null"], "items": { "type": "string" } },
+            "urgency": { "type": ["string", "null"] },
+            "certainty": { "type": ["string", "null"] },
+            "nwsEventCode": { "type": ["string", "null"] },
+            "senderName": { "type": ["string", "null"] },
+            "effectiveAt": { "type": ["string", "null"] },
+            "endsAt": { "type": ["string", "null"] }
+          }
+        },
+
+        "air_quality": {
+          "type": "object",
+          "description": "Populated when category = 'air_quality'.",
+          "properties": {
+            "intensity": {
+              "type": ["object", "null"],
+              "properties": {
+                "metric": { "type": "string", "examples": ["aqi"] },
+                "value": { "type": "number" },
+                "unit": { "type": "string", "examples": ["AQI"] },
+                "display": { "type": "string" }
+              }
+            },
+            "aqiValue": { "type": ["integer", "null"] },
+            "aqiCategory": {
+              "type": ["string", "null"],
+              "enum": ["Good", "Moderate", "Unhealthy for Sensitive Groups", "Unhealthy", "Very Unhealthy", "Hazardous", null]
+            },
+            "dominantPollutant": { "type": ["string", "null"] },
+            "pm25": { "type": ["number", "null"], "description": "PM2.5 concentration in µg/m³." },
+            "pm10": { "type": ["number", "null"] },
+            "ozone": { "type": ["number", "null"] },
+            "smokeSource": { "type": ["string", "null"], "description": "Origin of smoke (e.g. wildfire name or region)." },
+            "affectedCounties": { "type": ["array", "null"], "items": { "type": "string" } },
+            "senderName": { "type": ["string", "null"] },
+            "effectiveAt": { "type": ["string", "null"] },
+            "endsAt": { "type": ["string", "null"] }
+          }
+        },
+
+        "extreme_heat": {
+          "type": "object",
+          "description": "Populated when category = 'extreme_heat'.",
+          "properties": {
+            "intensity": {
+              "type": ["object", "null"],
+              "properties": {
+                "metric": { "type": "string", "examples": ["heat_index", "temperature"] },
+                "value": { "type": "number" },
+                "unit": { "type": "string", "examples": ["F"] },
+                "display": { "type": "string" }
+              }
+            },
+            "maxHeatIndexF": { "type": ["number", "null"], "description": "Maximum heat index (feels-like) in Fahrenheit." },
+            "maxTemperatureF": { "type": ["number", "null"] },
+            "heatAdvisoryThresholdF": { "type": ["number", "null"] },
+            "nighttimeMinF": { "type": ["number", "null"] },
+            "affectedCounties": { "type": ["array", "null"], "items": { "type": "string" } },
+            "urgency": { "type": ["string", "null"] },
+            "certainty": { "type": ["string", "null"] },
+            "nwsEventCode": { "type": ["string", "null"] },
+            "senderName": { "type": ["string", "null"] },
+            "effectiveAt": { "type": ["string", "null"] },
+            "endsAt": { "type": ["string", "null"] }
+          }
+        }
+
+      }
+    }
+  },
+
+  "exampleDocuments": {
+
+    "flood_nwps_gauge": {
+      "_id": { "$oid": "..." },
+      "externalId": "nwps:gauge:AACS2",
+      "source": "nwps",
+      "category": "flood",
+      "name": "Flood Watch",
+      "description": "Stage: 3199.62 ft · Flood category: no flooding · Observed: 2026-05-20T09:15:00Z",
+      "severity": "Moderate",
+      "type": "Watch",
+      "iconType": "cloud",
+      "status": "Take Action",
+      "dataStatus": "current",
+      "location": "CHEYENNE RIVER ABOVE ANGOSTURA AT HWY 71, SD",
+      "lat": 43.30577,
+      "lng": -103.562797,
+      "coordinates": null,
+      "geometry": null,
+      "issuedAt": "less than a minute ago",
+      "expiresAt": "See gauge / NWPS",
+      "instructions": ["Avoid flooded roads.", "Follow evacuation orders if issued."],
+      "createdAt": { "$date": "2026-05-18T09:06:23.701Z" },
+      "updatedAt": { "$date": "2026-05-20T10:59:43.312Z" },
+      "properties": {
+        "flood": {
+          "intensity": {
+            "metric": "stage",
+            "value": 3199.6,
+            "unit": "ft",
+            "display": "3199.6 ft",
+            "secondaryMetric": "flood_category",
+            "secondaryValue": 1,
+            "secondaryUnit": "level"
+          },
+          "stage": 3199.6,
+          "stageUnit": "ft",
+          "gageHeight": null,
+          "discharge": null,
+          "flowKcfs": null,
+          "forecastStage": null,
+          "forecastFloodCategory": "fcst_not_current",
+          "observedFloodCategory": "no_flooding",
+          "floodThresholds": {
+            "action": 3206,
+            "minor": 3207,
+            "moderate": 3209,
+            "major": 3211,
+            "unit": "ft"
+          },
+          "gaugeLid": "AACS2",
+          "gaugeUsgsId": null,
+          "gaugeRfc": "MBRFC",
+          "gaugeWfo": "UNR",
+          "affectedCounties": null,
+          "urgency": null,
+          "certainty": null,
+          "nwsEventCode": null,
+          "nwsVtec": null,
+          "senderName": null,
+          "effectiveAt": null,
+          "onsetAt": null,
+          "endsAt": null,
+          "observedAt": "2026-05-20T09:15:00Z",
+          "upstreamGaugeLid": "EDGS2",
+          "downstreamGaugeLid": "ANGS2"
+        }
+      }
+    },
+
+    "earthquake_usgs": {
+      "_id": { "$oid": "..." },
+      "externalId": "eq:us6000sxdg",
+      "source": "earthquake",
+      "category": "earthquake",
+      "name": "Earthquake · M4.3",
+      "description": "USGS M4.3 — 5 km SW of Easington, Jamaica. depth n/a",
+      "severity": "Moderate",
+      "type": "Watch",
+      "iconType": "triangle",
+      "status": "Take Action",
+      "dataStatus": "current",
+      "location": "5 km SW of Easington, Jamaica · 17.890, -76.624",
+      "lat": 17.890,
+      "lng": -76.624,
+      "coordinates": null,
+      "geometry": { "type": "Point", "coordinates": [-76.624, 17.890, 10] },
+      "issuedAt": "recently",
+      "expiresAt": "See USGS event page",
+      "instructions": ["Stay informed.", "Avoid unstable structures."],
+      "createdAt": { "$date": "2026-05-14T05:20:03.885Z" },
+      "updatedAt": { "$date": "2026-05-14T05:36:34.170Z" },
+      "properties": {
+        "earthquake": {
+          "intensity": {
+            "metric": "magnitude",
+            "value": 4.3,
+            "unit": "ml",
+            "display": "M4.3"
+          },
+          "magnitude": 4.3,
+          "magnitudeType": "ml",
+          "depth": 10,
+          "depthUnit": "km",
+          "place": "5 km SW of Easington, Jamaica",
+          "tsunami": 0,
+          "sig": 284,
+          "cdi": null,
+          "mmi": null,
+          "felt": null,
+          "alert": null,
+          "reviewStatus": "reviewed",
+          "nst": 45,
+          "gap": 72,
+          "dmin": 1.2,
+          "rms": 0.55,
+          "net": "us",
+          "usgsEventId": "us6000sxdg",
+          "usgsEventUrl": "https://earthquake.usgs.gov/earthquakes/eventpage/us6000sxdg",
+          "occurredAt": "2026-05-14T05:00:00Z"
+        }
+      }
+    },
+
+    "wildfire_fema": {
+      "_id": { "$oid": "..." },
+      "externalId": "fema:1c56ee81-9330-4d6b-85aa-45520d4c575a",
+      "source": "fema",
+      "category": "wildfire",
+      "name": "Pineland Road Wildfire",
+      "description": "Declaration: FM-5629-GA · GA — Type: Fire",
+      "severity": "High",
+      "type": "Warning",
+      "iconType": "triangle",
+      "status": "Take Action",
+      "dataStatus": "current",
+      "location": "Clinch (County), GA",
+      "lat": 32.679255,
+      "lng": -83.222447,
+      "coordinates": null,
+      "geometry": null,
+      "issuedAt": "29 days ago",
+      "expiresAt": "See OpenFEMA",
+      "instructions": ["Follow evacuation routes.", "Reduce ignition risks."],
+      "createdAt": { "$date": "2026-05-06T06:54:44.030Z" },
+      "updatedAt": { "$date": "2026-05-20T10:59:41.066Z" },
+      "properties": {
+        "wildfire": {
+          "intensity": {
+            "metric": "disaster_declaration",
+            "value": 5629,
+            "unit": "FM",
+            "display": "FM-5629"
+          },
+          "fireName": "Pineland Road Wildfire",
+          "containmentPct": null,
+          "areaAcres": null,
+          "areaHectares": null,
+          "perimeterMiles": null,
+          "frp": null,
+          "brightnessTi4": null,
+          "brightnessTi5": null,
+          "viirsScanTrack": null,
+          "firmsConfidence": null,
+          "dayNight": null,
+          "acquiredAt": null,
+          "satellite": null,
+          "instrument": null,
+          "incidentType": "Fire",
+          "femaDeclarationString": "FM-5629-GA",
+          "femaDisasterNumber": 5629,
+          "incidentBeginDate": null,
+          "incidentEndDate": null,
+          "iaProgram": false,
+          "paProgram": true,
+          "hmProgram": false,
+          "designatedArea": "Clinch (County), GA",
+          "wfigsPerimeterSource": null
+        }
+      }
+    },
+
+    "hurricane_fema": {
+      "_id": { "$oid": "..." },
+      "externalId": "fema:1973ca67-5693-4e84-9e66-d999291b6426",
+      "source": "fema",
+      "category": "hurricane_typhoon",
+      "name": "Super Typhoon Sinlaku",
+      "description": "Declaration: DR-4910-MP · MP — Type: Hurricane",
+      "severity": "High",
+      "type": "Warning",
+      "iconType": "cloud",
+      "status": "Take Action",
+      "dataStatus": "current",
+      "location": "Saipan (Municipality), MP",
+      "lat": null,
+      "lng": null,
+      "coordinates": null,
+      "geometry": null,
+      "issuedAt": "27 days ago",
+      "expiresAt": "5:00 AM",
+      "instructions": ["Stay informed.", "Avoid unnecessary travel."],
+      "createdAt": { "$date": "2026-05-06T06:54:44.030Z" },
+      "updatedAt": { "$date": "2026-05-20T10:59:41.066Z" },
+      "properties": {
+        "hurricane_typhoon": {
+          "intensity": {
+            "metric": "disaster_declaration",
+            "value": 4910,
+            "unit": "DR",
+            "display": "DR-4910"
+          },
+          "stormName": "Super Typhoon Sinlaku",
+          "category": null,
+          "maxSustainedWindMph": null,
+          "maxSustainedWindKts": null,
+          "centralPressureMb": null,
+          "stormSurgeFt": null,
+          "rainfallInches": null,
+          "femaDeclarationString": "DR-4910-MP",
+          "femaDisasterNumber": 4910,
+          "femaDeclarationType": "DR",
+          "declarationDate": null,
+          "incidentBeginDate": null,
+          "incidentEndDate": null,
+          "iaProgram": null,
+          "paProgram": null,
+          "hmProgram": null,
+          "designatedArea": "Saipan (Municipality), MP",
+          "femaRegion": null,
+          "fipsStateCode": null,
+          "fipsCountyCode": null
+        }
+      }
+    }
+  }
+}

@@ -58,18 +58,9 @@ type HazardArchetype =
     | 'multi'
     | 'baseline';
 
-function distroCounts(report: RiskReport): {
-    flood: number;
-    wildfire: number;
-    earthquake: number;
-    tornado: number;
-    storm: number;
-    hazardous: number;
-    coastal_surf: number;
-    marine: number;
-} {
+function distroCounts(report: RiskReport): Record<IncidentHistoryCategory, number> {
     /** Sum counts across duplicate rows so totals match stacked bar-chart expectations. */
-    const totals = {
+    const totals: Record<IncidentHistoryCategory, number> = {
         flood: 0,
         wildfire: 0,
         earthquake: 0,
@@ -78,6 +69,14 @@ function distroCounts(report: RiskReport): {
         hazardous: 0,
         coastal_surf: 0,
         marine: 0,
+        hurricane_typhoon: 0,
+        tsunami: 0,
+        volcanic: 0,
+        landslide: 0,
+        winter_weather: 0,
+        air_quality: 0,
+        extreme_heat: 0,
+        fema_declaration: 0,
     };
 
     for (const row of report.incident_distribution ?? []) {
@@ -441,10 +440,18 @@ export const INCIDENT_HISTORY_TAB_LABELS: Record<IncidentHistoryCategory, string
     tornado: 'Tornado',
     storm: 'Storm',
     hazardous: 'Hazardous',
-    coastal_surf: 'Coastal surf',
+    coastal_surf: 'Coastal Surf',
     marine: 'Marine',
     wildfire: 'Wildfire',
     earthquake: 'Earthquake',
+    hurricane_typhoon: 'Hurricane / Typhoon',
+    tsunami: 'Tsunami',
+    volcanic: 'Volcanic',
+    landslide: 'Landslide',
+    winter_weather: 'Winter Weather',
+    air_quality: 'Air Quality',
+    extreme_heat: 'Extreme Heat',
+    fema_declaration: 'FEMA Declaration',
 };
 
 export function isLikelyEarthquakeBullet(text: string): boolean {
@@ -626,6 +633,8 @@ function playbookForIncident(state: string, cat: IncidentHistoryCategory): Omit<
             return copyForCoastalSurf(state);
         case 'marine':
             return copyForMarine(state);
+        default:
+            return {};
     }
 }
 
