@@ -2,7 +2,21 @@
 
 import React, { useMemo, useCallback, useState, useRef } from 'react'
 import { GoogleMap as GoogleMapComponent, useJsApiLoader, Marker, InfoWindow, Circle } from '@react-google-maps/api'
+import { GoogleMapsOverlay } from '@deck.gl/google-maps'
+import { HeatmapLayer } from '@deck.gl/aggregation-layers'
 import { GOOGLE_MAPS_API_KEY, GOOGLE_MAPS_LIBRARIES, GOOGLE_MAPS_LOADER_ID } from '@/lib/constants/google-maps-config'
+
+type DeckHeatPoint = { position: [number, number]; weight: number }
+
+/** Matches prior Google HeatmapLayer gradient (blue → yellow → orange → red). */
+const HEATMAP_COLOR_RANGE: [number, number, number, number][] = [
+    [59, 130, 246, 0],
+    [59, 130, 246, 87],
+    [250, 204, 21, 143],
+    [251, 146, 60, 184],
+    [239, 68, 68, 220],
+    [185, 28, 28, 245],
+]
 
 interface MapMarker {
     id: string
@@ -83,20 +97,6 @@ function viewportExceedsStateBounds(map: google.maps.Map, bounds: MapStateBounds
     )
 }
 
-function heatPointCircleStyle(weight: number | undefined) {
-    const w = Math.max(0.1, Math.min(1.2, weight ?? 0.6))
-    if (w >= 0.9) {
-      return { radius: 22000, fillColor: '#B91C1C', strokeColor: '#7F1D1D', fillOpacity: 0.4, strokeOpacity: 0.55 }
-    }
-    if (w >= 0.75) {
-      return { radius: 18000, fillColor: '#EF4444', strokeColor: '#B91C1C', fillOpacity: 0.36, strokeOpacity: 0.5 }
-    }
-    if (w >= 0.6) {
-      return { radius: 14000, fillColor: '#FB923C', strokeColor: '#EA580C', fillOpacity: 0.32, strokeOpacity: 0.45 }
-    }
-    return { radius: 10000, fillColor: '#FACC15', strokeColor: '#EAB308', fillOpacity: 0.28, strokeOpacity: 0.4 }
-  }
-
 export function GoogleMap({
     address,
     markers = [],
@@ -119,7 +119,7 @@ export function GoogleMap({
 
     const [selectedMarker, setSelectedMarker] = useState<MapMarker | null>(null)
     const [map, setMap] = React.useState<google.maps.Map | null>(null)
-    const heatLayerRef = useRef<google.maps.visualization.HeatmapLayer | null>(null)
+    const deckOverlayRef = useRef<GoogleMapsOverlay | null>(null)
     const stateBoundsFittedRef = useRef(false)
     const stateMinZoomRef = useRef<number | null>(null)
     const lastZoomRef = useRef<number | null>(null)
@@ -128,9 +128,22 @@ export function GoogleMap({
         setMap(map)
     }, [])
 
-    const onUnmount = useCallback(function callback(map: google.maps.Map) {
+    const onUnmount = useCallback(function callback() {
+        if (deckOverlayRef.current) {
+            deckOverlayRef.current.setMap(null)
+            deckOverlayRef.current.finalize()
+            deckOverlayRef.current = null
+        }
         setMap(null)
     }, [])
+
+    const validHeatPoints = useMemo(
+        () =>
+            heatPoints.filter(
+                (p) => Number.isFinite(p.lat) && Number.isFinite(p.lng) && !isNaN(p.lat) && !isNaN(p.lng),
+            ),
+        [heatPoints],
+    )
 
     // Smooth pan when center changes (skip when locked to state — fitBounds owns the view)
     React.useEffect(() => {
@@ -249,52 +262,43 @@ export function GoogleMap({
     React.useEffect(() => {
         if (!map) return
 
-        if (heatLayerRef.current) {
-            heatLayerRef.current.setMap(null)
-            heatLayerRef.current = null
+        if (!deckOverlayRef.current) {
+            deckOverlayRef.current = new GoogleMapsOverlay({ interleaved: true })
+        }
+        const overlay = deckOverlayRef.current
+
+        if (!showHeatmap || validHeatPoints.length === 0) {
+            overlay.setProps({ layers: [] })
+            overlay.setMap(map)
+            return
         }
 
-        if (!showHeatmap || heatPoints.length === 0 || !google.maps.visualization?.HeatmapLayer) return
-
-        const data = heatPoints.map((p) => ({
-            location: new google.maps.LatLng(p.lat, p.lng),
+        const data: DeckHeatPoint[] = validHeatPoints.map((p) => ({
+            position: [p.lng, p.lat],
             weight: Math.max(0.1, Math.min(1.2, p.weight ?? 0.6)),
         }))
 
-        const heat = new google.maps.visualization.HeatmapLayer({
-            data,
-            radius: 36,
-            opacity: 0.78,
-            maxIntensity: 1.05,
-            dissipating: true,
-            gradient: [
-                'rgba(59,130,246,0)',
-                'rgba(59,130,246,0.34)',
-                'rgba(250,204,21,0.56)',
-                'rgba(251,146,60,0.72)',
-                'rgba(239,68,68,0.86)',
-                'rgba(185,28,28,0.96)',
+        overlay.setProps({
+            layers: [
+                new HeatmapLayer<DeckHeatPoint>({
+                    id: 'incident-heatmap',
+                    data,
+                    pickable: false,
+                    getPosition: (d) => d.position,
+                    getWeight: (d) => d.weight,
+                    radiusPixels: 36,
+                    intensity: 1.2,
+                    threshold: 0.04,
+                    colorRange: HEATMAP_COLOR_RANGE,
+                }),
             ],
         })
-
-        heat.setMap(map)
-        heatLayerRef.current = heat
+        overlay.setMap(map)
 
         return () => {
-            if (heatLayerRef.current) {
-                heatLayerRef.current.setMap(null)
-                heatLayerRef.current = null
-            }
+            overlay.setProps({ layers: [] })
         }
-    }, [map, showHeatmap, heatPoints])
-
-    const validHeatPoints = useMemo(
-        () =>
-          heatPoints.filter(
-            (p) => Number.isFinite(p.lat) && Number.isFinite(p.lng) && !isNaN(p.lat) && !isNaN(p.lng),
-          ),
-        [heatPoints],
-      )
+    }, [map, showHeatmap, validHeatPoints])
 
     if (!isLoaded) return <div className="w-full h-full min-h-[400px] bg-slate-100 animate-pulse flex items-center justify-center rounded-xl border border-slate-200">
         <p className="text-slate-400 text-xs font-black uppercase tracking-widest">Initalizing Satellite Feed...</p>
@@ -326,43 +330,6 @@ export function GoogleMap({
                     fullscreenControl: true
                 }}
             >
-                {showHeatmap &&
-  validHeatPoints.map((point, index) => {
-    const style = heatPointCircleStyle(point.weight)
-    return (
-      <Circle
-        key={`heat-${point.lat}-${point.lng}-${index}`}
-        center={{ lat: point.lat, lng: point.lng }}
-        radius={style.radius}
-        options={{
-          strokeColor: style.strokeColor,
-          strokeOpacity: style.strokeOpacity,
-          strokeWeight: 2,
-          fillColor: style.fillColor,
-          fillOpacity: style.fillOpacity,
-          clickable: false,
-          zIndex: 1,
-        }}
-      />
-    )
-  })}
-
-{showHeatmap &&
-  validHeatPoints.map((point, index) => (
-    <Marker
-      key={`heat-pin-${point.lat}-${point.lng}-${index}`}
-      position={{ lat: point.lat, lng: point.lng }}
-      icon={{
-        path: google.maps.SymbolPath.CIRCLE,
-        fillColor: '#DC2626',
-        fillOpacity: 0.95,
-        strokeColor: '#FFFFFF',
-        strokeWeight: 2,
-        scale: 6,
-      }}
-      zIndex={2}
-    />
-  ))}
                 {validMarkers.map((marker) => (
                     <React.Fragment key={marker.id}>
                         <Marker
