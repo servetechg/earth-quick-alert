@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongodb';
-import AlertCommunication from '@/models/AlertCommunication';
+import UnifiedEvent from '@/models/UnifiedEvent';
 import User from '@/models/User';
-import { alertCommunicationFeedFilter } from '@/lib/constants/alert-communication-feed';
 import {
     forceSyncAllAlertCommunicationFeedsNow,
     syncAlertCommunicationFeedsGate,
 } from '@/lib/services/alert-communication-feed-sync-gate';
-import { hydrateAlertCommunicationRows } from '@/lib/utils/alert-communication-hydrate';
+import { fetchUnifiedEventLegacyCards } from '@/lib/unified-event/feed';
+import { unifiedEventToLegacyAlertCard } from '@/lib/unified-event/legacy-card';
 import { getSession } from '@/lib/auth';
 import { filterHydratedForSubAdminState } from '@/lib/services/alert-communication-aligned-feed';
 
@@ -30,10 +30,7 @@ export async function GET() {
     try {
         await dbConnect();
         await syncAlertCommunicationFeedsGate();
-        const feedFilter = alertCommunicationFeedFilter();
-        /** Live feeds only (NWS + USGS + FIRMS + InciWeb). Set `ALERTS_COMMUNICATION_INCLUDE_MANUAL=true` to show manual/seed rows. */
-        const data = await AlertCommunication.find(feedFilter).sort({ createdAt: -1 }).lean();
-        const hydrated = hydrateAlertCommunicationRows(data as any[]);
+        const hydrated = await fetchUnifiedEventLegacyCards();
 
         const subAdminStateFilter = await resolveSubAdminStateFilterRaw();
         const filtered =
@@ -50,10 +47,7 @@ export async function POST() {
     try {
         await dbConnect();
         const { nws, multi } = await forceSyncAllAlertCommunicationFeedsNow();
-        const data = await AlertCommunication.find(alertCommunicationFeedFilter())
-            .sort({ createdAt: -1 })
-            .lean();
-        const hydrated = hydrateAlertCommunicationRows(data as any[]);
+        const hydrated = await fetchUnifiedEventLegacyCards();
 
         const subAdminStateFilter = await resolveSubAdminStateFilterRaw();
         const filtered =
@@ -69,8 +63,11 @@ export async function PATCH(request: Request) {
     try {
         await dbConnect();
         const { id, status } = await request.json();
-        const updated = await AlertCommunication.findByIdAndUpdate(id, { status }, { new: true });
-        return NextResponse.json(updated);
+        const updated = await UnifiedEvent.findByIdAndUpdate(id, { status }, { new: true }).lean();
+        if (!updated) {
+            return NextResponse.json({ error: 'Not found' }, { status: 404 });
+        }
+        return NextResponse.json(unifiedEventToLegacyAlertCard(updated as Record<string, unknown>));
     } catch (error: any) {
         return NextResponse.json({ error: error.message }, { status: 500 });
     }

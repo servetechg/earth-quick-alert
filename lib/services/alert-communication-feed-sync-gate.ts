@@ -1,7 +1,11 @@
-import AlertCommunication from '@/models/AlertCommunication';
-import { alertCommunicationFeedFilter } from '@/lib/constants/alert-communication-feed';
+import UnifiedEvent from '@/models/UnifiedEvent';
+import { unifiedEventFeedFilter } from '@/lib/constants/unified-event-feed';
 import { syncNwsAlertsNow, syncNwsAlertsIfStale } from '@/lib/services/alert-communication-nws-sync';
 import { syncAllSourcesNow, syncAllSourcesIfStale } from '@/lib/services/alert-communication-multi-sync';
+import {
+    syncAllHistoricalUnifiedEvents,
+    syncHistoricalUnifiedEventsIfStale,
+} from '@/lib/services/unified-event-historical-ingest';
 
 type MultiReport = Awaited<ReturnType<typeof syncAllSourcesNow>>;
 
@@ -32,11 +36,18 @@ export async function forceSyncAllAlertCommunicationFeedsNow(): Promise<{
  * Caller must `await dbConnect()` first.
  */
 export async function syncAlertCommunicationFeedsGate(): Promise<void> {
-    const feedFilter = alertCommunicationFeedFilter();
-    const hasLiveRows = !!(await AlertCommunication.findOne(feedFilter).select('_id').lean());
+    const feedFilter = unifiedEventFeedFilter();
+    const hasLiveRows = !!(await UnifiedEvent.findOne(feedFilter).select('_id').lean());
     if (!hasLiveRows) {
         await forceSyncAllAlertCommunicationFeedsNow();
+        if (process.env.UNIFIED_EVENT_HISTORICAL_ENABLED !== 'false') {
+            await syncAllHistoricalUnifiedEvents().catch((e) =>
+                console.error('[unified-historical:bootstrap]', e),
+            );
+        }
     } else {
         await Promise.all([syncNwsAlertsIfStale(), syncAllSourcesIfStale()]);
     }
+
+    void syncHistoricalUnifiedEventsIfStale();
 }

@@ -1,14 +1,10 @@
-import AlertCommunication from '@/models/AlertCommunication';
 import User from '@/models/User';
-import { alertCommunicationFeedFilter } from '@/lib/constants/alert-communication-feed';
-import { hydrateAlertCommunicationRows } from '@/lib/utils/alert-communication-hydrate';
 import { alertRowMatchesAiAlignedStateScope } from '@/lib/utils/alert-location-state-match';
 import { syncAlertCommunicationFeedsGate } from '@/lib/services/alert-communication-feed-sync-gate';
+import { fetchUnifiedEventLegacyCards } from '@/lib/unified-event/feed';
+import { unifiedCategoryToDistroBucket } from '@/lib/unified-event/category-infer';
 import type { DistroPoint } from '@/lib/types/risk-assessment';
-import {
-    classifyNwsIncidentDistributionBucket,
-    isFloodRelatedEvent,
-} from '@/lib/services/risk-ingest-service';
+import type { UnifiedEventCategory } from '@/lib/unified-event/types';
 
 export function filterHydratedForSubAdminState(hydrated: any[], stateRaw: string) {
     return hydrated.filter((row) =>
@@ -41,9 +37,7 @@ export async function fetchAlignedAlertCommunicationFeed(options: {
     role: string;
 }): Promise<any[]> {
     await syncAlertCommunicationFeedsGate();
-    const feedFilter = alertCommunicationFeedFilter();
-    const data = await AlertCommunication.find(feedFilter).sort({ createdAt: -1 }).lean();
-    const hydrated = hydrateAlertCommunicationRows(data as any[]);
+    const hydrated = await fetchUnifiedEventLegacyCards();
 
     const role = String(options.role ?? '').toLowerCase();
     if (role === 'sub-admin' && options.userId) {
@@ -64,26 +58,20 @@ type DistroCat =
     | 'wildfire'
     | 'earthquake';
 
-function categorizeAlertRow(row: { source?: string; name?: string; description?: string }): DistroCat {
-    const src = String(row.source ?? 'nws').toLowerCase();
-    const name = String(row.name ?? '');
-    const desc = String(row.description ?? '');
+function categorizeAlertRow(row: {
+    source?: string;
+    name?: string;
+    description?: string;
+    category?: string;
+}): DistroCat {
+    const cat = String(row.category ?? '').trim() as UnifiedEventCategory;
+    if (cat) return unifiedCategoryToDistroBucket(cat);
 
+    const src = String(row.source ?? 'nws').toLowerCase();
     if (src === 'earthquake') return 'earthquake';
     if (src === 'firms' || src === 'inciweb' || src === 'wfigs') return 'wildfire';
-    if (src === 'usgs' || src === 'nwps' || src === 'fema') return 'flood';
-
-    if (src === 'nws') {
-        if (isFloodRelatedEvent(name) || isFloodRelatedEvent(desc)) return 'flood';
-        const bucket = classifyNwsIncidentDistributionBucket(name) ?? classifyNwsIncidentDistributionBucket(desc);
-        if (bucket === 'tornado') return 'tornado';
-        if (bucket === 'storm') return 'storm';
-        if (bucket === 'hazardous') return 'hazardous';
-        if (bucket === 'coastal_surf') return 'coastal_surf';
-        if (bucket === 'marine') return 'marine';
-        return 'hazardous';
-    }
-
+    if (src === 'usgs' || src === 'nwps') return 'flood';
+    if (src === 'fema') return 'flood';
     return 'hazardous';
 }
 

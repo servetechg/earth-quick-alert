@@ -2,6 +2,45 @@ export interface RecommendationItem {
   priority: 'IMMEDIATE' | 'URGENT' | 'STANDARD';
   action: string;
   deployable: boolean;
+  step?: number;
+}
+
+/** One severity bucket from the new /summary endpoint */
+export interface SeverityCategoryItem {
+  category: string;
+  eventCount: number;
+  bullets: string[];
+  events?: unknown[];
+}
+
+export interface SeverityBucket {
+  severity: 'Low' | 'Moderate' | 'High' | 'Extreme';
+  categories: SeverityCategoryItem[];
+}
+
+/** Payload returned by GET /api/risk-assessment/summary */
+export interface RiskSummaryPayload {
+  generated_at: string;
+  overall_risk_level: string;
+  alerts_count: number;
+  major_incidents: number;
+  minor_incidents: number;
+  incident_distribution: DistroPoint[];
+  active_categories: string[];
+  active_severities: string[];
+  ai_confidence: number;
+  populations_at_risk: number;
+  sources_count: number;
+  /** False when OPENAI_API_KEY is unset — UI shows a banner and deterministic fallbacks are used. Added by /summary route, not by computeRiskSnapshot. */
+  ai_available?: boolean;
+}
+
+/** Payload returned by POST /api/risk-assessment/historical/[category] */
+export interface HistoricalTabPayload {
+  category: string;
+  historical_analysis: HistoricalAnalysis;
+  hasSimilarPast: boolean;
+  recommendations_list?: RecommendationItem[];
 }
 
 export interface DomainSeverities {
@@ -35,6 +74,14 @@ export const INCIDENT_HISTORY_TAB_KEYS = [
   'marine',
   'wildfire',
   'earthquake',
+  'hurricane_typhoon',
+  'tsunami',
+  'volcanic',
+  'landslide',
+  'winter_weather',
+  'air_quality',
+  'extreme_heat',
+  'fema_declaration',
 ] as const;
 
 export type IncidentHistoryCategory = (typeof INCIDENT_HISTORY_TAB_KEYS)[number];

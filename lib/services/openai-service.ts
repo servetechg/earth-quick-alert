@@ -1,4 +1,5 @@
 import { Alert, AlertSeverity, AlertSource, SocialMediaAlert, ResourceAlert } from '@/lib/types/api-alerts';
+import type { UnifiedEventDoc } from '@/lib/services/unified-event-repo';
 import type {
     DashboardIngestBundle,
     HistoricalAnalysis,
@@ -145,6 +146,10 @@ export class OpenAIService {
         return Boolean(this.apiKey);
     }
 
+    isAvailable(): boolean {
+        return this.canUseOpenAI();
+    }
+
     private async callOpenAI<T>(
         messages: ChatMessage[],
         fallback: T,
@@ -167,6 +172,7 @@ export class OpenAIService {
                     model: effectiveModel,
                     messages,
                     response_format: { type: 'json_object' },
+                    ...(typeof options?.max_tokens === 'number' ? { max_tokens: options.max_tokens } : {}),
                     ...(typeof options?.temperature === 'number' ? { temperature: options.temperature } : {}),
                 }),
             });
@@ -365,7 +371,6 @@ export class OpenAIService {
         - timestamp: ISO string (recent)
         - engagement: { likes: number, shares: number }`;
 
-        const fallback: { posts: SocialMediaAlert[] } = { posts: [] };
         const result = await this.callOpenAI<{ posts: any[] }>([{ role: 'system', content: 'You are an emergency management AI.' }, { role: 'user', content: prompt }], { posts: [] });
         
         return (result.posts || []).map(p => ({
@@ -1254,6 +1259,238 @@ Rules:
             major_incidents: 0,
             minor_incidents: 0,
         };
+    }
+
+    // ─── DB-driven methods (UnifiedEvent as source of truth) ───────────────
+
+    private projectEventForAI(e: UnifiedEventDoc) {
+        return {
+            name: e.name,
+            category: e.category,
+            severity: e.severity,
+            location: e.location,
+            issuedAt: e.issuedAt,
+            expiresAt: e.expiresAt,
+            description: e.description,
+            instructions: e.instructions,
+            properties: e.properties,
+            source: e.source,
+            status: e.status,
+        };
+    }
+
+    async generateSeverityCategorySummary(input: {
+        severity: 'Low' | 'Moderate' | 'High' | 'Extreme';
+        category: string;
+        events: UnifiedEventDoc[];
+    }): Promise<string[]> {
+        const fallback = [
+            `${input.events.length} active ${input.category} event(s) at ${input.severity} severity in ${[...new Set(input.events.map((e) => e.location))].slice(0, 3).join(', ')}.`,
+        ];
+        const result = await this.callOpenAI<{ bullets: string[] }>(
+            [
+                {
+                    role: 'system',
+                    content: `${PLAIN_ENGLISH_STYLE_RULES}
+
+You are summarizing all active ${input.category} events at ${input.severity} severity for an executive emergency briefing.
+
+Return a JSON array of bullet strings — one bullet per event or major finding. Each bullet MUST:
+- Be one complete, self-explanatory sentence.
+- Include the event name, the affected location or county, the date and time (formatted as "May 22, 2026, 3:45 PM"), and ALL key statistics present in the data.
+- Draw statistics directly from the "properties" field of each event: intensity value (1=Low, 2=Moderate, 3=High, 4=Extreme), affectedCounties array, effectiveAt, endsAt, injuriesDirect, deathsDirect, damageProperty, damageCrops, totalFederalAidUsd, femaDisasterNumber — whichever are non-null for this event.
+- NEVER omit numbers, counts, dollar amounts, names, or timestamps that appear in the data.
+- Wrap place names, severity words, and numeric facts in **double asterisks**.
+
+Return JSON: {"bullets": ["<sentence>", ...]}.`,
+                },
+                {
+                    role: 'user',
+                    content: JSON.stringify(input.events.map((e) => this.projectEventForAI(e))),
+                },
+            ],
+            { bullets: fallback },
+            { max_tokens: 700 },
+        );
+        return Array.isArray(result.bullets) && result.bullets.length > 0 ? result.bullets : fallback;
+    }
+
+    async generateHistoricalPastSummary(input: {
+        category: string;
+        similarPastEvents: UnifiedEventDoc[];
+        currentSeed: UnifiedEventDoc;
+    }): Promise<{
+        matched_event?: string;
+        similarity_summary?: string;
+        past_damages?: string[];
+        past_procedures?: string[];
+    }> {
+        const fallback: {
+            matched_event?: string;
+            similarity_summary?: string;
+            past_damages?: string[];
+            past_procedures?: string[];
+        } = {};
+        if (input.similarPastEvents.length === 0) return fallback;
+
+        return this.callOpenAI(
+            [
+                {
+                    role: 'system',
+                    content: `${PLAIN_ENGLISH_STYLE_RULES}
+
+You are summarizing up to 3 past ${input.category} events similar to today's active situation. Cite specific event names, friendly dates (e.g. "June 12, 2023, 4:15 PM"), locations, fatalities, injuries, property/crop damage, and federal aid figures as found in the data. Wrap key facts in **double asterisks**.
+
+Return JSON with exactly these keys:
+- matched_event: A single sentence identifying the closest comparable past event type. It must state: the event name or type, the location, the friendly date and time (e.g. "June 12, 2023, 4:15 PM"), and the most impactful statistic from the SEED_PROPERTIES (e.g. intensity level, femaDisasterNumber, total federal aid, deaths, injuries, property damage, acres burned). Format example: "**[Event Name]** — **[Location]**, **[Date/Time]** — **[key stat]**". Wrap specific facts in **double asterisks**.
+- similarity_summary: 1-2 plain sentences explaining why today's conditions resemble that past situation.
+- past_damages: string[] — Bullets describing the physical damage and human impact this type of hazard has caused in the past. Prefer exact figures from the event data (deaths, injuries, property damage in dollars, acres burned, structures destroyed) when they are present. When the event data contains no damage statistics (this is common for weather advisories such as marine, coastal, storm, or hazardous alerts, which do not carry post-event reports), write what this category of hazard is known to cause based on domain knowledge — for example capsizings and vessel losses for marine events, respiratory illness and hospital visits for hazardous air quality, structural damage and power outages for storms. Always write at least 2 meaningful bullets. Do NOT include any response actions or procedures — those belong in past_procedures.
+- past_procedures: string[] — Bullets describing what responders and officials have done in response to this type of hazard. Prefer specific actions from the event data (emergency declarations, federal aid disbursements with exact dollar amounts, evacuation orders, shelter activations). When the event data lacks procedural detail, describe the typical response steps taken for this category of hazard based on domain knowledge. Always write at least 2 meaningful bullets. Do NOT include damage statistics here — those belong in past_damages.`,
+                },
+                {
+                    role: 'user',
+                    content: `CURRENT SEED EVENT:\n${JSON.stringify(this.projectEventForAI(input.currentSeed))}\n\nSEED_PROPERTIES (use these raw fields for matched_event statistics):\n${JSON.stringify(input.currentSeed.properties ?? {})}\n\nSIMILAR PAST EVENTS:\n${JSON.stringify(input.similarPastEvents.map((e) => this.projectEventForAI(e)))}`,
+                },
+            ],
+            fallback,
+            { max_tokens: 900 },
+        );
+    }
+
+    async generateHistoricalCurrentSummary(input: {
+        category: string;
+        currentEvents: UnifiedEventDoc[];
+        activeResponders?: Record<string, unknown[]>;
+    }): Promise<{ current_procedures?: string[] }> {
+        const fallback: { current_procedures?: string[] } = {};
+
+        // Only generate AI summary when real responder activity exists in the DB.
+        // If no responders are on record, return empty so the UI shows the placeholder.
+        const hasResponders = input.activeResponders && Object.keys(input.activeResponders).length > 0;
+        if (!hasResponders) return fallback;
+
+        const system = `${PLAIN_ENGLISH_STYLE_RULES}
+
+You are writing the "Current Procedures" section for a ${input.category} emergency briefing. Describe what each responding organization is actively doing right now based on the RESPONDERS data below. Name every organization, state their deployed numbers, and note any units that are stressed or at limited capacity. Use the EVENTS block only to give geographic or incident context to the responder actions.
+
+Write in plain English. Examples of good bullets:
+- "**Riverside County Medical Center** currently has **14 of 20 ICU beds occupied**, with clinical staff managing a surge of patients from the active wildfire zone."
+- "**San Bernardino County Sheriff** has deployed **12 patrol vehicles** and **45 officers**, with two active incident operations and a staging area at **[location]**."
+- "**[Network Name]** National Guard has **[X] personnel** and **[Y] vehicles** at **[site]** — status: **active**."
+
+Return JSON: {"current_procedures": ["<sentence>", ...]}.`;
+
+        return this.callOpenAI(
+            [
+                { role: 'system', content: system },
+                {
+                    role: 'user',
+                    content: `RESPONDERS:\n${JSON.stringify(input.activeResponders)}\n\nEVENTS (context only):\n${JSON.stringify(input.currentEvents.map((e) => this.projectEventForAI(e)))}`,
+                },
+            ],
+            fallback,
+            { max_tokens: 900 },
+        );
+    }
+
+    async generateHistoricalFutureMeasures(input: {
+        category: string;
+        pastSummary: { past_damages?: string[]; past_procedures?: string[] };
+        currentSummary: { current_procedures?: string[] };
+    }): Promise<{ future_measures?: string[] }> {
+        const fallback: { future_measures?: string[] } = {};
+        const hasPast =
+            (input.pastSummary.past_damages?.length ?? 0) > 0 ||
+            (input.pastSummary.past_procedures?.length ?? 0) > 0;
+        const hasCurrent = (input.currentSummary.current_procedures?.length ?? 0) > 0;
+        if (!hasPast && !hasCurrent) return fallback;
+
+        return this.callOpenAI(
+            [
+                {
+                    role: 'system',
+                    content: `${PLAIN_ENGLISH_STYLE_RULES}\n\nYou are a senior emergency management advisor proposing expert-grade, realistic long-term mitigation strategies for ${input.category} hazards to be presented to senior executives. Be specific — name infrastructure upgrades, policy changes, funding mechanisms, training programs, or technology investments. Never generic platitudes. Return JSON: {"future_measures": ["<measure>", ...]}.`,
+                },
+                {
+                    role: 'user',
+                    content: `PAST DAMAGES:\n${JSON.stringify(input.pastSummary.past_damages ?? [])}\n\nPAST PROCEDURES:\n${JSON.stringify(input.pastSummary.past_procedures ?? [])}\n\nCURRENT SITUATION:\n${JSON.stringify(input.currentSummary.current_procedures ?? [])}`,
+                },
+            ],
+            fallback,
+            { max_tokens: 700 },
+        );
+    }
+
+    async generateCategoryStrategicPlan(input: {
+        category: string;
+        futureMeasures: string[];
+    }): Promise<RecommendationItem[]> {
+        const fallback: RecommendationItem[] = [
+            { priority: 'URGENT', action: `Review and activate emergency protocols for ${input.category} hazards.`, deployable: true, step: 1 },
+            { priority: 'STANDARD', action: `Update ${input.category} response procedures based on the current situation.`, deployable: false, step: 2 },
+        ];
+        if (!input.futureMeasures.length) return fallback;
+
+        const result = await this.callOpenAI<{ recommendations_list: RecommendationItem[] }>(
+            [
+                {
+                    role: 'system',
+                    content: `${PLAIN_ENGLISH_STYLE_RULES}\n\nYou are the Emergency Operations Chief. Translate the proposed future mitigation measures for ${input.category} hazards into a numbered, sequenced action plan. Each item must be concrete — specify who owns it, when, and what outcome it produces. Assign exactly one of: IMMEDIATE (life-safety, do now), URGENT (within 24-72 hours), STANDARD (within 1-4 weeks). Start each action with a bold verb. Return JSON: {"recommendations_list": [{"priority": "IMMEDIATE"|"URGENT"|"STANDARD", "action": "<string>", "step": <number>, "deployable": <boolean>}, ...]}.`,
+                },
+                {
+                    role: 'user',
+                    content: JSON.stringify(input.futureMeasures),
+                },
+            ],
+            { recommendations_list: fallback },
+            { max_tokens: 600 },
+        );
+
+        const list = result.recommendations_list;
+        if (!Array.isArray(list) || list.length === 0) return fallback;
+        return list.map((r, i) => ({
+            ...r,
+            priority: normalizeRecommendationPriority(r.priority),
+            step: r.step ?? i + 1,
+            deployable: Boolean(r.deployable),
+        }));
+    }
+
+    async generateStrategicPlan(input: {
+        futureMeasuresByCategory: Record<string, string[]>;
+    }): Promise<RecommendationItem[]> {
+        const fallback: RecommendationItem[] = [
+            { priority: 'URGENT', action: 'Review and activate jurisdiction emergency protocols for all active hazard categories.', deployable: true, step: 1 },
+            { priority: 'IMMEDIATE', action: 'Deploy emergency notifications to all affected communities via Ready2Go alert system.', deployable: true, step: 2 },
+            { priority: 'STANDARD', action: 'Conduct after-action review of all active incidents and update response procedures.', deployable: false, step: 3 },
+        ];
+
+        const hasContent = Object.values(input.futureMeasuresByCategory).some((m) => m.length > 0);
+        if (!hasContent) return fallback;
+
+        const result = await this.callOpenAI<{ recommendations_list: RecommendationItem[] }>(
+            [
+                {
+                    role: 'system',
+                    content: `${PLAIN_ENGLISH_STYLE_RULES}\n\nYou are the Emergency Operations Chief. Translate the proposed future mitigation measures into a numbered, sequenced action plan. Each item must be concrete — specify who owns it, when, and what outcome it produces. Assign exactly one of: IMMEDIATE (life-safety, do now), URGENT (within 24-72 hours), STANDARD (within 1-4 weeks). Start each action with a bold verb. Return JSON: {"recommendations_list": [{"priority": "IMMEDIATE"|"URGENT"|"STANDARD", "action": "<string>", "step": <number>, "deployable": <boolean>}, ...]}.`,
+                },
+                {
+                    role: 'user',
+                    content: JSON.stringify(input.futureMeasuresByCategory),
+                },
+            ],
+            { recommendations_list: fallback },
+            { max_tokens: 900 },
+        );
+
+        const list = result.recommendations_list;
+        if (!Array.isArray(list) || list.length === 0) return fallback;
+        return list.map((r, i) => ({
+            ...r,
+            priority: normalizeRecommendationPriority(r.priority),
+            step: r.step ?? i + 1,
+            deployable: Boolean(r.deployable),
+        }));
     }
 }
 
