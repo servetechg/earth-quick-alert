@@ -93,6 +93,8 @@ const UnifiedEventSchema = new Schema(
 );
 
 UnifiedEventSchema.index({ source: 1, dataStatus: 1, updatedAt: -1 });
+// Supports findSimilarPastEvents and getCurrentEvents category filters (§9 of dev plan)
+UnifiedEventSchema.index({ category: 1, dataStatus: 1, updatedAt: -1 });
 
 if (process.env.NODE_ENV !== 'production' && models.UnifiedEvent) {
     delete models.UnifiedEvent;
