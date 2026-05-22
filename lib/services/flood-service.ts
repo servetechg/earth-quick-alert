@@ -41,12 +41,19 @@ interface USGSIvResponse {
  */
 export async function getUSGSData(
     sites: string[] = ['01646500'],
-    parameterCd = '00065'
+    parameterCd = '00065',
+    period?: string,
 ): Promise<USGSTimeSeries[]> {
     if (sites.length === 0) return [];
 
     const siteList = sites.join(',');
-    const url = `${USGS_IV_BASE}/?sites=${encodeURIComponent(siteList)}&parameterCd=${encodeURIComponent(parameterCd)}&format=json`;
+    const q = new URLSearchParams({
+        sites: siteList,
+        parameterCd,
+        format: 'json',
+    });
+    if (period?.trim()) q.set('period', period.trim());
+    const url = `${USGS_IV_BASE}/?${q.toString()}`;
 
     const res = await fetch(url, { cache: 'no-store' });
     if (!res.ok) {

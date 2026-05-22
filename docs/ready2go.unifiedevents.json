@@ -1,0 +1,3508 @@
+[{
+  "category": "air_quality",
+  "documents": [
+    {
+      "_id": {
+        "$oid": "6a0e958a306874fe84c5fe9b"
+      },
+      "externalId": "urn:oid:2.49.0.1.840.0.d24de7d476e73ed9f0b0cac38857d0ffe60d25ae.001.1",
+      "__v": 0,
+      "category": "air_quality",
+      "coordinates": null,
+      "createdAt": {
+        "$date": "2026-05-21T05:17:59.556Z"
+      },
+      "dataStatus": "past",
+      "description": "The Imperial County APCD has issued an air quality alert.",
+      "expiresAt": "8:00 AM",
+      "geometry": null,
+      "iconType": "triangle",
+      "instructions": [
+        "To protect your health.",
+        "check air quality levels.",
+        "act as needed: * When Air Quality Index (AQI) levels are \"Unhealthy for Sensitive Groups\"."
+      ],
+      "issuedAt": "about 20 hours ago",
+      "lat": 39.8283,
+      "lng": -98.5795,
+      "location": "Imperial Valley",
+      "name": "Air Quality Alert",
+      "properties": {
+        "air_quality": {
+          "intensity": {
+            "metric": "nws_alert_severity",
+            "value": 2,
+            "unit": "level",
+            "display": "Moderate"
+          },
+          "affectedCounties": [
+            "Imperial Valley"
+          ],
+          "urgency": null,
+          "certainty": null,
+          "nwsEventCode": null,
+          "nwsVtec": null,
+          "senderName": null,
+          "effectiveAt": "2026-05-20T10:06:00-07:00",
+          "onsetAt": null,
+          "endsAt": "2026-05-21T20:00:00-07:00"
+        }
+      },
+      "severity": "Moderate",
+      "source": "nws",
+      "status": "Take Action",
+      "type": "Warning",
+      "updatedAt": {
+        "$date": "2026-05-22T04:41:58.307Z"
+      },
+      "presentCount": 18
+    },
+    {
+      "_id": {
+        "$oid": "6a0e958a306874fe84c5fe89"
+      },
+      "externalId": "urn:oid:2.49.0.1.840.0.56c9981b5712cf7890d945b2b14533188bee07a5.001.1",
+      "__v": 0,
+      "category": "air_quality",
+      "coordinates": null,
+      "createdAt": {
+        "$date": "2026-05-21T05:17:59.556Z"
+      },
+      "dataStatus": "past",
+      "description": "Air Quality Alert issued May 20 at 1:56PM MST by NWS Tucson AZ.",
+      "expiresAt": "2:00 AM",
+      "geometry": null,
+      "iconType": "triangle",
+      "instructions": [
+        "Stay informed using trusted weather and emergency sources.",
+        "Avoid unnecessary travel in the worst-affected areas.",
+        "Have a plan and supplies ready if conditions worsen."
+      ],
+      "issuedAt": "about 16 hours ago",
+      "lat": 39.8283,
+      "lng": -98.5795,
+      "location": "Tucson Metro Area including Tucson/Green Valley/Marana/Vail",
+      "name": "Air Quality Alert",
+      "properties": {
+        "air_quality": {
+          "intensity": {
+            "metric": "nws_alert_severity",
+            "value": 2,
+            "unit": "level",
+            "display": "Moderate"
+          },
+          "affectedCounties": [
+            "Tucson Metro Area including Tucson/Green Valley/Marana/Vail"
+          ],
+          "urgency": null,
+          "certainty": null,
+          "nwsEventCode": null,
+          "nwsVtec": null,
+          "senderName": null,
+          "effectiveAt": "2026-05-20T13:56:00-07:00",
+          "onsetAt": null,
+          "endsAt": "2026-05-21T14:00:00-07:00"
+        }
+      },
+      "severity": "Moderate",
+      "source": "nws",
+      "status": "Take Action",
+      "type": "Warning",
+      "updatedAt": {
+        "$date": "2026-05-22T04:41:58.307Z"
+      },
+      "presentCount": 18
+    },
+    {
+      "_id": {
+        "$oid": "6a0e958a306874fe84c5fe7c"
+      },
+      "externalId": "urn:oid:2.49.0.1.840.0.bbe6c43aba04278ef165511d5469403cfe8911c1.001.1",
+      "__v": 0,
+      "category": "air_quality",
+      "coordinates": null,
+      "createdAt": {
+        "$date": "2026-05-21T05:17:59.556Z"
+      },
+      "dataStatus": "past",
+      "description": "The South Coast AQMD has issued an air quality alert due.",
+      "expiresAt": "10:00 AM",
+      "geometry": null,
+      "iconType": "triangle",
+      "instructions": [
+        "To protect your health.",
+        "if you smell or see smoke: * Remain indoors with windows.",
+        "doors closed * Avoid intense outdoor physical activity * Run your air conditioner and/or an air."
+      ],
+      "issuedAt": "1 day ago",
+      "lat": 39.8283,
+      "lng": -98.5795,
+      "location": "Eastern San Fernando Valley; Eastern San Gabriel Mountains; Los Angeles County San Gabriel Valley; Santa Clarita Valley; Santa Susana Mountains; Western San Fernando Valley; Western San Gabriel Mountains and Highway 14 Corridor",
+      "name": "Air Quality Alert",
+      "properties": {
+        "air_quality": {
+          "intensity": {
+            "metric": "nws_alert_severity",
+            "value": 2,
+            "unit": "level",
+            "display": "Moderate"
+          },
+          "affectedCounties": [
+            "Eastern San Fernando Valley",
+            "Eastern San Gabriel Mountains",
+            "Los Angeles County San Gabriel Valley",
+            "Santa Clarita Valley",
+            "Santa Susana Mountains",
+            "Western San Fernando Valley",
+            "Western San Gabriel Mountains and Highway 14 Corridor"
+          ],
+          "urgency": null,
+          "certainty": null,
+          "nwsEventCode": null,
+          "nwsVtec": null,
+          "senderName": null,
+          "effectiveAt": "2026-05-20T15:59:00-07:00",
+          "onsetAt": null,
+          "endsAt": "2026-05-21T22:00:00-07:00"
+        }
+      },
+      "severity": "Moderate",
+      "source": "nws",
+      "status": "Take Action",
+      "type": "Warning",
+      "updatedAt": {
+        "$date": "2026-05-22T05:02:20.247Z"
+      },
+      "presentCount": 18
+    },
+    {
+      "_id": {
+        "$oid": "6a0e958a306874fe84c5fe21"
+      },
+      "externalId": "urn:oid:2.49.0.1.840.0.d07dde5009f1ae20b8081208940794d28d86aeac.001.1",
+      "__v": 0,
+      "category": "air_quality",
+      "coordinates": null,
+      "createdAt": {
+        "$date": "2026-05-21T05:17:59.556Z"
+      },
+      "dataStatus": "past",
+      "description": "The South Coast AQMD has issued an air quality alert due.",
+      "expiresAt": "5:45 AM",
+      "geometry": null,
+      "iconType": "triangle",
+      "instructions": [
+        "To protect your health.",
+        "if you smell or see smoke: * Remain indoors with windows.",
+        "doors closed * Avoid intense outdoor physical activity * Run your air conditioner and/or an air."
+      ],
+      "issuedAt": "about 12 hours ago",
+      "lat": 39.8283,
+      "lng": -98.5795,
+      "location": "San Bernardino and Riverside County Valleys-The Inland Empire",
+      "name": "Air Quality Alert",
+      "properties": {
+        "air_quality": {
+          "intensity": {
+            "metric": "nws_alert_severity",
+            "value": 2,
+            "unit": "level",
+            "display": "Moderate"
+          },
+          "affectedCounties": [
+            "San Bernardino and Riverside County Valleys-The Inland Empire"
+          ],
+          "urgency": null,
+          "certainty": null,
+          "nwsEventCode": null,
+          "nwsVtec": null,
+          "senderName": null,
+          "effectiveAt": "2026-05-20T17:44:00-07:00",
+          "onsetAt": null,
+          "endsAt": "2026-05-21T17:45:00-07:00"
+        }
+      },
+      "severity": "Moderate",
+      "source": "nws",
+      "status": "Take Action",
+      "type": "Warning",
+      "updatedAt": {
+        "$date": "2026-05-22T04:41:58.307Z"
+      },
+      "presentCount": 18
+    }
+  ]
+},
+{
+  "category": "fema_declaration",
+  "documents": [
+    {
+      "_id": {
+        "$oid": "6a0dac3e306874fe84ab241d"
+      },
+      "externalId": "fema:2614a761-3a8f-4c78-984a-ee85ac9cda4d",
+      "__v": 0,
+      "category": "fema_declaration",
+      "coordinates": null,
+      "createdAt": {
+        "$date": "2026-05-20T12:42:40.667Z"
+      },
+      "dataStatus": "past",
+      "description": "Declaration: DR-4902-MT · MT — Type: Straight-Line Winds — Federal aid (IHP+HA+ONA+PA+HMGP): $147,238",
+      "expiresAt": "5:00 AM",
+      "geometry": null,
+      "iconType": "triangle",
+      "instructions": [],
+      "issuedAt": "about 2 months ago",
+      "lat": null,
+      "lng": null,
+      "location": "Carbon (County), MT",
+      "name": "Severe Winter Storm And Straight-Line Winds",
+      "properties": {
+        "fema_declaration": {
+          "intensity": {
+            "metric": "disaster_declaration",
+            "value": 4902,
+            "unit": "DR",
+            "display": "DR-4902-MT"
+          },
+          "femaDeclarationString": "DR-4902-MT",
+          "femaDisasterNumber": 4902,
+          "declarationType": "DR",
+          "declarationTitle": "SEVERE WINTER STORM AND STRAIGHT-LINE WINDS",
+          "incidentType": "Straight-Line Winds",
+          "declarationDate": "2026-04-07T00:00:00.000Z",
+          "incidentBeginDate": "2025-12-17T00:00:00.000Z",
+          "incidentEndDate": "2025-12-18T00:00:00.000Z",
+          "designatedArea": "Carbon (County)",
+          "iaProgram": false,
+          "paProgram": true,
+          "hmProgram": false,
+          "ihProgram": false,
+          "totalNumberIaApproved": null,
+          "totalAmountIhpApproved": null,
+          "totalAmountHaApproved": null,
+          "totalAmountOnaApproved": null,
+          "totalObligatedAmountPa": 147237.76,
+          "totalObligatedAmountHmgp": 0,
+          "totalFederalAidUsd": 147237.76
+        }
+      },
+      "severity": "High",
+      "source": "fema",
+      "status": "Monitor",
+      "type": "Declaration",
+      "updatedAt": {
+        "$date": "2026-05-22T05:25:34.792Z"
+      },
+      "presentCount": 16
+    },
+    {
+      "_id": {
+        "$oid": "6a0e9ce5306874fe84c6d07d"
+      },
+      "externalId": "fema:f1ce3434-f78c-4532-90fe-0a76e035036f",
+      "__v": 0,
+      "category": "fema_declaration",
+      "coordinates": null,
+      "createdAt": {
+        "$date": "2026-05-21T05:49:25.028Z"
+      },
+      "dataStatus": "past",
+      "description": "Declaration: DR-4906-WA · WA — Type: Flood",
+      "expiresAt": "5:00 AM",
+      "geometry": null,
+      "iconType": "cloud",
+      "instructions": [],
+      "issuedAt": "about 2 months ago",
+      "lat": null,
+      "lng": null,
+      "location": "Sauk-Suiattle Indian Reservation, WA",
+      "name": "Severe Storms, Straight-Line Winds, Flooding, Landslides, And Mudslides",
+      "properties": {
+        "fema_declaration": {
+          "intensity": {
+            "metric": "disaster_declaration",
+            "value": 4906,
+            "unit": "DR",
+            "display": "DR-4906-WA"
+          },
+          "femaDeclarationString": "DR-4906-WA",
+          "femaDisasterNumber": 4906,
+          "declarationType": "DR",
+          "declarationTitle": "SEVERE STORMS, STRAIGHT-LINE WINDS, FLOODING, LANDSLIDES, AND MUDSLIDES",
+          "incidentType": "Flood",
+          "declarationDate": "2026-04-07T00:00:00.000Z",
+          "incidentBeginDate": "2025-12-05T00:00:00.000Z",
+          "incidentEndDate": "2025-12-19T00:00:00.000Z",
+          "designatedArea": "Sauk-Suiattle Indian Reservation",
+          "iaProgram": false,
+          "paProgram": true,
+          "hmProgram": false,
+          "ihProgram": true,
+          "totalNumberIaApproved": null,
+          "totalAmountIhpApproved": null,
+          "totalAmountHaApproved": null,
+          "totalAmountOnaApproved": null,
+          "totalObligatedAmountPa": null,
+          "totalObligatedAmountHmgp": 0,
+          "totalFederalAidUsd": 0
+        }
+      },
+      "severity": "High",
+      "source": "fema",
+      "status": "Monitor",
+      "type": "Declaration",
+      "updatedAt": {
+        "$date": "2026-05-22T05:25:34.792Z"
+      },
+      "presentCount": 16
+    },
+    {
+      "_id": {
+        "$oid": "6a0dac3e306874fe84ab2419"
+      },
+      "externalId": "fema:73d000fd-c6da-400a-992a-853185f4ee8f",
+      "__v": 0,
+      "category": "fema_declaration",
+      "coordinates": null,
+      "createdAt": {
+        "$date": "2026-05-20T12:42:40.667Z"
+      },
+      "dataStatus": "past",
+      "description": "Declaration: DR-4902-MT · MT — Type: Straight-Line Winds — Federal aid (IHP+HA+ONA+PA+HMGP): $147,238",
+      "expiresAt": "5:00 AM",
+      "geometry": null,
+      "iconType": "triangle",
+      "instructions": [],
+      "issuedAt": "about 2 months ago",
+      "lat": null,
+      "lng": null,
+      "location": "Flathead (County), MT",
+      "name": "Severe Winter Storm And Straight-Line Winds",
+      "properties": {
+        "fema_declaration": {
+          "intensity": {
+            "metric": "disaster_declaration",
+            "value": 4902,
+            "unit": "DR",
+            "display": "DR-4902-MT"
+          },
+          "femaDeclarationString": "DR-4902-MT",
+          "femaDisasterNumber": 4902,
+          "declarationType": "DR",
+          "declarationTitle": "SEVERE WINTER STORM AND STRAIGHT-LINE WINDS",
+          "incidentType": "Straight-Line Winds",
+          "declarationDate": "2026-04-07T00:00:00.000Z",
+          "incidentBeginDate": "2025-12-17T00:00:00.000Z",
+          "incidentEndDate": "2025-12-18T00:00:00.000Z",
+          "designatedArea": "Flathead (County)",
+          "iaProgram": false,
+          "paProgram": true,
+          "hmProgram": false,
+          "ihProgram": false,
+          "totalNumberIaApproved": null,
+          "totalAmountIhpApproved": null,
+          "totalAmountHaApproved": null,
+          "totalAmountOnaApproved": null,
+          "totalObligatedAmountPa": 147237.76,
+          "totalObligatedAmountHmgp": 0,
+          "totalFederalAidUsd": 147237.76
+        }
+      },
+      "severity": "High",
+      "source": "fema",
+      "status": "Monitor",
+      "type": "Declaration",
+      "updatedAt": {
+        "$date": "2026-05-22T05:25:34.792Z"
+      },
+      "presentCount": 16
+    },
+    {
+      "_id": {
+        "$oid": "6a0dac3e306874fe84ab2424"
+      },
+      "externalId": "fema:565100de-882d-4543-bbe5-de4b5b81bd48",
+      "__v": 0,
+      "category": "fema_declaration",
+      "coordinates": null,
+      "createdAt": {
+        "$date": "2026-05-20T12:42:40.667Z"
+      },
+      "dataStatus": "past",
+      "description": "Declaration: DR-4902-MT · MT — Type: Straight-Line Winds — Federal aid (IHP+HA+ONA+PA+HMGP): $147,238",
+      "expiresAt": "5:00 AM",
+      "geometry": null,
+      "iconType": "triangle",
+      "instructions": [],
+      "issuedAt": "about 2 months ago",
+      "lat": null,
+      "lng": null,
+      "location": "Dawson (County), MT",
+      "name": "Severe Winter Storm And Straight-Line Winds",
+      "properties": {
+        "fema_declaration": {
+          "intensity": {
+            "metric": "disaster_declaration",
+            "value": 4902,
+            "unit": "DR",
+            "display": "DR-4902-MT"
+          },
+          "femaDeclarationString": "DR-4902-MT",
+          "femaDisasterNumber": 4902,
+          "declarationType": "DR",
+          "declarationTitle": "SEVERE WINTER STORM AND STRAIGHT-LINE WINDS",
+          "incidentType": "Straight-Line Winds",
+          "declarationDate": "2026-04-07T00:00:00.000Z",
+          "incidentBeginDate": "2025-12-17T00:00:00.000Z",
+          "incidentEndDate": "2025-12-18T00:00:00.000Z",
+          "designatedArea": "Dawson (County)",
+          "iaProgram": false,
+          "paProgram": true,
+          "hmProgram": false,
+          "ihProgram": false,
+          "totalNumberIaApproved": null,
+          "totalAmountIhpApproved": null,
+          "totalAmountHaApproved": null,
+          "totalAmountOnaApproved": null,
+          "totalObligatedAmountPa": 147237.76,
+          "totalObligatedAmountHmgp": 0,
+          "totalFederalAidUsd": 147237.76
+        }
+      },
+      "severity": "High",
+      "source": "fema",
+      "status": "Monitor",
+      "type": "Declaration",
+      "updatedAt": {
+        "$date": "2026-05-22T05:25:34.792Z"
+      },
+      "presentCount": 16
+    },
+    {
+      "_id": {
+        "$oid": "6a0e9588306874fe84c5fdf2"
+      },
+      "externalId": "fema:945d220c-3357-4834-b5da-01f8fc156814",
+      "__v": 0,
+      "category": "fema_declaration",
+      "coordinates": null,
+      "createdAt": {
+        "$date": "2026-05-21T05:17:59.663Z"
+      },
+      "dataStatus": "past",
+      "description": "Declaration: DR-4902-MT · MT — Type: Straight-Line Winds — Federal aid (IHP+HA+ONA+PA+HMGP): $147,238",
+      "expiresAt": "5:00 AM",
+      "geometry": null,
+      "iconType": "triangle",
+      "instructions": [],
+      "issuedAt": "about 2 months ago",
+      "lat": null,
+      "lng": null,
+      "location": "Blaine (County), MT",
+      "name": "Severe Winter Storm And Straight-Line Winds",
+      "properties": {
+        "fema_declaration": {
+          "intensity": {
+            "metric": "disaster_declaration",
+            "value": 4902,
+            "unit": "DR",
+            "display": "DR-4902-MT"
+          },
+          "femaDeclarationString": "DR-4902-MT",
+          "femaDisasterNumber": 4902,
+          "declarationType": "DR",
+          "declarationTitle": "SEVERE WINTER STORM AND STRAIGHT-LINE WINDS",
+          "incidentType": "Straight-Line Winds",
+          "declarationDate": "2026-04-07T00:00:00.000Z",
+          "incidentBeginDate": "2025-12-17T00:00:00.000Z",
+          "incidentEndDate": "2025-12-18T00:00:00.000Z",
+          "designatedArea": "Blaine (County)",
+          "iaProgram": false,
+          "paProgram": true,
+          "hmProgram": false,
+          "ihProgram": false,
+          "totalNumberIaApproved": null,
+          "totalAmountIhpApproved": null,
+          "totalAmountHaApproved": null,
+          "totalAmountOnaApproved": null,
+          "totalObligatedAmountPa": 147237.76,
+          "totalObligatedAmountHmgp": 0,
+          "totalFederalAidUsd": 147237.76
+        }
+      },
+      "severity": "High",
+      "source": "fema",
+      "status": "Monitor",
+      "type": "Declaration",
+      "updatedAt": {
+        "$date": "2026-05-22T05:25:34.792Z"
+      },
+      "presentCount": 16
+    }
+  ]
+},
+{
+  "category": "hurricane_typhoon",
+  "documents": [
+    {
+      "_id": {
+        "$oid": "6a0dac3e306874fe84ab242a"
+      },
+      "externalId": "fema:bbebd356-44b9-499e-861f-366ddae1684b",
+      "__v": 0,
+      "category": "hurricane_typhoon",
+      "coordinates": null,
+      "createdAt": {
+        "$date": "2026-05-20T12:42:40.667Z"
+      },
+      "dataStatus": "current",
+      "description": "Declaration: DR-4910-MP · MP — Type: Hurricane",
+      "expiresAt": "5:00 AM",
+      "geometry": null,
+      "iconType": "cloud",
+      "instructions": [
+        "Stay informed using trusted weather and emergency sources.",
+        "Avoid unnecessary travel in the worst-affected areas.",
+        "Have a plan and supplies ready if conditions worsen."
+      ],
+      "issuedAt": "29 days ago",
+      "lat": null,
+      "lng": null,
+      "location": "Northern Islands (Municipality), MP",
+      "name": "Super Typhoon Sinlaku",
+      "properties": {
+        "hurricane_typhoon": {
+          "intensity": null
+        }
+      },
+      "severity": "High",
+      "source": "fema",
+      "status": "Take Action",
+      "type": "Warning",
+      "updatedAt": {
+        "$date": "2026-05-22T05:30:30.800Z"
+      },
+      "presentCount": 16
+    },
+    {
+      "_id": {
+        "$oid": "6a0dac3e306874fe84ab242c"
+      },
+      "externalId": "fema:1973ca67-5693-4e84-9e66-d999291b6426",
+      "__v": 0,
+      "category": "hurricane_typhoon",
+      "coordinates": null,
+      "createdAt": {
+        "$date": "2026-05-20T12:42:40.667Z"
+      },
+      "dataStatus": "current",
+      "description": "Declaration: DR-4910-MP · MP — Type: Hurricane",
+      "expiresAt": "5:00 AM",
+      "geometry": null,
+      "iconType": "cloud",
+      "instructions": [
+        "Stay informed using trusted weather and emergency sources.",
+        "Avoid unnecessary travel in the worst-affected areas.",
+        "Have a plan and supplies ready if conditions worsen."
+      ],
+      "issuedAt": "29 days ago",
+      "lat": null,
+      "lng": null,
+      "location": "Saipan (Municipality), MP",
+      "name": "Super Typhoon Sinlaku",
+      "properties": {
+        "hurricane_typhoon": {
+          "intensity": null
+        }
+      },
+      "severity": "High",
+      "source": "fema",
+      "status": "Take Action",
+      "type": "Warning",
+      "updatedAt": {
+        "$date": "2026-05-22T05:30:30.800Z"
+      },
+      "presentCount": 16
+    },
+    {
+      "_id": {
+        "$oid": "6a0dac3e306874fe84ab2427"
+      },
+      "externalId": "fema:506782df-4ddf-4bb3-8767-1420833944a6",
+      "__v": 0,
+      "category": "hurricane_typhoon",
+      "coordinates": null,
+      "createdAt": {
+        "$date": "2026-05-20T12:42:40.667Z"
+      },
+      "dataStatus": "current",
+      "description": "Declaration: DR-4910-MP · MP — Type: Hurricane",
+      "expiresAt": "5:00 AM",
+      "geometry": null,
+      "iconType": "cloud",
+      "instructions": [
+        "Stay informed using trusted weather and emergency sources.",
+        "Avoid unnecessary travel in the worst-affected areas.",
+        "Have a plan and supplies ready if conditions worsen."
+      ],
+      "issuedAt": "29 days ago",
+      "lat": null,
+      "lng": null,
+      "location": "Tinian (Municipality), MP",
+      "name": "Super Typhoon Sinlaku",
+      "properties": {
+        "hurricane_typhoon": {
+          "intensity": null
+        }
+      },
+      "severity": "High",
+      "source": "fema",
+      "status": "Take Action",
+      "type": "Warning",
+      "updatedAt": {
+        "$date": "2026-05-22T05:30:30.800Z"
+      },
+      "presentCount": 16
+    },
+    {
+      "_id": {
+        "$oid": "6a0dac3e306874fe84ab2426"
+      },
+      "externalId": "fema:30983325-417b-4302-9fd3-0e654ff320cc",
+      "__v": 0,
+      "category": "hurricane_typhoon",
+      "coordinates": null,
+      "createdAt": {
+        "$date": "2026-05-20T12:42:40.667Z"
+      },
+      "dataStatus": "current",
+      "description": "Declaration: DR-4910-MP · MP — Type: Hurricane",
+      "expiresAt": "5:00 AM",
+      "geometry": null,
+      "iconType": "cloud",
+      "instructions": [
+        "Stay informed using trusted weather and emergency sources.",
+        "Avoid unnecessary travel in the worst-affected areas.",
+        "Have a plan and supplies ready if conditions worsen."
+      ],
+      "issuedAt": "29 days ago",
+      "lat": null,
+      "lng": null,
+      "location": "Northern Mariana Islands (County-equivalent), MP",
+      "name": "Super Typhoon Sinlaku",
+      "properties": {
+        "hurricane_typhoon": {
+          "intensity": null
+        }
+      },
+      "severity": "High",
+      "source": "fema",
+      "status": "Take Action",
+      "type": "Warning",
+      "updatedAt": {
+        "$date": "2026-05-22T05:30:30.800Z"
+      },
+      "presentCount": 16
+    },
+    {
+      "_id": {
+        "$oid": "6a0dac3e306874fe84ab2413"
+      },
+      "externalId": "fema:c20ae4cd-959d-404e-b46e-549fad2e07fc",
+      "__v": 0,
+      "category": "hurricane_typhoon",
+      "coordinates": null,
+      "createdAt": {
+        "$date": "2026-05-20T12:42:40.667Z"
+      },
+      "dataStatus": "current",
+      "description": "Declaration: DR-4910-MP · MP — Type: Hurricane",
+      "expiresAt": "5:00 AM",
+      "geometry": null,
+      "iconType": "cloud",
+      "instructions": [
+        "Stay informed using trusted weather and emergency sources.",
+        "Avoid unnecessary travel in the worst-affected areas.",
+        "Have a plan and supplies ready if conditions worsen."
+      ],
+      "issuedAt": "29 days ago",
+      "lat": null,
+      "lng": null,
+      "location": "Rota (Municipality), MP",
+      "name": "Super Typhoon Sinlaku",
+      "properties": {
+        "hurricane_typhoon": {
+          "intensity": null
+        }
+      },
+      "severity": "High",
+      "source": "fema",
+      "status": "Take Action",
+      "type": "Warning",
+      "updatedAt": {
+        "$date": "2026-05-22T05:30:30.800Z"
+      },
+      "presentCount": 16
+    }
+  ]
+},
+{
+  "category": "coastal_surf",
+  "documents": [
+    {
+      "_id": {
+        "$oid": "6a0e958a306874fe84c5fe32"
+      },
+      "externalId": "urn:oid:2.49.0.1.840.0.785544d937b5c734e1c78505397eeab073bd904b.003.1",
+      "__v": 0,
+      "category": "coastal_surf",
+      "coordinates": null,
+      "createdAt": {
+        "$date": "2026-05-21T05:17:59.556Z"
+      },
+      "dataStatus": "past",
+      "description": "High wave action and dangerous currents expected at Lake.",
+      "expiresAt": "5:00 PM",
+      "geometry": null,
+      "iconType": "triangle",
+      "instructions": [
+        "Remain out of the water to avoid dangerous swimming conditions and do not venture out onto piers.",
+        "breakwalls.",
+        "or other shoreline structures."
+      ],
+      "issuedAt": "about 3 hours ago",
+      "lat": 39.8283,
+      "lng": -98.5795,
+      "location": "Porter",
+      "name": "Beach Hazards Statement",
+      "properties": {
+        "coastal_surf": {
+          "intensity": {
+            "metric": "nws_alert_severity",
+            "value": 2,
+            "unit": "level",
+            "display": "Moderate"
+          },
+          "affectedCounties": [
+            "Porter"
+          ],
+          "urgency": null,
+          "certainty": null,
+          "nwsEventCode": null,
+          "nwsVtec": null,
+          "senderName": null,
+          "effectiveAt": "2026-05-20T23:47:00-05:00",
+          "onsetAt": null,
+          "endsAt": "2026-05-21T07:00:00-05:00"
+        }
+      },
+      "severity": "Moderate",
+      "source": "nws",
+      "status": "Take Action",
+      "type": "Warning",
+      "updatedAt": {
+        "$date": "2026-05-21T12:11:33.451Z"
+      },
+      "presentCount": 18
+    },
+    {
+      "_id": {
+        "$oid": "6a0ef675306874fe84d151b7"
+      },
+      "externalId": "urn:oid:2.49.0.1.840.0.3951f1a00e8b280065d0dd00b05c420b27a45263.001.1",
+      "__v": 0,
+      "category": "coastal_surf",
+      "coordinates": null,
+      "createdAt": {
+        "$date": "2026-05-21T12:11:31.899Z"
+      },
+      "dataStatus": "past",
+      "description": "High wave action and dangerous currents expected at Lake.",
+      "expiresAt": "9:45 PM",
+      "geometry": null,
+      "iconType": "triangle",
+      "instructions": [
+        "Remain out of the water to avoid dangerous swimming conditions and do not venture out onto piers.",
+        "breakwalls.",
+        "or other shoreline structures."
+      ],
+      "issuedAt": "about 4 hours ago",
+      "lat": 39.8283,
+      "lng": -98.5795,
+      "location": "Lake; Northern Cook; Central Cook",
+      "name": "Beach Hazards Statement",
+      "properties": {
+        "coastal_surf": {
+          "intensity": {
+            "metric": "nws_alert_severity",
+            "value": 2,
+            "unit": "level",
+            "display": "Moderate"
+          },
+          "affectedCounties": [
+            "Lake",
+            "Northern Cook",
+            "Central Cook"
+          ],
+          "urgency": null,
+          "certainty": null,
+          "nwsEventCode": null,
+          "nwsVtec": null,
+          "senderName": null,
+          "effectiveAt": "2026-05-21T03:40:00-05:00",
+          "onsetAt": null,
+          "endsAt": "2026-05-21T11:45:00-05:00"
+        }
+      },
+      "severity": "Moderate",
+      "source": "nws",
+      "status": "Take Action",
+      "type": "Warning",
+      "updatedAt": {
+        "$date": "2026-05-22T04:41:58.307Z"
+      },
+      "presentCount": 18
+    },
+    {
+      "_id": {
+        "$oid": "6a0fde96306874fe84ecc6ab"
+      },
+      "externalId": "urn:oid:2.49.0.1.840.0.1ba20cfd4664e70baf29c1e77ef14dee98a878fb.001.1",
+      "__v": 0,
+      "category": "coastal_surf",
+      "coordinates": null,
+      "createdAt": {
+        "$date": "2026-05-22T04:41:57.060Z"
+      },
+      "dataStatus": "current",
+      "description": "Dangerous rip currents expected.",
+      "expiresAt": "2:00 PM",
+      "geometry": null,
+      "iconType": "triangle",
+      "instructions": [
+        "Always obey posted Beach Flags.",
+        "If you enter the surf zone.",
+        "always have a floatation device with you and swim near a lifeguard if possible."
+      ],
+      "issuedAt": "about 10 hours ago",
+      "lat": 39.8283,
+      "lng": -98.5795,
+      "location": "Delaware Beaches; Eastern Monmouth; Atlantic Coastal Cape May; Coastal Atlantic; Coastal Ocean",
+      "name": "Rip Current Statement",
+      "properties": {
+        "coastal_surf": {
+          "intensity": {
+            "metric": "nws_alert_severity",
+            "value": 2,
+            "unit": "level",
+            "display": "Moderate"
+          },
+          "affectedCounties": [
+            "Delaware Beaches",
+            "Eastern Monmouth",
+            "Atlantic Coastal Cape May",
+            "Coastal Atlantic",
+            "Coastal Ocean"
+          ],
+          "urgency": null,
+          "certainty": null,
+          "nwsEventCode": null,
+          "nwsVtec": null,
+          "senderName": null,
+          "effectiveAt": "2026-05-21T15:51:00-04:00",
+          "onsetAt": null,
+          "endsAt": "2026-05-22T05:00:00-04:00"
+        }
+      },
+      "severity": "Moderate",
+      "source": "nws",
+      "status": "Take Action",
+      "type": "Warning",
+      "updatedAt": {
+        "$date": "2026-05-22T05:31:30.497Z"
+      },
+      "presentCount": 18
+    },
+    {
+      "_id": {
+        "$oid": "6a0ef675306874fe84d15183"
+      },
+      "externalId": "urn:oid:2.49.0.1.840.0.7cf55a7dcb009a9a2ebf7b0ac0d5613af9cb6b54.001.1",
+      "__v": 0,
+      "category": "coastal_surf",
+      "coordinates": null,
+      "createdAt": {
+        "$date": "2026-05-21T12:11:31.899Z"
+      },
+      "dataStatus": "past",
+      "description": "Life threatening waves of 3 to 5 feet and dangerous.",
+      "expiresAt": "11:00 PM",
+      "geometry": null,
+      "iconType": "triangle",
+      "instructions": [
+        "Stay out of the water and away from dangerous areas like piers and breakwalls.",
+        "Strong structural and longshore currents are expected.",
+        "Rip currents are possible."
+      ],
+      "issuedAt": "about 1 hour ago",
+      "lat": 39.8283,
+      "lng": -98.5795,
+      "location": "Milwaukee; Racine; Kenosha",
+      "name": "Beach Hazards Statement",
+      "properties": {
+        "coastal_surf": {
+          "intensity": {
+            "metric": "nws_alert_severity",
+            "value": 2,
+            "unit": "level",
+            "display": "Moderate"
+          },
+          "affectedCounties": [
+            "Milwaukee",
+            "Racine",
+            "Kenosha"
+          ],
+          "urgency": null,
+          "certainty": null,
+          "nwsEventCode": null,
+          "nwsVtec": null,
+          "senderName": null,
+          "effectiveAt": "2026-05-21T06:42:00-05:00",
+          "onsetAt": null,
+          "endsAt": "2026-05-21T13:00:00-05:00"
+        }
+      },
+      "severity": "Moderate",
+      "source": "nws",
+      "status": "Take Action",
+      "type": "Warning",
+      "updatedAt": {
+        "$date": "2026-05-22T04:41:58.307Z"
+      },
+      "presentCount": 18
+    },
+    {
+      "_id": {
+        "$oid": "6a0fde96306874fe84ecc70e"
+      },
+      "externalId": "urn:oid:2.49.0.1.840.0.a7c6caec3c35a4f2d7f61ba302f6d24a2736e9b6.001.1",
+      "__v": 0,
+      "category": "coastal_surf",
+      "coordinates": null,
+      "createdAt": {
+        "$date": "2026-05-22T04:41:57.060Z"
+      },
+      "dataStatus": "current",
+      "description": "Numerous dangerous rip currents.",
+      "expiresAt": "1:00 PM",
+      "geometry": null,
+      "iconType": "triangle",
+      "instructions": [
+        "Rip currents are powerful channels of water flowing quickly away from shore.",
+        "which occur most often at low spots or breaks in the sandbar.",
+        "in the vicinity of structures such as jetties."
+      ],
+      "issuedAt": "about 2 hours ago",
+      "lat": 39.8283,
+      "lng": -98.5795,
+      "location": "Coastal Volusia; Coastal Indian River; Coastal St. Lucie; Coastal Martin; Mainland Northern Brevard; Northern Brevard Barrier Islands; Mainland Southern Brevard; Southern Brevard Barrier Islands",
+      "name": "Rip Current Statement",
+      "properties": {
+        "coastal_surf": {
+          "intensity": {
+            "metric": "nws_alert_severity",
+            "value": 2,
+            "unit": "level",
+            "display": "Moderate"
+          },
+          "affectedCounties": [
+            "Coastal Volusia",
+            "Coastal Indian River",
+            "Coastal St. Lucie",
+            "Coastal Martin",
+            "Mainland Northern Brevard",
+            "Northern Brevard Barrier Islands",
+            "Mainland Southern Brevard",
+            "Southern Brevard Barrier Islands"
+          ],
+          "urgency": null,
+          "certainty": null,
+          "nwsEventCode": null,
+          "nwsVtec": null,
+          "senderName": null,
+          "effectiveAt": "2026-05-21T23:50:00-04:00",
+          "onsetAt": null,
+          "endsAt": "2026-05-23T04:00:00-04:00"
+        }
+      },
+      "severity": "Moderate",
+      "source": "nws",
+      "status": "Take Action",
+      "type": "Warning",
+      "updatedAt": {
+        "$date": "2026-05-22T05:31:30.497Z"
+      },
+      "presentCount": 18
+    }
+  ]
+},
+{
+  "category": "flood",
+  "documents": [
+    {
+      "_id": {
+        "$oid": "6a0fde96306874fe84ecc71a"
+      },
+      "externalId": "urn:oid:2.49.0.1.840.0.f65c125c54eb93213f6a19633d46cda83b785bfe.001.1",
+      "__v": 0,
+      "category": "flood",
+      "coordinates": null,
+      "createdAt": {
+        "$date": "2026-05-22T04:41:57.060Z"
+      },
+      "dataStatus": "current",
+      "description": "Minor flooding is occurring and minor flooding is forecast.",
+      "expiresAt": "5:30 AM",
+      "geometry": null,
+      "iconType": "cloud",
+      "instructions": [
+        "Turn around, don't drown when encountering flooded roads.",
+        "Most flood deaths occur in vehicles.",
+        "Motorists should not attempt to drive around barricades or drive cars through flooded areas."
+      ],
+      "issuedAt": "about 5 hours ago",
+      "lat": 38.961666666666666,
+      "lng": -93.245,
+      "location": "Cooper, MO; Saline, MO",
+      "name": "Flood Warning",
+      "properties": {
+        "flood": {
+          "intensity": {
+            "metric": "nws_alert_severity",
+            "value": 3,
+            "unit": "level",
+            "display": "High"
+          },
+          "affectedCounties": [
+            "Cooper, MO",
+            "Saline, MO"
+          ],
+          "urgency": null,
+          "certainty": null,
+          "nwsEventCode": null,
+          "nwsVtec": null,
+          "senderName": null,
+          "effectiveAt": "2026-05-21T19:26:00-05:00",
+          "onsetAt": null,
+          "endsAt": "2026-05-22T19:30:00-05:00"
+        }
+      },
+      "severity": "High",
+      "source": "nws",
+      "status": "Take Action",
+      "type": "Warning",
+      "updatedAt": {
+        "$date": "2026-05-22T05:31:30.497Z"
+      },
+      "presentCount": 18
+    },
+    {
+      "_id": {
+        "$oid": "6a0fde96306874fe84ecc70d"
+      },
+      "externalId": "urn:oid:2.49.0.1.840.0.06f5495217e83a7dc14821bf951fcb48a1bb9982.001.1",
+      "__v": 0,
+      "category": "flood",
+      "coordinates": null,
+      "createdAt": {
+        "$date": "2026-05-22T04:41:57.060Z"
+      },
+      "dataStatus": "current",
+      "description": "Minor flooding is occurring and minor flooding is forecast.",
+      "expiresAt": "6:00 PM",
+      "geometry": null,
+      "iconType": "cloud",
+      "instructions": [
+        "Turn around, don't drown when encountering flooded roads.",
+        "Most flood deaths occur in vehicles.",
+        "Motorists should not attempt to drive around barricades or drive cars through flooded areas."
+      ],
+      "issuedAt": "about 5 hours ago",
+      "lat": 38.565,
+      "lng": -89.37666666666667,
+      "location": "Clinton, IL",
+      "name": "Flood Warning",
+      "properties": {
+        "flood": {
+          "intensity": {
+            "metric": "nws_alert_severity",
+            "value": 3,
+            "unit": "level",
+            "display": "High"
+          },
+          "affectedCounties": [
+            "Clinton, IL"
+          ],
+          "urgency": null,
+          "certainty": null,
+          "nwsEventCode": null,
+          "nwsVtec": null,
+          "senderName": null,
+          "effectiveAt": "2026-05-21T20:00:00-05:00",
+          "onsetAt": null,
+          "endsAt": "2026-05-23T08:00:00-05:00"
+        }
+      },
+      "severity": "High",
+      "source": "nws",
+      "status": "Take Action",
+      "type": "Warning",
+      "updatedAt": {
+        "$date": "2026-05-22T05:31:30.497Z"
+      },
+      "presentCount": 18
+    },
+    {
+      "_id": {
+        "$oid": "6a0fde96306874fe84ecc718"
+      },
+      "externalId": "urn:oid:2.49.0.1.840.0.c4485ea3144194c9ce293772732ac7e46fda7e83.001.1",
+      "__v": 0,
+      "category": "flood",
+      "coordinates": null,
+      "createdAt": {
+        "$date": "2026-05-22T04:41:57.060Z"
+      },
+      "dataStatus": "current",
+      "description": "Minor flooding is forecast.",
+      "expiresAt": "5:45 PM",
+      "geometry": null,
+      "iconType": "cloud",
+      "instructions": [
+        "Turn around, don't drown when encountering flooded roads.",
+        "Most flood deaths occur in vehicles.",
+        "Additional information is available at www.water.noaa.gov/wfo/jan The next statement will be."
+      ],
+      "issuedAt": "about 5 hours ago",
+      "lat": 33.065714285714286,
+      "lng": -89.86,
+      "location": "Attala, MS; Holmes, MS",
+      "name": "Flood Warning",
+      "properties": {
+        "flood": {
+          "intensity": {
+            "metric": "nws_alert_severity",
+            "value": 3,
+            "unit": "level",
+            "display": "High"
+          },
+          "affectedCounties": [
+            "Attala, MS",
+            "Holmes, MS"
+          ],
+          "urgency": null,
+          "certainty": null,
+          "nwsEventCode": null,
+          "nwsVtec": null,
+          "senderName": null,
+          "effectiveAt": "2026-05-21T19:45:00-05:00",
+          "onsetAt": null,
+          "endsAt": "2026-05-22T07:45:00-05:00"
+        }
+      },
+      "severity": "High",
+      "source": "nws",
+      "status": "Take Action",
+      "type": "Warning",
+      "updatedAt": {
+        "$date": "2026-05-22T05:31:30.497Z"
+      },
+      "presentCount": 18
+    },
+    {
+      "_id": {
+        "$oid": "6a0fde96306874fe84ecc717"
+      },
+      "externalId": "urn:oid:2.49.0.1.840.0.fa4d15b9c810c34dfde59dece684afc39e329b58.001.1",
+      "__v": 0,
+      "category": "flood",
+      "coordinates": null,
+      "createdAt": {
+        "$date": "2026-05-22T04:41:57.060Z"
+      },
+      "dataStatus": "current",
+      "description": "Moderate flooding is forecast.",
+      "expiresAt": "10:00 PM",
+      "geometry": null,
+      "iconType": "cloud",
+      "instructions": [
+        "Motorists should not attempt to drive around barricades or drive cars through flooded areas.",
+        "Turn around, don't drown when encountering flooded roads.",
+        "Most flood deaths occur in vehicles."
+      ],
+      "issuedAt": "about 5 hours ago",
+      "lat": 30.714,
+      "lng": -89.656,
+      "location": "Pearl River, MS",
+      "name": "Flood Warning",
+      "properties": {
+        "flood": {
+          "intensity": {
+            "metric": "nws_alert_severity",
+            "value": 3,
+            "unit": "level",
+            "display": "High"
+          },
+          "affectedCounties": [
+            "Pearl River, MS"
+          ],
+          "urgency": null,
+          "certainty": null,
+          "nwsEventCode": null,
+          "nwsVtec": null,
+          "senderName": null,
+          "effectiveAt": "2026-05-21T19:46:00-05:00",
+          "onsetAt": null,
+          "endsAt": "2026-05-22T12:00:00-05:00"
+        }
+      },
+      "severity": "High",
+      "source": "nws",
+      "status": "Take Action",
+      "type": "Warning",
+      "updatedAt": {
+        "$date": "2026-05-22T05:31:30.497Z"
+      },
+      "presentCount": 18
+    },
+    {
+      "_id": {
+        "$oid": "6a0fde96306874fe84ecc716"
+      },
+      "externalId": "urn:oid:2.49.0.1.840.0.aab98954e882dd969207f32b008a909348c2afe6.001.1",
+      "__v": 0,
+      "category": "flood",
+      "coordinates": null,
+      "createdAt": {
+        "$date": "2026-05-22T04:41:57.060Z"
+      },
+      "dataStatus": "current",
+      "description": "Moderate flooding is forecast.",
+      "expiresAt": "10:00 PM",
+      "geometry": null,
+      "iconType": "cloud",
+      "instructions": [
+        "Motorists should not attempt to drive around barricades or drive cars through flooded areas.",
+        "Turn around, don't drown when encountering flooded roads.",
+        "Most flood deaths occur in vehicles."
+      ],
+      "issuedAt": "about 5 hours ago",
+      "lat": 30.642000000000003,
+      "lng": -89.58200000000001,
+      "location": "Pearl River, MS",
+      "name": "Flood Warning",
+      "properties": {
+        "flood": {
+          "intensity": {
+            "metric": "nws_alert_severity",
+            "value": 3,
+            "unit": "level",
+            "display": "High"
+          },
+          "affectedCounties": [
+            "Pearl River, MS"
+          ],
+          "urgency": null,
+          "certainty": null,
+          "nwsEventCode": null,
+          "nwsVtec": null,
+          "senderName": null,
+          "effectiveAt": "2026-05-21T19:46:00-05:00",
+          "onsetAt": null,
+          "endsAt": "2026-05-22T12:00:00-05:00"
+        }
+      },
+      "severity": "High",
+      "source": "nws",
+      "status": "Take Action",
+      "type": "Warning",
+      "updatedAt": {
+        "$date": "2026-05-22T05:31:30.497Z"
+      },
+      "presentCount": 18
+    }
+  ]
+},
+{
+  "category": "hazardous",
+  "documents": [
+    {
+      "_id": {
+        "$oid": "6a0e958a306874fe84c5fe39"
+      },
+      "externalId": "urn:oid:2.49.0.1.840.0.4ef66b663f9933d954c6ea61ebec2d71a5bb3cc0.001.1",
+      "__v": 0,
+      "category": "hazardous",
+      "coordinates": null,
+      "createdAt": {
+        "$date": "2026-05-21T05:17:59.556Z"
+      },
+      "dataStatus": "past",
+      "description": "Northeast winds 20 to 30 mph with gusts up to 50 mph.",
+      "expiresAt": "8:30 PM",
+      "geometry": null,
+      "iconType": "triangle",
+      "instructions": [
+        "Watch out for falling tree branches when walking or driving.",
+        "Make sure tents and awnings are secure or take them down.",
+        "Be prepared for power outages."
+      ],
+      "issuedAt": "about 13 hours ago",
+      "lat": 39.8283,
+      "lng": -98.5795,
+      "location": "Lanai Mauka; Kahoolawe; Maui Windward West; Maui Leeward West; Kohala; Molokai Windward; Molokai Southeast; Molokai North; Molokai West; Molokai Leeward South; Lanai Windward; Lanai Leeward; Lanai South; Maui Central Valley North; Maui Central Valley South; South Haleakala; Big Island South; Big Island Southeast; Big Island North",
+      "name": "Wind Advisory",
+      "properties": {
+        "hazardous": {
+          "intensity": {
+            "metric": "nws_alert_severity",
+            "value": 2,
+            "unit": "level",
+            "display": "Moderate"
+          },
+          "affectedCounties": [
+            "Lanai Mauka",
+            "Kahoolawe",
+            "Maui Windward West",
+            "Maui Leeward West",
+            "Kohala",
+            "Molokai Windward",
+            "Molokai Southeast",
+            "Molokai North",
+            "Molokai West",
+            "Molokai Leeward South",
+            "Lanai Windward",
+            "Lanai Leeward",
+            "Lanai South",
+            "Maui Central Valley North",
+            "Maui Central Valley South",
+            "South Haleakala",
+            "Big Island South",
+            "Big Island Southeast",
+            "Big Island North"
+          ],
+          "urgency": null,
+          "certainty": null,
+          "nwsEventCode": null,
+          "nwsVtec": null,
+          "senderName": null,
+          "effectiveAt": "2026-05-20T14:05:00-10:00",
+          "onsetAt": null,
+          "endsAt": "2026-05-21T05:30:00-10:00"
+        }
+      },
+      "severity": "Moderate",
+      "source": "nws",
+      "status": "Take Action",
+      "type": "Warning",
+      "updatedAt": {
+        "$date": "2026-05-22T04:41:58.307Z"
+      },
+      "presentCount": 18
+    },
+    {
+      "_id": {
+        "$oid": "6a0ea475306874fe84c7b693"
+      },
+      "externalId": "urn:oid:2.49.0.1.840.0.c392908fcbe97995e061a1894e0529fb266900d2.001.1",
+      "__v": 0,
+      "category": "hazardous",
+      "coordinates": null,
+      "createdAt": {
+        "$date": "2026-05-21T06:21:41.347Z"
+      },
+      "dataStatus": "past",
+      "description": "Temperatures as low as 32 will result in frost formation.",
+      "expiresAt": "11:45 PM",
+      "geometry": null,
+      "iconType": "triangle",
+      "instructions": [
+        "Take steps now to protect tender plants from the cold.",
+        "Limit exposure to cold and wind; dress in layers.",
+        "Protect pipes, plants, and pets from freezing conditions."
+      ],
+      "issuedAt": "about 7 hours ago",
+      "lat": 39.8283,
+      "lng": -98.5795,
+      "location": "Northeast Aroostook; Northern Penobscot; Southeast Aroostook; Central Piscataquis",
+      "name": "Frost Advisory",
+      "properties": {
+        "hazardous": {
+          "intensity": {
+            "metric": "nws_alert_severity",
+            "value": 2,
+            "unit": "level",
+            "display": "Moderate"
+          },
+          "affectedCounties": [
+            "Northeast Aroostook",
+            "Northern Penobscot",
+            "Southeast Aroostook",
+            "Central Piscataquis"
+          ],
+          "urgency": null,
+          "certainty": null,
+          "nwsEventCode": null,
+          "nwsVtec": null,
+          "senderName": null,
+          "effectiveAt": "2026-05-21T02:20:00-04:00",
+          "onsetAt": null,
+          "endsAt": "2026-05-21T14:45:00-04:00"
+        }
+      },
+      "severity": "Moderate",
+      "source": "nws",
+      "status": "Take Action",
+      "type": "Warning",
+      "updatedAt": {
+        "$date": "2026-05-22T04:41:58.307Z"
+      },
+      "presentCount": 18
+    },
+    {
+      "_id": {
+        "$oid": "6a0ea4ed306874fe84c7b9b8"
+      },
+      "externalId": "urn:oid:2.49.0.1.840.0.093a2f8a5ac7f27eab63733ea0e455750542046f.001.2",
+      "__v": 0,
+      "category": "hazardous",
+      "coordinates": null,
+      "createdAt": {
+        "$date": "2026-05-21T06:23:41.583Z"
+      },
+      "dataStatus": "past",
+      "description": "Sub-freezing temperatures as low as 24.",
+      "expiresAt": "6:00 PM",
+      "geometry": null,
+      "iconType": "cloud",
+      "instructions": [
+        "Take steps now to protect tender plants from the cold.",
+        "To prevent water pipes from freezing; wrap or drain or allow them to drip slowly.",
+        "Those that have in-ground sprinkler systems should drain them."
+      ],
+      "issuedAt": "about 7 hours ago",
+      "lat": 39.8283,
+      "lng": -98.5795,
+      "location": "Baraga; Marquette; Alger; Iron; Dickinson; Delta; Southern Schoolcraft; Southern Houghton; Northern Schoolcraft",
+      "name": "Freeze Warning",
+      "properties": {
+        "hazardous": {
+          "intensity": {
+            "metric": "nws_alert_severity",
+            "value": 2,
+            "unit": "level",
+            "display": "Moderate"
+          },
+          "affectedCounties": [
+            "Baraga",
+            "Marquette",
+            "Alger",
+            "Iron",
+            "Dickinson",
+            "Delta",
+            "Southern Schoolcraft",
+            "Southern Houghton",
+            "Northern Schoolcraft"
+          ],
+          "urgency": null,
+          "certainty": null,
+          "nwsEventCode": null,
+          "nwsVtec": null,
+          "senderName": null,
+          "effectiveAt": "2026-05-21T02:21:00-04:00",
+          "onsetAt": null,
+          "endsAt": "2026-05-21T09:00:00-04:00"
+        }
+      },
+      "severity": "Moderate",
+      "source": "nws",
+      "status": "Take Action",
+      "type": "Warning",
+      "updatedAt": {
+        "$date": "2026-05-22T04:41:58.307Z"
+      },
+      "presentCount": 18
+    },
+    {
+      "_id": {
+        "$oid": "6a0e9daf306874fe84c6d96c"
+      },
+      "externalId": "urn:oid:2.49.0.1.840.0.4da13a84f42202f8a872327bb818c80ed2fa8e77.002.1",
+      "__v": 0,
+      "category": "hazardous",
+      "coordinates": null,
+      "createdAt": {
+        "$date": "2026-05-21T05:52:47.161Z"
+      },
+      "dataStatus": "past",
+      "description": "Temperatures between 32 and 36 degrees will result in frost.",
+      "expiresAt": "12:00 AM",
+      "geometry": null,
+      "iconType": "triangle",
+      "instructions": [
+        "Take steps now to protect tender plants from the cold.",
+        "Limit exposure to cold and wind; dress in layers.",
+        "Protect pipes, plants, and pets from freezing conditions."
+      ],
+      "issuedAt": "about 7 hours ago",
+      "lat": 39.8283,
+      "lng": -98.5795,
+      "location": "Northern St. Lawrence; Northern Franklin; Southwestern St. Lawrence; Orleans; Lamoille; Caledonia; Washington; Western Addison; Orange; Western Rutland; Eastern Franklin; Eastern Chittenden; Eastern Addison; Eastern Rutland; Western Windsor; Eastern Windsor",
+      "name": "Frost Advisory",
+      "properties": {
+        "hazardous": {
+          "intensity": {
+            "metric": "nws_alert_severity",
+            "value": 2,
+            "unit": "level",
+            "display": "Moderate"
+          },
+          "affectedCounties": [
+            "Northern St. Lawrence",
+            "Northern Franklin",
+            "Southwestern St. Lawrence",
+            "Orleans",
+            "Lamoille",
+            "Caledonia",
+            "Washington",
+            "Western Addison",
+            "Orange",
+            "Western Rutland",
+            "Eastern Franklin",
+            "Eastern Chittenden",
+            "Eastern Addison",
+            "Eastern Rutland",
+            "Western Windsor",
+            "Eastern Windsor"
+          ],
+          "urgency": null,
+          "certainty": null,
+          "nwsEventCode": null,
+          "nwsVtec": null,
+          "senderName": null,
+          "effectiveAt": "2026-05-21T01:51:00-04:00",
+          "onsetAt": null,
+          "endsAt": "2026-05-21T15:00:00-04:00"
+        }
+      },
+      "severity": "Moderate",
+      "source": "nws",
+      "status": "Take Action",
+      "type": "Warning",
+      "updatedAt": {
+        "$date": "2026-05-22T04:41:58.307Z"
+      },
+      "presentCount": 18
+    },
+    {
+      "_id": {
+        "$oid": "6a0ea4ed306874fe84c7b9b9"
+      },
+      "externalId": "urn:oid:2.49.0.1.840.0.093a2f8a5ac7f27eab63733ea0e455750542046f.002.1",
+      "__v": 0,
+      "category": "hazardous",
+      "coordinates": null,
+      "createdAt": {
+        "$date": "2026-05-21T06:23:41.583Z"
+      },
+      "dataStatus": "past",
+      "description": "Sub-freezing temperatures as low as 27.",
+      "expiresAt": "6:00 PM",
+      "geometry": null,
+      "iconType": "cloud",
+      "instructions": [
+        "Take steps now to protect tender plants from the cold.",
+        "To prevent water pipes from freezing; wrap or drain or allow them to drip slowly.",
+        "Those that have in-ground sprinkler systems should drain them."
+      ],
+      "issuedAt": "about 7 hours ago",
+      "lat": 39.8283,
+      "lng": -98.5795,
+      "location": "Luce",
+      "name": "Freeze Warning",
+      "properties": {
+        "hazardous": {
+          "intensity": {
+            "metric": "nws_alert_severity",
+            "value": 2,
+            "unit": "level",
+            "display": "Moderate"
+          },
+          "affectedCounties": [
+            "Luce"
+          ],
+          "urgency": null,
+          "certainty": null,
+          "nwsEventCode": null,
+          "nwsVtec": null,
+          "senderName": null,
+          "effectiveAt": "2026-05-21T02:21:00-04:00",
+          "onsetAt": null,
+          "endsAt": "2026-05-21T09:00:00-04:00"
+        }
+      },
+      "severity": "Moderate",
+      "source": "nws",
+      "status": "Take Action",
+      "type": "Warning",
+      "updatedAt": {
+        "$date": "2026-05-22T04:41:58.307Z"
+      },
+      "presentCount": 18
+    }
+  ]
+},
+{
+  "category": "landslide",
+  "documents": [
+    {
+      "_id": {
+        "$oid": "6a0eb3cc306874fe84c94c36"
+      },
+      "externalId": "ncei:1315394",
+      "__v": 0,
+      "category": "landslide",
+      "coordinates": null,
+      "createdAt": {
+        "$date": "2026-05-21T07:27:07.129Z"
+      },
+      "dataStatus": "past",
+      "description": "NCEI Avalanche · State: COLORADO · Property damage: 0.00K",
+      "expiresAt": "22-FEB-26 17:00:00",
+      "geometry": null,
+      "iconType": "wind",
+      "instructions": [],
+      "issuedAt": "3 months ago",
+      "lat": null,
+      "lng": null,
+      "location": "COLORADO",
+      "name": "Avalanche",
+      "properties": {
+        "landslide": {
+          "intensity": null,
+          "nceiEventId": "1315394",
+          "nceiEventType": "Avalanche",
+          "episodeId": "210664",
+          "state": "COLORADO",
+          "beginDateTime": "2026-02-22T12:00:00.000Z",
+          "endDateTime": "2026-02-22T17:00:00.000Z",
+          "injuriesDirect": "1",
+          "deathsDirect": "0",
+          "damageProperty": "0.00K",
+          "damageCrops": "0.00K",
+          "damagePropertyUsd": 0
+        }
+      },
+      "severity": "High",
+      "source": "noaa_ncei",
+      "status": "Monitor",
+      "type": "Statement",
+      "updatedAt": {
+        "$date": "2026-05-21T07:27:07.129Z"
+      },
+      "presentCount": 16
+    },
+    {
+      "_id": {
+        "$oid": "6a0eb3cc306874fe84c94c45"
+      },
+      "externalId": "ncei:1320942",
+      "__v": 0,
+      "category": "landslide",
+      "coordinates": null,
+      "createdAt": {
+        "$date": "2026-05-21T07:27:07.129Z"
+      },
+      "dataStatus": "past",
+      "description": "NCEI Avalanche · State: IDAHO · Property damage: 0.00K",
+      "expiresAt": "22-FEB-26 15:00:00",
+      "geometry": null,
+      "iconType": "wind",
+      "instructions": [],
+      "issuedAt": "3 months ago",
+      "lat": null,
+      "lng": null,
+      "location": "IDAHO",
+      "name": "Avalanche",
+      "properties": {
+        "landslide": {
+          "intensity": null,
+          "nceiEventId": "1320942",
+          "nceiEventType": "Avalanche",
+          "episodeId": "211447",
+          "state": "IDAHO",
+          "beginDateTime": "2026-02-22T14:00:00.000Z",
+          "endDateTime": "2026-02-22T15:00:00.000Z",
+          "injuriesDirect": "0",
+          "deathsDirect": "0",
+          "damageProperty": "0.00K",
+          "damageCrops": "0.00K",
+          "damagePropertyUsd": 0
+        }
+      },
+      "severity": "Low",
+      "source": "noaa_ncei",
+      "status": "Monitor",
+      "type": "Statement",
+      "updatedAt": {
+        "$date": "2026-05-21T07:27:07.129Z"
+      },
+      "presentCount": 16
+    },
+    {
+      "_id": {
+        "$oid": "6a0eb3cc306874fe84c94cb6"
+      },
+      "externalId": "ncei:1306850",
+      "__v": 0,
+      "category": "landslide",
+      "coordinates": null,
+      "createdAt": {
+        "$date": "2026-05-21T07:27:07.129Z"
+      },
+      "dataStatus": "past",
+      "description": "NCEI Avalanche · State: UTAH · Property damage: 0.00K · Deaths: 1",
+      "expiresAt": "22-FEB-26 15:45:00",
+      "geometry": null,
+      "iconType": "wind",
+      "instructions": [],
+      "issuedAt": "3 months ago",
+      "lat": null,
+      "lng": null,
+      "location": "UTAH",
+      "name": "Avalanche",
+      "properties": {
+        "landslide": {
+          "intensity": null,
+          "nceiEventId": "1306850",
+          "nceiEventType": "Avalanche",
+          "episodeId": "209599",
+          "state": "UTAH",
+          "beginDateTime": "2026-02-22T15:30:00.000Z",
+          "endDateTime": "2026-02-22T15:45:00.000Z",
+          "injuriesDirect": "1",
+          "deathsDirect": "1",
+          "damageProperty": "0.00K",
+          "damageCrops": "0.00K",
+          "damagePropertyUsd": 0
+        }
+      },
+      "severity": "Extreme",
+      "source": "noaa_ncei",
+      "status": "Monitor",
+      "type": "Statement",
+      "updatedAt": {
+        "$date": "2026-05-21T07:27:07.129Z"
+      },
+      "presentCount": 16
+    }
+  ]
+},
+{
+  "category": "storm",
+  "documents": [
+    {
+      "_id": {
+        "$oid": "6a0fe628306874fe84ed924c"
+      },
+      "externalId": "urn:oid:2.49.0.1.840.0.d3e71bd6755105f68b2658c5713f562a0515a444.001.1",
+      "__v": 0,
+      "category": "storm",
+      "coordinates": null,
+      "createdAt": {
+        "$date": "2026-05-22T05:14:15.649Z"
+      },
+      "dataStatus": "past",
+      "description": "Severe Thunderstorm Warning issued May 21 at 11:10PM MDT until May 22 at 12:00AM MDT by NWS Goodland KS.",
+      "expiresAt": "11:00 AM",
+      "geometry": null,
+      "iconType": "lightning",
+      "instructions": [
+        "For your protection move to an interior room on the lowest floor of a building.",
+        "This thunderstorm is producing accumulating hail.",
+        "which will make driving hazardous."
+      ],
+      "issuedAt": "14 minutes ago",
+      "lat": 39.69199999999999,
+      "lng": -102.564,
+      "location": "Yuma, CO",
+      "name": "Severe Thunderstorm Warning",
+      "properties": {
+        "storm": {
+          "intensity": {
+            "metric": "nws_alert_severity",
+            "value": 3,
+            "unit": "level",
+            "display": "High"
+          },
+          "affectedCounties": [
+            "Yuma, CO"
+          ],
+          "urgency": null,
+          "certainty": null,
+          "nwsEventCode": null,
+          "nwsVtec": null,
+          "senderName": null,
+          "effectiveAt": "2026-05-21T23:10:00-06:00",
+          "onsetAt": null,
+          "endsAt": "2026-05-22T00:00:00-06:00"
+        }
+      },
+      "severity": "High",
+      "source": "nws",
+      "status": "Take Action",
+      "type": "Warning",
+      "updatedAt": {
+        "$date": "2026-05-22T05:25:30.955Z"
+      },
+      "presentCount": 18
+    },
+    {
+      "_id": {
+        "$oid": "6a0e958a306874fe84c5fe5e"
+      },
+      "externalId": "urn:oid:2.49.0.1.840.0.c1749096509105760f70f365a1671de53904b5fb.001.1",
+      "__v": 0,
+      "category": "storm",
+      "coordinates": null,
+      "createdAt": {
+        "$date": "2026-05-21T05:17:59.556Z"
+      },
+      "dataStatus": "past",
+      "description": "Severe Thunderstorm Warning issued May 20 at 11:36PM CDT until May 21 at 12:30AM CDT by NWS San Angelo TX.",
+      "expiresAt": "10:30 AM",
+      "geometry": null,
+      "iconType": "lightning",
+      "instructions": [
+        "For your protection move to an interior room on the lowest floor of a building.",
+        "Seek sturdy shelter indoors away from windows.",
+        "Avoid travel and exposed areas until the threat passes."
+      ],
+      "issuedAt": "42 minutes ago",
+      "lat": 30.688,
+      "lng": -99.274,
+      "location": "Mason, TX",
+      "name": "Severe Thunderstorm Warning",
+      "properties": {
+        "storm": {
+          "intensity": {
+            "metric": "nws_alert_severity",
+            "value": 3,
+            "unit": "level",
+            "display": "High"
+          },
+          "affectedCounties": [
+            "Mason, TX"
+          ],
+          "urgency": null,
+          "certainty": null,
+          "nwsEventCode": null,
+          "nwsVtec": null,
+          "senderName": null,
+          "effectiveAt": "2026-05-20T23:36:00-05:00",
+          "onsetAt": null,
+          "endsAt": "2026-05-21T00:30:00-05:00"
+        }
+      },
+      "severity": "High",
+      "source": "nws",
+      "status": "Take Action",
+      "type": "Warning",
+      "updatedAt": {
+        "$date": "2026-05-21T05:33:41.955Z"
+      },
+      "presentCount": 18
+    },
+    {
+      "_id": {
+        "$oid": "6a0fe8ca306874fe84eda7df"
+      },
+      "externalId": "urn:oid:2.49.0.1.840.0.307377fcd397a584c101579f292e240e393382ee.001.1",
+      "__v": 0,
+      "category": "storm",
+      "coordinates": null,
+      "createdAt": {
+        "$date": "2026-05-22T05:25:29.782Z"
+      },
+      "dataStatus": "current",
+      "description": "Severe Thunderstorm Warning issued May 21 at 11:24PM MDT until May 22 at 12:00AM MDT by NWS Goodland KS.",
+      "expiresAt": "11:00 AM",
+      "geometry": null,
+      "iconType": "lightning",
+      "instructions": [
+        "For your protection move to an interior room on the lowest floor of a building.",
+        "This thunderstorm is producing accumulating hail.",
+        "which will make driving hazardous."
+      ],
+      "issuedAt": "8 minutes ago",
+      "lat": 39.722,
+      "lng": -102.482,
+      "location": "Yuma, CO",
+      "name": "Severe Thunderstorm Warning",
+      "properties": {
+        "storm": {
+          "intensity": {
+            "metric": "nws_alert_severity",
+            "value": 3,
+            "unit": "level",
+            "display": "High"
+          },
+          "affectedCounties": [
+            "Yuma, CO"
+          ],
+          "urgency": null,
+          "certainty": null,
+          "nwsEventCode": null,
+          "nwsVtec": null,
+          "senderName": null,
+          "effectiveAt": "2026-05-21T23:24:00-06:00",
+          "onsetAt": null,
+          "endsAt": "2026-05-22T00:00:00-06:00"
+        }
+      },
+      "severity": "High",
+      "source": "nws",
+      "status": "Take Action",
+      "type": "Warning",
+      "updatedAt": {
+        "$date": "2026-05-22T05:31:30.497Z"
+      },
+      "presentCount": 18
+    },
+    {
+      "_id": {
+        "$oid": "6a0fde96306874fe84ecc6d7"
+      },
+      "externalId": "urn:oid:2.49.0.1.840.0.b6fa1cf19f2da9b5b64f8849040d7a790bd8224a.001.1",
+      "__v": 0,
+      "category": "storm",
+      "coordinates": null,
+      "createdAt": {
+        "$date": "2026-05-22T04:41:57.060Z"
+      },
+      "dataStatus": "past",
+      "description": "Severe Thunderstorm Warning issued May 21 at 11:19PM CDT until May 22 at 12:15AM CDT by NWS Midland/Odessa TX.",
+      "expiresAt": "10:15 AM",
+      "geometry": null,
+      "iconType": "lightning",
+      "instructions": [
+        "For your protection move to an interior room on the lowest floor of a building.",
+        "Seek sturdy shelter indoors away from windows.",
+        "Avoid travel and exposed areas until the threat passes."
+      ],
+      "issuedAt": "34 minutes ago",
+      "lat": 30.483684210526306,
+      "lng": -101.77210526315791,
+      "location": "Pecos, TX; Terrell, TX",
+      "name": "Severe Thunderstorm Warning",
+      "properties": {
+        "storm": {
+          "intensity": {
+            "metric": "nws_alert_severity",
+            "value": 3,
+            "unit": "level",
+            "display": "High"
+          },
+          "affectedCounties": [
+            "Pecos, TX",
+            "Terrell, TX"
+          ],
+          "urgency": null,
+          "certainty": null,
+          "nwsEventCode": null,
+          "nwsVtec": null,
+          "senderName": null,
+          "effectiveAt": "2026-05-21T23:19:00-05:00",
+          "onsetAt": null,
+          "endsAt": "2026-05-22T00:15:00-05:00"
+        }
+      },
+      "severity": "High",
+      "source": "nws",
+      "status": "Take Action",
+      "type": "Warning",
+      "updatedAt": {
+        "$date": "2026-05-22T04:57:58.863Z"
+      },
+      "presentCount": 18
+    },
+    {
+      "_id": {
+        "$oid": "6a0fde96306874fe84ecc665"
+      },
+      "externalId": "urn:oid:2.49.0.1.840.0.826365497c39749c059a8061238eb2ccf373dd74.002.1",
+      "__v": 0,
+      "category": "storm",
+      "coordinates": null,
+      "createdAt": {
+        "$date": "2026-05-22T04:41:57.060Z"
+      },
+      "dataStatus": "past",
+      "description": "Severe Thunderstorm Warning issued May 21 at 11:38PM CDT until May 21 at 11:45PM CDT by NWS Midland/Odessa TX.",
+      "expiresAt": "9:45 AM",
+      "geometry": null,
+      "iconType": "lightning",
+      "instructions": [
+        "For your protection move to an interior room on the lowest floor of a building.",
+        "Torrential rainfall is occurring with these storms, and may lead to flash flooding.",
+        "Do not drive your vehicle through flooded roadways."
+      ],
+      "issuedAt": "6 minutes ago",
+      "lat": 29.872500000000002,
+      "lng": -101.97749999999999,
+      "location": "Terrell, TX",
+      "name": "Severe Thunderstorm Warning",
+      "properties": {
+        "storm": {
+          "intensity": {
+            "metric": "nws_alert_severity",
+            "value": 3,
+            "unit": "level",
+            "display": "High"
+          },
+          "affectedCounties": [
+            "Terrell, TX"
+          ],
+          "urgency": null,
+          "certainty": null,
+          "nwsEventCode": null,
+          "nwsVtec": null,
+          "senderName": null,
+          "effectiveAt": "2026-05-21T23:38:00-05:00",
+          "onsetAt": null,
+          "endsAt": "2026-05-21T23:45:00-05:00"
+        }
+      },
+      "severity": "High",
+      "source": "nws",
+      "status": "Take Action",
+      "type": "Warning",
+      "updatedAt": {
+        "$date": "2026-05-22T04:45:19.297Z"
+      },
+      "presentCount": 18
+    }
+  ]
+},
+{
+  "category": "earthquake",
+  "documents": [
+    {
+      "_id": {
+        "$oid": "6a0ea29e306874fe84c7a3d4"
+      },
+      "externalId": "eq:aka2026eyazld",
+      "__v": 0,
+      "category": "earthquake",
+      "coordinates": null,
+      "createdAt": {
+        "$date": "2026-05-21T06:13:48.617Z"
+      },
+      "dataStatus": "past",
+      "description": "USGS M2.9 — 34 km N of Aleneva, Alaska",
+      "expiresAt": "See USGS event page",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -152.993,
+          58.363,
+          62.6
+        ]
+      },
+      "iconType": "triangle",
+      "instructions": [
+        "Stay informed.",
+        "Avoid unstable structures."
+      ],
+      "issuedAt": "2 months ago",
+      "lat": 58.363,
+      "lng": -152.993,
+      "location": "34 km N of Aleneva, Alaska",
+      "name": "Earthquake · M2.9",
+      "properties": {
+        "earthquake": {
+          "intensity": {
+            "metric": "magnitude",
+            "value": 2.9,
+            "unit": "ml",
+            "display": "M2.9"
+          },
+          "magnitude": 2.9,
+          "magnitudeType": "ml",
+          "depth": 62.6,
+          "depthUnit": "km",
+          "place": "34 km N of Aleneva, Alaska",
+          "tsunami": 0,
+          "sig": 129,
+          "cdi": null,
+          "mmi": null,
+          "felt": null,
+          "alert": null,
+          "reviewStatus": "reviewed",
+          "nst": 93,
+          "gap": 86,
+          "dmin": 0.4,
+          "rms": 0.5,
+          "net": "ak",
+          "usgsEventId": "aka2026eyazld",
+          "usgsEventUrl": "https://earthquake.usgs.gov/earthquakes/eventpage/aka2026eyazld",
+          "occurredAt": "2026-03-11T18:02:21.647Z"
+        }
+      },
+      "severity": "Low",
+      "source": "earthquake",
+      "status": "Monitor",
+      "type": "Statement",
+      "updatedAt": {
+        "$date": "2026-05-22T05:25:34.611Z"
+      },
+      "presentCount": 20
+    },
+    {
+      "_id": {
+        "$oid": "6a0ea29e306874fe84c7a3de"
+      },
+      "externalId": "eq:pr71509593",
+      "__v": 0,
+      "category": "earthquake",
+      "coordinates": null,
+      "createdAt": {
+        "$date": "2026-05-21T06:13:48.617Z"
+      },
+      "dataStatus": "past",
+      "description": "USGS M2.9 — 59 km N of Culebra, Puerto Rico",
+      "expiresAt": "See USGS event page",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -65.31,
+          18.8443333333333,
+          19.4
+        ]
+      },
+      "iconType": "triangle",
+      "instructions": [
+        "Stay informed.",
+        "Avoid unstable structures."
+      ],
+      "issuedAt": "2 months ago",
+      "lat": 18.8443333333333,
+      "lng": -65.31,
+      "location": "59 km N of Culebra, Puerto Rico",
+      "name": "Earthquake · M2.9",
+      "properties": {
+        "earthquake": {
+          "intensity": {
+            "metric": "magnitude",
+            "value": 2.92,
+            "unit": "md",
+            "display": "M2.9"
+          },
+          "magnitude": 2.92,
+          "magnitudeType": "md",
+          "depth": 19.4,
+          "depthUnit": "km",
+          "place": "59 km N of Culebra, Puerto Rico",
+          "tsunami": 0,
+          "sig": 131,
+          "cdi": null,
+          "mmi": null,
+          "felt": null,
+          "alert": null,
+          "reviewStatus": "reviewed",
+          "nst": 11,
+          "gap": 221,
+          "dmin": 0.5932,
+          "rms": 0.13,
+          "net": "pr",
+          "usgsEventId": "pr71509593",
+          "usgsEventUrl": "https://earthquake.usgs.gov/earthquakes/eventpage/pr71509593",
+          "occurredAt": "2026-03-11T12:06:28.580Z"
+        }
+      },
+      "severity": "Low",
+      "source": "earthquake",
+      "status": "Monitor",
+      "type": "Statement",
+      "updatedAt": {
+        "$date": "2026-05-22T05:25:34.611Z"
+      },
+      "presentCount": 20
+    },
+    {
+      "_id": {
+        "$oid": "6a0ea29e306874fe84c7a3df"
+      },
+      "externalId": "eq:us7000s3qh",
+      "__v": 0,
+      "category": "earthquake",
+      "coordinates": null,
+      "createdAt": {
+        "$date": "2026-05-21T06:13:48.617Z"
+      },
+      "dataStatus": "past",
+      "description": "USGS M2.6 — 13 km W of Powhatan, Louisiana",
+      "expiresAt": "See USGS event page",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -93.3414,
+          31.8563,
+          5
+        ]
+      },
+      "iconType": "triangle",
+      "instructions": [
+        "Stay informed.",
+        "Avoid unstable structures."
+      ],
+      "issuedAt": "2 months ago",
+      "lat": 31.8563,
+      "lng": -93.3414,
+      "location": "13 km W of Powhatan, Louisiana",
+      "name": "Earthquake · M2.6",
+      "properties": {
+        "earthquake": {
+          "intensity": {
+            "metric": "magnitude",
+            "value": 2.6,
+            "unit": "mb_lg",
+            "display": "M2.6"
+          },
+          "magnitude": 2.6,
+          "magnitudeType": "mb_lg",
+          "depth": 5,
+          "depthUnit": "km",
+          "place": "13 km W of Powhatan, Louisiana",
+          "tsunami": 0,
+          "sig": 104,
+          "cdi": null,
+          "mmi": null,
+          "felt": null,
+          "alert": null,
+          "reviewStatus": "reviewed",
+          "nst": 16,
+          "gap": 72,
+          "dmin": 0.152,
+          "rms": 1.21,
+          "net": "us",
+          "usgsEventId": "us7000s3qh",
+          "usgsEventUrl": "https://earthquake.usgs.gov/earthquakes/eventpage/us7000s3qh",
+          "occurredAt": "2026-03-11T11:06:25.199Z"
+        }
+      },
+      "severity": "Low",
+      "source": "earthquake",
+      "status": "Monitor",
+      "type": "Statement",
+      "updatedAt": {
+        "$date": "2026-05-22T05:25:34.611Z"
+      },
+      "presentCount": 20
+    },
+    {
+      "_id": {
+        "$oid": "6a0ea29e306874fe84c7a3e0"
+      },
+      "externalId": "eq:uw62232776",
+      "__v": 0,
+      "category": "earthquake",
+      "coordinates": null,
+      "createdAt": {
+        "$date": "2026-05-21T06:13:48.617Z"
+      },
+      "dataStatus": "past",
+      "description": "USGS M2.9 — 2 km W of Home, Washington",
+      "expiresAt": "See USGS event page",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -122.79583333333333,
+          47.272166666666664,
+          25.33
+        ]
+      },
+      "iconType": "triangle",
+      "instructions": [
+        "Stay informed.",
+        "Avoid unstable structures."
+      ],
+      "issuedAt": "2 months ago",
+      "lat": 47.272166666666664,
+      "lng": -122.79583333333333,
+      "location": "2 km W of Home, Washington",
+      "name": "Earthquake · M2.9",
+      "properties": {
+        "earthquake": {
+          "intensity": {
+            "metric": "magnitude",
+            "value": 2.86,
+            "unit": "ml",
+            "display": "M2.9"
+          },
+          "magnitude": 2.86,
+          "magnitudeType": "ml",
+          "depth": 25.33,
+          "depthUnit": "km",
+          "place": "2 km W of Home, Washington",
+          "tsunami": 0,
+          "sig": 136,
+          "cdi": 2.7,
+          "mmi": null,
+          "felt": 38,
+          "alert": null,
+          "reviewStatus": "reviewed",
+          "nst": 148,
+          "gap": 13,
+          "dmin": 0.08752,
+          "rms": 0.24,
+          "net": "uw",
+          "usgsEventId": "uw62232776",
+          "usgsEventUrl": "https://earthquake.usgs.gov/earthquakes/eventpage/uw62232776",
+          "occurredAt": "2026-03-11T10:49:32.380Z"
+        }
+      },
+      "severity": "Low",
+      "source": "earthquake",
+      "status": "Monitor",
+      "type": "Statement",
+      "updatedAt": {
+        "$date": "2026-05-22T05:25:34.611Z"
+      },
+      "presentCount": 20
+    },
+    {
+      "_id": {
+        "$oid": "6a0ea29e306874fe84c7a3e1"
+      },
+      "externalId": "eq:us7000s3qv",
+      "__v": 0,
+      "category": "earthquake",
+      "coordinates": null,
+      "createdAt": {
+        "$date": "2026-05-21T06:13:48.617Z"
+      },
+      "dataStatus": "past",
+      "description": "USGS M2.6 — 79 km SW of Unalaska, Alaska",
+      "expiresAt": "See USGS event page",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -167.252,
+          53.3053,
+          11.068
+        ]
+      },
+      "iconType": "triangle",
+      "instructions": [
+        "Stay informed.",
+        "Avoid unstable structures."
+      ],
+      "issuedAt": "2 months ago",
+      "lat": 53.3053,
+      "lng": -167.252,
+      "location": "79 km SW of Unalaska, Alaska",
+      "name": "Earthquake · M2.6",
+      "properties": {
+        "earthquake": {
+          "intensity": {
+            "metric": "magnitude",
+            "value": 2.6,
+            "unit": "ml",
+            "display": "M2.6"
+          },
+          "magnitude": 2.6,
+          "magnitudeType": "ml",
+          "depth": 11.068,
+          "depthUnit": "km",
+          "place": "79 km SW of Unalaska, Alaska",
+          "tsunami": 0,
+          "sig": 104,
+          "cdi": null,
+          "mmi": null,
+          "felt": null,
+          "alert": null,
+          "reviewStatus": "reviewed",
+          "nst": 20,
+          "gap": 201,
+          "dmin": 0.481,
+          "rms": 0.29,
+          "net": "us",
+          "usgsEventId": "us7000s3qv",
+          "usgsEventUrl": "https://earthquake.usgs.gov/earthquakes/eventpage/us7000s3qv",
+          "occurredAt": "2026-03-11T09:17:49.183Z"
+        }
+      },
+      "severity": "Low",
+      "source": "earthquake",
+      "status": "Monitor",
+      "type": "Statement",
+      "updatedAt": {
+        "$date": "2026-05-22T05:25:34.611Z"
+      },
+      "presentCount": 20
+    }
+  ]
+},
+{
+  "category": "wildfire",
+  "documents": [
+    {
+      "_id": {
+        "$oid": "6a0e9ce5306874fe84c6d08a"
+      },
+      "externalId": "fema:fac56b7a-0aae-4787-9954-3c3597373eb8",
+      "__v": 0,
+      "category": "wildfire",
+      "coordinates": null,
+      "createdAt": {
+        "$date": "2026-05-21T05:49:25.028Z"
+      },
+      "dataStatus": "past",
+      "description": "Declaration: FM-5623-NE · NE — Type: Fire",
+      "expiresAt": "5:00 AM",
+      "geometry": null,
+      "iconType": "triangle",
+      "instructions": [],
+      "issuedAt": "2 months ago",
+      "lat": null,
+      "lng": null,
+      "location": "Keith (County), NE",
+      "name": "Morrill-Cottonwood Fire",
+      "properties": {
+        "wildfire": {
+          "intensity": {
+            "metric": "disaster_declaration",
+            "value": 5623,
+            "unit": "FM",
+            "display": "FM-5623-NE"
+          },
+          "femaDeclarationString": "FM-5623-NE",
+          "femaDisasterNumber": 5623,
+          "declarationType": "FM",
+          "declarationTitle": "MORRILL-COTTONWOOD FIRE",
+          "incidentType": "Fire",
+          "declarationDate": "2026-03-13T00:00:00.000Z",
+          "incidentBeginDate": "2026-03-12T00:00:00.000Z",
+          "incidentEndDate": "2026-03-27T00:00:00.000Z",
+          "designatedArea": "Keith (County)",
+          "iaProgram": false,
+          "paProgram": true,
+          "hmProgram": false,
+          "ihProgram": false,
+          "totalNumberIaApproved": null,
+          "totalAmountIhpApproved": null,
+          "totalAmountHaApproved": null,
+          "totalAmountOnaApproved": null,
+          "totalObligatedAmountPa": null,
+          "totalObligatedAmountHmgp": 0,
+          "totalFederalAidUsd": 0
+        }
+      },
+      "severity": "High",
+      "source": "fema",
+      "status": "Monitor",
+      "type": "Declaration",
+      "updatedAt": {
+        "$date": "2026-05-22T05:25:34.792Z"
+      },
+      "presentCount": 16
+    },
+    {
+      "_id": {
+        "$oid": "6a0dac3e306874fe84ab2431"
+      },
+      "externalId": "fema:f81df622-f153-4d7a-a578-e54c094c9b5c",
+      "__v": 0,
+      "category": "wildfire",
+      "coordinates": null,
+      "createdAt": {
+        "$date": "2026-05-20T12:42:40.667Z"
+      },
+      "dataStatus": "past",
+      "description": "Declaration: FM-5630-GA · GA — Type: Fire",
+      "expiresAt": "See OpenFEMA",
+      "geometry": null,
+      "iconType": "triangle",
+      "instructions": [
+        "Follow evacuation routes promptly if ordered.",
+        "Reduce ignition risks and avoid outdoor burning where restricted.",
+        "Keep emergency supplies ready and stay informed on fire spread."
+      ],
+      "issuedAt": "about 1 month ago",
+      "lat": null,
+      "lng": null,
+      "location": "Brantley (County), GA",
+      "name": "Highway 82 Wildfire",
+      "properties": {
+        "wildfire": {
+          "intensity": null
+        }
+      },
+      "severity": "High",
+      "source": "fema",
+      "status": "Take Action",
+      "type": "Warning",
+      "updatedAt": {
+        "$date": "2026-05-22T04:45:18.551Z"
+      },
+      "presentCount": 16
+    },
+    {
+      "_id": {
+        "$oid": "6a0dac3e306874fe84ab2433"
+      },
+      "externalId": "fema:19fd19f4-6ac3-4699-b244-2cf972b9c68d",
+      "__v": 0,
+      "category": "wildfire",
+      "coordinates": null,
+      "createdAt": {
+        "$date": "2026-05-20T12:42:40.667Z"
+      },
+      "dataStatus": "current",
+      "description": "Declaration: FM-5631-FL · FL — Type: Fire",
+      "expiresAt": "See OpenFEMA",
+      "geometry": null,
+      "iconType": "triangle",
+      "instructions": [
+        "Follow evacuation routes promptly if ordered.",
+        "Reduce ignition risks and avoid outdoor burning where restricted.",
+        "Keep emergency supplies ready and stay informed on fire spread."
+      ],
+      "issuedAt": "about 1 month ago",
+      "lat": null,
+      "lng": null,
+      "location": "Putnam (County), FL",
+      "name": "Railroad Complex Fire",
+      "properties": {
+        "wildfire": {
+          "intensity": null
+        }
+      },
+      "severity": "High",
+      "source": "fema",
+      "status": "Take Action",
+      "type": "Warning",
+      "updatedAt": {
+        "$date": "2026-05-22T05:30:30.800Z"
+      },
+      "presentCount": 16
+    },
+    {
+      "_id": {
+        "$oid": "6a0eb3cc306874fe84c94c67"
+      },
+      "externalId": "ncei:1321423",
+      "__v": 0,
+      "category": "wildfire",
+      "coordinates": null,
+      "createdAt": {
+        "$date": "2026-05-21T07:27:07.129Z"
+      },
+      "dataStatus": "past",
+      "description": "NCEI Wildfire · State: FLORIDA · Property damage: 0.00K",
+      "expiresAt": "28-FEB-26 23:59:00",
+      "geometry": null,
+      "iconType": "flame",
+      "instructions": [],
+      "issuedAt": "3 months ago",
+      "lat": null,
+      "lng": null,
+      "location": "FLORIDA",
+      "name": "Wildfire",
+      "properties": {
+        "wildfire": {
+          "intensity": null,
+          "nceiEventId": "1321423",
+          "nceiEventType": "Wildfire",
+          "episodeId": "211518",
+          "state": "FLORIDA",
+          "beginDateTime": "2026-02-22T12:00:00.000Z",
+          "endDateTime": "2026-02-28T23:59:00.000Z",
+          "injuriesDirect": "0",
+          "deathsDirect": "0",
+          "damageProperty": "0.00K",
+          "damageCrops": "0.00K",
+          "damagePropertyUsd": 0
+        }
+      },
+      "severity": "Low",
+      "source": "noaa_ncei",
+      "status": "Monitor",
+      "type": "Statement",
+      "updatedAt": {
+        "$date": "2026-05-21T07:27:07.129Z"
+      },
+      "presentCount": 16
+    },
+    {
+      "_id": {
+        "$oid": "6a0eb3cc306874fe84c94a80"
+      },
+      "externalId": "ncei:1318060",
+      "__v": 0,
+      "category": "wildfire",
+      "coordinates": null,
+      "createdAt": {
+        "$date": "2026-05-21T07:27:07.129Z"
+      },
+      "dataStatus": "past",
+      "description": "NCEI Wildfire · State: TEXAS · Property damage: 5.00K",
+      "expiresAt": "24-FEB-26 22:00:00",
+      "geometry": null,
+      "iconType": "flame",
+      "instructions": [],
+      "issuedAt": "3 months ago",
+      "lat": null,
+      "lng": null,
+      "location": "TEXAS",
+      "name": "Wildfire",
+      "properties": {
+        "wildfire": {
+          "intensity": {
+            "metric": "damage_property",
+            "value": 5000,
+            "unit": "USD",
+            "display": "5.00K"
+          },
+          "nceiEventId": "1318060",
+          "nceiEventType": "Wildfire",
+          "episodeId": "210979",
+          "state": "TEXAS",
+          "beginDateTime": "2026-02-24T15:00:00.000Z",
+          "endDateTime": "2026-02-24T22:00:00.000Z",
+          "injuriesDirect": "0",
+          "deathsDirect": "0",
+          "damageProperty": "5.00K",
+          "damageCrops": "0.00K",
+          "damagePropertyUsd": 5000
+        }
+      },
+      "severity": "Low",
+      "source": "noaa_ncei",
+      "status": "Monitor",
+      "type": "Statement",
+      "updatedAt": {
+        "$date": "2026-05-21T07:27:07.129Z"
+      },
+      "presentCount": 16
+    }
+  ]
+},
+{
+  "category": "extreme_heat",
+  "documents": [
+    {
+      "_id": {
+        "$oid": "6a0eb3cc306874fe84c94ab9"
+      },
+      "externalId": "ncei:1320061",
+      "__v": 0,
+      "category": "extreme_heat",
+      "coordinates": null,
+      "createdAt": {
+        "$date": "2026-05-21T07:27:07.129Z"
+      },
+      "dataStatus": "past",
+      "description": "NCEI Drought · State: LOUISIANA · Property damage: 0.00K",
+      "expiresAt": "28-FEB-26 23:59:00",
+      "geometry": null,
+      "iconType": "wind",
+      "instructions": [],
+      "issuedAt": "3 months ago",
+      "lat": null,
+      "lng": null,
+      "location": "LOUISIANA",
+      "name": "Drought",
+      "properties": {
+        "extreme_heat": {
+          "intensity": null,
+          "nceiEventId": "1320061",
+          "nceiEventType": "Drought",
+          "episodeId": "211288",
+          "state": "LOUISIANA",
+          "beginDateTime": "2026-02-24T06:00:00.000Z",
+          "endDateTime": "2026-02-28T23:59:00.000Z",
+          "injuriesDirect": "0",
+          "deathsDirect": "0",
+          "damageProperty": "0.00K",
+          "damageCrops": "0.00K",
+          "damagePropertyUsd": 0
+        }
+      },
+      "severity": "Low",
+      "source": "noaa_ncei",
+      "status": "Monitor",
+      "type": "Statement",
+      "updatedAt": {
+        "$date": "2026-05-21T07:27:07.129Z"
+      },
+      "presentCount": 16
+    },
+    {
+      "_id": {
+        "$oid": "6a0eb3cc306874fe84c94ab8"
+      },
+      "externalId": "ncei:1320060",
+      "__v": 0,
+      "category": "extreme_heat",
+      "coordinates": null,
+      "createdAt": {
+        "$date": "2026-05-21T07:27:07.129Z"
+      },
+      "dataStatus": "past",
+      "description": "NCEI Drought · State: LOUISIANA · Property damage: 0.00K",
+      "expiresAt": "28-FEB-26 23:59:00",
+      "geometry": null,
+      "iconType": "wind",
+      "instructions": [],
+      "issuedAt": "3 months ago",
+      "lat": null,
+      "lng": null,
+      "location": "LOUISIANA",
+      "name": "Drought",
+      "properties": {
+        "extreme_heat": {
+          "intensity": null,
+          "nceiEventId": "1320060",
+          "nceiEventType": "Drought",
+          "episodeId": "211288",
+          "state": "LOUISIANA",
+          "beginDateTime": "2026-02-24T06:00:00.000Z",
+          "endDateTime": "2026-02-28T23:59:00.000Z",
+          "injuriesDirect": "0",
+          "deathsDirect": "0",
+          "damageProperty": "0.00K",
+          "damageCrops": "0.00K",
+          "damagePropertyUsd": 0
+        }
+      },
+      "severity": "Low",
+      "source": "noaa_ncei",
+      "status": "Monitor",
+      "type": "Statement",
+      "updatedAt": {
+        "$date": "2026-05-21T07:27:07.129Z"
+      },
+      "presentCount": 16
+    },
+    {
+      "_id": {
+        "$oid": "6a0eb3cc306874fe84c94b42"
+      },
+      "externalId": "ncei:1320068",
+      "__v": 0,
+      "category": "extreme_heat",
+      "coordinates": null,
+      "createdAt": {
+        "$date": "2026-05-21T07:27:07.129Z"
+      },
+      "dataStatus": "past",
+      "description": "NCEI Drought · State: LOUISIANA · Property damage: 0.00K",
+      "expiresAt": "28-FEB-26 23:59:00",
+      "geometry": null,
+      "iconType": "wind",
+      "instructions": [],
+      "issuedAt": "3 months ago",
+      "lat": null,
+      "lng": null,
+      "location": "LOUISIANA",
+      "name": "Drought",
+      "properties": {
+        "extreme_heat": {
+          "intensity": null,
+          "nceiEventId": "1320068",
+          "nceiEventType": "Drought",
+          "episodeId": "211288",
+          "state": "LOUISIANA",
+          "beginDateTime": "2026-02-24T06:00:00.000Z",
+          "endDateTime": "2026-02-28T23:59:00.000Z",
+          "injuriesDirect": "0",
+          "deathsDirect": "0",
+          "damageProperty": "0.00K",
+          "damageCrops": "0.00K",
+          "damagePropertyUsd": 0
+        }
+      },
+      "severity": "Low",
+      "source": "noaa_ncei",
+      "status": "Monitor",
+      "type": "Statement",
+      "updatedAt": {
+        "$date": "2026-05-21T07:27:07.129Z"
+      },
+      "presentCount": 16
+    },
+    {
+      "_id": {
+        "$oid": "6a0eb3cc306874fe84c94a98"
+      },
+      "externalId": "ncei:1320059",
+      "__v": 0,
+      "category": "extreme_heat",
+      "coordinates": null,
+      "createdAt": {
+        "$date": "2026-05-21T07:27:07.129Z"
+      },
+      "dataStatus": "past",
+      "description": "NCEI Drought · State: LOUISIANA · Property damage: 0.00K",
+      "expiresAt": "28-FEB-26 23:59:00",
+      "geometry": null,
+      "iconType": "wind",
+      "instructions": [],
+      "issuedAt": "3 months ago",
+      "lat": null,
+      "lng": null,
+      "location": "LOUISIANA",
+      "name": "Drought",
+      "properties": {
+        "extreme_heat": {
+          "intensity": null,
+          "nceiEventId": "1320059",
+          "nceiEventType": "Drought",
+          "episodeId": "211288",
+          "state": "LOUISIANA",
+          "beginDateTime": "2026-02-24T06:00:00.000Z",
+          "endDateTime": "2026-02-28T23:59:00.000Z",
+          "injuriesDirect": "0",
+          "deathsDirect": "0",
+          "damageProperty": "0.00K",
+          "damageCrops": "0.00K",
+          "damagePropertyUsd": 0
+        }
+      },
+      "severity": "Low",
+      "source": "noaa_ncei",
+      "status": "Monitor",
+      "type": "Statement",
+      "updatedAt": {
+        "$date": "2026-05-21T07:27:07.129Z"
+      },
+      "presentCount": 16
+    },
+    {
+      "_id": {
+        "$oid": "6a0eb3cc306874fe84c94a97"
+      },
+      "externalId": "ncei:1320058",
+      "__v": 0,
+      "category": "extreme_heat",
+      "coordinates": null,
+      "createdAt": {
+        "$date": "2026-05-21T07:27:07.129Z"
+      },
+      "dataStatus": "past",
+      "description": "NCEI Drought · State: LOUISIANA · Property damage: 0.00K",
+      "expiresAt": "28-FEB-26 23:59:00",
+      "geometry": null,
+      "iconType": "wind",
+      "instructions": [],
+      "issuedAt": "3 months ago",
+      "lat": null,
+      "lng": null,
+      "location": "LOUISIANA",
+      "name": "Drought",
+      "properties": {
+        "extreme_heat": {
+          "intensity": null,
+          "nceiEventId": "1320058",
+          "nceiEventType": "Drought",
+          "episodeId": "211288",
+          "state": "LOUISIANA",
+          "beginDateTime": "2026-02-24T06:00:00.000Z",
+          "endDateTime": "2026-02-28T23:59:00.000Z",
+          "injuriesDirect": "0",
+          "deathsDirect": "0",
+          "damageProperty": "0.00K",
+          "damageCrops": "0.00K",
+          "damagePropertyUsd": 0
+        }
+      },
+      "severity": "Low",
+      "source": "noaa_ncei",
+      "status": "Monitor",
+      "type": "Statement",
+      "updatedAt": {
+        "$date": "2026-05-21T07:27:07.129Z"
+      },
+      "presentCount": 16
+    }
+  ]
+},
+{
+  "category": "winter_weather",
+  "documents": [
+    {
+      "_id": {
+        "$oid": "6a0e958a306874fe84c5fee2"
+      },
+      "externalId": "urn:oid:2.49.0.1.840.0.8031833b16b5ed3434a2c4ff207c60299c58ec25.002.1",
+      "__v": 0,
+      "category": "winter_weather",
+      "coordinates": null,
+      "createdAt": {
+        "$date": "2026-05-21T05:17:59.556Z"
+      },
+      "dataStatus": "past",
+      "description": "Snow expected. Total snow accumulations 5 to 10 inches.",
+      "expiresAt": "7:15 AM",
+      "geometry": null,
+      "iconType": "cloud",
+      "instructions": [
+        "For the latest road conditions, call 5 1 1.",
+        "Limit exposure to cold and wind; dress in layers.",
+        "Protect pipes, plants, and pets from freezing conditions."
+      ],
+      "issuedAt": "about 5 hours ago",
+      "lat": 39.8283,
+      "lng": -98.5795,
+      "location": "Pryor/Northern Bighorn Mountains; Northeast Bighorn Mountains",
+      "name": "Winter Weather Advisory",
+      "properties": {
+        "winter_weather": {
+          "intensity": {
+            "metric": "nws_alert_severity",
+            "value": 2,
+            "unit": "level",
+            "display": "Moderate"
+          },
+          "affectedCounties": [
+            "Pryor/Northern Bighorn Mountains",
+            "Northeast Bighorn Mountains"
+          ],
+          "urgency": null,
+          "certainty": null,
+          "nwsEventCode": null,
+          "nwsVtec": null,
+          "senderName": null,
+          "effectiveAt": "2026-05-20T20:04:00-06:00",
+          "onsetAt": null,
+          "endsAt": "2026-05-21T20:15:00-06:00"
+        }
+      },
+      "severity": "Moderate",
+      "source": "nws",
+      "status": "Take Action",
+      "type": "Warning",
+      "updatedAt": {
+        "$date": "2026-05-21T08:00:25.524Z"
+      },
+      "presentCount": 18
+    },
+    {
+      "_id": {
+        "$oid": "6a0ebb99306874fe84caae54"
+      },
+      "externalId": "urn:oid:2.49.0.1.840.0.8abaae52f1fdf1f003250b82132bf8589e429dcd.002.1",
+      "__v": 0,
+      "category": "winter_weather",
+      "coordinates": null,
+      "createdAt": {
+        "$date": "2026-05-21T08:00:23.893Z"
+      },
+      "dataStatus": "past",
+      "description": "Snow expected. Total snow accumulations 5 to 10 inches.",
+      "expiresAt": "8:00 AM",
+      "geometry": null,
+      "iconType": "cloud",
+      "instructions": [
+        "For the latest road conditions, call 5 1 1.",
+        "Limit exposure to cold and wind; dress in layers.",
+        "Protect pipes, plants, and pets from freezing conditions."
+      ],
+      "issuedAt": "about 6 hours ago",
+      "lat": 39.8283,
+      "lng": -98.5795,
+      "location": "Pryor/Northern Bighorn Mountains; Northeast Bighorn Mountains",
+      "name": "Winter Weather Advisory",
+      "properties": {
+        "winter_weather": {
+          "intensity": {
+            "metric": "nws_alert_severity",
+            "value": 2,
+            "unit": "level",
+            "display": "Moderate"
+          },
+          "affectedCounties": [
+            "Pryor/Northern Bighorn Mountains",
+            "Northeast Bighorn Mountains"
+          ],
+          "urgency": null,
+          "certainty": null,
+          "nwsEventCode": null,
+          "nwsVtec": null,
+          "senderName": null,
+          "effectiveAt": "2026-05-21T01:15:00-06:00",
+          "onsetAt": null,
+          "endsAt": "2026-05-21T21:00:00-06:00"
+        }
+      },
+      "severity": "Moderate",
+      "source": "nws",
+      "status": "Take Action",
+      "type": "Warning",
+      "updatedAt": {
+        "$date": "2026-05-22T04:41:58.307Z"
+      },
+      "presentCount": 18
+    },
+    {
+      "_id": {
+        "$oid": "6a0ebb99306874fe84caae55"
+      },
+      "externalId": "urn:oid:2.49.0.1.840.0.8abaae52f1fdf1f003250b82132bf8589e429dcd.001.1",
+      "__v": 0,
+      "category": "winter_weather",
+      "coordinates": null,
+      "createdAt": {
+        "$date": "2026-05-21T08:00:23.893Z"
+      },
+      "dataStatus": "past",
+      "description": "Periods of heavy snow...mainly on north facing slopes above.",
+      "expiresAt": "5:00 AM",
+      "geometry": null,
+      "iconType": "cloud",
+      "instructions": [
+        "Don't be caught unprepared in the high country during this winter storm.",
+        "For the latest road conditions, call 5 1 1.",
+        "Limit exposure to cold and wind; dress in layers."
+      ],
+      "issuedAt": "about 6 hours ago",
+      "lat": 39.8283,
+      "lng": -98.5795,
+      "location": "Absaroka/Beartooth Mountains",
+      "name": "Winter Storm Warning",
+      "properties": {
+        "winter_weather": {
+          "intensity": {
+            "metric": "nws_alert_severity",
+            "value": 3,
+            "unit": "level",
+            "display": "High"
+          },
+          "affectedCounties": [
+            "Absaroka/Beartooth Mountains"
+          ],
+          "urgency": null,
+          "certainty": null,
+          "nwsEventCode": null,
+          "nwsVtec": null,
+          "senderName": null,
+          "effectiveAt": "2026-05-21T01:15:00-06:00",
+          "onsetAt": null,
+          "endsAt": "2026-05-21T18:00:00-06:00"
+        }
+      },
+      "severity": "High",
+      "source": "nws",
+      "status": "Take Action",
+      "type": "Warning",
+      "updatedAt": {
+        "$date": "2026-05-22T04:41:58.307Z"
+      },
+      "presentCount": 18
+    },
+    {
+      "_id": {
+        "$oid": "6a0e958a306874fe84c5fee3"
+      },
+      "externalId": "urn:oid:2.49.0.1.840.0.8031833b16b5ed3434a2c4ff207c60299c58ec25.001.1",
+      "__v": 0,
+      "category": "winter_weather",
+      "coordinates": null,
+      "createdAt": {
+        "$date": "2026-05-21T05:17:59.556Z"
+      },
+      "dataStatus": "past",
+      "description": "Periods of heavy snow...mainly on north facing slopes above.",
+      "expiresAt": "5:00 AM",
+      "geometry": null,
+      "iconType": "cloud",
+      "instructions": [
+        "Don't be caught unprepared in the high country during this winter storm.",
+        "For the latest road conditions, call 5 1 1.",
+        "Limit exposure to cold and wind; dress in layers."
+      ],
+      "issuedAt": "about 5 hours ago",
+      "lat": 39.8283,
+      "lng": -98.5795,
+      "location": "Absaroka/Beartooth Mountains",
+      "name": "Winter Storm Warning",
+      "properties": {
+        "winter_weather": {
+          "intensity": {
+            "metric": "nws_alert_severity",
+            "value": 3,
+            "unit": "level",
+            "display": "High"
+          },
+          "affectedCounties": [
+            "Absaroka/Beartooth Mountains"
+          ],
+          "urgency": null,
+          "certainty": null,
+          "nwsEventCode": null,
+          "nwsVtec": null,
+          "senderName": null,
+          "effectiveAt": "2026-05-20T20:04:00-06:00",
+          "onsetAt": null,
+          "endsAt": "2026-05-21T18:00:00-06:00"
+        }
+      },
+      "severity": "High",
+      "source": "nws",
+      "status": "Take Action",
+      "type": "Warning",
+      "updatedAt": {
+        "$date": "2026-05-21T08:00:25.524Z"
+      },
+      "presentCount": 18
+    },
+    {
+      "_id": {
+        "$oid": "6a0eb3cc306874fe84c94ad7"
+      },
+      "externalId": "ncei:1317885",
+      "__v": 0,
+      "category": "winter_weather",
+      "coordinates": null,
+      "createdAt": {
+        "$date": "2026-05-21T07:27:07.129Z"
+      },
+      "dataStatus": "past",
+      "description": "NCEI Blizzard · State: MAINE",
+      "expiresAt": "23-FEB-26 23:00:00",
+      "geometry": null,
+      "iconType": "snowflake",
+      "instructions": [],
+      "issuedAt": "3 months ago",
+      "lat": null,
+      "lng": null,
+      "location": "MAINE",
+      "name": "Blizzard",
+      "properties": {
+        "winter_weather": {
+          "intensity": null,
+          "nceiEventId": "1317885",
+          "nceiEventType": "Blizzard",
+          "episodeId": "210913",
+          "state": "MAINE",
+          "beginDateTime": "2026-02-23T11:00:00.000Z",
+          "endDateTime": "2026-02-23T23:00:00.000Z",
+          "injuriesDirect": "0",
+          "deathsDirect": "0",
+          "damageProperty": "",
+          "damageCrops": "",
+          "damagePropertyUsd": null
+        }
+      },
+      "severity": "Low",
+      "source": "noaa_ncei",
+      "status": "Monitor",
+      "type": "Statement",
+      "updatedAt": {
+        "$date": "2026-05-21T07:27:07.129Z"
+      },
+      "presentCount": 16
+    }
+  ]
+},
+{
+  "category": "marine",
+  "documents": [
+    {
+      "_id": {
+        "$oid": "6a0ef675306874fe84d15170"
+      },
+      "externalId": "urn:oid:2.49.0.1.840.0.a7c5b83495b505097ec6fd16d44b43c8933eb5d0.012.2",
+      "__v": 0,
+      "category": "marine",
+      "coordinates": null,
+      "createdAt": {
+        "$date": "2026-05-21T12:11:31.899Z"
+      },
+      "dataStatus": "past",
+      "description": "For the first Small Craft Advisory, seas 6 to 8 ft.",
+      "expiresAt": "1:00 AM",
+      "geometry": null,
+      "iconType": "triangle",
+      "instructions": [
+        "Inexperienced mariners.",
+        "especially those operating smaller vessels.",
+        "should avoid navigating in hazardous conditions."
+      ],
+      "issuedAt": "about 1 hour ago",
+      "lat": 39.8283,
+      "lng": -98.5795,
+      "location": "Cape Fairweather to Icy Cape out to 15 NM",
+      "name": "Small Craft Advisory",
+      "properties": {
+        "marine": {
+          "intensity": {
+            "metric": "nws_alert_severity",
+            "value": 2,
+            "unit": "level",
+            "display": "Moderate"
+          },
+          "affectedCounties": [
+            "Cape Fairweather to Icy Cape out to 15 NM"
+          ],
+          "urgency": null,
+          "certainty": null,
+          "nwsEventCode": null,
+          "nwsVtec": null,
+          "senderName": null,
+          "effectiveAt": "2026-05-21T03:55:00-08:00",
+          "onsetAt": null,
+          "endsAt": "2026-05-21T12:00:00-08:00"
+        }
+      },
+      "severity": "Moderate",
+      "source": "nws",
+      "status": "Take Action",
+      "type": "Warning",
+      "updatedAt": {
+        "$date": "2026-05-22T04:41:58.307Z"
+      },
+      "presentCount": 18
+    },
+    {
+      "_id": {
+        "$oid": "6a0e958a306874fe84c5fed9"
+      },
+      "externalId": "urn:oid:2.49.0.1.840.0.a7655be611992c0e543b7d34085c85b43a63af23.001.1",
+      "__v": 0,
+      "category": "marine",
+      "coordinates": null,
+      "createdAt": {
+        "$date": "2026-05-21T05:17:59.556Z"
+      },
+      "dataStatus": "past",
+      "description": "North winds to 25 knots.",
+      "expiresAt": "11:00 AM",
+      "geometry": null,
+      "iconType": "triangle",
+      "instructions": [
+        "Inexperienced mariners.",
+        "especially those operating smaller vessels.",
+        "should avoid navigating in hazardous conditions."
+      ],
+      "issuedAt": "about 3 hours ago",
+      "lat": 39.8283,
+      "lng": -98.5795,
+      "location": "St Joseph to South Haven MI; South Haven to Holland MI; Holland to Grand Haven MI",
+      "name": "Small Craft Advisory",
+      "properties": {
+        "marine": {
+          "intensity": {
+            "metric": "nws_alert_severity",
+            "value": 2,
+            "unit": "level",
+            "display": "Moderate"
+          },
+          "affectedCounties": [
+            "St Joseph to South Haven MI",
+            "South Haven to Holland MI",
+            "Holland to Grand Haven MI"
+          ],
+          "urgency": null,
+          "certainty": null,
+          "nwsEventCode": null,
+          "nwsVtec": null,
+          "senderName": null,
+          "effectiveAt": "2026-05-20T22:39:00-04:00",
+          "onsetAt": null,
+          "endsAt": "2026-05-21T02:00:00-04:00"
+        }
+      },
+      "severity": "Moderate",
+      "source": "nws",
+      "status": "Take Action",
+      "type": "Warning",
+      "updatedAt": {
+        "$date": "2026-05-21T06:00:47.878Z"
+      },
+      "presentCount": 18
+    },
+    {
+      "_id": {
+        "$oid": "6a0dac3e306874fe84ab2521"
+      },
+      "externalId": "urn:oid:2.49.0.1.840.0.24ee7985af7d029da8377064a5c79c7a6a438954.032.1",
+      "__v": 0,
+      "category": "marine",
+      "coordinates": null,
+      "createdAt": {
+        "$date": "2026-05-20T12:42:39.464Z"
+      },
+      "dataStatus": "past",
+      "description": "Small Craft Advisory issued May 19 at 3:26PM AKDT until May 21 at 5:00AM AKDT by NWS Anchorage AK.",
+      "expiresAt": "5:00 PM",
+      "geometry": null,
+      "iconType": "triangle",
+      "instructions": [
+        "Avoid flooded roads and fast-moving water.",
+        "Follow evacuation or harbor orders if issued.",
+        "Stay tuned to official updates and move to safer ground if needed."
+      ],
+      "issuedAt": "1 day ago",
+      "lat": 39.8283,
+      "lng": -98.5795,
+      "location": "Bristol Bay from Port Heiden to Cape Chichagof out to 15 NM",
+      "name": "Small Craft Advisory",
+      "properties": {
+        "marine": {
+          "intensity": {
+            "metric": "nws_alert_severity",
+            "value": 2,
+            "unit": "level",
+            "display": "Moderate"
+          },
+          "affectedCounties": [
+            "Bristol Bay from Port Heiden to Cape Chichagof out to 15 NM"
+          ],
+          "urgency": null,
+          "certainty": null,
+          "nwsEventCode": null,
+          "nwsVtec": null,
+          "senderName": null,
+          "effectiveAt": "2026-05-19T15:26:00-08:00",
+          "onsetAt": null,
+          "endsAt": "2026-05-20T04:00:00-08:00"
+        }
+      },
+      "severity": "Moderate",
+      "source": "nws",
+      "status": "Take Action",
+      "type": "Warning",
+      "updatedAt": {
+        "$date": "2026-05-22T04:41:58.307Z"
+      },
+      "presentCount": 18
+    },
+    {
+      "_id": {
+        "$oid": "6a0ef675306874fe84d1517a"
+      },
+      "externalId": "urn:oid:2.49.0.1.840.0.a7c5b83495b505097ec6fd16d44b43c8933eb5d0.009.2",
+      "__v": 0,
+      "category": "marine",
+      "coordinates": null,
+      "createdAt": {
+        "$date": "2026-05-21T12:11:31.899Z"
+      },
+      "dataStatus": "past",
+      "description": "For the first Small Craft Advisory, seas 7 to 8 ft.",
+      "expiresAt": "1:00 AM",
+      "geometry": null,
+      "iconType": "triangle",
+      "instructions": [
+        "Inexperienced mariners.",
+        "especially those operating smaller vessels.",
+        "should avoid navigating in hazardous conditions."
+      ],
+      "issuedAt": "about 1 hour ago",
+      "lat": 39.8283,
+      "lng": -98.5795,
+      "location": "Cape Decision to Cape Edgecumbe from 15 to 80 NM",
+      "name": "Small Craft Advisory",
+      "properties": {
+        "marine": {
+          "intensity": {
+            "metric": "nws_alert_severity",
+            "value": 2,
+            "unit": "level",
+            "display": "Moderate"
+          },
+          "affectedCounties": [
+            "Cape Decision to Cape Edgecumbe from 15 to 80 NM"
+          ],
+          "urgency": null,
+          "certainty": null,
+          "nwsEventCode": null,
+          "nwsVtec": null,
+          "senderName": null,
+          "effectiveAt": "2026-05-21T03:55:00-08:00",
+          "onsetAt": null,
+          "endsAt": "2026-05-21T12:00:00-08:00"
+        }
+      },
+      "severity": "Moderate",
+      "source": "nws",
+      "status": "Take Action",
+      "type": "Warning",
+      "updatedAt": {
+        "$date": "2026-05-22T04:41:58.307Z"
+      },
+      "presentCount": 18
+    },
+    {
+      "_id": {
+        "$oid": "6a0ef675306874fe84d15179"
+      },
+      "externalId": "urn:oid:2.49.0.1.840.0.a7c5b83495b505097ec6fd16d44b43c8933eb5d0.005.1",
+      "__v": 0,
+      "category": "marine",
+      "coordinates": null,
+      "createdAt": {
+        "$date": "2026-05-21T12:11:31.899Z"
+      },
+      "dataStatus": "past",
+      "description": "For the first Small Craft Advisory, seas 6 to 8 ft.",
+      "expiresAt": "1:00 AM",
+      "geometry": null,
+      "iconType": "triangle",
+      "instructions": [
+        "Inexperienced mariners.",
+        "especially those operating smaller vessels.",
+        "should avoid navigating in hazardous conditions."
+      ],
+      "issuedAt": "about 1 hour ago",
+      "lat": 39.8283,
+      "lng": -98.5795,
+      "location": "Cape Edgecumbe to Cape Spencer out to 15 NM",
+      "name": "Small Craft Advisory",
+      "properties": {
+        "marine": {
+          "intensity": {
+            "metric": "nws_alert_severity",
+            "value": 2,
+            "unit": "level",
+            "display": "Moderate"
+          },
+          "affectedCounties": [
+            "Cape Edgecumbe to Cape Spencer out to 15 NM"
+          ],
+          "urgency": null,
+          "certainty": null,
+          "nwsEventCode": null,
+          "nwsVtec": null,
+          "senderName": null,
+          "effectiveAt": "2026-05-21T03:55:00-08:00",
+          "onsetAt": null,
+          "endsAt": "2026-05-21T12:00:00-08:00"
+        }
+      },
+      "severity": "Moderate",
+      "source": "nws",
+      "status": "Take Action",
+      "type": "Warning",
+      "updatedAt": {
+        "$date": "2026-05-22T04:41:58.307Z"
+      },
+      "presentCount": 18
+    }
+  ]
+}]

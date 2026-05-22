@@ -5,9 +5,9 @@
 import { format, formatDistanceToNow } from 'date-fns';
 import type { WeatherAlert as APIWeatherAlert } from '@/lib/types/api-alerts';
 import { AlertSeverity } from '@/lib/types/api-alerts';
-import type { AnyBulkWriteOperation } from 'mongoose';
 import { weatherAPI } from '@/lib/services/weather-api';
-import AlertCommunication from '@/models/AlertCommunication';
+import { buildUnifiedEventFromNwsAlert } from '@/lib/unified-event/build-from-nws';
+import { upsertAndPruneUnifiedEvents } from '@/lib/unified-event/repository';
 
 function syncCoordinates(): { lat: number; lon: number } {
     const lat = parseFloat(process.env.NWS_ALERT_SYNC_LAT ?? '41.8781');
@@ -332,12 +332,10 @@ export async function syncNwsAlertsToAlertCommunication(): Promise<{ upserted: n
         ? await weatherAPI.fetchNWSActiveAlertsNationwide()
         : await weatherAPI.fetchNWSActiveAlertsForPoint(syncCoordinates().lat, syncCoordinates().lon);
 
-    const activeExternalIds = new Set<string>();
-    const ops: AnyBulkWriteOperation<Record<string, unknown>>[] = [];
+    const events = [];
 
     for (const a of alerts) {
         if (!a.id) continue;
-        activeExternalIds.add(a.id);
 
         const eventName = a.event || a.title || 'Weather Alert';
         const location =
@@ -351,40 +349,22 @@ export async function syncNwsAlertsToAlertCommunication(): Promise<{ upserted: n
         const description = nwsOneLineSummary(a);
         const instructions = buildNwsInstructionBullets(a.instruction, a.description || '', eventName);
 
-        ops.push({
-            updateOne: {
-                filter: { externalId: a.id },
-                update: {
-                    $set: {
-                        source: 'nws',
-                        externalId: a.id,
-                        name: eventName,
-                        type: inferWatchOrWarning(eventName),
-                        iconType: inferIconType(eventName),
-                        location,
-                        issuedAt,
-                        expiresAt,
-                        status: 'Take Action',
-                        description,
-                        instructions,
-                        severity: severityToLabel(a.severity),
-                    },
-                },
-                upsert: true,
-            },
-        });
+        events.push(
+            buildUnifiedEventFromNwsAlert(a, {
+                eventName,
+                location,
+                issuedAt,
+                expiresAt,
+                description,
+                instructions,
+                severity: severityToLabel(a.severity),
+                type: inferWatchOrWarning(eventName),
+                iconType: inferIconType(eventName),
+            }),
+        );
     }
 
-    if (ops.length > 0) {
-        await AlertCommunication.bulkWrite(ops, { ordered: false });
-    }
-
-    const removeResult = await AlertCommunication.deleteMany({
-        source: 'nws',
-        externalId: { $exists: true, $nin: [...activeExternalIds] },
-    });
-
-    return { upserted: ops.length, removed: removeResult.deletedCount ?? 0 };
+    return upsertAndPruneUnifiedEvents('nws', events);
 }
 
 let lastSyncMs = 0;
