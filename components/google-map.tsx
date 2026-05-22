@@ -83,6 +83,20 @@ function viewportExceedsStateBounds(map: google.maps.Map, bounds: MapStateBounds
     )
 }
 
+function heatPointCircleStyle(weight: number | undefined) {
+    const w = Math.max(0.1, Math.min(1.2, weight ?? 0.6))
+    if (w >= 0.9) {
+      return { radius: 22000, fillColor: '#B91C1C', strokeColor: '#7F1D1D', fillOpacity: 0.4, strokeOpacity: 0.55 }
+    }
+    if (w >= 0.75) {
+      return { radius: 18000, fillColor: '#EF4444', strokeColor: '#B91C1C', fillOpacity: 0.36, strokeOpacity: 0.5 }
+    }
+    if (w >= 0.6) {
+      return { radius: 14000, fillColor: '#FB923C', strokeColor: '#EA580C', fillOpacity: 0.32, strokeOpacity: 0.45 }
+    }
+    return { radius: 10000, fillColor: '#FACC15', strokeColor: '#EAB308', fillOpacity: 0.28, strokeOpacity: 0.4 }
+  }
+
 export function GoogleMap({
     address,
     markers = [],
@@ -274,6 +288,14 @@ export function GoogleMap({
         }
     }, [map, showHeatmap, heatPoints])
 
+    const validHeatPoints = useMemo(
+        () =>
+          heatPoints.filter(
+            (p) => Number.isFinite(p.lat) && Number.isFinite(p.lng) && !isNaN(p.lat) && !isNaN(p.lng),
+          ),
+        [heatPoints],
+      )
+
     if (!isLoaded) return <div className="w-full h-full min-h-[400px] bg-slate-100 animate-pulse flex items-center justify-center rounded-xl border border-slate-200">
         <p className="text-slate-400 text-xs font-black uppercase tracking-widest">Initalizing Satellite Feed...</p>
     </div>
@@ -304,6 +326,43 @@ export function GoogleMap({
                     fullscreenControl: true
                 }}
             >
+                {showHeatmap &&
+  validHeatPoints.map((point, index) => {
+    const style = heatPointCircleStyle(point.weight)
+    return (
+      <Circle
+        key={`heat-${point.lat}-${point.lng}-${index}`}
+        center={{ lat: point.lat, lng: point.lng }}
+        radius={style.radius}
+        options={{
+          strokeColor: style.strokeColor,
+          strokeOpacity: style.strokeOpacity,
+          strokeWeight: 2,
+          fillColor: style.fillColor,
+          fillOpacity: style.fillOpacity,
+          clickable: false,
+          zIndex: 1,
+        }}
+      />
+    )
+  })}
+
+{showHeatmap &&
+  validHeatPoints.map((point, index) => (
+    <Marker
+      key={`heat-pin-${point.lat}-${point.lng}-${index}`}
+      position={{ lat: point.lat, lng: point.lng }}
+      icon={{
+        path: google.maps.SymbolPath.CIRCLE,
+        fillColor: '#DC2626',
+        fillOpacity: 0.95,
+        strokeColor: '#FFFFFF',
+        strokeWeight: 2,
+        scale: 6,
+      }}
+      zIndex={2}
+    />
+  ))}
                 {validMarkers.map((marker) => (
                     <React.Fragment key={marker.id}>
                         <Marker
