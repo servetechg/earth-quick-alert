@@ -1,5 +1,6 @@
 import { Alert, AlertSeverity, AlertSource, SocialMediaAlert, ResourceAlert } from '@/lib/types/api-alerts';
 import type { UnifiedEventDoc } from '@/lib/services/unified-event-repo';
+import { formatEventTimestamp } from '@/lib/services/event-formatters';
 import type {
     DashboardIngestBundle,
     HistoricalAnalysis,
@@ -1269,7 +1270,7 @@ Rules:
             category: e.category,
             severity: e.severity,
             location: e.location,
-            issuedAt: e.issuedAt,
+            formattedTimestamp: formatEventTimestamp(e),
             expiresAt: e.expiresAt,
             description: e.description,
             instructions: e.instructions,
@@ -1295,9 +1296,16 @@ Rules:
 
 You are summarizing all active ${input.category} events at ${input.severity} severity for an executive emergency briefing.
 
-Return a JSON array of bullet strings — one bullet per event or major finding. Each bullet MUST:
+IMPORTANT — output rules:
+- Return AT MOST 5 bullets total.
+- Cluster events by affected state or county — one bullet per cluster.
+- Every event must be represented in at least one bullet. Do NOT drop any events silently.
+- Do NOT produce a single semicolon-joined mega-bullet listing every event on one line.
+- Do NOT use placeholder text like "N more events" or "X more events" — represent all events within the 5-bullet limit by clustering.
+
+Each bullet MUST:
 - Be one complete, self-explanatory sentence.
-- Include the event name, the affected location or county, the date and time (formatted as "May 22, 2026, 3:45 PM"), and ALL key statistics present in the data.
+- Include the event name, the affected location or county, the date and time from the "formattedTimestamp" field (e.g. "May 22, 2026, 3:45 PM"), and ALL key statistics present in the data.
 - Draw statistics directly from the "properties" field of each event: intensity value (1=Low, 2=Moderate, 3=High, 4=Extreme), affectedCounties array, effectiveAt, endsAt, injuriesDirect, deathsDirect, damageProperty, damageCrops, totalFederalAidUsd, femaDisasterNumber — whichever are non-null for this event.
 - NEVER omit numbers, counts, dollar amounts, names, or timestamps that appear in the data.
 - Wrap place names, severity words, and numeric facts in **double asterisks**.
@@ -1310,7 +1318,7 @@ Return JSON: {"bullets": ["<sentence>", ...]}.`,
                 },
             ],
             { bullets: fallback },
-            { max_tokens: 700 },
+            { max_tokens: 2000 },
         );
         return Array.isArray(result.bullets) && result.bullets.length > 0 ? result.bullets : fallback;
     }

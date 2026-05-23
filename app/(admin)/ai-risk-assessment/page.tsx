@@ -17,7 +17,7 @@ import {
   Sparkles, ShieldAlert, FileDown, Loader2,
   Activity, Users, AlertTriangle, Gauge, CheckCircle2,
   History, TrendingDown, ClipboardList, Radio, Lightbulb,
-  RefreshCw,
+  RefreshCw, MapPin, ChevronDown, ChevronUp,
 } from "lucide-react";
 import jsPDF from "jspdf";
 import {
@@ -27,8 +27,9 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type {
   RiskSummaryPayload, SeverityBucket, HistoricalTabPayload,
-  RecommendationItem, HistoricalAnalysis,
+  RecommendationItem, HistoricalAnalysis, EventGroupSummary,
 } from "@/lib/types/risk-assessment";
+import { SOURCE_LABEL_MAP } from "@/lib/types/risk-assessment";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -93,6 +94,36 @@ function renderEmphasis(text: string): ReactNode {
 
 function dedupeConsecutive(xs: string[]): string[] {
   return xs.filter((x, i) => i === 0 || x !== xs[i - 1]);
+}
+
+// ─── EventChipStrip ───────────────────────────────────────────────────────────
+
+function EventChipStrip({ group }: { group: EventGroupSummary }) {
+  const src = SOURCE_LABEL_MAP[group.source] ?? { label: group.source, tone: 'bg-slate-50 text-slate-700 border-slate-200' };
+  return (
+    <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[10px] font-bold">
+      <span className={`rounded px-1.5 py-0.5 border ${src.tone}`}>{src.label}</span>
+      {group.state && (
+        <span className="rounded px-1.5 py-0.5 border bg-slate-50 text-slate-700 border-slate-200">{group.state}</span>
+      )}
+      {group.affectedCounties.length === 1 ? (
+        <span className="text-slate-500 font-normal">{group.affectedCounties[0]}</span>
+      ) : group.affectedCounties.length > 1 ? (
+        <span className="rounded px-1.5 py-0.5 border bg-emerald-50 text-emerald-700 border-emerald-200">
+          covers {group.affectedCounties.length} counties
+        </span>
+      ) : null}
+      {group.hasCoordinates && (
+        <span className="text-slate-400" title={`${group.lat?.toFixed(2)}, ${group.lng?.toFixed(2)}`}>
+          <MapPin className="inline h-3 w-3" />
+        </span>
+      )}
+      {group.duplicateCount > 1 && (
+        <span className="text-slate-400 font-normal">+ {group.duplicateCount - 1} duplicate alert(s)</span>
+      )}
+      <span className="text-slate-400 font-normal">· {group.formattedTimestamp}</span>
+    </div>
+  );
 }
 
 // ─── Small components ─────────────────────────────────────────────────────────
@@ -253,6 +284,63 @@ function HistoricalAnalysisBody({
   );
 }
 
+// ─── Category sub-block with scroll + collapse ────────────────────────────────
+
+function CategorySubBlock({ cat }: { cat: SeverityBucket['categories'][number] }) {
+  const COLLAPSE_AFTER = 3;
+  const [expanded, setExpanded] = useState(false);
+  const bullets = cat.bullets ?? [];
+  const groups = cat.groups ?? [];
+  const visible = expanded ? bullets : bullets.slice(0, COLLAPSE_AFTER);
+  const hidden = bullets.length - COLLAPSE_AFTER;
+  const groupCount = cat.groupCount ?? groups.length;
+
+  return (
+    <div className="rounded-xl border border-slate-200/70 bg-white p-4">
+      <p className="text-[11px] font-extrabold uppercase tracking-widest text-slate-500 mb-2">
+        {humanizeCategory(cat.category)}
+        <span className="ml-2 font-normal normal-case tracking-normal text-slate-400">
+          · {cat.eventCount} active
+          {groupCount > 0 && groupCount < cat.eventCount && (
+            <> · <span className="text-emerald-600">{groupCount} distinct</span></>
+          )}
+        </span>
+      </p>
+      <div className="max-h-[480px] overflow-y-auto pr-1">
+        <ul className="space-y-2.5">
+          {visible.map((b, i) => (
+            <li key={i} className="flex flex-col gap-0.5 text-sm leading-relaxed text-slate-700">
+              <div className="flex gap-2">
+                <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-slate-400" />
+                <span>{renderEmphasis(b)}</span>
+              </div>
+              {groups[i] && <div className="pl-3.5"><EventChipStrip group={groups[i]} /></div>}
+            </li>
+          ))}
+        </ul>
+      </div>
+      {!expanded && hidden > 0 && (
+        <button
+          onClick={() => setExpanded(true)}
+          className="mt-2.5 flex items-center gap-1 text-[11px] font-bold text-slate-500 hover:text-slate-700"
+        >
+          <ChevronDown className="h-3.5 w-3.5" />
+          Show all {bullets.length} bullets
+        </button>
+      )}
+      {expanded && bullets.length > COLLAPSE_AFTER && (
+        <button
+          onClick={() => setExpanded(false)}
+          className="mt-2.5 flex items-center gap-1 text-[11px] font-bold text-slate-500 hover:text-slate-700"
+        >
+          <ChevronUp className="h-3.5 w-3.5" />
+          Show less
+        </button>
+      )}
+    </div>
+  );
+}
+
 // ─── Severity Levels grid ─────────────────────────────────────────────────────
 
 function SeverityLevelGrid({ buckets, loading }: { buckets: SeverityBucket[]; loading: boolean }) {
@@ -291,20 +379,7 @@ function SeverityLevelGrid({ buckets, loading }: { buckets: SeverityBucket[]; lo
             </div>
             <div className="space-y-4">
               {bucket.categories.map((cat) => (
-                <div key={cat.category} className="rounded-xl border border-slate-200/70 bg-white p-4">
-                  <p className="text-[11px] font-extrabold uppercase tracking-widest text-slate-500 mb-2">
-                    {humanizeCategory(cat.category)}
-                    <span className="ml-2 font-normal normal-case tracking-normal text-slate-400">· {cat.eventCount} active</span>
-                  </p>
-                  <ul className="space-y-1.5">
-                    {(cat.bullets ?? []).map((b, i) => (
-                      <li key={i} className="flex gap-2 text-sm leading-relaxed text-slate-700">
-                        <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-slate-400" />
-                        <span>{renderEmphasis(b)}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+                <CategorySubBlock key={cat.category} cat={cat} />
               ))}
             </div>
           </Card>

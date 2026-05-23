@@ -5,11 +5,45 @@ export interface RecommendationItem {
   step?: number;
 }
 
+export type UnifiedEventSource =
+  | 'nws' | 'fema' | 'usgs' | 'earthquake' | 'noaa_ncei'
+  | 'noaa_nwis' | 'nwps' | 'nasa_firms' | 'inciweb' | 'manual' | 'seed';
+
+export const SOURCE_LABEL_MAP: Record<UnifiedEventSource, { label: string; tone: string }> = {
+  nws:        { label: 'NWS',         tone: 'bg-blue-50 text-blue-700 border-blue-200' },
+  fema:       { label: 'FEMA',        tone: 'bg-red-50 text-red-700 border-red-200' },
+  usgs:       { label: 'USGS',        tone: 'bg-amber-50 text-amber-700 border-amber-200' },
+  earthquake: { label: 'USGS Quakes', tone: 'bg-amber-50 text-amber-700 border-amber-200' },
+  noaa_ncei:  { label: 'NOAA NCEI',   tone: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
+  noaa_nwis:  { label: 'NOAA NWIS',   tone: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
+  nwps:       { label: 'NOAA NWPS',   tone: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
+  nasa_firms: { label: 'NASA FIRMS',  tone: 'bg-orange-50 text-orange-700 border-orange-200' },
+  inciweb:    { label: 'InciWeb',     tone: 'bg-orange-50 text-orange-700 border-orange-200' },
+  manual:     { label: 'Manual',      tone: 'bg-slate-50 text-slate-700 border-slate-200' },
+  seed:       { label: 'Seed',        tone: 'bg-slate-50 text-slate-700 border-slate-200' },
+};
+
+export interface EventGroupSummary {
+  name: string;
+  source: UnifiedEventSource;
+  severity: 'Low' | 'Moderate' | 'High' | 'Extreme';
+  primaryLocation: string;
+  state?: string;
+  affectedCounties: string[];
+  duplicateCount: number;
+  lat?: number;
+  lng?: number;
+  hasCoordinates: boolean;
+  formattedTimestamp: string;
+}
+
 /** One severity bucket from the new /summary endpoint */
 export interface SeverityCategoryItem {
   category: string;
   eventCount: number;
+  groupCount: number;
   bullets: string[];
+  groups: EventGroupSummary[];
   events?: unknown[];
 }
 
