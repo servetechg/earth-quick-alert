@@ -1,5 +1,5 @@
 /**
- * Sync multi-source hazard alerts (USGS, NWPS, NASA FIRMS, InciWeb, FEMA OpenFEMA) into `AlertCommunication`
+ * Sync multi-source hazard alerts (USGS, NWPS, NASA FIRMS, InciWeb, FEMA OpenFEMA) into `UnifiedEvent`
  * for the Alerts & Communication admin UI. Mirrors the pattern of `alert-communication-nws-sync.ts`
  * but reuses the hazard pipeline normalizers where applicable.
  */

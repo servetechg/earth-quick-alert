@@ -1,5 +1,5 @@
 /**
- * Sync National Weather Service active alerts into `AlertCommunication` for the Alerts & Communication admin UI.
+ * Sync National Weather Service active alerts into `UnifiedEvent` for the Alerts & Communication admin UI.
  */
 
 import { format, formatDistanceToNow } from 'date-fns';
