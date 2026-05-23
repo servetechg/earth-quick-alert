@@ -1,4 +1,5 @@
 import type { UnifiedEventDoc } from '@/lib/services/unified-event-repo';
+import { normalizeUnifiedEventCategory } from '@/lib/unified-event/category-infer';
 import type { DistroPoint, RiskSummaryPayload } from '@/lib/types/risk-assessment';
 
 export interface SeverityCategoryGroup {
@@ -40,7 +41,7 @@ function deriveOverallThreatLevel(avg: number): string {
 function deriveAiConfidence(events: UnifiedEventDoc[]): number {
     if (events.length === 0) return 0;
     const distinctSources = new Set(events.map((e) => e.source)).size;
-    const distinctCats = new Set(events.map((e) => e.category)).size;
+    const distinctCats = new Set(events.map((e) => normalizeUnifiedEventCategory(e.category))).size;
     const hasProps = events.some(
         (e) => e.properties && Object.keys(e.properties).length > 0,
     );
@@ -68,7 +69,8 @@ export function computeRiskSnapshot(events: UnifiedEventDoc[]): RiskSnapshot {
     // Incident distribution grouped by category
     const catCountMap = new Map<string, number>();
     for (const e of events) {
-        catCountMap.set(e.category, (catCountMap.get(e.category) ?? 0) + 1);
+        const cat = normalizeUnifiedEventCategory(e.category);
+        catCountMap.set(cat, (catCountMap.get(cat) ?? 0) + 1);
     }
     const incident_distribution: DistroPoint[] = [...catCountMap.entries()]
         .map(([category, count]) => ({ category, count }))
@@ -80,8 +82,9 @@ export function computeRiskSnapshot(events: UnifiedEventDoc[]): RiskSnapshot {
     for (const e of events) {
         if (!sevMap.has(e.severity)) sevMap.set(e.severity, new Map());
         const cm = sevMap.get(e.severity)!;
-        if (!cm.has(e.category)) cm.set(e.category, []);
-        cm.get(e.category)!.push(e);
+        const cat = normalizeUnifiedEventCategory(e.category);
+        if (!cm.has(cat)) cm.set(cat, []);
+        cm.get(cat)!.push(e);
     }
 
     const active_severities = SEVERITY_ORDER.filter((s) => sevMap.has(s));

@@ -1,5 +1,6 @@
 import UnifiedEvent from '@/models/UnifiedEvent';
 import dbConnect from '@/lib/mongodb';
+import { mongoUnifiedEventCategoryFilter } from '@/lib/unified-event/category-infer';
 
 export interface UnifiedEventDoc {
     _id: string;
@@ -51,7 +52,7 @@ export async function getPastEventsByCategory(
     opts?: { stateCd?: string; limit?: number },
 ): Promise<UnifiedEventDoc[]> {
     await dbConnect();
-    const filter: Record<string, unknown> = { dataStatus: 'past', category };
+    const filter: Record<string, unknown> = { dataStatus: 'past', ...mongoUnifiedEventCategoryFilter(category) };
     const loc = locationFilter(opts?.stateCd);
     if (loc) Object.assign(filter, loc);
     return UnifiedEvent

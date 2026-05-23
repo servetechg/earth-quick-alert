@@ -8,7 +8,6 @@ export const UNIFIED_EVENT_CATEGORIES = [
     'marine',
     'coastal_surf',
     'hazardous',
-    'hurricane_typhoon',
     'tsunami',
     'volcanic',
     'landslide',

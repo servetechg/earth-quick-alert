@@ -1,8 +1,36 @@
 import type { UnifiedEventCategory } from '@/lib/unified-event/types';
+import { UNIFIED_EVENT_CATEGORIES } from '@/lib/unified-event/types';
 import {
     classifyNwsIncidentDistributionBucket,
     isFloodRelatedEvent,
 } from '@/lib/services/risk-ingest-service';
+
+/** Retired category — merged into `storm` for display and storage. */
+const DEPRECATED_CATEGORY_ALIASES: Record<string, UnifiedEventCategory> = {
+    hurricane_typhoon: 'storm',
+};
+
+export function normalizeUnifiedEventCategory(
+    category: string | null | undefined,
+): UnifiedEventCategory {
+    const raw = String(category ?? '').trim().toLowerCase();
+    if (DEPRECATED_CATEGORY_ALIASES[raw]) return DEPRECATED_CATEGORY_ALIASES[raw];
+    if ((UNIFIED_EVENT_CATEGORIES as readonly string[]).includes(raw)) {
+        return raw as UnifiedEventCategory;
+    }
+    return 'hazardous';
+}
+
+/** Mongo filter for category — includes retired `hurricane_typhoon` rows under `storm`. */
+export function mongoUnifiedEventCategoryFilter(
+    category: string | null | undefined,
+): { category: string | { $in: string[] } } {
+    const normalized = normalizeUnifiedEventCategory(category);
+    if (normalized === 'storm') {
+        return { category: { $in: ['storm', 'hurricane_typhoon'] } };
+    }
+    return { category: normalized };
+}
 
 export function inferCategoryFromLegacyRow(input: {
     source?: string;
@@ -31,7 +59,7 @@ export function inferCategoryFromLegacyRow(input: {
 
     if (src === 'fema') {
         const blob = `${name} ${desc}`.toLowerCase();
-        if (/hurricane|typhoon|tropical/.test(blob)) return 'hurricane_typhoon';
+        if (/hurricane|typhoon|tropical/.test(blob)) return 'storm';
         if (/fire|wildfire/.test(blob)) return 'wildfire';
         if (/flood|storm|wind|landslide/.test(blob)) return 'fema_declaration';
         return 'fema_declaration';
@@ -47,7 +75,7 @@ export function inferCategoryFromLegacyRow(input: {
         if (/air quality|smoke/.test(name.toLowerCase())) return 'air_quality';
         if (/heat|excessive heat/.test(name.toLowerCase())) return 'extreme_heat';
         if (/tsunami/.test(name.toLowerCase())) return 'tsunami';
-        if (/hurricane|typhoon|tropical/.test(name.toLowerCase())) return 'hurricane_typhoon';
+        if (/hurricane|typhoon|tropical/.test(name.toLowerCase())) return 'storm';
         return 'hazardous';
     }
 
@@ -56,9 +84,9 @@ export function inferCategoryFromLegacyRow(input: {
 
 /** Map unified category to AI risk bar-chart bucket (legacy distribution). */
 export function unifiedCategoryToDistroBucket(
-    category: UnifiedEventCategory,
+    category: string,
 ): 'flood' | 'tornado' | 'storm' | 'hazardous' | 'coastal_surf' | 'marine' | 'wildfire' | 'earthquake' {
-    switch (category) {
+    switch (normalizeUnifiedEventCategory(category)) {
         case 'flood':
         case 'landslide':
             return 'flood';
@@ -69,7 +97,6 @@ export function unifiedCategoryToDistroBucket(
         case 'wildfire':
             return 'wildfire';
         case 'storm':
-        case 'hurricane_typhoon':
             return 'storm';
         case 'marine':
             return 'marine';

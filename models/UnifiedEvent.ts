@@ -31,7 +31,6 @@ const UnifiedEventSchema = new Schema(
                 'marine',
                 'coastal_surf',
                 'hazardous',
-                'hurricane_typhoon',
                 'tsunami',
                 'volcanic',
                 'landslide',

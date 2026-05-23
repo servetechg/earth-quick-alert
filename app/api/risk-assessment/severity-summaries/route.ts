@@ -5,6 +5,7 @@ import { getCurrentEvents } from '@/lib/services/unified-event-repo';
 import { computeRiskSnapshot } from '@/lib/services/risk-current-snapshot';
 import { openaiService } from '@/lib/services/openai-service';
 import { resolveRiskIngestScopeForSession } from '@/lib/risk-assessment/resolve-ingest-scope';
+import { groupRelatedEvents, toEventGroupSummary } from '@/lib/services/event-grouping';
 import type { SeverityBucket } from '@/lib/types/risk-assessment';
 
 const ALLOWED_ROLES = new Set([
@@ -62,22 +63,34 @@ export async function POST(req: Request) {
         const snapshot = computeRiskSnapshot(events);
 
         // Build one AI task per (severity, category) pair
-        type BucketResult = { severity: string; category: string; eventCount: number; bullets: string[] };
+        type BucketResult = {
+            severity: string;
+            category: string;
+            eventCount: number;
+            groupCount: number;
+            bullets: string[];
+            groups: ReturnType<typeof toEventGroupSummary>[];
+        };
         const tasks: (() => Promise<BucketResult>)[] = [];
 
         for (const bucket of snapshot.severity_buckets) {
             for (const catGroup of bucket.categories) {
                 tasks.push(async () => {
+                    const eventGroups = groupRelatedEvents(catGroup.events);
+                    // Pass primary events (one per group) to AI — eliminates duplicate noise
+                    const primaryEvents = eventGroups.map((g) => g.primary);
                     const bullets = await openaiService.generateSeverityCategorySummary({
                         severity: bucket.severity,
                         category: catGroup.category,
-                        events: catGroup.events,
+                        events: primaryEvents,
                     });
                     return {
                         severity: bucket.severity,
                         category: catGroup.category,
                         eventCount: catGroup.events.length,
+                        groupCount: eventGroups.length,
                         bullets,
+                        groups: eventGroups.map(toEventGroupSummary),
                     };
                 });
             }
@@ -97,7 +110,9 @@ export async function POST(req: Request) {
             bucketMap.get(item.severity)!.categories.push({
                 category: item.category,
                 eventCount: item.eventCount,
+                groupCount: item.groupCount,
                 bullets: item.bullets,
+                groups: item.groups,
             });
         }
 

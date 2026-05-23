@@ -13,6 +13,10 @@ import UnifiedEvent from '@/models/UnifiedEvent';
 import dbConnect from '@/lib/mongodb';
 import type { UnifiedEventDoc } from '@/lib/services/unified-event-repo';
 import { getEventPropertyValue, getEventPropertyString } from '@/lib/services/unified-event-repo';
+import {
+    mongoUnifiedEventCategoryFilter,
+    normalizeUnifiedEventCategory,
+} from '@/lib/unified-event/category-infer';
 
 interface PropertyMatchConfig {
     /** Dot-path within properties, e.g. "earthquake.magnitude" */
@@ -36,10 +40,6 @@ const PROPERTY_MATCH_MAP: Partial<Record<string, PropertyMatchConfig>> = {
     },
     wildfire: {
         path: 'wildfire.intensity.value',
-        tolerance: (v) => ({ lo: Math.max(1, v - 1), hi: Math.min(4, v + 1) }),
-    },
-    hurricane_typhoon: {
-        path: 'hurricane_typhoon.intensity.value',
         tolerance: (v) => ({ lo: Math.max(1, v - 1), hi: Math.min(4, v + 1) }),
     },
     marine: {
@@ -104,9 +104,13 @@ export async function findSimilarPastEvents(
 ): Promise<UnifiedEventDoc[]> {
     await dbConnect();
 
-    const category = seedEvent.category;
+    const category = normalizeUnifiedEventCategory(seedEvent.category);
     const config = PROPERTY_MATCH_MAP[category];
-    const propValue = config ? getEventPropertyValue(seedEvent, config.path) : null;
+    let propValue = config ? getEventPropertyValue(seedEvent, config.path) : null;
+    if (propValue === null && category === 'storm' && config) {
+        propValue = getEventPropertyValue(seedEvent, 'hurricane_typhoon.intensity.value');
+    }
+    const categoryFilter = mongoUnifiedEventCategoryFilter(category);
     const stateAbbr = extractStateFromLocation(seedEvent.location);
 
     const found = new Map<string, UnifiedEventDoc>();
@@ -123,7 +127,7 @@ export async function findSimilarPastEvents(
             const mongoPath = `properties.${config.path}`;
             const filter: Record<string, unknown> = {
                 dataStatus: 'past',
-                category,
+                ...categoryFilter,
                 [mongoPath]: { $gte: lo, $lte: hi },
             };
 
@@ -144,7 +148,7 @@ export async function findSimilarPastEvents(
     if (found.size < limit) {
         const filter: Record<string, unknown> = {
             dataStatus: 'past',
-            category,
+            ...categoryFilter,
             severity: seedEvent.severity,
         };
         if (stateAbbr) {
@@ -166,7 +170,7 @@ export async function findSimilarPastEvents(
     // Phase 4: last resort — same-category only, no state filter
     if (found.size < limit) {
         const rows = await UnifiedEvent
-            .find({ dataStatus: 'past', category })
+            .find({ dataStatus: 'past', ...categoryFilter })
             .sort({ updatedAt: -1 })
             .limit((limit - found.size) * 4)
             .lean() as unknown as UnifiedEventDoc[];

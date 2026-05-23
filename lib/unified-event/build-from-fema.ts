@@ -126,9 +126,9 @@ export function buildUnifiedEventFromFemaRecord(
         },
     };
 
-    if (category === 'hurricane_typhoon') {
-        (properties.hurricane_typhoon as Record<string, unknown>).stormName = name;
-        (properties.hurricane_typhoon as Record<string, unknown>).femaDeclarationType = declarationType;
+    if (category === 'storm' && /hurricane|typhoon|tropical/.test(incident)) {
+        (properties.storm as Record<string, unknown>).stormName = name;
+        (properties.storm as Record<string, unknown>).femaDeclarationType = declarationType;
     }
 
     return {

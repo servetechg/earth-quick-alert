@@ -1,12 +1,12 @@
-import type { UnifiedEventCategory } from '@/lib/unified-event/types';
+import { normalizeUnifiedEventCategory } from '@/lib/unified-event/category-infer';
 import { unifiedSourceToLegacy } from '@/lib/unified-event/legacy-source';
 
 /** Shape expected by Alerts & Communication UI and risk alignment (legacy `AlertCommunication` card). */
 export function unifiedEventToLegacyAlertCard(row: Record<string, unknown>): Record<string, unknown> {
     const id = String(row._id ?? '');
-    const category = String(row.category ?? '') as UnifiedEventCategory;
+    const category = normalizeUnifiedEventCategory(String(row.category ?? ''));
     const props = (row.properties ?? {}) as Record<string, unknown>;
-    const catBlock = (props[category] ?? {}) as Record<string, unknown>;
+    const catBlock = (props[category] ?? props.hurricane_typhoon ?? {}) as Record<string, unknown>;
     const intensity = catBlock.intensity ?? null;
 
     return {

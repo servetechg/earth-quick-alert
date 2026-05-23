@@ -21,9 +21,8 @@ import ResponderNonprofitDeployment from '@/models/ResponderNonprofitDeployment'
 /** Which responder verticals are relevant per hazard category */
 const CATEGORY_RESPONDER_MAP: Record<string, string[]> = {
     flood:             ['hospital', 'police', 'national_guard', 'food_logistics', 'water', 'nonprofit'],
-    storm:             ['hospital', 'police', 'national_guard', 'electric'],
+    storm:             ['hospital', 'police', 'national_guard', 'federal', 'food_logistics', 'water', 'electric', 'nonprofit'],
     wildfire:          ['hospital', 'police', 'national_guard', 'water', 'food_logistics', 'electric'],
-    hurricane_typhoon: ['hospital', 'police', 'national_guard', 'federal', 'food_logistics', 'water', 'electric', 'nonprofit'],
     earthquake:        ['hospital', 'police', 'national_guard', 'federal'],
     tsunami:           ['hospital', 'police', 'national_guard', 'federal'],
     volcanic:          ['hospital', 'police', 'national_guard', 'federal'],
