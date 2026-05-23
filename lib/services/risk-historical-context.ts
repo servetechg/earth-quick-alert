@@ -69,7 +69,6 @@ function distroCounts(report: RiskReport): Record<IncidentHistoryCategory, numbe
         hazardous: 0,
         coastal_surf: 0,
         marine: 0,
-        hurricane_typhoon: 0,
         tsunami: 0,
         volcanic: 0,
         landslide: 0,
@@ -80,7 +79,8 @@ function distroCounts(report: RiskReport): Record<IncidentHistoryCategory, numbe
     };
 
     for (const row of report.incident_distribution ?? []) {
-        const cat = String(row.category ?? '').trim().toLowerCase();
+        let cat = String(row.category ?? '').trim().toLowerCase();
+        if (cat === 'hurricane_typhoon') cat = 'storm';
         if (!isKnownIncidentCategory(cat)) continue;
         const parsed = Number(row.count);
         const n = Number.isFinite(parsed) ? Math.max(0, Math.floor(parsed)) : 0;
@@ -444,7 +444,6 @@ export const INCIDENT_HISTORY_TAB_LABELS: Record<IncidentHistoryCategory, string
     marine: 'Marine',
     wildfire: 'Wildfire',
     earthquake: 'Earthquake',
-    hurricane_typhoon: 'Hurricane / Typhoon',
     tsunami: 'Tsunami',
     volcanic: 'Volcanic',
     landslide: 'Landslide',

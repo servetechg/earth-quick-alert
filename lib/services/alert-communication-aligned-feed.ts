@@ -30,9 +30,9 @@ async function subAdminHomeStateRaw(userId: string | undefined): Promise<string 
 }
 
 /**
- * Live `AlertCommunication` rows after the same refresh + hydration + sub-admin filter as Alerts & Communication.
+ * Live `UnifiedEvent` rows (current ingest) after refresh + sub-admin filter — same feed as Alerts & Communication.
  */
-export async function fetchAlignedAlertCommunicationFeed(options: {
+export async function fetchAlignedUnifiedEventFeed(options: {
     userId?: string;
     role: string;
 }): Promise<any[]> {
@@ -47,6 +47,9 @@ export async function fetchAlignedAlertCommunicationFeed(options: {
 
     return hydrated;
 }
+
+/** @deprecated Use `fetchAlignedUnifiedEventFeed` */
+export const fetchAlignedAlertCommunicationFeed = fetchAlignedUnifiedEventFeed;
 
 type DistroCat =
     | 'flood'

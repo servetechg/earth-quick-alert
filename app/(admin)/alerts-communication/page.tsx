@@ -55,6 +55,10 @@ import { useUser } from '@/lib/store/user-store'
 import Image from 'next/image'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
+import {
+  normalizeUnifiedEventAlertCards,
+  type UnifiedEventAlertCardView,
+} from '@/lib/unified-event/client-card'
 
 const ALERT_CATEGORIES = [
   { name: 'Tornado Warning', color: '#FF0000' },
@@ -142,7 +146,7 @@ export default function AlertsCommunicationPage() {
     email: false,
   })
 
-  const [alerts, setAlerts] = useState<any[]>([])
+  const [alerts, setAlerts] = useState<UnifiedEventAlertCardView[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedAlertId, setSelectedAlertId] = useState<string | null>(null)
   const [expandedLocations, setExpandedLocations] = useState<Record<string, boolean>>({})
@@ -169,13 +173,7 @@ export default function AlertsCommunicationPage() {
       const res = await fetch('/api/alerts-communication')
       if (res.ok) {
         const data = await res.json()
-        const formattedAlerts = data.map((item: any) => ({
-          ...item,
-          id: item._id,
-          affectedAreas: Array.isArray(item.locations) && item.locations.length > 0
-            ? item.locations
-            : [item.locationSummary ?? item.location]
-        }))
+        const formattedAlerts = normalizeUnifiedEventAlertCards(data)
         setAlerts(formattedAlerts)
 
         setSelectedAlertId(prev => prev ?? formattedAlerts[0]?.id ?? null)
@@ -229,7 +227,7 @@ export default function AlertsCommunicationPage() {
     }
   }
 
-  const handleStatusChange = async (alert: any) => {
+  const handleStatusChange = async (alert: UnifiedEventAlertCardView) => {
     try {
       const newStatus = alert.status === 'Take Action' ? 'Get Prepared' : 'Take Action'
       const res = await fetch('/api/alerts-communication', {
@@ -266,7 +264,7 @@ export default function AlertsCommunicationPage() {
     setIsChannelModalOpen(true)
   }
 
-  const handleFeedDispatch = (alert: any) => {
+  const handleFeedDispatch = (alert: UnifiedEventAlertCardView) => {
     setCurrentActionAlert(alert)
     setAlertMessage('') // Reset message for the new alert
     setIsActionModalOpen(true)
@@ -282,7 +280,7 @@ export default function AlertsCommunicationPage() {
 
   const selectedAlert = alerts.find(a => a.id === selectedAlertId)
 
-  const displayLocation = (alert: any) =>
+  const displayLocation = (alert: UnifiedEventAlertCardView) =>
     (alert?.locationSummary ?? alert?.location ?? '').toString()
 
   // AI Alert State
@@ -291,7 +289,15 @@ export default function AlertsCommunicationPage() {
   const [isSendingAlert, setIsSendingAlert] = useState(false)
   const [filterCategory, setFilterCategory] = useState<string | null>(null)
 
-  const handleGenerateAIMessage = async (alert: any) => {
+  const filteredAlerts = useMemo(
+    () => alerts.filter((alert) => !filterCategory || alert.name === filterCategory),
+    [alerts, filterCategory],
+  )
+
+  const eventCount = alerts.length
+  const visibleEventCount = filteredAlerts.length
+
+  const handleGenerateAIMessage = async (alert: UnifiedEventAlertCardView) => {
     setIsGeneratingAI(true)
     try {
       const response = await fetch('/api/ai/generate-alert', {
@@ -315,7 +321,7 @@ export default function AlertsCommunicationPage() {
     }
   }
 
-  const handleSendOfficialAlert = async (alert: any) => {
+  const handleSendOfficialAlert = async (alert: UnifiedEventAlertCardView) => {
     setIsSendingAlert(true)
     // Simulate API call to send alert
     await new Promise(resolve => setTimeout(resolve, 1500))
@@ -344,10 +350,13 @@ export default function AlertsCommunicationPage() {
             <div className="flex items-center gap-1.5 text-[12px] font-bold">
               <span className="text-[#3730A3]">Real-time monitoring:</span>
               <span className="font-medium text-[#4338CA]/80">
-                {alerts.length > 0
-                  ? `Signals are live: Most recent alert detected in ${displayLocation(alerts[0])}.`
-                  : "Polling the National Weather Service every minute for the latest alerts."
-                }
+                {loading
+                  ? 'Loading unified events…'
+                  : eventCount > 0
+                    ? `${visibleEventCount} active event${visibleEventCount === 1 ? '' : 's'} in your sector${
+                        filterCategory ? ` (filtered from ${eventCount})` : ''
+                      }. Latest: ${displayLocation(alerts[0])}.`
+                    : 'Polling unified feeds every minute for the latest events.'}
               </span>
             </div>
           </div>
@@ -429,7 +438,7 @@ export default function AlertsCommunicationPage() {
                 <p className="text-slate-500 font-bold uppercase tracking-widest text-[10px]">No active alerts detected in your sector logic.</p>
               </div>
             ) : (
-              alerts.filter(alert => !filterCategory || alert.name === filterCategory).map((alert) => {
+              filteredAlerts.map((alert) => {
                 const isSelected = selectedAlertId === alert.id;
                 const sourceKey = String(alert.source || 'manual').toLowerCase()
                 const sourceMeta = SOURCE_BADGE_STYLES[sourceKey] ?? {
@@ -501,12 +510,12 @@ export default function AlertsCommunicationPage() {
                             }}
                             type="button"
                           >
-                            {isLocExpanded ? 'Hide' : `View all (${alert.locationCount ?? alert.locations.length})`}
+                            {isLocExpanded ? 'Hide' : `View all (${alert.locationCount ?? alert.locations?.length ?? 0})`}
                           </button>
                         )}
                         {hasManyLocations && isLocExpanded && (
                           <div className="mt-2 text-[12px] font-bold text-slate-500">
-                            {alert.locations.join(', ')}
+                            {(alert.locations ?? []).join(', ')}
                           </div>
                         )}
                       </div>

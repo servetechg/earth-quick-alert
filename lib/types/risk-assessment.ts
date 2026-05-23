@@ -108,7 +108,6 @@ export const INCIDENT_HISTORY_TAB_KEYS = [
   'marine',
   'wildfire',
   'earthquake',
-  'hurricane_typhoon',
   'tsunami',
   'volcanic',
   'landslide',

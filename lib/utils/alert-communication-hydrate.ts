@@ -1,4 +1,4 @@
-/** Shared hydration for `AlertCommunication` rows (same shape as `/api/alerts-communication`). */
+/** Location list hydration for unified event cards (`/api/alerts-communication`). */
 
 export function parseLocations(raw: unknown): string[] {
     if (typeof raw !== 'string') return [];

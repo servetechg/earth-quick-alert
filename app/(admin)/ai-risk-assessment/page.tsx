@@ -287,7 +287,7 @@ function HistoricalAnalysisBody({
 // ─── Category sub-block with scroll + collapse ────────────────────────────────
 
 function CategorySubBlock({ cat }: { cat: SeverityBucket['categories'][number] }) {
-  const COLLAPSE_AFTER = 3;
+  const COLLAPSE_AFTER = 1;
   const [expanded, setExpanded] = useState(false);
   const bullets = cat.bullets ?? [];
   const groups = cat.groups ?? [];

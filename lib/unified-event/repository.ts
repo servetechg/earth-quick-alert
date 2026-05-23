@@ -1,6 +1,7 @@
 import type { AnyBulkWriteOperation } from 'mongoose';
 import UnifiedEvent from '@/models/UnifiedEvent';
 import type { UnifiedEventInsert } from '@/lib/unified-event/types';
+import { normalizeUnifiedEventCategory } from '@/lib/unified-event/category-infer';
 
 const DATA_STATUS_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -25,8 +26,14 @@ export async function upsertAndPruneUnifiedEvents(
 
     for (const ev of events) {
         activeIds.add(ev.externalId);
-        const category = ev.category;
-        const properties = { [category]: ev.properties?.[category] ?? ev.properties ?? {} };
+        const category = normalizeUnifiedEventCategory(ev.category);
+        const rawProps = (ev.properties ?? {}) as Record<string, unknown>;
+        const catProps =
+            rawProps[category] ??
+            rawProps[ev.category] ??
+            (ev.category === 'hurricane_typhoon' ? rawProps.hurricane_typhoon : undefined) ??
+            {};
+        const properties = { [category]: catProps };
 
         ops.push({
             updateOne: {
@@ -35,7 +42,7 @@ export async function upsertAndPruneUnifiedEvents(
                     $set: {
                         externalId: ev.externalId,
                         source: ev.source,
-                        category: ev.category,
+                        category,
                         name: ev.name,
                         description: ev.description ?? '',
                         severity: ev.severity,
@@ -119,8 +126,14 @@ export async function upsertHistoricalUnifiedEvents(
             skippedCurrent += 1;
             continue;
         }
-        const category = ev.category;
-        const properties = { [category]: ev.properties?.[category] ?? ev.properties ?? {} };
+        const category = normalizeUnifiedEventCategory(ev.category);
+        const rawProps = (ev.properties ?? {}) as Record<string, unknown>;
+        const catProps =
+            rawProps[category] ??
+            rawProps[ev.category] ??
+            (ev.category === 'hurricane_typhoon' ? rawProps.hurricane_typhoon : undefined) ??
+            {};
+        const properties = { [category]: catProps };
 
         ops.push({
             updateOne: {
@@ -129,7 +142,7 @@ export async function upsertHistoricalUnifiedEvents(
                     $set: {
                         externalId: ev.externalId,
                         source: ev.source,
-                        category: ev.category,
+                        category,
                         name: ev.name,
                         description: ev.description ?? '',
                         severity: ev.severity,

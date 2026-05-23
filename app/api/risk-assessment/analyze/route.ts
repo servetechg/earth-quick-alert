@@ -5,7 +5,7 @@ import { runDashboardIngest } from '@/lib/services/risk-ingest-service';
 import { openaiService } from '@/lib/services/openai-service';
 import { countReady2GoReachableUsers } from '@/lib/services/ready2go-reachable-users';
 import { recordActivity, ACTIVITY_ACTIONS } from '@/lib/activity-log';
-import { fetchAlignedAlertCommunicationFeed } from '@/lib/services/alert-communication-aligned-feed';
+import { fetchAlignedUnifiedEventFeed } from '@/lib/services/alert-communication-aligned-feed';
 import { applyRiskReportToAlignedAlertFeed } from '@/lib/services/risk-report-alert-alignment';
 import { resolveRiskIngestScopeForSession } from '@/lib/risk-assessment/resolve-ingest-scope';
 
@@ -75,7 +75,7 @@ export async function POST(req: Request) {
             ready2go_users_reachable: reachable,
         };
 
-        const alignedAlerts = await fetchAlignedAlertCommunicationFeed({
+        const alignedAlerts = await fetchAlignedUnifiedEventFeed({
             userId: session.user.id as string | undefined,
             role,
         });
@@ -107,7 +107,8 @@ export async function POST(req: Request) {
                 populationsAtRiskAcsEstimate: bundle.riskExposure?.populationAffectedEstimate ?? null,
                 reachableReady2GoUsers: reachable,
                 riskExposureVintage: bundle.riskExposure?.censusVintageLabel ?? null,
-                /** Same live rows as Alerts & Communication after refresh + role filter (KPIs are aligned to this). */
+                /** Same live UnifiedEvent rows as Alerts & Communication after refresh + role filter. */
+                aligned_event_count: alignedAlerts.length,
                 aligned_alert_count: alignedAlerts.length,
                 sources: bundle.sources.map((s) => ({
                     source: s.source,

@@ -7,6 +7,7 @@ import { findSimilarPastEvents, computeMatchConfidence, pickSeedEvent } from '@/
 import { getActiveRespondersForCategory } from '@/lib/services/risk-responder-data';
 import { openaiService } from '@/lib/services/openai-service';
 import type { HistoricalTabPayload } from '@/lib/types/risk-assessment';
+import { normalizeUnifiedEventCategory } from '@/lib/unified-event/category-infer';
 
 const ALLOWED_ROLES = new Set([
     'admin', 'super-admin', 'sub-admin', 'eoc-manager',
@@ -17,8 +18,10 @@ const cache = new Map<string, { data: HistoricalTabPayload; expiresAt: number }>
 
 export async function POST(
     req: Request,
-    { params }: { params: { category: string } },
+    { params }: { params: Promise<{ category: string }> | { category: string } },
 ) {
+    const { category: categoryParam } = await Promise.resolve(params);
+
     try {
         await dbConnect();
         const session = await getSession();
@@ -27,10 +30,11 @@ export async function POST(
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const category = params.category;
-        if (!category) {
+        if (!categoryParam?.trim()) {
             return NextResponse.json({ error: 'Missing category' }, { status: 400 });
         }
+
+        const category = normalizeUnifiedEventCategory(categoryParam);
 
         let body: { stateCd?: string; nationwide?: boolean } = {};
         try { body = await req.json(); } catch { /* empty body */ }
@@ -49,7 +53,9 @@ export async function POST(
 
         // Load all current events then filter to this category
         const allCurrent = await getCurrentEvents({ stateCd: scope.nationwide ? undefined : scope.stateCd });
-        const currentEvents = allCurrent.filter((e) => e.category === category);
+        const currentEvents = allCurrent.filter(
+            (e) => normalizeUnifiedEventCategory(e.category) === category,
+        );
 
         if (currentEvents.length === 0) {
             return NextResponse.json({ error: 'No active events for this category' }, { status: 404 });
@@ -102,7 +108,7 @@ export async function POST(
         cache.set(cacheKey, { data: payload, expiresAt: Date.now() + 60_000 });
         return NextResponse.json(payload);
     } catch (e: any) {
-        console.error(`risk-assessment/historical/${params?.category}:`, e);
+        console.error(`risk-assessment/historical/${categoryParam}:`, e);
         return NextResponse.json({ error: 'Failed to generate historical context', message: e?.message }, { status: 500 });
     }
 }
