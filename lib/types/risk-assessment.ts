@@ -52,6 +52,19 @@ export interface SeverityBucket {
   categories: SeverityCategoryItem[];
 }
 
+/** One factor that contributes to the overall AI Confidence score. */
+export interface ConfidenceFactor {
+  factor: string;
+  score: number;
+  max: number;
+  reason: string;
+}
+
+export interface AiConfidenceResult {
+  score: number;
+  breakdown: ConfidenceFactor[];
+}
+
 /** Payload returned by GET /api/risk-assessment/summary */
 export interface RiskSummaryPayload {
   generated_at: string;
@@ -63,6 +76,7 @@ export interface RiskSummaryPayload {
   active_categories: string[];
   active_severities: string[];
   ai_confidence: number;
+  ai_confidence_breakdown?: ConfidenceFactor[];
   populations_at_risk: number;
   sources_count: number;
   /** False when OPENAI_API_KEY is unset — UI shows a banner and deterministic fallbacks are used. Added by /summary route, not by computeRiskSnapshot. */

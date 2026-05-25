@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import dbConnect from '@/lib/mongodb';
-import { getCurrentEvents } from '@/lib/services/unified-event-repo';
+import { getCurrentEvents, type UnifiedEventDoc } from '@/lib/services/unified-event-repo';
 import { computeRiskSnapshot } from '@/lib/services/risk-current-snapshot';
 import { openaiService } from '@/lib/services/openai-service';
 import { resolveRiskIngestScopeForSession } from '@/lib/risk-assessment/resolve-ingest-scope';
@@ -77,12 +77,24 @@ export async function POST(req: Request) {
             for (const catGroup of bucket.categories) {
                 tasks.push(async () => {
                     const eventGroups = groupRelatedEvents(catGroup.events);
-                    // Pass primary events (one per group) to AI — eliminates duplicate noise
-                    const primaryEvents = eventGroups.map((g) => g.primary);
+                    // For FEMA: send ALL county-docs of each disaster so per-county
+                    //   nuance (different programs, aid amounts, areas) reaches the bullet.
+                    //   The prompt collapses them by femaDisasterNumber into one bullet.
+                    // For every other source: send the primary only — non-FEMA groups
+                    //   only exist when externalId matched exactly (true re-ingest duplicates),
+                    //   so the extra members carry no new information.
+                    const aiInputEvents: UnifiedEventDoc[] = [];
+                    for (const g of eventGroups) {
+                        if (g.primary.source === 'fema' && g.members.length > 1) {
+                            aiInputEvents.push(...g.members);
+                        } else {
+                            aiInputEvents.push(g.primary);
+                        }
+                    }
                     const bullets = await openaiService.generateSeverityCategorySummary({
                         severity: bucket.severity,
                         category: catGroup.category,
-                        events: primaryEvents,
+                        events: aiInputEvents,
                     });
                     return {
                         severity: bucket.severity,
