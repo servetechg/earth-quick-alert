@@ -40,13 +40,14 @@ export async function GET(req: Request) {
         }
 
         const events = await getCurrentEvents({ stateCd: scope.nationwide ? undefined : scope.stateCd });
-        const snapshot = computeRiskSnapshot(events);
+        const aiAvailable = openaiService.isAvailable();
+        const snapshot = computeRiskSnapshot(events, { aiAvailable });
 
         // Strip raw event arrays from the response (only needed server-side)
         const { severity_buckets, ...rest } = snapshot;
         const response = {
             ...rest,
-            ai_available: openaiService.isAvailable(),
+            ai_available: aiAvailable,
             severity_buckets: severity_buckets.map((b) => ({
                 severity: b.severity,
                 categories: b.categories.map((c) => ({

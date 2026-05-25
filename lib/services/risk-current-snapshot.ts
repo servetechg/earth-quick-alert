@@ -1,6 +1,7 @@
 import type { UnifiedEventDoc } from '@/lib/services/unified-event-repo';
 import { normalizeUnifiedEventCategory } from '@/lib/unified-event/category-infer';
-import type { DistroPoint, RiskSummaryPayload } from '@/lib/types/risk-assessment';
+import type { ConfidenceFactor, DistroPoint, RiskSummaryPayload } from '@/lib/types/risk-assessment';
+import { computeAiConfidence } from '@/lib/services/risk-ai-confidence';
 
 export interface SeverityCategoryGroup {
     category: string;
@@ -14,6 +15,7 @@ export interface SeverityBucketRaw {
 
 export interface RiskSnapshot extends RiskSummaryPayload {
     severity_buckets: SeverityBucketRaw[];
+    ai_confidence_breakdown: ConfidenceFactor[];
 }
 
 const SEVERITY_SCORE: Record<string, number> = {
@@ -38,22 +40,10 @@ function deriveOverallThreatLevel(avg: number): string {
     return 'LOW';
 }
 
-function deriveAiConfidence(events: UnifiedEventDoc[]): number {
-    if (events.length === 0) return 0;
-    const distinctSources = new Set(events.map((e) => e.source)).size;
-    const distinctCats = new Set(events.map((e) => normalizeUnifiedEventCategory(e.category))).size;
-    const hasProps = events.some(
-        (e) => e.properties && Object.keys(e.properties).length > 0,
-    );
-    let conf = 60;
-    if (events.length >= 5) conf += 15;
-    if (distinctCats >= 3) conf += 10;
-    if (hasProps) conf += 10;
-    if (distinctSources >= 3) conf += 5;
-    return Math.min(100, conf);
-}
-
-export function computeRiskSnapshot(events: UnifiedEventDoc[]): RiskSnapshot {
+export function computeRiskSnapshot(
+    events: UnifiedEventDoc[],
+    opts: { aiAvailable?: boolean } = {},
+): RiskSnapshot {
     const alerts_count = events.length;
     const major_incidents = events.filter(
         (e) => e.severity === 'High' || e.severity === 'Extreme',
@@ -98,6 +88,11 @@ export function computeRiskSnapshot(events: UnifiedEventDoc[]): RiskSnapshot {
 
     const distinctSources = new Set(events.map((e) => e.source));
 
+    const confidence = computeAiConfidence({
+        events,
+        aiAvailable: opts.aiAvailable ?? false,
+    });
+
     return {
         generated_at: new Date().toISOString(),
         overall_risk_level,
@@ -107,7 +102,8 @@ export function computeRiskSnapshot(events: UnifiedEventDoc[]): RiskSnapshot {
         incident_distribution,
         active_categories,
         active_severities,
-        ai_confidence: deriveAiConfidence(events),
+        ai_confidence: confidence.score,
+        ai_confidence_breakdown: confidence.breakdown,
         populations_at_risk: 0, // deferred; UI shows em-dash when 0
         sources_count: distinctSources.size,
         severity_buckets,
