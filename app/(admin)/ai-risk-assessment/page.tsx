@@ -215,7 +215,11 @@ function HistoricalAnalysisBody({
       <div className="mb-5 rounded-xl border-l-4 border-l-blue-500 bg-blue-50 p-4">
         <p className="text-[10px] font-bold uppercase tracking-widest text-blue-600">Matched Event</p>
         <p className="mt-1 text-lg font-extrabold tracking-tight text-slate-800">
-          {h.matched_event ?? (hasSimilarPast ? "Analyzing past events…" : "No comparable past events found.")}
+          {h.matched_event
+            ? renderEmphasis(h.matched_event)
+            : hasSimilarPast
+              ? "Analyzing past events…"
+              : "No comparable past events found."}
         </p>
         {h.similarity_summary && (
           <p className="mt-1.5 text-sm leading-relaxed text-slate-600">{renderEmphasis(h.similarity_summary)}</p>
