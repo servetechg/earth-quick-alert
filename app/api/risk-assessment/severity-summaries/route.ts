@@ -7,6 +7,7 @@ import { openaiService } from '@/lib/services/openai-service';
 import { resolveRiskIngestScopeForSession } from '@/lib/risk-assessment/resolve-ingest-scope';
 import { groupRelatedEvents, toEventGroupSummary } from '@/lib/services/event-grouping';
 import type { SeverityBucket } from '@/lib/types/risk-assessment';
+import { normalizeAiBulletList } from '@/lib/utils/normalize-ai-text';
 
 const ALLOWED_ROLES = new Set([
     'admin', 'super-admin', 'sub-admin', 'eoc-manager',
@@ -123,7 +124,7 @@ export async function POST(req: Request) {
                 category: item.category,
                 eventCount: item.eventCount,
                 groupCount: item.groupCount,
-                bullets: item.bullets,
+                bullets: normalizeAiBulletList(item.bullets, 5),
                 groups: item.groups,
             });
         }

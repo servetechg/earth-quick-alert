@@ -25,6 +25,7 @@ import {
 } from '@/lib/services/risk-kpi-dynamic';
 import { deriveEventBasedIncidentDistribution } from '@/lib/services/risk-event-distribution';
 import { buildLiveHistoricalContext } from '@/lib/services/risk-historical-context';
+import { normalizeAiBullet, normalizeAiBulletList } from '@/lib/utils/normalize-ai-text';
 
 export interface EmergencyInsights {
     status: 'All Clear' | 'Warning' | 'Emergency';
@@ -803,19 +804,17 @@ ${(bundle.narrative ?? '').slice(0, 8000)}`;
     ): HistoricalAnalysis {
         const a = ai ?? {};
         const pickStr = (v: unknown, fb?: string): string | undefined => {
-            const s = typeof v === 'string' ? v.trim() : '';
+            const s = normalizeAiBullet(v);
             return s || (fb && fb.trim()) || undefined;
         };
         const pickArr = (v: unknown, fb: string[] | undefined): string[] | undefined => {
-            const list = Array.isArray(v) ? v.map((x) => String(x ?? '').trim()).filter(Boolean) : [];
-            if (list.length) return list.slice(0, cap);
+            const list = normalizeAiBulletList(v, cap);
+            if (list.length) return list;
             return fb && fb.length ? fb : undefined;
         };
 
         // current_procedures: a capped AI summary wins; otherwise keep the full live ingest lines.
-        const aiCurrent = Array.isArray(a.current_procedures)
-            ? a.current_procedures.map((x) => String(x ?? '').trim()).filter(Boolean)
-            : [];
+        const aiCurrent = normalizeAiBulletList(a.current_procedures, cap);
         const current_procedures = aiCurrent.length
             ? aiCurrent.slice(0, cap)
             : deterministic.current_procedures;
@@ -1311,7 +1310,7 @@ Each bullet MUST:
 - NEVER omit numbers, counts, dollar amounts, names, or timestamps that appear in the data.
 - Wrap place names, severity words, and numeric facts in **double asterisks**.
 
-Return JSON: {"bullets": ["<sentence>", ...]}.`,
+Return JSON: {"bullets": ["<sentence>", ...]} — each bullet MUST be a plain string sentence, never a JSON object.`,
                 },
                 {
                     role: 'user',
@@ -1321,7 +1320,8 @@ Return JSON: {"bullets": ["<sentence>", ...]}.`,
             { bullets: fallback },
             { max_tokens: 2000 },
         );
-        return Array.isArray(result.bullets) && result.bullets.length > 0 ? result.bullets : fallback;
+        const bullets = normalizeAiBulletList(result.bullets, 5);
+        return bullets.length > 0 ? bullets : fallback;
     }
 
     async generateHistoricalPastSummary(input: {

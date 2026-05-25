@@ -30,6 +30,7 @@ import type {
   RecommendationItem, HistoricalAnalysis, EventGroupSummary,
 } from "@/lib/types/risk-assessment";
 import { SOURCE_LABEL_MAP } from "@/lib/types/risk-assessment";
+import { normalizeAiBullet } from "@/lib/utils/normalize-ai-text";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -78,18 +79,20 @@ function stripEmphasis(text: string): string {
 }
 
 /** Render **bold** markers + auto-bold measurements */
-function renderEmphasis(text: string): ReactNode {
+function renderEmphasis(text: unknown): ReactNode {
+  const plain = normalizeAiBullet(text);
+  if (!plain) return null;
   const boldRe = /\*\*([^*]+?)\*\*/g;
   const nodes: ReactNode[] = [];
   let last = 0, i = 0;
   let m: RegExpExecArray | null;
-  while ((m = boldRe.exec(text)) !== null) {
-    if (m.index > last) nodes.push(<span key={i++}>{text.slice(last, m.index).replace(/\*/g, "")}</span>);
+  while ((m = boldRe.exec(plain)) !== null) {
+    if (m.index > last) nodes.push(<span key={i++}>{plain.slice(last, m.index).replace(/\*/g, "")}</span>);
     nodes.push(<strong key={i++} className="font-bold text-[#232a43]">{m[1]}</strong>);
     last = m.index + m[0].length;
   }
-  if (last < text.length) nodes.push(<span key={i++}>{text.slice(last).replace(/\*/g, "")}</span>);
-  return nodes.length <= 1 ? (nodes[0] ?? text) : <Fragment>{nodes}</Fragment>;
+  if (last < plain.length) nodes.push(<span key={i++}>{plain.slice(last).replace(/\*/g, "")}</span>);
+  return nodes.length <= 1 ? (nodes[0] ?? plain) : <Fragment>{nodes}</Fragment>;
 }
 
 function dedupeConsecutive(xs: string[]): string[] {
@@ -304,7 +307,7 @@ function HistoricalAnalysisBody({
 function CategorySubBlock({ cat }: { cat: SeverityBucket['categories'][number] }) {
   const COLLAPSE_AFTER = 1;
   const [expanded, setExpanded] = useState(false);
-  const bullets = cat.bullets ?? [];
+  const bullets = (cat.bullets ?? []).map((b) => normalizeAiBullet(b)).filter(Boolean);
   const groups = cat.groups ?? [];
   const visible = expanded ? bullets : bullets.slice(0, COLLAPSE_AFTER);
   const hidden = bullets.length - COLLAPSE_AFTER;
