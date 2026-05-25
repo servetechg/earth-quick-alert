@@ -42,27 +42,42 @@ function extractAffectedCounties(e: UnifiedEventDoc): string[] {
     return [];
 }
 
+/**
+ * Returns a canonical merge key for an event.
+ *
+ * GUARANTEE: two distinct real-world events will NEVER produce the same key.
+ * The key is built from the source's own authoritative identifier
+ * (externalId or domain-specific ID). Fuzzy matching on name/time/state is
+ * NEVER used — it caused legitimate distinct incidents to be merged.
+ *
+ * Special case: FEMA stores ONE disaster declaration as N separate county
+ * documents (each with its own externalId). The disasterNumber /
+ * femaDeclarationString is the authoritative federal grouping unit, so
+ * FEMA — and ONLY FEMA — is grouped by that field instead of externalId.
+ *
+ * If a document lacks an authoritative ID it is keyed by its Mongo _id,
+ * which guarantees it stays in a group of one and is never merged with
+ * anything else.
+ */
 function canonicalKey(e: UnifiedEventDoc): string {
     const p = (e.properties ?? {})[e.category] as Record<string, unknown> | undefined;
-    switch (e.source) {
-        case 'fema': {
-            const declStr = p?.femaDeclarationString ?? p?.disasterNumber;
-            return `fema:${declStr ?? e.name}`;
-        }
-        case 'nws': {
-            const effectiveAt = p?.effectiveAt ?? '';
-            return `nws:${e.name}|${effectiveAt}`;
-        }
-        case 'noaa_ncei': {
-            const nceiId = p?.nceiEventId ?? e.externalId;
-            return `ncei:${nceiId}`;
-        }
-        case 'earthquake':
-        case 'usgs':
-            return `usgs:${e.externalId}`;
-        default:
-            return `${e.source}:${e.name}|${e.category}|${extractState(e.location)}`;
+
+    if (e.source === 'fema') {
+        const declStr =
+            (typeof p?.femaDeclarationString === 'string' && p.femaDeclarationString) ||
+            (p?.disasterNumber != null && String(p.disasterNumber)) ||
+            null;
+        if (declStr) return `fema:decl:${declStr}`;
+        // No federal declaration ID — treat as standalone, never merge with siblings.
+        return `fema:standalone:${e.externalId || e._id}`;
     }
+
+    // Every other source: externalId IS the authoritative unique identifier.
+    // Two documents only merge if they share the exact same source-issued ID.
+    if (e.externalId) return `${e.source}:${e.externalId}`;
+
+    // No externalId on the document — stays in a group of one.
+    return `${e.source}:standalone:${e._id}`;
 }
 
 /**

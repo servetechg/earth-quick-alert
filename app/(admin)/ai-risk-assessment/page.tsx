@@ -109,8 +109,13 @@ function EventChipStrip({ group }: { group: EventGroupSummary }) {
       {group.affectedCounties.length === 1 ? (
         <span className="text-slate-500 font-normal">{group.affectedCounties[0]}</span>
       ) : group.affectedCounties.length > 1 ? (
-        <span className="rounded px-1.5 py-0.5 border bg-emerald-50 text-emerald-700 border-emerald-200">
-          covers {group.affectedCounties.length} counties
+        <span
+          className="rounded px-1.5 py-0.5 border bg-emerald-50 text-emerald-700 border-emerald-200"
+          title={group.affectedCounties.join(', ')}
+        >
+          {group.affectedCounties.length <= 3
+            ? `covers ${group.affectedCounties.join(', ')}`
+            : `covers ${group.affectedCounties.slice(0, 2).join(', ')} +${group.affectedCounties.length - 2} more`}
         </span>
       ) : null}
       {group.hasCoordinates && (
@@ -118,9 +123,15 @@ function EventChipStrip({ group }: { group: EventGroupSummary }) {
           <MapPin className="inline h-3 w-3" />
         </span>
       )}
-      {group.duplicateCount > 1 && (
-        <span className="text-slate-400 font-normal">+ {group.duplicateCount - 1} duplicate alert(s)</span>
-      )}
+      {group.duplicateCount > 1 && group.source === 'fema' ? (
+        <span className="text-slate-400 font-normal">
+          one declaration · {group.duplicateCount} county records
+        </span>
+      ) : group.duplicateCount > 1 ? (
+        <span className="text-slate-400 font-normal">
+          + {group.duplicateCount - 1} re-ingested record(s)
+        </span>
+      ) : null}
       <span className="text-slate-400 font-normal">· {group.formattedTimestamp}</span>
     </div>
   );

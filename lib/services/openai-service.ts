@@ -1302,6 +1302,7 @@ IMPORTANT — output rules:
 - Every event must be represented in at least one bullet. Do NOT drop any events silently.
 - Do NOT produce a single semicolon-joined mega-bullet listing every event on one line.
 - Do NOT use placeholder text like "N more events" or "X more events" — represent all events within the 5-bullet limit by clustering.
+- FEMA grouping rule: if multiple events share the same "femaDisasterNumber" (or "femaDeclarationString") inside their properties, they are the SAME federal disaster declaration spanning multiple counties. Collapse them into ONE bullet that names the disaster once and lists every affected county (e.g., "covers **Saipan**, **Tinian**, **Rota**"). Mention per-county variations in incidentType, programs, or aid amounts if they actually differ across the county-docs. Never emit a separate bullet per county for the same disaster number.
 
 Each bullet MUST:
 - Be one complete, self-explanatory sentence.
