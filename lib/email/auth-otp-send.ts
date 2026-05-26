@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
 import type { OtpPurpose } from '@/lib/types/mobile/auth';
+import { otpExpiryMinutes } from '@/lib/services/mobile/otp-service';
 
 function smtpConfigured(): boolean {
     if (process.env.RESPONDER_INVITE_SMTP_URL?.trim()) return true;
@@ -52,7 +53,7 @@ export async function sendOtpEmail(email: string, code: string, purpose: OtpPurp
     const text = [
         `Your verification code to ${label} is: ${code}`,
         '',
-        'This code expires in 10 minutes.',
+        `This code expires in ${otpExpiryMinutes()} minutes.`,
         'If you did not request this, you can ignore this email.',
     ].join('\n');
     await sendMail(email, subject, text);

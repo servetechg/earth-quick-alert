@@ -4,7 +4,13 @@ import AuthOtp from '@/models/AuthOtp';
 import type { OtpPurpose } from '@/lib/types/mobile/auth';
 import { sendOtpEmail } from '@/lib/email/auth-otp-send';
 
-const OTP_TTL_MS = 10 * 60 * 1000;
+export function otpExpiryMinutes(): number {
+    const raw = process.env.MOBILE_OTP_EXPIRY_MINUTES;
+    const n = raw ? Number(raw) : 10;
+    return Number.isFinite(n) && n > 0 ? n : 10;
+}
+
+const OTP_TTL_MS = otpExpiryMinutes() * 60 * 1000;
 const OTP_LOCK_MS = 15 * 60 * 1000;
 const MAX_ATTEMPTS = 5;
 const RATE_LIMIT_COUNT = 3;
