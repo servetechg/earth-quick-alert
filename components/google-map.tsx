@@ -42,6 +42,12 @@ export interface MapStateBounds {
     north: number
 }
 
+export interface CoverageCircleSpec {
+    center: { lat: number; lng: number }
+    radiusMeters: number
+    label?: string
+}
+
 interface GoogleMapProps {
     address?: string
     markers?: MapMarker[]
@@ -51,6 +57,8 @@ interface GoogleMapProps {
     showHeatmap?: boolean
     /** When set, pan/zoom are limited to this US state envelope. */
     stateBounds?: MapStateBounds | null
+    /** Sub-admin license service area (miles stored server-side; pass meters here). */
+    coverageCircle?: CoverageCircleSpec | null
 }
 
 const containerStyle = {
@@ -105,6 +113,7 @@ export function GoogleMap({
     heatPoints = [],
     showHeatmap = false,
     stateBounds = null,
+    coverageCircle = null,
 }: GoogleMapProps) {
     const { isLoaded } = useJsApiLoader({
         id: GOOGLE_MAPS_LOADER_ID,
@@ -330,6 +339,25 @@ export function GoogleMap({
                     fullscreenControl: true
                 }}
             >
+                {coverageCircle &&
+                    Number.isFinite(coverageCircle.center.lat) &&
+                    Number.isFinite(coverageCircle.center.lng) &&
+                    coverageCircle.radiusMeters > 0 && (
+                        <Circle
+                            center={coverageCircle.center}
+                            radius={coverageCircle.radiusMeters}
+                            options={{
+                                strokeColor: '#33375D',
+                                strokeOpacity: 0.85,
+                                strokeWeight: 2,
+                                fillColor: '#33375D',
+                                fillOpacity: 0.06,
+                                clickable: false,
+                                zIndex: 1,
+                            }}
+                        />
+                    )}
+
                 {validMarkers.map((marker) => (
                     <React.Fragment key={marker.id}>
                         <Marker

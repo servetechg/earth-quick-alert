@@ -4,6 +4,12 @@ import License from '@/models/License';
 import User from '@/models/User';
 import EOCSettings from '@/models/EOCSettings';
 import { getSession } from '@/lib/auth';
+import { GOOGLE_MAPS_API_KEY } from '@/lib/constants/google-maps-config';
+import {
+    clampLicenseRadiusMile,
+    LICENSE_COVERAGE_MIN_MILE,
+    resolveMaxRadiusForState,
+} from '@/lib/geo/license-coverage-radius';
 import bcrypt from 'bcryptjs';
 
 export async function GET(req: NextRequest) {
@@ -49,11 +55,34 @@ export async function POST(req: NextRequest) {
             billingEmail,
             phoneNumber,
             radiusMile,
+            stateCode,
+            countryCode,
             isNewUser
         } = await req.json();
 
         if (!organizationName || (!userId && !isNewUser)) {
             return NextResponse.json({ error: 'Missing required fields (organizationName and user assignation)' }, { status: 400 });
+        }
+
+        const requestedRadius = Number(radiusMile) || LICENSE_COVERAGE_MIN_MILE;
+        if (state || stateCode) {
+            const maxRadiusMile = await resolveMaxRadiusForState(
+                {
+                    stateCode: stateCode || undefined,
+                    countryCode: countryCode || undefined,
+                    stateName: state || undefined,
+                    countryName: country || undefined,
+                },
+                GOOGLE_MAPS_API_KEY
+            );
+            if (maxRadiusMile != null && requestedRadius > maxRadiusMile) {
+                return NextResponse.json(
+                    {
+                        error: `Coverage radius cannot exceed ${maxRadiusMile} miles for ${state || stateCode}`,
+                    },
+                    { status: 400 }
+                );
+            }
         }
 
         let assignedSubAdmin;
@@ -111,7 +140,7 @@ export async function POST(req: NextRequest) {
             billingAddress,
             billingEmail,
             phoneNumber,
-            radiusMile: Number(radiusMile) || 5
+            radiusMile: requestedRadius
         });
 
         // 3. Update the sub-admin to point to this new license
