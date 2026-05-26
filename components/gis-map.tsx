@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useId } from 'react'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -30,7 +30,8 @@ import {
   AlertOctagon,
   X,
 } from 'lucide-react'
-import { GoogleMap, type MapStateBounds } from '@/components/google-map'
+import { GoogleMap, type CoverageCircleSpec, type MapStateBounds } from '@/components/google-map'
+import type { UnifiedEventHeatPoint } from '@/lib/geo/unified-event-heatmap'
 import { cn } from '@/lib/utils'
 import { getUsStateBbox } from '@/lib/constants/us-state-bounding-boxes'
 import { normalizeStateToUsps } from '@/lib/utils/us-state-usps'
@@ -88,10 +89,15 @@ export function GISMap({
   const [mapZoom, setMapZoom] = useState(4)
   const [activeTab, setActiveTab] = useState<'Citizens' | 'Responders' | 'Leaders' | 'Infrastructure'>('Citizens')
   const [showHeatmap, setShowHeatmap] = useState(true)
+  const [unifiedIncidents, setUnifiedIncidents] = useState<UnifiedEventHeatPoint[]>([])
+  const [incidentHeatCount, setIncidentHeatCount] = useState(0)
+  const [coverageCircle, setCoverageCircle] = useState<CoverageCircleSpec | null>(null)
+  const [situationalLoading, setSituationalLoading] = useState(false)
   const [mapLayers, setMapLayers] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(DEFAULT_MAP_LAYERS.map((layer) => [layer.id, true])),
   )
   const [layersPanelOpen, setLayersPanelOpen] = useState(true)
+  const heatSwitchId = useId()
 
   const stateBoundsRestriction = useMemo((): MapStateBounds | null => {
     const st = (focusState || '').trim()
@@ -103,6 +109,62 @@ export function GISMap({
     const [west, south, east, north] = bbox
     return { west, south, east, north }
   }, [focusState])
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function fetchSituational() {
+      setSituationalLoading(true)
+      try {
+        const res = await fetch('/api/admin/situational-map')
+        if (!res.ok) return
+        const data = await res.json()
+        if (cancelled) return
+        setUnifiedIncidents(Array.isArray(data.incidents) ? data.incidents : [])
+        setIncidentHeatCount(
+          typeof data.incidentCount === 'number'
+            ? data.incidentCount
+            : Array.isArray(data.incidents)
+              ? data.incidents.length
+              : 0
+        )
+        if (
+          showLayersPanel &&
+          data.coverage?.center &&
+          data.coverage?.radiusMeters
+        ) {
+          const mile = data.coverage.radiusMile
+          setCoverageCircle({
+            center: data.coverage.center,
+            radiusMeters: data.coverage.radiusMeters,
+            label:
+              typeof mile === 'number'
+                ? `License coverage · ${mile} mi`
+                : 'License coverage',
+          })
+          if (
+            Number.isFinite(data.coverage.center.lat) &&
+            Number.isFinite(data.coverage.center.lng)
+          ) {
+            setMapCenter(data.coverage.center)
+          }
+        } else {
+          setCoverageCircle(null)
+        }
+      } catch (e) {
+        console.error('Situational map feed:', e)
+      } finally {
+        if (!cancelled) setSituationalLoading(false)
+      }
+    }
+
+    void fetchSituational()
+    const interval = setInterval(fetchSituational, 60_000)
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+    }
+  }, [showLayersPanel])
 
   useEffect(() => {
     async function fetchData() {
@@ -448,6 +510,14 @@ export function GISMap({
   }, [activeTab, impactedUsers, responders, subAdmins, dynamicInfra, selectedLocation])
 
   const heatPoints = useMemo(() => {
+    if (unifiedIncidents.length > 0) {
+      return unifiedIncidents.map((inc) => ({
+        lat: inc.lat,
+        lng: inc.lng,
+        weight: inc.weight,
+      }))
+    }
+
     const base = [...impactedUsers, ...responders, ...dynamicInfra]
       .filter((m: any) => m?.position && Number.isFinite(m.position.lat) && Number.isFinite(m.position.lng))
       .map((m: any, i: number) => ({
@@ -462,19 +532,50 @@ export function GISMap({
                 ? 0.55
                 : 0.45 + ((i % 4) * 0.08),
       }))
-    // Keep count close to the reference panel value.
     return base.slice(0, 24)
-  }, [impactedUsers, responders, dynamicInfra])
+  }, [showLayersPanel, unifiedIncidents, impactedUsers, responders, dynamicInfra])
+
+  const situationalMarkers = useMemo(() => {
+    if (!showLayersPanel) return []
+    return unifiedIncidents.map((inc) => ({
+      id: `unified-${inc.id}`,
+      position: { lat: inc.lat, lng: inc.lng },
+      title: inc.name,
+      type: 'weather' as const,
+      description: `${inc.severity} severity · ${inc.category || inc.source || 'unified event'}`,
+      status: inc.severity,
+    }))
+  }, [showLayersPanel, unifiedIncidents])
+
+  const mapMarkers = useMemo(
+    () => (showLayersPanel ? [...markers, ...situationalMarkers] : markers),
+    [showLayersPanel, markers, situationalMarkers]
+  )
+
+  const displayHeatCount =
+    unifiedIncidents.length > 0 ? incidentHeatCount : heatPoints.length
+  const usesUnifiedHeat = unifiedIncidents.length > 0
 
   return (
     <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm h-[700px] flex flex-col">
-      <div className="p-4 sm:p-6 border-b border-slate-100 flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <h2 className="text-lg sm:text-xl font-black text-slate-900 tracking-tighter uppercase shrink-0">{title}</h2>
+      <div className="p-4 sm:p-6 border-b border-slate-100 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex flex-wrap items-start gap-4 min-w-0 flex-1">
+          <h2 className="text-lg sm:text-xl font-black text-slate-900 tracking-tighter uppercase shrink-0 pt-0.5">
+            {title}
+          </h2>
+          <GisHeatMapHeaderPanel
+            heatSwitchId={heatSwitchId}
+            showHeatmap={showHeatmap}
+            onShowHeatmapChange={setShowHeatmap}
+            displayHeatCount={displayHeatCount}
+            situationalLoading={situationalLoading}
+            coverageLabel={showLayersPanel ? coverageCircle?.label : undefined}
+            usesUnifiedHeat={usesUnifiedHeat}
+          />
         </div>
 
         {!hideTabs && (
-          <div className="flex bg-slate-50 p-1 rounded-2xl gap-0.5 overflow-x-auto no-scrollbar">
+          <div className="flex bg-slate-50 p-1 rounded-2xl gap-0.5 overflow-x-auto no-scrollbar shrink-0">
             {(['Citizens', 'Responders', 'Leaders', 'Infrastructure'] as const).map((tab) => (
               <button
                 key={tab}
@@ -496,91 +597,15 @@ export function GISMap({
       <div className="flex-1 flex flex-col min-h-0">
         <div className="flex-1 relative min-h-0">
         <GoogleMap
-          markers={markers}
+          markers={mapMarkers}
           zoom={mapZoom}
           center={mapCenter}
           heatPoints={heatPoints}
           showHeatmap={showHeatmap}
           stateBounds={stateBoundsRestriction}
+          coverageCircle={showLayersPanel ? coverageCircle : null}
         />
 
-        {showLayersPanel && layersPanelOpen && (
-          <div className="absolute left-4 top-16 z-40 w-[210px] rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-xl backdrop-blur-sm sm:top-20">
-            <div className="flex items-center justify-between mb-3 border-b border-slate-100 pb-2">
-              <h4 className="text-xs font-black uppercase tracking-widest text-slate-700">Map Layers</h4>
-              <button
-                onClick={() => setLayersPanelOpen(false)}
-                className="p-0.5 rounded hover:bg-slate-100 transition-colors"
-                aria-label="Close map layers"
-                type="button"
-              >
-                <X className="w-3.5 h-3.5 text-slate-500" />
-              </button>
-            </div>
-            <ul className="flex flex-col gap-2">
-              {DEFAULT_MAP_LAYERS.map((layer) => {
-                const Icon = layer.Icon
-                const checked = mapLayers[layer.id]
-                return (
-                  <li key={layer.id}>
-                    <label className="flex items-center gap-2 cursor-pointer group select-none">
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={(e) =>
-                          setMapLayers((prev) => ({ ...prev, [layer.id]: e.target.checked }))
-                        }
-                        className="w-3.5 h-3.5 accent-[#33375D] cursor-pointer shrink-0"
-                      />
-                      <span
-                        className="w-5 h-5 rounded-md flex items-center justify-center shrink-0"
-                        style={{ backgroundColor: `${layer.color}1A` }}
-                        aria-hidden
-                      >
-                        <Icon className="w-3 h-3" strokeWidth={2.25} style={{ color: layer.color }} />
-                      </span>
-                      <span className="text-[11px] font-semibold text-slate-700 group-hover:text-slate-900">
-                        {layer.label}
-                      </span>
-                    </label>
-                  </li>
-                )
-              })}
-            </ul>
-          </div>
-        )}
-
-        <div className="absolute right-4 top-16 z-40 w-64 rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-xl backdrop-blur-sm sm:top-20">
-          <div className="mb-3 border-b border-slate-100 pb-2">
-            <h4 className="text-xs font-black uppercase tracking-widest text-slate-700">Heat Map</h4>
-          </div>
-          <div className="space-y-3">
-            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Risk Overlays</p>
-            <div className="flex items-center justify-between gap-2">
-              <label
-                htmlFor="incident-heatmap"
-                className="flex flex-1 cursor-pointer items-center gap-2 text-xs font-bold text-slate-700"
-              >
-                <span className="text-amber-500">🔥</span>
-                Incident Heatmap
-                <span className="ml-auto rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-black text-slate-500">
-                  {heatPoints.length}
-                </span>
-              </label>
-              <Switch id="incident-heatmap" checked={showHeatmap} onCheckedChange={setShowHeatmap} />
-            </div>
-            {showHeatmap && (
-              <div className="space-y-1.5 border-t border-slate-100 pt-3">
-                <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Intensity</p>
-                <div className="h-2 w-full rounded-full bg-gradient-to-r from-[#33375D] via-yellow-400 via-orange-500 to-red-700" />
-                <div className="flex justify-between text-[9px] font-bold text-slate-400">
-                  <span>Low</span>
-                  <span>Critical</span>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
         {isSearchingInfra && (
           <div className="absolute right-4 top-4 bg-white/90 backdrop-blur-md px-4 py-2 rounded-2xl shadow-2xl border border-slate-100 flex items-center gap-2 z-50 animate-in fade-in slide-in-from-top-2 duration-300">
             <Loader2 className="w-4 h-4 text-[#33375D] animate-spin" />
@@ -588,6 +613,58 @@ export function GISMap({
           </div>
         )}
         </div>
+      </div>
+    </div>
+  )
+}
+
+function GisHeatMapHeaderPanel({
+  heatSwitchId,
+  showHeatmap,
+  onShowHeatmapChange,
+  displayHeatCount,
+  situationalLoading,
+  coverageLabel,
+  usesUnifiedHeat,
+}: {
+  heatSwitchId: string
+  showHeatmap: boolean
+  onShowHeatmapChange: (v: boolean) => void
+  displayHeatCount: number
+  situationalLoading: boolean
+  coverageLabel?: string
+  usesUnifiedHeat: boolean
+}) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-slate-50/90 px-4 py-3 min-w-[220px] max-w-sm shadow-sm">
+      <div className="mb-2 border-b border-slate-200/80 pb-2">
+      </div>
+      <div className="space-y-2.5">
+        <div className="flex items-center justify-between gap-2">
+          <label
+            htmlFor={heatSwitchId}
+            className="flex flex-1 cursor-pointer items-center gap-2 text-xs font-bold text-slate-700"
+          >
+            <span className="text-amber-500" aria-hidden>🔥</span>
+            Incident Heatmap
+            <span className="ml-auto rounded-full bg-white px-2 py-0.5 text-[10px] font-black text-slate-600 border border-slate-200">
+              {displayHeatCount}
+            </span>
+          </label>
+          <Switch id={heatSwitchId} checked={showHeatmap} onCheckedChange={onShowHeatmapChange} />
+        </div>
+        {showHeatmap && (
+          <div className="space-y-1 border-t border-slate-200/80 pt-2">
+            <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">
+              {usesUnifiedHeat ? 'Severity' : 'Intensity'}
+            </p>
+            <div className="h-1.5 w-full rounded-full bg-gradient-to-r from-[#33375D] via-yellow-400 via-orange-500 to-red-700" />
+            <div className="flex justify-between text-[9px] font-bold text-slate-400">
+              <span>Low</span>
+              <span>Critical</span>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
