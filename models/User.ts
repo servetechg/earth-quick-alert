@@ -6,6 +6,22 @@ const UserSchema = new Schema({
         type: String,
         required: [true, 'Please provide a name'],
     },
+    firstName: {
+        type: String,
+        default: '',
+    },
+    lastName: {
+        type: String,
+        default: '',
+    },
+    emailVerified: {
+        type: Boolean,
+        default: true,
+    },
+    profileComplete: {
+        type: Boolean,
+        default: false,
+    },
     email: {
         type: String,
         required: [true, 'Please provide an email'],

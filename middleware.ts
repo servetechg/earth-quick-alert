@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { handleApiCors } from '@/lib/api/cors'
 
 export function middleware(request: NextRequest) {
+    const apiCors = handleApiCors(request)
+    if (apiCors) return apiCors
+
     const session = request.cookies.get('session')?.value
     const userRole = request.cookies.get('userRole')?.value
     const accountStatus = request.cookies.get('accountStatus')?.value
@@ -205,5 +209,8 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-    matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)'],
+    matcher: [
+        '/api/:path*',
+        '/((?!api|_next/static|_next/image|favicon.ico).*)',
+    ],
 }
