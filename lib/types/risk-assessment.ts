@@ -35,6 +35,15 @@ export interface EventGroupSummary {
   lng?: number;
   hasCoordinates: boolean;
   formattedTimestamp: string;
+  /** Mongo _id strings of every member event in this group — used to fetch per-group AI narrative. */
+  memberIds: string[];
+}
+
+/** One AI-generated bullet with the exact Mongo _ids it summarizes. */
+export interface BulletWithRefs {
+  text: string;
+  /** Mongo _id strings of every event represented in this bullet. Always length >= 1. */
+  eventIds: string[];
 }
 
 /** One severity bucket from the new /summary endpoint */
@@ -42,7 +51,7 @@ export interface SeverityCategoryItem {
   category: string;
   eventCount: number;
   groupCount: number;
-  bullets: string[];
+  bullets: BulletWithRefs[];
   groups: EventGroupSummary[];
   events?: unknown[];
 }

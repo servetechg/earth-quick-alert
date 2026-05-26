@@ -17,7 +17,7 @@ import {
   Sparkles, ShieldAlert, FileDown, Loader2,
   Activity, Users, AlertTriangle, Gauge, CheckCircle2,
   History, TrendingDown, ClipboardList, Radio, Lightbulb,
-  RefreshCw, MapPin, ChevronDown, ChevronUp,
+  RefreshCw, MapPin, ChevronDown, ChevronUp, BookOpen,
 } from "lucide-react";
 import jsPDF from "jspdf";
 import {
@@ -25,12 +25,14 @@ import {
   Tooltip, CartesianGrid, Cell,
 } from "recharts";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import type {
   RiskSummaryPayload, SeverityBucket, HistoricalTabPayload,
-  RecommendationItem, HistoricalAnalysis, EventGroupSummary,
+  RecommendationItem, HistoricalAnalysis, EventGroupSummary, BulletWithRefs,
 } from "@/lib/types/risk-assessment";
 import { SOURCE_LABEL_MAP } from "@/lib/types/risk-assessment";
-import { normalizeAiBullet } from "@/lib/utils/normalize-ai-text";
+import { normalizeAiBullet, dropAbsenceSentences } from "@/lib/utils/normalize-ai-text";
+import type { IncidentDetailResponse } from "@/app/api/risk-assessment/incident-details/route";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -302,12 +304,257 @@ function HistoricalAnalysisBody({
   );
 }
 
+// ─── Incident detail caches (client-side, 10 min) ────────────────────────────
+
+const incidentGroupsCache = new Map<string, { data: IncidentDetailResponse; expiresAt: number }>();
+const incidentNarrativeCache = new Map<string, { data: import('@/lib/services/openai-service').IncidentDetailNarrative; expiresAt: number }>();
+
+// ─── LearnMoreButton ──────────────────────────────────────────────────────────
+
+function LearnMoreButton({ eventIds, bulletText }: { eventIds: string[]; bulletText: string }) {
+  const [open, setOpen] = useState(false);
+  if (eventIds.length === 0) return null;
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="mt-1 inline-flex items-center gap-1 text-[11px] font-bold text-[#33375D] hover:text-[#1f223a] underline-offset-2 hover:underline"
+      >
+        <BookOpen className="h-3 w-3" />
+        Learn more
+        <span className="text-slate-400 font-normal">· {eventIds.length} record(s)</span>
+      </button>
+      <IncidentDetailDialog
+        open={open}
+        onOpenChange={setOpen}
+        eventIds={eventIds}
+        bulletText={bulletText}
+      />
+    </>
+  );
+}
+
+// ─── GroupAccordionItem — one incident, fetches its own narrative on open ─────
+
+type IncidentNarrative = import('@/lib/services/openai-service').IncidentDetailNarrative;
+
+function GroupAccordionItem({
+  group, isOpen, onToggle, groupIndex, totalGroups,
+}: {
+  group: EventGroupSummary;
+  isOpen: boolean;
+  onToggle: () => void;
+  groupIndex: number;
+  totalGroups: number;
+}) {
+  const [narrative, setNarrative] = useState<IncidentNarrative | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isOpen || narrative || loading || error) return;
+    const cacheKey = group.memberIds.slice().sort().join(',');
+    const cached = incidentNarrativeCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) {
+      setNarrative(cached.data);
+      return;
+    }
+    setLoading(true);
+    fetch('/api/risk-assessment/incident-details', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eventIds: group.memberIds }),
+    })
+      .then(async (r) => {
+        if (!r.ok) throw new Error((await r.json()).message ?? 'Failed to load');
+        return r.json() as Promise<IncidentDetailResponse>;
+      })
+      .then((d) => {
+        if (d.narrative) {
+          incidentNarrativeCache.set(cacheKey, { data: d.narrative, expiresAt: Date.now() + 10 * 60 * 1000 });
+          setNarrative(d.narrative);
+        }
+      })
+      .catch((e: Error) => setError(e.message ?? 'Failed to load details'))
+      .finally(() => setLoading(false));
+  }, [isOpen, group.memberIds, narrative, loading, error]);
+
+  const src = SOURCE_LABEL_MAP[group.source] ?? { label: group.source, tone: 'bg-slate-50 text-slate-700 border-slate-200' };
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
+      {/* Accordion header — click to open/close */}
+      <button
+        type="button"
+        onClick={onToggle}
+        className="w-full flex items-start justify-between gap-3 p-4 text-left hover:bg-slate-50 transition-colors"
+      >
+        <div className="flex-1 min-w-0">
+          <div className="flex flex-wrap items-center gap-1.5 mb-1">
+            <span className={`text-[10px] font-bold rounded px-1.5 py-0.5 border ${src.tone}`}>{src.label}</span>
+            {group.state && (
+              <span className="text-[10px] font-bold rounded px-1.5 py-0.5 border bg-slate-50 text-slate-700 border-slate-200">{group.state}</span>
+            )}
+            <span className="text-[10px] text-slate-400 font-normal">Incident {groupIndex + 1} of {totalGroups}</span>
+          </div>
+          <p className="text-sm font-semibold text-slate-800 truncate">{group.name}</p>
+          <p className="text-[11px] text-slate-500 mt-0.5">{group.primaryLocation} · {group.formattedTimestamp}</p>
+        </div>
+        <div className="shrink-0 mt-1">
+          {isOpen
+            ? <ChevronUp className="h-4 w-4 text-slate-400" />
+            : <ChevronDown className="h-4 w-4 text-slate-400" />}
+        </div>
+      </button>
+
+      {/* Accordion body */}
+      {isOpen && (
+        <div className="border-t border-slate-100 px-4 pb-4 pt-3 space-y-4">
+          {/* Full chip strip */}
+          <EventChipStrip group={group} />
+
+          {loading && (
+            <div className="flex items-center gap-2 text-sm text-slate-500 py-4">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Generating in-depth summary…
+            </div>
+          )}
+
+          {error && (
+            <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>
+          )}
+
+          {narrative && (
+            <div className="space-y-4">
+              <DetailSection title="Overview" body={narrative.overview} />
+              <DetailSection title="Current Status" body={narrative.currentStatus} />
+              <DetailSection title="Affected Areas" body={narrative.affectedAreas} />
+              <DetailSection title="Key Statistics" body={narrative.keyStatistics} />
+              {narrative.historicalContext && <DetailSection title="Historical Context" body={narrative.historicalContext} />}
+              <p className="text-[10px] text-slate-400">
+                {group.memberIds.length} record(s) · AI-assisted summary, verify before acting.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── IncidentDetailDialog ─────────────────────────────────────────────────────
+
+function IncidentDetailDialog({
+  open, onOpenChange, eventIds, bulletText,
+}: {
+  open: boolean;
+  onOpenChange: (b: boolean) => void;
+  eventIds: string[];
+  bulletText: string;
+}) {
+  const [groups, setGroups] = useState<EventGroupSummary[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  // Only one accordion item open at a time; null = all closed
+  const [openGroupKey, setOpenGroupKey] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const cacheKey = eventIds.slice().sort().join(',');
+    const cached = incidentGroupsCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) {
+      setGroups(cached.data.groups);
+      setOpenGroupKey(cached.data.groups[0]?.memberIds.slice().sort().join(',') ?? null);
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    setGroups([]);
+    fetch('/api/risk-assessment/incident-details', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eventIds, groupsOnly: true }),
+    })
+      .then(async (r) => {
+        if (!r.ok) throw new Error((await r.json()).message ?? 'Failed to load');
+        return r.json() as Promise<IncidentDetailResponse>;
+      })
+      .then((d) => {
+        incidentGroupsCache.set(cacheKey, { data: d, expiresAt: Date.now() + 10 * 60 * 1000 });
+        setGroups(d.groups);
+        // Auto-open the first incident
+        setOpenGroupKey(d.groups[0]?.memberIds.slice().sort().join(',') ?? null);
+      })
+      .catch((e: Error) => setError(e.message ?? 'Failed to load incident groups'))
+      .finally(() => setLoading(false));
+  }, [open, eventIds]);
+
+  // Reset accordion state when dialog closes
+  useEffect(() => {
+    if (!open) { setOpenGroupKey(null); setGroups([]); setError(null); }
+  }, [open]);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl max-h-[88vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="text-base font-extrabold text-slate-800">Incident Details</DialogTitle>
+          <DialogDescription className="text-xs text-slate-500 leading-relaxed line-clamp-2">{bulletText}</DialogDescription>
+        </DialogHeader>
+
+        {loading && (
+          <div className="py-10 text-center">
+            <Loader2 className="mx-auto h-6 w-6 animate-spin text-slate-400" />
+            <p className="mt-2 text-sm text-slate-500">Loading incidents…</p>
+          </div>
+        )}
+
+        {error && (
+          <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>
+        )}
+
+        {groups.length > 0 && (
+          <div className="space-y-2">
+            {groups.map((g) => {
+              const key = g.memberIds.slice().sort().join(',');
+              return (
+                <GroupAccordionItem
+                  key={key}
+                  group={g}
+                  isOpen={openGroupKey === key}
+                  onToggle={() => setOpenGroupKey(openGroupKey === key ? null : key)}
+                  groupIndex={groups.indexOf(g)}
+                  totalGroups={groups.length}
+                />
+              );
+            })}
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function DetailSection({ title, body }: { title: string; body: string }) {
+  const cleaned = dropAbsenceSentences(body);
+  if (!cleaned) return null;
+  return (
+    <div>
+      <h4 className="text-xs font-extrabold uppercase tracking-widest text-slate-500 mb-1.5">{title}</h4>
+      <p className="text-sm leading-relaxed text-slate-700">{renderEmphasis(cleaned)}</p>
+    </div>
+  );
+}
+
 // ─── Category sub-block with scroll + collapse ────────────────────────────────
 
 function CategorySubBlock({ cat }: { cat: SeverityBucket['categories'][number] }) {
   const COLLAPSE_AFTER = 1;
   const [expanded, setExpanded] = useState(false);
-  const bullets = (cat.bullets ?? []).map((b) => normalizeAiBullet(b)).filter(Boolean);
+  const bullets: BulletWithRefs[] = (cat.bullets ?? [])
+    .map((b) => ({ text: normalizeAiBullet(b.text), eventIds: b.eventIds ?? [] }))
+    .filter((b) => b.text);
   const groups = cat.groups ?? [];
   const visible = expanded ? bullets : bullets.slice(0, COLLAPSE_AFTER);
   const hidden = bullets.length - COLLAPSE_AFTER;
@@ -330,9 +577,12 @@ function CategorySubBlock({ cat }: { cat: SeverityBucket['categories'][number] }
             <li key={i} className="flex flex-col gap-0.5 text-sm leading-relaxed text-slate-700">
               <div className="flex gap-2">
                 <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-slate-400" />
-                <span>{renderEmphasis(b)}</span>
+                <span className="flex-1">{renderEmphasis(b.text)}</span>
               </div>
               {groups[i] && <div className="pl-3.5"><EventChipStrip group={groups[i]} /></div>}
+              <div className="pl-3.5">
+                <LearnMoreButton eventIds={b.eventIds} bulletText={b.text} />
+              </div>
             </li>
           ))}
         </ul>
@@ -538,7 +788,7 @@ function buildPdf(
   // Severity Levels
   for (const bucket of severityBuckets) {
     for (const cat of bucket.categories) {
-      writeBullets(`${bucket.severity} — ${humanizeCategory(cat.category)}`, cat.bullets ?? []);
+      writeBullets(`${bucket.severity} — ${humanizeCategory(cat.category)}`, (cat.bullets ?? []).map((b) => b.text));
     }
   }
 
