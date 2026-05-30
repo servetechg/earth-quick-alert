@@ -1424,7 +1424,13 @@ Return JSON exactly: {"overview": "...", "currentStatus": "...", "affectedAreas"
             fallback,
             { max_tokens: 1400 },
         );
-        return result;
+        return {
+            overview: normalizeAiBullet(result.overview),
+            currentStatus: normalizeAiBullet(result.currentStatus),
+            affectedAreas: normalizeAiBullet(result.affectedAreas),
+            keyStatistics: normalizeAiBullet(result.keyStatistics),
+            historicalContext: normalizeAiBullet(result.historicalContext),
+        };
     }
 
     async generateHistoricalPastSummary(input: {

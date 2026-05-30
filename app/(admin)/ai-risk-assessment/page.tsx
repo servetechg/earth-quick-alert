@@ -14,6 +14,12 @@ import { toast } from "sonner";
 import { useUser } from "@/lib/store/user-store";
 import { getRiskAnalyzeContextFromBrowser } from "@/lib/risk-assessment/client-analyze-context";
 import {
+  buildAiRiskReportCacheKey,
+  clearCachedAiRiskReport,
+  loadCachedAiRiskReport,
+  saveCachedAiRiskReport,
+} from "@/lib/risk-assessment/client-report-cache";
+import {
   Sparkles, ShieldAlert, FileDown, Loader2,
   Activity, Users, AlertTriangle, Gauge, CheckCircle2,
   History, TrendingDown, ClipboardList, Radio, Lightbulb,
@@ -32,6 +38,7 @@ import type {
 } from "@/lib/types/risk-assessment";
 import { SOURCE_LABEL_MAP } from "@/lib/types/risk-assessment";
 import { normalizeAiBullet, dropAbsenceSentences } from "@/lib/utils/normalize-ai-text";
+import { renderEmphasis } from "@/lib/utils/render-emphasis";
 import type { IncidentDetailResponse } from "@/app/api/risk-assessment/incident-details/route";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -78,23 +85,6 @@ function humanizeCategory(cat: string): string {
 
 function stripEmphasis(text: string): string {
   return text.replace(/\*/g, "");
-}
-
-/** Render **bold** markers + auto-bold measurements */
-function renderEmphasis(text: unknown): ReactNode {
-  const plain = normalizeAiBullet(text);
-  if (!plain) return null;
-  const boldRe = /\*\*([^*]+?)\*\*/g;
-  const nodes: ReactNode[] = [];
-  let last = 0, i = 0;
-  let m: RegExpExecArray | null;
-  while ((m = boldRe.exec(plain)) !== null) {
-    if (m.index > last) nodes.push(<span key={i++}>{plain.slice(last, m.index).replace(/\*/g, "")}</span>);
-    nodes.push(<strong key={i++} className="font-bold text-[#232a43]">{m[1]}</strong>);
-    last = m.index + m[0].length;
-  }
-  if (last < plain.length) nodes.push(<span key={i++}>{plain.slice(last).replace(/\*/g, "")}</span>);
-  return nodes.length <= 1 ? (nodes[0] ?? plain) : <Fragment>{nodes}</Fragment>;
 }
 
 function dedupeConsecutive(xs: string[]): string[] {
@@ -500,7 +490,9 @@ function IncidentDetailDialog({
       <DialogContent className="max-w-2xl max-h-[88vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-base font-extrabold text-slate-800">Incident Details</DialogTitle>
-          <DialogDescription className="text-xs text-slate-500 leading-relaxed line-clamp-2">{bulletText}</DialogDescription>
+          <DialogDescription asChild>
+            <p className="text-xs text-slate-500 leading-relaxed line-clamp-2">{renderEmphasis(bulletText)}</p>
+          </DialogDescription>
         </DialogHeader>
 
         {loading && (
@@ -536,13 +528,20 @@ function IncidentDetailDialog({
   );
 }
 
-function DetailSection({ title, body }: { title: string; body: string }) {
-  const cleaned = dropAbsenceSentences(body);
+function DetailSection({ title, body }: { title: string; body: unknown }) {
+  const cleaned = dropAbsenceSentences(normalizeAiBullet(body));
   if (!cleaned) return null;
+  const paragraphs = cleaned.split(/\n+/).map((p) => p.trim()).filter(Boolean);
   return (
     <div>
       <h4 className="text-xs font-extrabold uppercase tracking-widest text-slate-500 mb-1.5">{title}</h4>
-      <p className="text-sm leading-relaxed text-slate-700">{renderEmphasis(cleaned)}</p>
+      <div className="space-y-2">
+        {paragraphs.map((paragraph, index) => (
+          <p key={index} className="text-sm leading-relaxed text-slate-700">
+            {renderEmphasis(paragraph)}
+          </p>
+        ))}
+      </div>
     </div>
   );
 }
@@ -849,7 +848,33 @@ export default function RiskAssessment() {
     return b;
   }, [ctx.role, ctx.stateCd]);
 
+  const reportCacheKey = useMemo(() => buildAiRiskReportCacheKey(scopeBody), [scopeBody]);
+
   useEffect(() => { setTimeout(() => setBootstrapping(false), 400); }, []);
+
+  // Restore the last generated report for this scope when returning to the page.
+  useEffect(() => {
+    const cached = loadCachedAiRiskReport(reportCacheKey);
+    if (cached) {
+      setSummary(cached.summary);
+      setSeverityBuckets(cached.severityBuckets ?? []);
+      setTabDataMap(new Map(Object.entries(cached.tabDataMap ?? {})));
+    } else {
+      setSummary(null);
+      setSeverityBuckets([]);
+      setTabDataMap(new Map());
+    }
+  }, [reportCacheKey]);
+
+  // Persist report as it loads (summary first, then severity + historical tabs).
+  useEffect(() => {
+    if (!summary) return;
+    saveCachedAiRiskReport(reportCacheKey, {
+      summary,
+      severityBuckets,
+      tabDataMap: Object.fromEntries(tabDataMap),
+    });
+  }, [reportCacheKey, summary, severityBuckets, tabDataMap]);
 
   const fetchHistoricalCategory = useCallback(async (category: string) => {
     setLoadingCategories((prev) => new Set(prev).add(category));
@@ -872,6 +897,7 @@ export default function RiskAssessment() {
   const generate = useCallback(async () => {
     setLoadingSummary(true);
     setLoadingSeverity(true);
+    clearCachedAiRiskReport(reportCacheKey);
     setSummary(null);
     setSeverityBuckets([]);
     setTabDataMap(new Map());
@@ -918,7 +944,7 @@ export default function RiskAssessment() {
       setLoadingSummary(false);
       setLoadingSeverity(false);
     }
-  }, [scopeBody, fetchHistoricalCategory]);
+  }, [scopeBody, fetchHistoricalCategory, reportCacheKey]);
 
   const canDownload = summary !== null && !loadingSeverity && loadingCategories.size === 0;
 
