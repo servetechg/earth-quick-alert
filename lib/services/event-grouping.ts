@@ -149,5 +149,6 @@ export function toEventGroupSummary(group: EventGroup): EventGroupSummary {
         lng: e.lng ?? undefined,
         hasCoordinates: e.lat != null && e.lng != null,
         formattedTimestamp: formatEventTimestamp(e),
+        memberIds: group.members.map((m) => String(m._id)),
     };
 }
