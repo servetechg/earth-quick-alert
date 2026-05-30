@@ -695,7 +695,7 @@ function GisHeatMapHeaderPanel({
   usesUnifiedHeat: boolean
 }) {
   return (
-    <div className="flex items-center rounded-3xl border border-slate-100 bg-white px-2 shadow-sm min-h-[34px]">
+    <div className="flex items-center rounded-3xl border border-slate-100 bg-white px-2 shadow-sm min-h-[34px] min-w-[500px]">
       {/* Label, Badge, and Switch Row */}
       <div className="flex items-center gap-1 shrink-0">
         <label
