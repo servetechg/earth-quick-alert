@@ -202,8 +202,9 @@ export default function Dashboard() {
           {/* Live Situational Map — same Google Map as super-admin, with Map Layers overlay */}
           <GISMap
             title="Live Situational Map"
-            hideTabs
             showLayersPanel
+            stateScoped
+            visibleTabs={['Citizens', 'Responders', 'Infrastructure']}
             selectedLocation={gisSelectedLocation}
             focusState={gisFocusState}
           />

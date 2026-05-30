@@ -59,16 +59,25 @@ const DEFAULT_MAP_LAYERS: MapLayerDef[] = [
   { id: 'incidents', label: 'Incident Reports', Icon: AlertOctagon, color: '#DC2626' },
 ]
 
+type GisMapTab = 'Citizens' | 'Responders' | 'Leaders' | 'Infrastructure'
+
+const ALL_GIS_TABS: GisMapTab[] = ['Citizens', 'Responders', 'Leaders', 'Infrastructure']
+const SUB_ADMIN_GIS_TABS: GisMapTab[] = ['Citizens', 'Responders', 'Infrastructure']
+
 interface GISMapProps {
   selectedLocation?: string
   /** When set, map can center on this US state even if `selectedLocation` is `All` (e.g. sub-admin home state). */
   focusState?: string
   /** Override the panel header title. Defaults to `GIS Impact Map`. */
   title?: string
-  /** Hide the Citizens / Responders / Leaders / Infrastructure tabs. */
+  /** Hide all entity tabs (legacy). Prefer `visibleTabs`. */
   hideTabs?: boolean
+  /** Which tabs to show. Sub-admin: Citizens, Responders, Infrastructure. */
+  visibleTabs?: GisMapTab[]
   /** Show the floating Map Layers panel on the left of the map. */
   showLayersPanel?: boolean
+  /** Use session-scoped situational-map API for citizens/responders (sub-admin). */
+  stateScoped?: boolean
 }
 
 export function GISMap({
@@ -76,8 +85,16 @@ export function GISMap({
   focusState,
   title = 'GIS Impact Map',
   hideTabs = false,
+  visibleTabs,
   showLayersPanel = false,
+  stateScoped = false,
 }: GISMapProps) {
+  const tabs = useMemo(() => {
+    if (hideTabs) return [] as GisMapTab[]
+    if (visibleTabs?.length) return visibleTabs
+    if (stateScoped || showLayersPanel) return SUB_ADMIN_GIS_TABS
+    return ALL_GIS_TABS
+  }, [hideTabs, visibleTabs, stateScoped, showLayersPanel])
   const [activeEmergencies, setActiveEmergencies] = useState<any[]>([])
   const [impactedUsers, setImpactedUsers] = useState<any[]>([])
   const [responders, setResponders] = useState<any[]>([])
@@ -87,7 +104,7 @@ export function GISMap({
   const [isSearchingInfra, setIsSearchingInfra] = useState(false)
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number }>({ lat: 37.0902, lng: -95.7129 }) // Center of USA
   const [mapZoom, setMapZoom] = useState(4)
-  const [activeTab, setActiveTab] = useState<'Citizens' | 'Responders' | 'Leaders' | 'Infrastructure'>('Citizens')
+  const [activeTab, setActiveTab] = useState<GisMapTab>('Citizens')
   const [showHeatmap, setShowHeatmap] = useState(true)
   const [unifiedIncidents, setUnifiedIncidents] = useState<UnifiedEventHeatPoint[]>([])
   const [incidentHeatCount, setIncidentHeatCount] = useState(0)
@@ -111,9 +128,16 @@ export function GISMap({
   }, [focusState])
 
   useEffect(() => {
+    if (tabs.length > 0 && !tabs.includes(activeTab)) {
+      setActiveTab(tabs[0])
+    }
+  }, [tabs, activeTab])
+
+  useEffect(() => {
     let cancelled = false
 
     async function fetchSituational() {
+      if (!stateScoped && !showLayersPanel) return
       setSituationalLoading(true)
       try {
         const res = await fetch('/api/admin/situational-map')
@@ -128,6 +152,38 @@ export function GISMap({
               ? data.incidents.length
               : 0
         )
+
+        if (stateScoped && Array.isArray(data.citizens)) {
+          setDynamicInfra([])
+          setImpactedUsers(
+            data.citizens.map((c: { id: string; lat: number; lng: number; title: string; isSafe?: boolean; status?: string; location?: string; description?: string }) => ({
+              id: c.id,
+              position: { lat: c.lat, lng: c.lng },
+              title: c.title,
+              type: 'user',
+              isSafe: c.isSafe,
+              status: c.status,
+              location: c.location,
+              description: c.description,
+            }))
+          )
+        }
+        if (stateScoped && Array.isArray(data.responders)) {
+          setResponders(
+            data.responders.map((r: { id: string; lat: number; lng: number; title: string; status?: string; location?: string; description?: string; color?: string; icon?: string }) => ({
+              id: r.id,
+              position: { lat: r.lat, lng: r.lng },
+              title: r.title,
+              type: 'incident',
+              status: r.status,
+              location: r.location,
+              description: r.description,
+              color: r.color,
+              icon: r.icon,
+            }))
+          )
+        }
+
         if (
           showLayersPanel &&
           data.coverage?.center &&
@@ -164,9 +220,11 @@ export function GISMap({
       cancelled = true
       clearInterval(interval)
     }
-  }, [showLayersPanel])
+  }, [showLayersPanel, stateScoped])
 
   useEffect(() => {
+    if (stateScoped) return
+
     async function fetchData() {
       setIsLoading(true)
       try {
@@ -257,7 +315,7 @@ export function GISMap({
       }
     }
     fetchData()
-  }, [])
+  }, [stateScoped])
 
   // Auto-zoom and center when selection changes (USA vs sub-admin state / metro)
   useEffect(() => {
@@ -441,8 +499,8 @@ export function GISMap({
           }))
         }));
 
-        // 3. Add Mock Data for Waivers and Evacuation Routes if in a specific area
-        if (searchCenters.length > 0) {
+        // Demo waiver/evac only for super-admin national view
+        if (searchCenters.length > 0 && !stateScoped) {
           const mainCenter = searchCenters[0];
 
           // Add a Waiver
@@ -483,7 +541,7 @@ export function GISMap({
     }
 
     fetchNearbyInfra()
-  }, [activeTab, impactedUsers.length, dynamicInfra.length])
+  }, [activeTab, impactedUsers.length, dynamicInfra.length, stateScoped])
 
   const markers = useMemo(() => {
     let currentFiltered: any[] = []
@@ -547,10 +605,11 @@ export function GISMap({
     }))
   }, [showLayersPanel, unifiedIncidents])
 
-  const mapMarkers = useMemo(
-    () => (showLayersPanel ? [...markers, ...situationalMarkers] : markers),
-    [showLayersPanel, markers, situationalMarkers]
-  )
+  const mapMarkers = useMemo(() => {
+    if (stateScoped) return markers
+    if (showLayersPanel) return [...markers, ...situationalMarkers]
+    return markers
+  }, [stateScoped, showLayersPanel, markers, situationalMarkers])
 
   const displayHeatCount =
     unifiedIncidents.length > 0 ? incidentHeatCount : heatPoints.length
@@ -574,9 +633,9 @@ export function GISMap({
           />
         </div>
 
-        {!hideTabs && (
+        {!hideTabs && tabs.length > 0 && (
           <div className="flex bg-slate-50 p-1 rounded-2xl gap-0.5 overflow-x-auto no-scrollbar shrink-0">
-            {(['Citizens', 'Responders', 'Leaders', 'Infrastructure'] as const).map((tab) => (
+            {tabs.map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -636,36 +695,42 @@ function GisHeatMapHeaderPanel({
   usesUnifiedHeat: boolean
 }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50/90 px-4 py-3 min-w-[220px] max-w-sm shadow-sm">
-      <div className="mb-2 border-b border-slate-200/80 pb-2">
+    <div className="flex items-center rounded-3xl border border-slate-100 bg-white px-2 shadow-sm min-h-[34px]">
+      {/* Label, Badge, and Switch Row */}
+      <div className="flex items-center gap-1 shrink-0">
+        <label
+          htmlFor={heatSwitchId}
+          className="flex items-center gap-2 text-sm font-black text-slate-800 tracking-tight"
+        >
+          <span className="text-base" aria-hidden="true">🔥</span>
+          Incident Heatmap
+        </label>
+        
+        <span className="rounded-full bg-slate-50 px-2.5 py-0.5 text-xs font-black text-slate-700 border border-slate-200/60 min-w-[28px] text-center">
+          {displayHeatCount}
+        </span>
+
+        <Switch 
+          id={heatSwitchId} 
+          checked={showHeatmap} 
+          onCheckedChange={onShowHeatmapChange} 
+        />
       </div>
-      <div className="space-y-2.5">
-        <div className="flex items-center justify-between gap-2">
-          <label
-            htmlFor={heatSwitchId}
-            className="flex flex-1 cursor-pointer items-center gap-2 text-xs font-bold text-slate-700"
-          >
-            <span className="text-amber-500" aria-hidden>🔥</span>
-            Incident Heatmap
-            <span className="ml-auto rounded-full bg-white px-2 py-0.5 text-[10px] font-black text-slate-600 border border-slate-200">
-              {displayHeatCount}
-            </span>
-          </label>
-          <Switch id={heatSwitchId} checked={showHeatmap} onCheckedChange={onShowHeatmapChange} />
+
+      {/* Inline Intensity Bar - Collapses gracefully if unchecked */}
+      {showHeatmap && (
+        <div className="flex items-center gap-3 flex-1 min-w-[250px] border-l border-slate-100 pl-6 animate-in fade-in slide-in-from-left-2 duration-200">
+          <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 shrink-0">
+            Low
+          </span>
+          
+          <div className="relative flex-1 h-2 rounded-full bg-gradient-to-r from-[#2A2E4F] via-yellow-400 via-orange-500 to-red-600" />
+          
+          <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 shrink-0">
+            Critical
+          </span>
         </div>
-        {showHeatmap && (
-          <div className="space-y-1 border-t border-slate-200/80 pt-2">
-            <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">
-              {usesUnifiedHeat ? 'Severity' : 'Intensity'}
-            </p>
-            <div className="h-1.5 w-full rounded-full bg-gradient-to-r from-[#33375D] via-yellow-400 via-orange-500 to-red-700" />
-            <div className="flex justify-between text-[9px] font-bold text-slate-400">
-              <span>Low</span>
-              <span>Critical</span>
-            </div>
-          </div>
-        )}
-      </div>
+      )}
     </div>
   )
 }
