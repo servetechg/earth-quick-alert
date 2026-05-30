@@ -29,6 +29,14 @@ import {
 import { toast } from "sonner"
 import { GoogleMap, useJsApiLoader, Autocomplete, Circle, Marker } from '@react-google-maps/api'
 import { GOOGLE_MAPS_API_KEY, GOOGLE_MAPS_LIBRARIES, GOOGLE_MAPS_LOADER_ID } from '@/lib/constants/google-maps-config'
+import { useLicenseCoverageRadius } from '@/hooks/use-license-coverage-radius'
+import {
+  LICENSE_COVERAGE_MIN_MILE,
+  LICENSE_COVERAGE_STEP_MILE,
+  clampLicenseRadiusMile,
+  mapZoomForRadiusMiles,
+  midpointRadiusLabel,
+} from '@/lib/geo/license-coverage-radius'
 import { cn } from '@/lib/utils'
 
 interface GrantLicenseModalProps {
@@ -74,10 +82,22 @@ export function GrantLicenseModal({ user, isOpen, onClose, onSuccess }: GrantLic
     state: user?.state || '',
     city: user?.city || '',
     zipcode: user?.zipcode || '',
-    radiusMile: 5,
+    radiusMile: LICENSE_COVERAGE_MIN_MILE,
+    stateCode: '',
+    countryCode: '',
     userId: user?._id || '',
     organizationalAddress: '',
   })
+
+  const {
+    maxRadiusMile,
+    hasStateCoverage,
+    coverageLoading,
+    fetchCoverageMax,
+    resetCoverage,
+    clampRadius,
+    geocodeAddressAndFetchCoverage,
+  } = useLicenseCoverageRadius()
 
   const [mapCenter, setMapCenter] = useState(defaultCenter)
   const primaryAutocompleteRef = useRef<any>(null)
@@ -106,20 +126,29 @@ export function GrantLicenseModal({ user, isOpen, onClose, onSuccess }: GrantLic
       }))
 
       if (fullAddress) {
-        // Attempt to update map center if address exists
-        const geocode = async () => {
-          try {
-            const res = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(fullAddress)}&key=${GOOGLE_MAPS_API_KEY}`)
-            const data = await res.json()
-            if (data.results?.[0]?.geometry?.location) {
-              setMapCenter(data.results[0].geometry.location)
-            }
-          } catch (e) { }
-        }
-        geocode()
+        void geocodeAddressAndFetchCoverage(
+          fullAddress,
+          { stateName: user.state, countryName: user.country },
+          setMapCenter
+        ).then((region) => {
+          if (region) {
+            setFormData((prev) => ({
+              ...prev,
+              stateCode: region.stateCode || prev.stateCode,
+              countryCode: region.countryCode || prev.countryCode,
+            }))
+          }
+        })
+      } else if (user.state) {
+        void fetchCoverageMax({
+          stateName: user.state,
+          countryName: user.country,
+        })
       }
+    } else {
+      resetCoverage()
     }
-  }, [isOpen, user])
+  }, [isOpen, user, geocodeAddressAndFetchCoverage, fetchCoverageMax, resetCoverage])
 
   const onPrimaryLoad = useCallback((autocomplete: any) => {
     primaryAutocompleteRef.current = autocomplete
@@ -132,30 +161,57 @@ export function GrantLicenseModal({ user, isOpen, onClose, onSuccess }: GrantLic
   const onPrimaryPlaceChanged = useCallback(() => {
     if (primaryAutocompleteRef.current !== null) {
       const place = primaryAutocompleteRef.current.getPlace()
-      if (place.geometry) {
+      if (place.geometry?.location) {
         const lat = place.geometry.location.lat()
         const lng = place.geometry.location.lng()
         setMapCenter({ lat, lng })
 
-        let city = '', state = '', country = '', zipcode = ''
+        let city = ''
+        let state = ''
+        let stateCode = ''
+        let country = ''
+        let countryCode = ''
+        let zipcode = ''
         place.address_components?.forEach((c: any) => {
           if (c.types.includes('locality')) city = c.long_name
-          if (c.types.includes('administrative_area_level_1')) state = c.long_name
-          if (c.types.includes('country')) country = c.long_name
+          if (c.types.includes('administrative_area_level_1')) {
+            state = c.long_name
+            stateCode = c.short_name
+          }
+          if (c.types.includes('country')) {
+            country = c.long_name
+            countryCode = c.short_name
+          }
           if (c.types.includes('postal_code')) zipcode = c.long_name
         })
 
-        setFormData(prev => ({
+        setFormData((prev) => ({
           ...prev,
           city: city || prev.city,
           state: state || prev.state,
+          stateCode: stateCode || prev.stateCode,
           country: country || prev.country,
+          countryCode: countryCode || prev.countryCode,
           zipcode: zipcode || prev.zipcode,
-          billingAddress: place.formatted_address || prev.billingAddress
+          billingAddress: place.formatted_address || prev.billingAddress,
         }))
+
+        void fetchCoverageMax({
+          stateCode: stateCode || undefined,
+          countryCode: countryCode || undefined,
+          stateName: state || undefined,
+          countryName: country || undefined,
+        }).then((max) => {
+          if (max != null) {
+            setFormData((prev) => ({
+              ...prev,
+              radiusMile: clampLicenseRadiusMile(prev.radiusMile, max),
+            }))
+          }
+        })
       }
     }
-  }, [])
+  }, [fetchCoverageMax])
 
   const onOrgPlaceChanged = useCallback(() => {
     if (orgAutocompleteRef.current !== null) {
@@ -171,6 +227,10 @@ export function GrantLicenseModal({ user, isOpen, onClose, onSuccess }: GrantLic
 
   const handleGrant = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!hasStateCoverage || maxRadiusMile == null) {
+      toast.error('Select a primary address from suggestions to set the state coverage limit')
+      return
+    }
     setLoading(true)
     try {
       const res = await fetch('/api/admin/licenses', {
@@ -318,23 +378,50 @@ export function GrantLicenseModal({ user, isOpen, onClose, onSuccess }: GrantLic
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
                   <div className="space-y-6">
-                    <div className="flex justify-between items-center">
+                    <div className="flex justify-between items-center gap-2">
                       <Label className="text-sm font-medium text-slate-700">Coverage Radius</Label>
-                      <span className="text-sm font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-full">{formData.radiusMile} Miles</span>
+                      <span className="text-sm font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-full shrink-0 flex items-center gap-1.5">
+                        {coverageLoading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                        {hasStateCoverage && maxRadiusMile != null
+                          ? `${formData.radiusMile} / ${maxRadiusMile} Mi`
+                          : `${formData.radiusMile} Mi`}
+                      </span>
                     </div>
+                    {!hasStateCoverage && !coverageLoading && (
+                      <p className="text-xs text-slate-500">
+                        Pick a primary address from Google suggestions (not just typed text) to load the state max radius.
+                      </p>
+                    )}
+                    {hasStateCoverage && maxRadiusMile != null && formData.state && (
+                      <p className="text-xs text-slate-500">
+                        Max for {formData.state}: {maxRadiusMile} mi
+                      </p>
+                    )}
                     <input
                       type="range"
-                      min="5"
-                      max="100"
-                      step="5"
+                      min={LICENSE_COVERAGE_MIN_MILE}
+                      max={maxRadiusMile ?? LICENSE_COVERAGE_MIN_MILE}
+                      step={LICENSE_COVERAGE_STEP_MILE}
                       value={formData.radiusMile}
-                      onChange={(e) => setFormData({ ...formData, radiusMile: parseInt(e.target.value) })}
-                      className="w-full h-1.5 bg-slate-200 rounded-full appearance-none cursor-pointer accent-blue-600"
+                      disabled={!hasStateCoverage || maxRadiusMile == null || coverageLoading}
+                      onChange={(e) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          radiusMile: clampRadius(parseInt(e.target.value, 10)),
+                        }))
+                      }
+                      className="w-full h-1.5 bg-slate-200 rounded-full appearance-none cursor-pointer accent-blue-600 disabled:opacity-40 disabled:cursor-not-allowed"
                     />
                     <div className="flex justify-between text-[10px] text-slate-400 font-medium uppercase tracking-widest">
-                      <span>5 Miles</span>
-                      <span>50 Miles</span>
-                      <span>100 Miles</span>
+                      <span>{LICENSE_COVERAGE_MIN_MILE} Mi</span>
+                      {hasStateCoverage && maxRadiusMile != null ? (
+                        <>
+                          <span>{midpointRadiusLabel(LICENSE_COVERAGE_MIN_MILE, maxRadiusMile)} Mi</span>
+                          <span>{maxRadiusMile} Mi</span>
+                        </>
+                      ) : (
+                        <span className="text-slate-300">Max —</span>
+                      )}
                     </div>
                   </div>
 
@@ -343,7 +430,7 @@ export function GrantLicenseModal({ user, isOpen, onClose, onSuccess }: GrantLic
                       <GoogleMap
                         mapContainerStyle={{ width: '100%', height: '100%' }}
                         center={mapCenter}
-                        zoom={10}
+                        zoom={mapZoomForRadiusMiles(formData.radiusMile)}
                         options={{
                           disableDefaultUI: true,
                           zoomControl: false,

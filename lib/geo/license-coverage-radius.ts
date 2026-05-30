@@ -1,0 +1,172 @@
+import { calculateDistance } from '@/lib/services/mock-map-service';
+
+export type LatLngPoint = { lat: number; lng: number };
+
+export type GeoBounds = {
+    northeast: LatLngPoint;
+    southwest: LatLngPoint;
+};
+
+export const LICENSE_COVERAGE_MIN_MILE = 5;
+export const LICENSE_COVERAGE_STEP_MILE = 5;
+
+type GeocodeGeometry = {
+    location?: { lat: number; lng: number };
+    viewport?: {
+        northeast: { lat: number; lng: number };
+        southwest: { lat: number; lng: number };
+    };
+    bounds?: {
+        northeast: { lat: number; lng: number };
+        southwest: { lat: number; lng: number };
+    };
+};
+
+function roundRadiusMiles(miles: number): number {
+    const rounded = Math.ceil(miles / LICENSE_COVERAGE_STEP_MILE) * LICENSE_COVERAGE_STEP_MILE;
+    return Math.max(rounded, LICENSE_COVERAGE_MIN_MILE);
+}
+
+export function boundsFromGeocodeGeometry(geometry?: GeocodeGeometry | null): GeoBounds | null {
+    const box = geometry?.bounds ?? geometry?.viewport;
+    if (!box) return null;
+    return {
+        northeast: { lat: box.northeast.lat, lng: box.northeast.lng },
+        southwest: { lat: box.southwest.lat, lng: box.southwest.lng },
+    };
+}
+
+export function boundsCenter(bounds: GeoBounds): LatLngPoint {
+    const { northeast: ne, southwest: sw } = bounds;
+    return {
+        lat: (ne.lat + sw.lat) / 2,
+        lng: (ne.lng + sw.lng) / 2,
+    };
+}
+
+/**
+ * Approximate bounding-circle radius for a region: center of the state's bounding box
+ * to the farthest corner (Haversine), per Google Geocoding bounds/viewport.
+ */
+export function maxRadiusMilesFromStateBounds(bounds: GeoBounds): number {
+    const center = boundsCenter(bounds);
+    const { northeast: ne, southwest: sw } = bounds;
+    const corners: LatLngPoint[] = [
+        { lat: ne.lat, lng: ne.lng },
+        { lat: ne.lat, lng: sw.lng },
+        { lat: sw.lat, lng: ne.lng },
+        { lat: sw.lat, lng: sw.lng },
+    ];
+
+    const maxDist = Math.max(
+        ...corners.map((c) => calculateDistance(center.lat, center.lng, c.lat, c.lng))
+    );
+
+    return roundRadiusMiles(maxDist);
+}
+
+export type StateRegionQuery = {
+    stateCode?: string;
+    countryCode?: string;
+    stateName?: string;
+    countryName?: string;
+};
+
+export function buildStateGeocodeUrl(query: StateRegionQuery, apiKey: string): string | null {
+    if (!apiKey) return null;
+    if (!query.stateCode && !query.stateName) return null;
+
+    if (query.stateCode && query.countryCode) {
+        return (
+            `https://maps.googleapis.com/maps/api/geocode/json?components=` +
+            `administrative_area:${encodeURIComponent(query.stateCode)}` +
+            `|country:${encodeURIComponent(query.countryCode)}` +
+            `&key=${encodeURIComponent(apiKey)}`
+        );
+    }
+
+    const address = query.countryName
+        ? `${query.stateName}, ${query.countryName}`
+        : (query.stateName ?? '');
+    return (
+        `https://maps.googleapis.com/maps/api/geocode/json?address=` +
+        `${encodeURIComponent(address)}&key=${encodeURIComponent(apiKey)}`
+    );
+}
+
+export async function geocodeStateBounds(
+    query: StateRegionQuery,
+    apiKey: string
+): Promise<GeoBounds | null> {
+    const url = buildStateGeocodeUrl(query, apiKey);
+    if (!url) return null;
+
+    try {
+        const res = await fetch(url, { next: { revalidate: 86400 } });
+        const data = await res.json();
+        if (data.status !== 'OK' || !data.results?.[0]) return null;
+        return boundsFromGeocodeGeometry(data.results[0].geometry as GeocodeGeometry);
+    } catch {
+        return null;
+    }
+}
+
+export async function resolveMaxRadiusForState(
+    query: StateRegionQuery,
+    apiKey: string
+): Promise<number | null> {
+    const bounds = await geocodeStateBounds(query, apiKey);
+    if (!bounds) return null;
+    return maxRadiusMilesFromStateBounds(bounds);
+}
+
+export function parseRegionCodesFromGeocodeResult(result: {
+    address_components?: Array<{ long_name: string; short_name: string; types: string[] }>;
+}): { stateCode: string; countryCode: string; stateName: string; countryName: string } {
+    let stateCode = '';
+    let countryCode = '';
+    let stateName = '';
+    let countryName = '';
+
+    result.address_components?.forEach((c) => {
+        if (c.types.includes('administrative_area_level_1')) {
+            stateName = c.long_name;
+            stateCode = c.short_name;
+        }
+        if (c.types.includes('country')) {
+            countryName = c.long_name;
+            countryCode = c.short_name;
+        }
+    });
+
+    return { stateCode, countryCode, stateName, countryName };
+}
+
+export function centerFromGeocodeGeometry(
+    geometry?: GeocodeGeometry | null
+): LatLngPoint | null {
+    const loc = geometry?.location;
+    if (!loc) return null;
+    return { lat: loc.lat, lng: loc.lng };
+}
+
+export function clampLicenseRadiusMile(radiusMile: number, maxRadiusMile: number): number {
+    return Math.min(
+        Math.max(radiusMile, LICENSE_COVERAGE_MIN_MILE),
+        maxRadiusMile
+    );
+}
+
+export function midpointRadiusLabel(min: number, max: number): number {
+    return Math.round((min + max) / 2 / LICENSE_COVERAGE_STEP_MILE) * LICENSE_COVERAGE_STEP_MILE;
+}
+
+export function mapZoomForRadiusMiles(miles: number): number {
+    if (miles <= 10) return 11;
+    if (miles <= 25) return 10;
+    if (miles <= 50) return 9;
+    if (miles <= 100) return 8;
+    if (miles <= 200) return 7;
+    if (miles <= 350) return 6;
+    return 5;
+}
