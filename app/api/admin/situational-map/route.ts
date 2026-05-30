@@ -10,6 +10,10 @@ import { getUsStateBbox } from '@/lib/constants/us-state-bounding-boxes';
 import { normalizeStateToUsps } from '@/lib/utils/us-state-usps';
 import { GOOGLE_MAPS_API_KEY } from '@/lib/constants/google-maps-config';
 import { resolveMaxRadiusForState } from '@/lib/geo/license-coverage-radius';
+import {
+    fetchScopedCitizenMarkers,
+    fetchScopedResponderMarkers,
+} from '@/lib/services/situational-map-markers';
 
 const MAX_GEOCODE_WITHOUT_COORDS = 12;
 
@@ -84,6 +88,16 @@ export async function GET() {
         const rows = await fetchAlignedUnifiedEventFeed({ userId, role });
         const incidents = await resolveHeatPoints(rows as Record<string, unknown>[]);
 
+        let citizens: Awaited<ReturnType<typeof fetchScopedCitizenMarkers>> = [];
+        let responders: Awaited<ReturnType<typeof fetchScopedResponderMarkers>> = [];
+
+        if (role === 'sub-admin') {
+            [citizens, responders] = await Promise.all([
+                fetchScopedCitizenMarkers(userId),
+                fetchScopedResponderMarkers(userId),
+            ]);
+        }
+
         let coverage: {
             center: { lat: number; lng: number };
             radiusMile: number;
@@ -152,6 +166,8 @@ export async function GET() {
         return NextResponse.json({
             incidents,
             incidentCount: incidents.length,
+            citizens,
+            responders,
             coverage,
         });
     } catch (error) {
