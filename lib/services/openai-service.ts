@@ -2,6 +2,7 @@ import { Alert, AlertSeverity, AlertSource, SocialMediaAlert, ResourceAlert } fr
 import type { UnifiedEventDoc } from '@/lib/services/unified-event-repo';
 import { formatEventTimestamp } from '@/lib/services/event-formatters';
 import type {
+    BulletWithRefs,
     DashboardIngestBundle,
     HistoricalAnalysis,
     IncidentHistoryCategory,
@@ -139,6 +140,14 @@ const PLAIN_ENGLISH_STYLE_RULES = `WRITING STYLE — this report is read by ordi
 - When a technical number or measurement is unavoidable, explain what it means right after it. Examples: "a river flow of 10,200 cubic feet per second (very high — well above the normal range)", "a magnitude 5.1 earthquake (moderate — felt widely and can damage weaker buildings)", "30% contained (crews have a fire line around roughly a third of the fire's edge)".
 - Emphasize place names, what is happening, who or what it affects, and timing. Never output raw GPS coordinates.
 - Keep each bullet to one or two short, clear sentences.`;
+
+export interface IncidentDetailNarrative {
+    overview: string;
+    currentStatus: string;
+    affectedAreas: string;
+    keyStatistics: string;
+    historicalContext: string;
+}
 
 export class OpenAIService {
     private apiKey = process.env.OPENAI_API_KEY || '';
@@ -1265,17 +1274,22 @@ Rules:
 
     private projectEventForAI(e: UnifiedEventDoc) {
         return {
+            _ref: String(e._id),
             name: e.name,
             category: e.category,
             severity: e.severity,
+            type: e.type,
+            status: e.status,
+            source: e.source,
             location: e.location,
+            lat: e.lat ?? null,
+            lng: e.lng ?? null,
+            issuedAt: e.issuedAt,
             formattedTimestamp: formatEventTimestamp(e),
             expiresAt: e.expiresAt,
             description: e.description,
             instructions: e.instructions,
             properties: e.properties,
-            source: e.source,
-            status: e.status,
         };
     }
 
@@ -1283,11 +1297,12 @@ Rules:
         severity: 'Low' | 'Moderate' | 'High' | 'Extreme';
         category: string;
         events: UnifiedEventDoc[];
-    }): Promise<string[]> {
-        const fallback = [
-            `${input.events.length} active ${input.category} event(s) at ${input.severity} severity in ${[...new Set(input.events.map((e) => e.location))].slice(0, 3).join(', ')}.`,
-        ];
-        const result = await this.callOpenAI<{ bullets: string[] }>(
+    }): Promise<BulletWithRefs[]> {
+        const fallback: BulletWithRefs[] = [{
+            text: `${input.events.length} active ${input.category} event(s) at ${input.severity} severity in ${[...new Set(input.events.map((e) => e.location))].slice(0, 3).join(', ')}.`,
+            eventIds: input.events.map((e) => String(e._id)),
+        }];
+        const result = await this.callOpenAI<{ bullets: { text: string; eventRefs: string[] }[] }>(
             [
                 {
                     role: 'system',
@@ -1310,18 +1325,112 @@ Each bullet MUST:
 - NEVER omit numbers, counts, dollar amounts, names, or timestamps that appear in the data.
 - Wrap place names, severity words, and numeric facts in **double asterisks**.
 
-Return JSON: {"bullets": ["<sentence>", ...]} — each bullet MUST be a plain string sentence, never a JSON object.`,
+EVENT REFERENCE TRACKING — REQUIRED:
+- Every input event has a "_ref" string field. You MUST echo back the exact "_ref" values of every event included in each bullet under "eventRefs".
+- "eventRefs" is an array of strings, length >= 1, containing every _ref the bullet covers.
+- Union of all "eventRefs" across all bullets MUST equal the full input set — no event may be silently dropped.
+- Do NOT invent _ref values. Only return strings that appeared in the input.
+
+Return JSON: {"bullets": [{"text": "<sentence>", "eventRefs": ["<_ref>", ...]}, ...]}.`,
                 },
                 {
                     role: 'user',
                     content: JSON.stringify(input.events.map((e) => this.projectEventForAI(e))),
                 },
             ],
-            { bullets: fallback },
+            { bullets: fallback.map((b) => ({ text: b.text, eventRefs: b.eventIds })) },
             { max_tokens: 2000 },
         );
-        const bullets = normalizeAiBulletList(result.bullets, 5);
-        return bullets.length > 0 ? bullets : fallback;
+
+        const validRefs = new Set(input.events.map((e) => String(e._id)));
+        const cleaned: BulletWithRefs[] = result.bullets
+            .map((b) => ({
+                text: normalizeAiBullet(b.text),
+                eventIds: (b.eventRefs ?? []).filter((r) => validRefs.has(r)),
+            }))
+            .filter((b) => b.text && b.eventIds.length > 0);
+
+        if (cleaned.length === 0) return fallback;
+
+        // Orphan rescue: ensure every input event is referenced by at least one bullet.
+        const referenced = new Set(cleaned.flatMap((b) => b.eventIds));
+        const missing = [...validRefs].filter((r) => !referenced.has(r));
+        if (missing.length > 0) {
+            cleaned[cleaned.length - 1].eventIds.push(...missing);
+        }
+        return cleaned;
+    }
+
+    async generateIncidentDetailNarrative(input: {
+        events: UnifiedEventDoc[];
+    }): Promise<IncidentDetailNarrative> {
+        const fallback: IncidentDetailNarrative = {
+            overview: `${input.events.length} incident record(s) summarized.`,
+            currentStatus: 'See raw chip metadata.',
+            affectedAreas: input.events.map((e) => e.location).join('; '),
+            keyStatistics: '',
+            historicalContext: '',
+        };
+        const result = await this.callOpenAI<IncidentDetailNarrative>(
+            [
+                {
+                    role: 'system',
+                    content: `${PLAIN_ENGLISH_STYLE_RULES}
+
+You are writing a complete, detailed incident briefing for an emergency operations center. The user clicked "Learn More" to see the FULL picture of this specific incident — do NOT summarize loosely. Every non-null, non-zero, non-empty field in the event data MUST appear somewhere in the output.
+
+Produce a structured JSON object with these six fields (all strings, required, use "" only when the source data truly has nothing for that field):
+
+  - overview
+      What is happening, what type of alert/declaration, which hazard category, issued by which source.
+      Include name, type (Warning/Watch/Advisory/Declaration), severity level, and a plain-English explanation of what the severity means for ordinary people.
+
+  - currentStatus
+      When was it issued (issuedAt / formattedTimestamp). When does it expire (expiresAt). Is it ongoing, expiring soon, or already resolved.
+      If lat/lng are non-null, say "centered near latitude X, longitude Y" — but ALSO explain what that location is in plain words (nearest town / coastal zone / ocean region).
+
+  - affectedAreas
+      List EVERY geographic detail in the data: location string, affectedCounties array, designatedArea, areaName, zone names, state codes, and lat/lng interpreted as a readable place.
+      If the data contains a zone or area range description (e.g. "Flaxman Island to Demarcation Point out to 15 NM"), include it word for word.
+
+  - keyStatistics
+      Exhaustively extract EVERY non-null numeric and named value from the properties object, regardless of field name.
+      This MUST include (when present): intensity/magnitude/level values, wind speed, gust speed, wave height, gauge height, river stage, flood stage, flow rate, fire acreage, containment %, temperature, air quality index, visibility, precipitation amounts, damage estimates (damageProperty, damageCrops), casualty counts (injuriesDirect, injuriesIndirect, deathsDirect, deathsIndirect), federal aid totals (totalFederalAidUsd, totalAmountIhpApproved, totalObligatedAmountPa, etc.), disaster/declaration numbers, program codes, any other numeric field.
+      Format each as: "Field name: **value units** (plain-English explanation of what this means)".
+      NEVER skip a field just because it seems minor. If it has a value, include it.
+
+  - historicalContext
+      Only if the description field explicitly mentions a past event, prior declaration, or historical comparison. Otherwise "".
+
+Strict rules:
+  - NEVER invent data. Only use values that appear in the provided event data.
+  - NEVER drop a field that has a non-null/non-zero value.
+  - If a field has NO available data, return exactly "" (empty string) — NEVER write sentences like "No data is available", "No coordinates are provided", "No numeric values were found", "No additional information", or any other negative/absence statement. Empty string silently hides the section; a negative sentence pollutes the report.
+  - lat/lng: only mention coordinates if both lat and lng are non-null numbers in the data. If either is null, omit coordinates entirely — do not say "no coordinates provided".
+  - keyStatistics: if there are genuinely zero non-null numeric or named values in properties, return "".
+  - affectedAreas: if the only geographic data is the location string already shown in the header, return "".
+  - historicalContext: if there is no historical reference in the data, return "".
+  - If multiple events share a femaDisasterNumber, treat them as one declaration covering multiple areas — list all areas together.
+  - Wrap every place name, measurement, number, and statistic in **double asterisks**.
+  - Each field may be multiple sentences. Completeness matters more than brevity here.
+
+Return JSON exactly: {"overview": "...", "currentStatus": "...", "affectedAreas": "...", "keyStatistics": "...", "historicalContext": ""}.`,
+                },
+                {
+                    role: 'user',
+                    content: JSON.stringify(input.events.map((e) => this.projectEventForAI(e))),
+                },
+            ],
+            fallback,
+            { max_tokens: 1400 },
+        );
+        return {
+            overview: normalizeAiBullet(result.overview),
+            currentStatus: normalizeAiBullet(result.currentStatus),
+            affectedAreas: normalizeAiBullet(result.affectedAreas),
+            keyStatistics: normalizeAiBullet(result.keyStatistics),
+            historicalContext: normalizeAiBullet(result.historicalContext),
+        };
     }
 
     async generateHistoricalPastSummary(input: {

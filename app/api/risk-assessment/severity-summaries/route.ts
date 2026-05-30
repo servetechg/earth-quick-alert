@@ -6,8 +6,7 @@ import { computeRiskSnapshot } from '@/lib/services/risk-current-snapshot';
 import { openaiService } from '@/lib/services/openai-service';
 import { resolveRiskIngestScopeForSession } from '@/lib/risk-assessment/resolve-ingest-scope';
 import { groupRelatedEvents, toEventGroupSummary } from '@/lib/services/event-grouping';
-import type { SeverityBucket } from '@/lib/types/risk-assessment';
-import { normalizeAiBulletList } from '@/lib/utils/normalize-ai-text';
+import type { SeverityBucket, BulletWithRefs } from '@/lib/types/risk-assessment';
 
 const ALLOWED_ROLES = new Set([
     'admin', 'super-admin', 'sub-admin', 'eoc-manager',
@@ -69,7 +68,7 @@ export async function POST(req: Request) {
             category: string;
             eventCount: number;
             groupCount: number;
-            bullets: string[];
+            bullets: BulletWithRefs[];
             groups: ReturnType<typeof toEventGroupSummary>[];
         };
         const tasks: (() => Promise<BucketResult>)[] = [];
@@ -124,7 +123,7 @@ export async function POST(req: Request) {
                 category: item.category,
                 eventCount: item.eventCount,
                 groupCount: item.groupCount,
-                bullets: normalizeAiBulletList(item.bullets, 5),
+                bullets: item.bullets,
                 groups: item.groups,
             });
         }
