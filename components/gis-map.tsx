@@ -618,7 +618,7 @@ export function GISMap({
   return (
     <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm h-[700px] flex flex-col">
       <div className="p-4 sm:p-6 border-b border-slate-100 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex flex-wrap items-start gap-4 min-w-0 flex-1">
+        <div className="flex flex-wrap items-start gap-8 min-w-0 flex-1">
           <h2 className="text-lg sm:text-xl font-black text-slate-900 tracking-tighter uppercase shrink-0 pt-0.5">
             {title}
           </h2>
@@ -695,9 +695,10 @@ function GisHeatMapHeaderPanel({
   usesUnifiedHeat: boolean
 }) {
   return (
-    <div className="flex items-center rounded-3xl border border-slate-100 bg-white px-2 shadow-sm min-h-[34px] min-w-[500px]">
+    <div className="flex rounded-2xl border border-slate-100 bg-white px-3 py-1 w-fit flex-col gap-1">
       {/* Label, Badge, and Switch Row */}
-      <div className="flex items-center gap-1 shrink-0">
+      <div className="flex items-center gap-2 shrink-0 w-fit">
+        <div className="flex items-center gap-2">
         <label
           htmlFor={heatSwitchId}
           className="flex items-center gap-2 text-sm font-black text-slate-800 tracking-tight"
@@ -709,7 +710,7 @@ function GisHeatMapHeaderPanel({
         <span className="rounded-full bg-slate-50 px-2.5 py-0.5 text-xs font-black text-slate-700 border border-slate-200/60 min-w-[28px] text-center">
           {displayHeatCount}
         </span>
-
+        </div>
         <Switch 
           id={heatSwitchId} 
           checked={showHeatmap} 
@@ -719,12 +720,12 @@ function GisHeatMapHeaderPanel({
 
       {/* Inline Intensity Bar - Collapses gracefully if unchecked */}
       {showHeatmap && (
-        <div className="flex items-center gap-3 flex-1 min-w-[250px] border-l border-slate-100 pl-6 animate-in fade-in slide-in-from-left-2 duration-200">
+        <div className="flex items-center gap-3 flex-1 w-fit border-l border-slate-100 animate-in fade-in slide-in-from-left-2 duration-200">
           <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 shrink-0">
             Low
           </span>
           
-          <div className="relative flex-1 h-2 rounded-full bg-gradient-to-r from-[#2A2E4F] via-yellow-400 via-orange-500 to-red-600" />
+          <div className="relative min-w-[200px] flex-1 h-2 rounded-full bg-gradient-to-r from-[#2A2E4F] via-yellow-400 via-orange-500 to-red-600" />
           
           <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 shrink-0">
             Critical
