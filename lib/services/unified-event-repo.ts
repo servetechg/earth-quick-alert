@@ -1,6 +1,11 @@
 import UnifiedEvent from '@/models/UnifiedEvent';
 import dbConnect from '@/lib/mongodb';
+import { unifiedEventFeedFilter } from '@/lib/constants/unified-event-feed';
 import { mongoUnifiedEventCategoryFilter } from '@/lib/unified-event/category-infer';
+import {
+    jurisdictionLatLngBBox,
+    type SubAdminJurisdiction,
+} from '@/lib/sub-admin/jurisdiction';
 
 export interface UnifiedEventDoc {
     _id: string;
@@ -32,12 +37,40 @@ function locationFilter(stateCd: string | undefined): Record<string, unknown> | 
 }
 
 /**
+ * Current events whose coordinates fall in the license bbox, plus rows missing lat/lng
+ * (for geocoded radius checks). Optionally narrowed by state token in location text.
+ */
+export async function getCurrentEventsForJurisdiction(
+    jurisdiction: SubAdminJurisdiction
+): Promise<UnifiedEventDoc[]> {
+    await dbConnect();
+    const { minLat, maxLat, minLng, maxLng } = jurisdictionLatLngBBox(jurisdiction);
+
+    const filter: Record<string, unknown> = {
+        ...unifiedEventFeedFilter(),
+        $or: [
+            {
+                lat: { $gte: minLat, $lte: maxLat },
+                lng: { $gte: minLng, $lte: maxLng },
+            },
+            { lat: null },
+            { lng: null },
+        ],
+    };
+
+    const loc = locationFilter(jurisdiction.stateCode?.toLowerCase());
+    if (loc) Object.assign(filter, loc);
+
+    return UnifiedEvent.find(filter).sort({ updatedAt: -1 }).lean() as unknown as UnifiedEventDoc[];
+}
+
+/**
  * All events with dataStatus='current', optionally scoped to a state.
  * Index hint: { dataStatus:1, updatedAt:-1 }
  */
 export async function getCurrentEvents(opts?: { stateCd?: string }): Promise<UnifiedEventDoc[]> {
     await dbConnect();
-    const filter: Record<string, unknown> = { dataStatus: 'current' };
+    const filter: Record<string, unknown> = { ...unifiedEventFeedFilter() };
     const loc = locationFilter(opts?.stateCd);
     if (loc) Object.assign(filter, loc);
     return UnifiedEvent.find(filter).sort({ updatedAt: -1 }).lean() as unknown as UnifiedEventDoc[];

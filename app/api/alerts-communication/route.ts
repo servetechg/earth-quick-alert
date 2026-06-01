@@ -1,40 +1,22 @@
 import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongodb';
 import UnifiedEvent from '@/models/UnifiedEvent';
-import User from '@/models/User';
-import {
-    forceSyncAllAlertCommunicationFeedsNow,
-    syncAlertCommunicationFeedsGate,
-} from '@/lib/services/alert-communication-feed-sync-gate';
-import { fetchUnifiedEventLegacyCards } from '@/lib/unified-event/feed';
+import { forceSyncAllAlertCommunicationFeedsNow } from '@/lib/services/alert-communication-feed-sync-gate';
 import { unifiedEventToLegacyAlertCard } from '@/lib/unified-event/legacy-card';
 import { getSession } from '@/lib/auth';
-import { filterHydratedForSubAdminState } from '@/lib/services/alert-communication-aligned-feed';
-
-/** Sub-admins see alerts whose geography text matches their profile `state` (server-side). */
-async function resolveSubAdminStateFilterRaw(): Promise<string | null> {
-    try {
-        const session = await getSession();
-        const role = String(session?.user?.role ?? '').toLowerCase();
-        const userId = session?.user?.id as string | undefined;
-        if (role !== 'sub-admin' || !userId) return null;
-        const u = await User.findById(userId).select('state').lean();
-        const st = typeof u?.state === 'string' ? u.state.trim() : '';
-        return st || null;
-    } catch {
-        return null;
-    }
-}
+import {
+    fetchAlignedUnifiedEventFeed,
+    invalidateAlignedFeedCache,
+} from '@/lib/services/alert-communication-aligned-feed';
 
 export async function GET() {
     try {
         await dbConnect();
-        await syncAlertCommunicationFeedsGate();
-        const hydrated = await fetchUnifiedEventLegacyCards();
+        const session = await getSession();
+        const role = String(session?.user?.role ?? '');
+        const userId = session?.user?.id as string | undefined;
 
-        const subAdminStateFilter = await resolveSubAdminStateFilterRaw();
-        const filtered =
-            subAdminStateFilter != null ? filterHydratedForSubAdminState(hydrated, subAdminStateFilter) : hydrated;
+        const filtered = await fetchAlignedUnifiedEventFeed({ userId, role, syncFeeds: true });
 
         return NextResponse.json(filtered);
     } catch (error: any) {
@@ -47,11 +29,11 @@ export async function POST() {
     try {
         await dbConnect();
         const { nws, multi } = await forceSyncAllAlertCommunicationFeedsNow();
-        const hydrated = await fetchUnifiedEventLegacyCards();
-
-        const subAdminStateFilter = await resolveSubAdminStateFilterRaw();
-        const filtered =
-            subAdminStateFilter != null ? filterHydratedForSubAdminState(hydrated, subAdminStateFilter) : hydrated;
+        const session = await getSession();
+        const role = String(session?.user?.role ?? '');
+        const userId = session?.user?.id as string | undefined;
+        invalidateAlignedFeedCache(userId, role);
+        const filtered = await fetchAlignedUnifiedEventFeed({ userId, role, syncFeeds: false });
 
         return NextResponse.json({ stats: { nws, ...multi }, data: filtered });
     } catch (error: any) {

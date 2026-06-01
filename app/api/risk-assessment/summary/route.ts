@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import dbConnect from '@/lib/mongodb';
-import { getCurrentEvents } from '@/lib/services/unified-event-repo';
 import { computeRiskSnapshot } from '@/lib/services/risk-current-snapshot';
 import { resolveRiskIngestScopeForSession } from '@/lib/risk-assessment/resolve-ingest-scope';
+import { fetchAlignedUnifiedEventDocsForSession, fetchAlignedUnifiedEventFeed } from '@/lib/services/alert-communication-aligned-feed';
+import { applyRiskReportToAlignedAlertFeed } from '@/lib/services/risk-report-alert-alignment';
 import { openaiService } from '@/lib/services/openai-service';
 
 const ALLOWED_ROLES = new Set([
@@ -33,20 +34,39 @@ export async function GET(req: Request) {
             { nationwide: bodyNationwide, stateCd: bodyStateCd },
         );
 
-        const cacheKey = `${session.user.id}:${scope.stateCd}`;
+        const cacheKey = `${session.user.id}:${scope.stateCd}:aligned-v3`;
         const cached = cache.get(cacheKey);
         if (cached && cached.expiresAt > Date.now()) {
             return NextResponse.json(cached.data);
         }
 
-        const events = await getCurrentEvents({ stateCd: scope.nationwide ? undefined : scope.stateCd });
+        const events = await fetchAlignedUnifiedEventDocsForSession({
+            userId: session.user.id as string | undefined,
+            role,
+        });
+        const alignedCards = await fetchAlignedUnifiedEventFeed({
+            userId: session.user.id as string | undefined,
+            role,
+        });
         const aiAvailable = openaiService.isAvailable();
         const snapshot = computeRiskSnapshot(events, { aiAvailable });
+        const aligned = applyRiskReportToAlignedAlertFeed(
+            {
+                ...snapshot,
+                recommendations: [],
+                historical_analysis: {},
+            },
+            alignedCards,
+        );
 
         // Strip raw event arrays from the response (only needed server-side)
         const { severity_buckets, ...rest } = snapshot;
         const response = {
             ...rest,
+            alerts_count: aligned.alerts_count,
+            major_incidents: aligned.major_incidents,
+            minor_incidents: aligned.minor_incidents,
+            incident_distribution: aligned.incident_distribution,
             ai_available: aiAvailable,
             severity_buckets: severity_buckets.map((b) => ({
                 severity: b.severity,

@@ -1,11 +1,44 @@
-import User from '@/models/User';
+import {
+    filterUnifiedEventDocsForJurisdiction,
+    resolveSubAdminJurisdiction,
+} from '@/lib/sub-admin/jurisdiction';
 import { alertRowMatchesAiAlignedStateScope } from '@/lib/utils/alert-location-state-match';
 import { syncAlertCommunicationFeedsGate } from '@/lib/services/alert-communication-feed-sync-gate';
-import { fetchUnifiedEventLegacyCards } from '@/lib/unified-event/feed';
+import {
+    getCurrentEvents,
+    getCurrentEventsForJurisdiction,
+    type UnifiedEventDoc,
+} from '@/lib/services/unified-event-repo';
 import { unifiedCategoryToDistroBucket } from '@/lib/unified-event/category-infer';
+import { unifiedEventToLegacyAlertCard } from '@/lib/unified-event/legacy-card';
+import { hydrateAlertCommunicationRows } from '@/lib/utils/alert-communication-hydrate';
 import type { DistroPoint } from '@/lib/types/risk-assessment';
 import type { UnifiedEventCategory } from '@/lib/unified-event/types';
+import User from '@/models/User';
 
+const FEED_CACHE_TTL_MS = 60_000;
+
+type FeedCacheEntry = {
+    docs: UnifiedEventDoc[];
+    cards: Record<string, unknown>[];
+    expiresAt: number;
+};
+
+const feedCache = new Map<string, FeedCacheEntry>();
+
+function feedCacheKey(userId: string | undefined, role: string): string {
+    return `${userId ?? 'anon'}:${String(role ?? '').toLowerCase()}:aligned-v3`;
+}
+
+export function invalidateAlignedFeedCache(userId?: string, role?: string): void {
+    if (userId && role) {
+        feedCache.delete(feedCacheKey(userId, role));
+        return;
+    }
+    feedCache.clear();
+}
+
+/** State-only filter (legacy fallback when jurisdiction cannot be resolved). */
 export function filterHydratedForSubAdminState(hydrated: any[], stateRaw: string) {
     return hydrated.filter((row) =>
         alertRowMatchesAiAlignedStateScope(
@@ -22,30 +55,135 @@ export function filterHydratedForSubAdminState(hydrated: any[], stateRaw: string
     );
 }
 
-async function subAdminHomeStateRaw(userId: string | undefined): Promise<string | null> {
-    if (!userId) return null;
-    const u = await User.findById(userId).select('state').lean();
-    const st = typeof u?.state === 'string' ? u.state.trim() : '';
-    return st || null;
+function filterDocsForSubAdminState(docs: UnifiedEventDoc[], stateRaw: string): UnifiedEventDoc[] {
+    return docs.filter((doc) =>
+        alertRowMatchesAiAlignedStateScope(
+            {
+                source: doc.source,
+                location: doc.location,
+                description: doc.description,
+                name: doc.name,
+                instructions: doc.instructions,
+            },
+            stateRaw,
+        ),
+    );
+}
+
+function docsToLegacyCards(docs: UnifiedEventDoc[]): Record<string, unknown>[] {
+    const cards = docs.map((doc) =>
+        unifiedEventToLegacyAlertCard(doc as unknown as Record<string, unknown>),
+    );
+    return hydrateAlertCommunicationRows(cards);
+}
+
+/** Map legacy alert cards to `UnifiedEventDoc` for AI Risk snapshot APIs. */
+export function legacyAlertCardsToUnifiedEventDocs(rows: Record<string, unknown>[]): UnifiedEventDoc[] {
+    return rows.map((row) => {
+        const severity = String(row.severity ?? 'Moderate');
+        const sevNorm =
+            severity === 'Low' || severity === 'Moderate' || severity === 'High' || severity === 'Extreme'
+                ? severity
+                : 'Moderate';
+        return {
+            _id: String(row._id ?? row.id ?? ''),
+            externalId: String(row.externalId ?? row._id ?? row.id ?? ''),
+            source: String(row.source ?? 'nws'),
+            category: String(row.category ?? ''),
+            name: String(row.name ?? ''),
+            description: String(row.description ?? ''),
+            severity: sevNorm,
+            type: String(row.type ?? ''),
+            status: String(row.status ?? ''),
+            location: String(row.location ?? ''),
+            lat: typeof row.lat === 'number' ? row.lat : null,
+            lng: typeof row.lng === 'number' ? row.lng : null,
+            issuedAt: String(row.issuedAt ?? ''),
+            expiresAt: String(row.expiresAt ?? ''),
+            instructions: Array.isArray(row.instructions) ? (row.instructions as string[]) : [],
+            properties: {},
+            dataStatus: (row.dataStatus === 'past' ? 'past' : 'current') as 'current' | 'past',
+            createdAt: String(row.createdAt ?? ''),
+            updatedAt: String(row.updatedAt ?? ''),
+        };
+    });
+}
+
+async function loadAlignedUnifiedEvents(options: {
+    userId?: string;
+    role: string;
+    syncFeeds?: boolean;
+}): Promise<FeedCacheEntry> {
+    const key = feedCacheKey(options.userId, options.role);
+    const cached = feedCache.get(key);
+    if (cached && cached.expiresAt > Date.now() && !options.syncFeeds) {
+        return cached;
+    }
+
+    if (options.syncFeeds) {
+        await syncAlertCommunicationFeedsGate();
+        feedCache.delete(key);
+    }
+
+    const role = String(options.role ?? '').toLowerCase();
+    let docs: UnifiedEventDoc[];
+
+    if (role === 'sub-admin' && options.userId) {
+        const jurisdiction = await resolveSubAdminJurisdiction(options.userId);
+        if (jurisdiction) {
+            const candidates = await getCurrentEventsForJurisdiction(jurisdiction);
+            docs = await filterUnifiedEventDocsForJurisdiction(candidates, jurisdiction);
+        } else {
+            const u = await User.findById(options.userId).select('state').lean();
+            const stateRaw = typeof u?.state === 'string' ? u.state.trim() : '';
+            docs = await getCurrentEvents();
+            if (stateRaw) {
+                docs = filterDocsForSubAdminState(docs, stateRaw);
+            }
+        }
+    } else {
+        docs = await getCurrentEvents();
+    }
+
+    const entry: FeedCacheEntry = {
+        docs,
+        cards: docsToLegacyCards(docs),
+        expiresAt: Date.now() + FEED_CACHE_TTL_MS,
+    };
+    feedCache.set(key, entry);
+    return entry;
 }
 
 /**
- * Live `UnifiedEvent` rows (current ingest) after refresh + sub-admin filter — same feed as Alerts & Communication.
+ * Live unified events for this session — same rows as Alerts & Communication.
+ * Sub-admins: license radius only (not whole state).
+ */
+export async function fetchAlignedUnifiedEventDocsForSession(options: {
+    userId?: string;
+    role: string;
+    syncFeeds?: boolean;
+}): Promise<UnifiedEventDoc[]> {
+    const entry = await loadAlignedUnifiedEvents({
+        ...options,
+        syncFeeds: options.syncFeeds ?? false,
+    });
+    return entry.docs;
+}
+
+/**
+ * Live unified event cards after optional feed sync + sub-admin radius filter.
+ * Pass `syncFeeds: true` only from Alerts & Communication (throttled upstream refresh).
  */
 export async function fetchAlignedUnifiedEventFeed(options: {
     userId?: string;
     role: string;
+    syncFeeds?: boolean;
 }): Promise<any[]> {
-    await syncAlertCommunicationFeedsGate();
-    const hydrated = await fetchUnifiedEventLegacyCards();
-
-    const role = String(options.role ?? '').toLowerCase();
-    if (role === 'sub-admin' && options.userId) {
-        const stateRaw = await subAdminHomeStateRaw(options.userId);
-        if (stateRaw) return filterHydratedForSubAdminState(hydrated, stateRaw);
-    }
-
-    return hydrated;
+    const entry = await loadAlignedUnifiedEvents({
+        ...options,
+        syncFeeds: options.syncFeeds ?? false,
+    });
+    return entry.cards;
 }
 
 /** @deprecated Use `fetchAlignedUnifiedEventFeed` */
@@ -118,4 +256,16 @@ export function majorMinorFromAlignedAlerts(rows: any[]): { major: number; minor
         if (isMajor) major += 1;
     }
     return { major, minor: Math.max(0, rows.length - major) };
+}
+
+/** Canonical incident stats — same row set as Alerts & Communication list. */
+export function alignedIncidentStatsFromCards(cards: Record<string, unknown>[]) {
+    const count = cards.length;
+    const { major, minor } = majorMinorFromAlignedAlerts(cards);
+    return {
+        alignedEventCount: count,
+        incident_distribution: incidentDistributionFromAlignedAlerts(cards),
+        major_incidents: major,
+        minor_incidents: minor,
+    };
 }

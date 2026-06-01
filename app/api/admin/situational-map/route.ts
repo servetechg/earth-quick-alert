@@ -1,80 +1,64 @@
 import { NextResponse } from 'next/server';
 import connectDB from '@/lib/mongodb';
-import License from '@/models/License';
-import User from '@/models/User';
 import { getSession } from '@/lib/auth';
-import { fetchAlignedUnifiedEventFeed } from '@/lib/services/alert-communication-aligned-feed';
-import { geocodeLocation } from '@/lib/services/location-matching';
-import { severityToHeatWeight, type UnifiedEventHeatPoint } from '@/lib/geo/unified-event-heatmap';
-import { getUsStateBbox } from '@/lib/constants/us-state-bounding-boxes';
-import { normalizeStateToUsps } from '@/lib/utils/us-state-usps';
-import { GOOGLE_MAPS_API_KEY } from '@/lib/constants/google-maps-config';
-import { resolveMaxRadiusForState } from '@/lib/geo/license-coverage-radius';
 import {
+    alignedIncidentStatsFromCards,
+    fetchAlignedUnifiedEventFeed,
+} from '@/lib/services/alert-communication-aligned-feed';
+import { resolveHeatPointsFromAlignedRows } from '@/lib/geo/resolve-aligned-event-heatpoints';
+import {
+    fetchNationwideCitizenMarkers,
+    fetchNationwideResponderMarkers,
     fetchScopedCitizenMarkers,
     fetchScopedResponderMarkers,
+    fetchSubAdminLeaderMarkers,
 } from '@/lib/services/situational-map-markers';
+import { resolveSubAdminJurisdiction } from '@/lib/sub-admin/jurisdiction';
 
-const MAX_GEOCODE_WITHOUT_COORDS = 12;
-
-async function resolveHeatPoints(rows: Record<string, unknown>[]): Promise<UnifiedEventHeatPoint[]> {
-    const points: UnifiedEventHeatPoint[] = [];
-    let geocodeBudget = MAX_GEOCODE_WITHOUT_COORDS;
-
-    for (const row of rows) {
-        const id = String(row.id ?? row._id ?? '');
-        let lat = typeof row.lat === 'number' ? row.lat : null;
-        let lng = typeof row.lng === 'number' ? row.lng : null;
-
-        if ((lat == null || lng == null) && geocodeBudget > 0) {
-            const loc =
-                typeof row.locationSummary === 'string'
-                    ? row.locationSummary
-                    : typeof row.location === 'string'
-                      ? row.location
-                      : '';
-            if (loc.trim()) {
-                const geo = await geocodeLocation(loc);
-                if (geo) {
-                    lat = geo.lat;
-                    lng = geo.lon;
-                    geocodeBudget -= 1;
-                }
-            }
-        }
-
-        if (lat == null || lng == null || !Number.isFinite(lat) || !Number.isFinite(lng)) {
-            continue;
-        }
-
-        points.push({
-            id,
-            lat,
-            lng,
-            weight: severityToHeatWeight(
-                typeof row.severity === 'string' ? row.severity : undefined,
-                typeof row.type === 'string' ? row.type : undefined
-            ),
-            severity: String(row.severity ?? 'Moderate'),
-            name: String(row.name ?? 'Event'),
-            category: typeof row.category === 'string' ? row.category : undefined,
-            source: typeof row.source === 'string' ? row.source : undefined,
-        });
-    }
-
-    return points;
+function mapCitizensToClient(
+    rows: Awaited<ReturnType<typeof fetchNationwideCitizenMarkers>>
+) {
+    return rows.map((c) => ({
+        id: c.id,
+        lat: c.lat,
+        lng: c.lng,
+        title: c.title,
+        isSafe: c.isSafe,
+        status: c.status,
+        location: c.location,
+        description: c.description,
+    }));
 }
 
-function bboxCenter(stateRaw: string): { lat: number; lng: number } | null {
-    const usps = normalizeStateToUsps(stateRaw);
-    if (!usps) return null;
-    const bbox = getUsStateBbox(usps);
-    if (!bbox) return null;
-    const [west, south, east, north] = bbox;
-    return { lat: (south + north) / 2, lng: (west + east) / 2 };
+function mapRespondersToClient(
+    rows: Awaited<ReturnType<typeof fetchNationwideResponderMarkers>>
+) {
+    return rows.map((r) => ({
+        id: r.id,
+        lat: r.lat,
+        lng: r.lng,
+        title: r.title,
+        status: r.status,
+        location: r.location,
+        description: r.description,
+        color: r.color,
+        icon: r.icon,
+    }));
 }
 
-export async function GET() {
+function mapLeadersToClient(rows: Awaited<ReturnType<typeof fetchSubAdminLeaderMarkers>>) {
+    return rows.map((l) => ({
+        id: l.id,
+        lat: l.lat,
+        lng: l.lng,
+        title: l.title,
+        status: l.status,
+        location: l.location,
+        description: l.description,
+    }));
+}
+
+export async function GET(req: Request) {
     try {
         await connectDB();
         const session = await getSession();
@@ -84,18 +68,32 @@ export async function GET() {
 
         const role = String(session.user.role ?? '').toLowerCase();
         const userId = session.user.id as string;
+        const scopeState = new URL(req.url).searchParams.get('scopeState')?.trim() || undefined;
 
         const rows = await fetchAlignedUnifiedEventFeed({ userId, role });
-        const incidents = await resolveHeatPoints(rows as Record<string, unknown>[]);
+        const stats = alignedIncidentStatsFromCards(rows as Record<string, unknown>[]);
+        const incidents = await resolveHeatPointsFromAlignedRows(rows as Record<string, unknown>[]);
 
-        let citizens: Awaited<ReturnType<typeof fetchScopedCitizenMarkers>> = [];
-        let responders: Awaited<ReturnType<typeof fetchScopedResponderMarkers>> = [];
+        let citizens: ReturnType<typeof mapCitizensToClient> = [];
+        let responders: ReturnType<typeof mapRespondersToClient> = [];
+        let leaders: ReturnType<typeof mapLeadersToClient> = [];
 
         if (role === 'sub-admin') {
-            [citizens, responders] = await Promise.all([
+            const [citizenRows, responderRows] = await Promise.all([
                 fetchScopedCitizenMarkers(userId),
                 fetchScopedResponderMarkers(userId),
             ]);
+            citizens = mapCitizensToClient(citizenRows);
+            responders = mapRespondersToClient(responderRows);
+        } else if (role === 'super-admin') {
+            const [citizenRows, responderRows, leaderRows] = await Promise.all([
+                fetchNationwideCitizenMarkers({ stateRaw: scopeState }),
+                fetchNationwideResponderMarkers({ stateRaw: scopeState }),
+                fetchSubAdminLeaderMarkers({ stateRaw: scopeState }),
+            ]);
+            citizens = mapCitizensToClient(citizenRows);
+            responders = mapRespondersToClient(responderRows);
+            leaders = mapLeadersToClient(leaderRows);
         }
 
         let coverage: {
@@ -107,68 +105,31 @@ export async function GET() {
         } | null = null;
 
         if (role === 'sub-admin') {
-            const user = await User.findById(userId).select('state country city licenseId').lean();
-            const license = user?.licenseId
-                ? await License.findById(user.licenseId)
-                      .select('radiusMile billingAddress state country')
-                      .lean()
-                : null;
-
-            const stateName = typeof user?.state === 'string' ? user.state.trim() : '';
-
-            let center: { lat: number; lng: number } | null = null;
-            const billingAddress =
-                typeof license?.billingAddress === 'string' ? license.billingAddress.trim() : '';
-
-            if (billingAddress) {
-                const geo = await geocodeLocation(billingAddress);
-                if (geo) center = { lat: geo.lat, lng: geo.lon };
-            }
-
-            if (!center && stateName) {
-                const geo = await geocodeLocation(
-                    [user?.city, stateName, user?.country || 'USA'].filter(Boolean).join(', ')
-                );
-                if (geo) center = { lat: geo.lat, lng: geo.lon };
-            }
-
-            if (!center && stateName) {
-                center = bboxCenter(stateName);
-            }
-
-            const stateCode = normalizeStateToUsps(stateName) ?? undefined;
-            const countryCode = 'US';
-
-            let radiusMile =
-                typeof license?.radiusMile === 'number' ? Math.max(5, license.radiusMile) : 5;
-
-            if (stateCode && GOOGLE_MAPS_API_KEY) {
-                const stateMax = await resolveMaxRadiusForState(
-                    { stateCode, countryCode, stateName },
-                    GOOGLE_MAPS_API_KEY
-                );
-                if (stateMax != null) {
-                    radiusMile = Math.min(radiusMile, stateMax);
-                }
-            }
-
-            if (center) {
+            const jurisdiction = await resolveSubAdminJurisdiction(userId);
+            if (jurisdiction) {
                 coverage = {
-                    center,
-                    radiusMile,
-                    radiusMeters: radiusMile * 1609.34,
-                    state: stateName || undefined,
-                    stateCode,
+                    center: jurisdiction.center,
+                    radiusMile: jurisdiction.radiusMile,
+                    radiusMeters: jurisdiction.radiusMile * 1609.34,
+                    state: jurisdiction.stateRaw,
+                    stateCode: jurisdiction.stateCode ?? undefined,
                 };
             }
         }
 
         return NextResponse.json({
             incidents,
-            incidentCount: incidents.length,
+            /** Same count as Alerts & Communication list and AI Risk `alerts_count`. */
+            alignedEventCount: stats.alignedEventCount,
+            incidentCount: stats.alignedEventCount,
+            heatPointCount: incidents.length,
+            majorIncidents: stats.major_incidents,
+            minorIncidents: stats.minor_incidents,
             citizens,
             responders,
+            leaders,
             coverage,
+            scope: role === 'sub-admin' ? 'jurisdiction' : 'nationwide',
         });
     } catch (error) {
         console.error('situational-map error:', error);

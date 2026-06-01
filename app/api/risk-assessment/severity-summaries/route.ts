@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import dbConnect from '@/lib/mongodb';
-import { getCurrentEvents, type UnifiedEventDoc } from '@/lib/services/unified-event-repo';
+import { type UnifiedEventDoc } from '@/lib/services/unified-event-repo';
 import { computeRiskSnapshot } from '@/lib/services/risk-current-snapshot';
 import { openaiService } from '@/lib/services/openai-service';
 import { resolveRiskIngestScopeForSession } from '@/lib/risk-assessment/resolve-ingest-scope';
+import { fetchAlignedUnifiedEventDocsForSession } from '@/lib/services/alert-communication-aligned-feed';
 import { groupRelatedEvents, toEventGroupSummary } from '@/lib/services/event-grouping';
 import type { SeverityBucket, BulletWithRefs } from '@/lib/types/risk-assessment';
 
@@ -53,13 +54,16 @@ export async function POST(req: Request) {
             body,
         );
 
-        const cacheKey = `sev:${session.user.id}:${scope.stateCd}`;
+        const cacheKey = `sev:${session.user.id}:${scope.stateCd}:aligned-v3`;
         const cached = cache.get(cacheKey);
         if (cached && cached.expiresAt > Date.now()) {
             return NextResponse.json(cached.data);
         }
 
-        const events = await getCurrentEvents({ stateCd: scope.nationwide ? undefined : scope.stateCd });
+        const events = await fetchAlignedUnifiedEventDocsForSession({
+            userId: session.user.id as string | undefined,
+            role,
+        });
         const snapshot = computeRiskSnapshot(events);
 
         // Build one AI task per (severity, category) pair

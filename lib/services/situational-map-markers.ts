@@ -3,6 +3,11 @@ import Responder from '@/models/Responder';
 import { getSubAdminUserFilter } from '@/lib/admin-filters';
 import { geocodeLocation } from '@/lib/services/location-matching';
 import { normalizeStateToUsps } from '@/lib/utils/us-state-usps';
+import {
+    coordinatesInJurisdiction,
+    resolveSubAdminJurisdiction,
+    type SubAdminJurisdiction,
+} from '@/lib/sub-admin/jurisdiction';
 
 export type GisMapMarkerDto = {
     id: string;
@@ -44,6 +49,7 @@ async function resolveCoords(
 }
 
 export async function fetchScopedCitizenMarkers(subAdminUserId: string): Promise<GisMapMarkerDto[]> {
+    const jurisdiction = await resolveSubAdminJurisdiction(subAdminUserId);
     const subAdmin = await User.findById(subAdminUserId).select('state city name').lean();
     if (!subAdmin) return [];
 
@@ -70,6 +76,9 @@ export async function fetchScopedCitizenMarkers(subAdminUserId: string): Promise
             if (coords) geocodeBudget -= 1;
         }
         if (!coords) continue;
+        if (jurisdiction && !coordinatesInJurisdiction(coords.lat, coords.lng, jurisdiction)) {
+            continue;
+        }
 
         const isSafe = u.isSafe !== false;
         markers.push({
@@ -91,6 +100,7 @@ export async function fetchScopedCitizenMarkers(subAdminUserId: string): Promise
 }
 
 export async function fetchScopedResponderMarkers(subAdminUserId: string): Promise<GisMapMarkerDto[]> {
+    const jurisdiction = await resolveSubAdminJurisdiction(subAdminUserId);
     const subAdmin = await User.findById(subAdminUserId)
         .select('state city licenseId')
         .lean();
@@ -142,7 +152,8 @@ export async function fetchScopedResponderMarkers(subAdminUserId: string): Promi
         unitType: string,
         status: string,
         location: string,
-        coords?: { lat?: number; lng?: number } | null
+        coords?: { lat?: number; lng?: number } | null,
+        jurisdictionScope?: SubAdminJurisdiction | null
     ) => {
         if (seen.has(id)) return;
         let pos: { lat: number; lng: number } | null = null;
@@ -153,6 +164,12 @@ export async function fetchScopedResponderMarkers(subAdminUserId: string): Promi
             if (pos) geocodeBudget -= 1;
         }
         if (!pos) return;
+        if (
+            jurisdictionScope &&
+            !coordinatesInJurisdiction(pos.lat, pos.lng, jurisdictionScope)
+        ) {
+            return;
+        }
         seen.add(id);
         const visuals = responderVisuals(unitType);
         markers.push({
@@ -175,7 +192,7 @@ export async function fetchScopedResponderMarkers(subAdminUserId: string): Promi
         const locationStr =
             (typeof u.location === 'string' && u.location.trim()) ||
             [u.city, u.state].filter(Boolean).join(', ');
-        await pushMarker(String(u._id), String(u.name || 'Responder'), unitType, 'Active', locationStr);
+        await pushMarker(String(u._id), String(u.name || 'Responder'), unitType, 'Active', locationStr, null, jurisdiction);
     }
 
     for (const r of legacyResponders) {
@@ -188,7 +205,8 @@ export async function fetchScopedResponderMarkers(subAdminUserId: string): Promi
             String(r.type || 'Unit'),
             String(r.status || 'Active'),
             locationStr,
-            r.coordinates as { lat?: number; lng?: number } | undefined
+            r.coordinates as { lat?: number; lng?: number } | undefined,
+            jurisdiction
         );
     }
 
@@ -208,4 +226,159 @@ export function gisMarkerDtoToClientMarker(dto: GisMapMarkerDto) {
         color: dto.color,
         icon: dto.icon,
     };
+}
+
+function stateRegex(stateRaw: string): RegExp {
+    return new RegExp(stateRaw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+}
+
+function userMatchesStateFilter(
+    user: { state?: string | null },
+    stateRaw?: string
+): boolean {
+    if (!stateRaw?.trim()) return true;
+    const st = String(user.state ?? '').trim();
+    if (!st) return false;
+    const usps = normalizeStateToUsps(stateRaw);
+    const userUsps = normalizeStateToUsps(st);
+    if (usps && userUsps) return usps === userUsps;
+    return stateRegex(stateRaw).test(st);
+}
+
+/** Super-admin: approved citizens from `User` (not legacy seed collections). */
+export async function fetchNationwideCitizenMarkers(opts?: {
+    stateRaw?: string;
+}): Promise<GisMapMarkerDto[]> {
+    const users = await User.find({
+        role: { $in: [...CITIZEN_ROLES] },
+        accountStatus: 'approved',
+    })
+        .select('name location city state zipcode isSafe lat lng')
+        .limit(500)
+        .lean();
+
+    const markers: GisMapMarkerDto[] = [];
+    let geocodeBudget = 60;
+
+    for (const u of users) {
+        if (!userMatchesStateFilter(u, opts?.stateRaw)) continue;
+
+        const locationStr =
+            (typeof u.location === 'string' && u.location.trim()) ||
+            [u.city, u.state, u.zipcode].filter(Boolean).join(', ');
+
+        let coords: { lat: number; lng: number } | null = null;
+        if (typeof u.lat === 'number' && typeof u.lng === 'number') {
+            coords = { lat: u.lat, lng: u.lng };
+        } else if (geocodeBudget > 0) {
+            coords = await resolveCoords(null, null, locationStr);
+            if (coords) geocodeBudget -= 1;
+        }
+        if (!coords) continue;
+
+        const isSafe = u.isSafe !== false;
+        markers.push({
+            id: String(u._id),
+            lat: coords.lat,
+            lng: coords.lng,
+            title: String(u.name || 'Citizen'),
+            type: 'user',
+            isSafe,
+            status: isSafe ? 'Safe' : 'At Risk',
+            location: locationStr,
+            description: isSafe
+                ? `Citizen · ${locationStr || 'Unknown'}`
+                : `At risk · ${locationStr || 'Unknown'}`,
+        });
+    }
+
+    return markers;
+}
+
+/** Super-admin: responder accounts from `User` (not legacy `Responder` seed rows). */
+export async function fetchNationwideResponderMarkers(opts?: {
+    stateRaw?: string;
+}): Promise<GisMapMarkerDto[]> {
+    const responderUsers = await User.find({ role: 'responder' })
+        .select('name location city state lat lng responderVertical responderFunction')
+        .limit(300)
+        .lean();
+
+    const markers: GisMapMarkerDto[] = [];
+    let geocodeBudget = 40;
+
+    for (const u of responderUsers) {
+        if (!userMatchesStateFilter(u, opts?.stateRaw)) continue;
+
+        const unitType =
+            String(u.responderVertical || u.responderFunction || 'Responder').replace(/_/g, ' ');
+        const locationStr =
+            (typeof u.location === 'string' && u.location.trim()) ||
+            [u.city, u.state].filter(Boolean).join(', ');
+
+        let coords: { lat: number; lng: number } | null = null;
+        if (typeof u.lat === 'number' && typeof u.lng === 'number') {
+            coords = { lat: u.lat, lng: u.lng };
+        } else if (geocodeBudget > 0) {
+            coords = await resolveCoords(null, null, locationStr);
+            if (coords) geocodeBudget -= 1;
+        }
+        if (!coords) continue;
+
+        const visuals = responderVisuals(unitType);
+        markers.push({
+            id: String(u._id),
+            lat: coords.lat,
+            lng: coords.lng,
+            title: String(u.name || 'Responder'),
+            type: 'incident',
+            status: 'Active',
+            location: locationStr,
+            description: `${unitType} · ${locationStr}`,
+            color: visuals.color,
+            icon: visuals.icon,
+        });
+    }
+
+    return markers;
+}
+
+/** Super-admin Leaders tab: sub-admin accounts with map positions. */
+export async function fetchSubAdminLeaderMarkers(opts?: {
+    stateRaw?: string;
+}): Promise<GisMapMarkerDto[]> {
+    const admins = await User.find({ role: 'sub-admin' })
+        .select('name city state country lat lng email')
+        .limit(200)
+        .lean();
+
+    const markers: GisMapMarkerDto[] = [];
+    let geocodeBudget = 30;
+
+    for (const u of admins) {
+        if (!userMatchesStateFilter(u, opts?.stateRaw)) continue;
+
+        const locationStr = [u.city, u.state, u.country || 'USA'].filter(Boolean).join(', ');
+        let coords: { lat: number; lng: number } | null = null;
+        if (typeof u.lat === 'number' && typeof u.lng === 'number') {
+            coords = { lat: u.lat, lng: u.lng };
+        } else if (geocodeBudget > 0) {
+            coords = await resolveCoords(null, null, locationStr);
+            if (coords) geocodeBudget -= 1;
+        }
+        if (!coords) continue;
+
+        markers.push({
+            id: String(u._id),
+            lat: coords.lat,
+            lng: coords.lng,
+            title: String(u.name || 'Sub-Admin'),
+            type: 'user',
+            status: 'Online',
+            location: locationStr,
+            description: `Sub-Admin · ${locationStr}`,
+        });
+    }
+
+    return markers;
 }
