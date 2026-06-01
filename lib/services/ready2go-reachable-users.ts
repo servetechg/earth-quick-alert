@@ -2,6 +2,10 @@ import connectDB from '@/lib/mongodb';
 import User from '@/models/User';
 import type { RiskExposureSnapshot } from '@/lib/types/risk-assessment';
 import { CITY_TO_COUNTY_HINT, type CountyPopulationHint } from '@/lib/services/risk-exposure-service';
+import {
+    coordinatesInJurisdiction,
+    type SubAdminJurisdiction,
+} from '@/lib/sub-admin/jurisdiction';
 
 function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371;
@@ -117,7 +121,10 @@ function userInAnyBuffer(
 /**
  * Approved `role: user` accounts that plausibly overlap hazard counties (string match) or NWPS / epicenter buffers.
  */
-export async function countReady2GoReachableUsers(exposure: RiskExposureSnapshot | null | undefined): Promise<number> {
+export async function countReady2GoReachableUsers(
+    exposure: RiskExposureSnapshot | null | undefined,
+    jurisdiction?: SubAdminJurisdiction | null,
+): Promise<number> {
   if (!exposure) return 0;
   const countyHints: CountyPopulationHint[] = exposure.countyMatchHints.map((c) => ({
     stateAbbr: c.stateAbbr,
@@ -137,6 +144,16 @@ export async function countReady2GoReachableUsers(exposure: RiskExposureSnapshot
   for (const u of users) {
     const lat = u.lat != null ? Number(u.lat) : null;
     const lng = u.lng != null ? Number(u.lng) : null;
+
+    if (jurisdiction) {
+      if (lat == null || lng == null || !Number.isFinite(lat) || !Number.isFinite(lng)) {
+        continue;
+      }
+      if (!coordinatesInJurisdiction(lat, lng, jurisdiction)) {
+        continue;
+      }
+    }
+
     if (userInAnyBuffer(lat, lng, exposure)) {
       n++;
       continue;

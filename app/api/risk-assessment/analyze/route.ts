@@ -8,6 +8,10 @@ import { recordActivity, ACTIVITY_ACTIONS } from '@/lib/activity-log';
 import { fetchAlignedUnifiedEventFeed } from '@/lib/services/alert-communication-aligned-feed';
 import { applyRiskReportToAlignedAlertFeed } from '@/lib/services/risk-report-alert-alignment';
 import { resolveRiskIngestScopeForSession } from '@/lib/risk-assessment/resolve-ingest-scope';
+import {
+    coordinatesInJurisdiction,
+    resolveSubAdminJurisdiction,
+} from '@/lib/sub-admin/jurisdiction';
 
 /** Roles allowed to run Dashboard A fusion (aligned with admin operational tooling). */
 const ALLOWED_ROLES = new Set([
@@ -61,12 +65,28 @@ export async function POST(req: Request) {
             usgsSite,
             nationwide: useNationwide,
         });
-        const reachable = await countReady2GoReachableUsers(bundle.riskExposure ?? undefined);
+
+        const jurisdiction =
+            role === 'sub-admin'
+                ? await resolveSubAdminJurisdiction(session.user.id as string)
+                : null;
+
+        let exposure = bundle.riskExposure ?? undefined;
+        if (jurisdiction && exposure) {
+            exposure = {
+                ...exposure,
+                centroids: exposure.centroids.filter((c) =>
+                    coordinatesInJurisdiction(c.lat, c.lon, jurisdiction),
+                ),
+            };
+        }
+
+        const reachable = await countReady2GoReachableUsers(exposure, jurisdiction);
         let report = await openaiService.synthesizeDashboardRiskReport(bundle);
 
         const pop =
-            bundle.riskExposure != null
-                ? bundle.riskExposure.populationAffectedEstimate
+            exposure != null
+                ? exposure.populationAffectedEstimate
                 : report.populations_at_risk;
 
         report = {

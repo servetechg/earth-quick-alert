@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import dbConnect from '@/lib/mongodb';
-import { getCurrentEvents } from '@/lib/services/unified-event-repo';
 import { resolveRiskIngestScopeForSession } from '@/lib/risk-assessment/resolve-ingest-scope';
+import { fetchAlignedUnifiedEventDocsForSession } from '@/lib/services/alert-communication-aligned-feed';
 import { findSimilarPastEvents, computeMatchConfidence, pickSeedEvent } from '@/lib/services/risk-similar-events';
 import { getActiveRespondersForCategory } from '@/lib/services/risk-responder-data';
 import { openaiService } from '@/lib/services/openai-service';
@@ -45,14 +45,17 @@ export async function POST(
             body,
         );
 
-        const cacheKey = `hist:${session.user.id}:${scope.stateCd}:${category}`;
+        const cacheKey = `hist:${session.user.id}:${scope.stateCd}:${category}:aligned-v3`;
         const cached = cache.get(cacheKey);
         if (cached && cached.expiresAt > Date.now()) {
             return NextResponse.json(cached.data);
         }
 
-        // Load all current events then filter to this category
-        const allCurrent = await getCurrentEvents({ stateCd: scope.nationwide ? undefined : scope.stateCd });
+        // Same aligned feed as Alerts & Communication, scoped to this category
+        const allCurrent = await fetchAlignedUnifiedEventDocsForSession({
+            userId: session.user.id as string | undefined,
+            role,
+        });
         const currentEvents = allCurrent.filter(
             (e) => normalizeUnifiedEventCategory(e.category) === category,
         );
