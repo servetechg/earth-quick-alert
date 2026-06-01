@@ -302,6 +302,12 @@ export default function SuperAdminDashboard() {
                   ? undefined
                   : String(selectedSubAdmin.state).trim() || undefined
               }
+              scopeState={
+                selectedLocation === 'All' || !selectedSubAdmin?.state
+                  ? undefined
+                  : String(selectedSubAdmin.state).trim() || undefined
+              }
+              unifiedMapFeed
             />
           </div>
 
