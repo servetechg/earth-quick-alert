@@ -4,6 +4,8 @@ import dbConnect from '@/lib/mongodb';
 import UnifiedEvent from '@/models/UnifiedEvent';
 import { groupRelatedEvents, toEventGroupSummary } from '@/lib/services/event-grouping';
 import { openaiService, type IncidentDetailNarrative } from '@/lib/services/openai-service';
+import { pickSeedEvent, findSimilarPastEvents, computeMatchConfidence } from '@/lib/services/risk-similar-events';
+import { normalizeUnifiedEventCategory } from '@/lib/unified-event/category-infer';
 import type { UnifiedEventDoc } from '@/lib/services/unified-event-repo';
 import type { EventGroupSummary } from '@/lib/types/risk-assessment';
 
@@ -17,9 +19,18 @@ const CACHE_TTL_MS = 10 * 60 * 1000;
 
 const cache = new Map<string, { data: unknown; expiresAt: number }>();
 
+export interface IncidentPastContext {
+    matchedEvent?: string;
+    similaritySummary?: string;
+    pastDamages?: string[];
+    pastProcedures?: string[];
+    matchConfidence?: number;
+}
+
 export interface IncidentDetailResponse {
     groups: EventGroupSummary[];
     narrative?: IncidentDetailNarrative;
+    pastContext?: IncidentPastContext;
     eventCount: number;
 }
 
@@ -54,13 +65,44 @@ export async function POST(req: Request) {
         }
 
         const groups = groupRelatedEvents(events);
-        const narrative = groupsOnly
-            ? undefined
-            : await openaiService.generateIncidentDetailNarrative({ events });
+
+        async function buildPastContext(): Promise<IncidentPastContext | undefined> {
+            const seed = pickSeedEvent(events);
+            const similarPast = await findSimilarPastEvents(seed, 3);
+            if (similarPast.length === 0) return undefined;
+
+            const summary = await openaiService.generateHistoricalPastSummary({
+                category: normalizeUnifiedEventCategory(seed.category),
+                similarPastEvents: similarPast,
+                currentSeed: seed,
+            });
+
+            const ctx: IncidentPastContext = {
+                matchedEvent: summary.matched_event,
+                similaritySummary: summary.similarity_summary,
+                pastDamages: summary.past_damages,
+                pastProcedures: summary.past_procedures,
+                matchConfidence: computeMatchConfidence(seed, similarPast),
+            };
+
+            const hasContent =
+                (ctx.pastDamages?.length ?? 0) > 0 ||
+                (ctx.pastProcedures?.length ?? 0) > 0 ||
+                !!ctx.matchedEvent;
+            return hasContent ? ctx : undefined;
+        }
+
+        const [narrative, pastContext] = groupsOnly
+            ? [undefined, undefined]
+            : await Promise.all([
+                openaiService.generateIncidentDetailNarrative({ events }),
+                buildPastContext(),
+            ]);
 
         const response: IncidentDetailResponse = {
             groups: groups.map(toEventGroupSummary),
             ...(narrative ? { narrative } : {}),
+            ...(pastContext ? { pastContext } : {}),
             eventCount: events.length,
         };
 
