@@ -297,7 +297,11 @@ function HistoricalAnalysisBody({
 // ─── Incident detail caches (client-side, 10 min) ────────────────────────────
 
 const incidentGroupsCache = new Map<string, { data: IncidentDetailResponse; expiresAt: number }>();
-const incidentNarrativeCache = new Map<string, { data: import('@/lib/services/openai-service').IncidentDetailNarrative; expiresAt: number }>();
+type IncidentPastContext = import('@/app/api/risk-assessment/incident-details/route').IncidentPastContext;
+const incidentNarrativeCache = new Map<string, {
+  data: { narrative: IncidentNarrative; pastContext: IncidentPastContext | null };
+  expiresAt: number;
+}>();
 
 // ─── LearnMoreButton ──────────────────────────────────────────────────────────
 
@@ -339,6 +343,7 @@ function GroupAccordionItem({
   totalGroups: number;
 }) {
   const [narrative, setNarrative] = useState<IncidentNarrative | null>(null);
+  const [pastContext, setPastContext] = useState<IncidentPastContext | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -347,7 +352,8 @@ function GroupAccordionItem({
     const cacheKey = group.memberIds.slice().sort().join(',');
     const cached = incidentNarrativeCache.get(cacheKey);
     if (cached && cached.expiresAt > Date.now()) {
-      setNarrative(cached.data);
+      setNarrative(cached.data.narrative);
+      setPastContext(cached.data.pastContext);
       return;
     }
     setLoading(true);
@@ -362,8 +368,12 @@ function GroupAccordionItem({
       })
       .then((d) => {
         if (d.narrative) {
-          incidentNarrativeCache.set(cacheKey, { data: d.narrative, expiresAt: Date.now() + 10 * 60 * 1000 });
+          incidentNarrativeCache.set(cacheKey, {
+            data: { narrative: d.narrative, pastContext: d.pastContext ?? null },
+            expiresAt: Date.now() + 10 * 60 * 1000,
+          });
           setNarrative(d.narrative);
+          setPastContext(d.pastContext ?? null);
         }
       })
       .catch((e: Error) => setError(e.message ?? 'Failed to load details'))
@@ -422,9 +432,27 @@ function GroupAccordionItem({
               <DetailSection title="Affected Areas" body={narrative.affectedAreas} />
               <DetailSection title="Key Statistics" body={narrative.keyStatistics} />
               {narrative.historicalContext && <DetailSection title="Historical Context" body={narrative.historicalContext} />}
-              <p className="text-[10px] text-slate-400">
-                {group.memberIds.length} record(s) · AI-assisted summary, verify before acting.
-              </p>
+
+              {pastContext && (pastContext.matchedEvent || (pastContext.pastDamages?.length ?? 0) > 0 || (pastContext.pastProcedures?.length ?? 0) > 0) && (
+                <div className="space-y-4 rounded-xl border border-slate-200 bg-slate-50/60 p-3">
+                  {pastContext.matchedEvent && (
+                    <div>
+                      <div className="flex items-center justify-between gap-2 mb-1">
+                        <h4 className="text-xs font-extrabold uppercase tracking-widest text-slate-500">Closest Past Incident</h4>
+                        {typeof pastContext.matchConfidence === 'number' && (
+                          <span className="text-[10px] font-bold text-slate-400">{pastContext.matchConfidence}% match</span>
+                        )}
+                      </div>
+                      <p className="text-sm leading-relaxed text-slate-700">{renderEmphasis(pastContext.matchedEvent)}</p>
+                      {pastContext.similaritySummary && (
+                        <p className="text-[13px] leading-relaxed text-slate-600 mt-1">{renderEmphasis(pastContext.similaritySummary)}</p>
+                      )}
+                    </div>
+                  )}
+                  <DetailBulletSection title="Past Damages / Losses" items={pastContext.pastDamages} />
+                  <DetailBulletSection title="Past Procedures" items={pastContext.pastProcedures} />
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -542,6 +570,24 @@ function DetailSection({ title, body }: { title: string; body: unknown }) {
           </p>
         ))}
       </div>
+    </div>
+  );
+}
+
+function DetailBulletSection({ title, items }: { title: string; items?: string[] }) {
+  const cleaned = (items ?? []).map((s) => s?.trim()).filter(Boolean) as string[];
+  if (cleaned.length === 0) return null;
+  return (
+    <div>
+      <h4 className="text-xs font-extrabold uppercase tracking-widest text-slate-500 mb-1.5">{title}</h4>
+      <ul className="space-y-1.5">
+        {cleaned.map((item, i) => (
+          <li key={i} className="flex gap-2 text-sm leading-relaxed text-slate-700">
+            <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-slate-400" />
+            <span>{renderEmphasis(item)}</span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

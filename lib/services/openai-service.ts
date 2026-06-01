@@ -1272,6 +1272,38 @@ Rules:
 
     // ─── DB-driven methods (UnifiedEvent as source of truth) ───────────────
 
+    /**
+     * Recursively walks any properties object and returns a flat { "dot.path": value }
+     * map containing ONLY leaves that are non-null, non-zero, non-empty-string, and
+     * non-empty-array. Works for every UnifiedEvent category without knowing field names
+     * in advance — the AI just receives the meaningful data points.
+     */
+    private flattenEventStats(
+        obj: unknown,
+        prefix = '',
+        out: Record<string, unknown> = {},
+    ): Record<string, unknown> {
+        if (obj === null || obj === undefined) return out;
+        if (Array.isArray(obj)) {
+            const nonEmpty = (obj as unknown[]).filter(
+                (v) => v !== null && v !== undefined && v !== '' && v !== 0,
+            );
+            if (nonEmpty.length > 0) out[prefix] = nonEmpty;
+            return out;
+        }
+        if (typeof obj === 'object') {
+            for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
+                this.flattenEventStats(v, prefix ? `${prefix}.${k}` : k, out);
+            }
+            return out;
+        }
+        // Leaf value — keep only if meaningful
+        if (obj !== null && obj !== undefined && obj !== '' && obj !== 0 && obj !== '0.00K') {
+            out[prefix] = obj;
+        }
+        return out;
+    }
+
     private projectEventForAI(e: UnifiedEventDoc) {
         return {
             _ref: String(e._id),
@@ -1451,27 +1483,52 @@ Return JSON exactly: {"overview": "...", "currentStatus": "...", "affectedAreas"
         } = {};
         if (input.similarPastEvents.length === 0) return fallback;
 
+        // Build a flat stats map for each past event — every non-null, non-zero leaf
+        // value from the entire properties object, regardless of category or field name.
+        const pastStats = input.similarPastEvents.map((e, i) => ({
+            index: i,
+            name: e.name,
+            location: e.location,
+            lat: e.lat ?? null,
+            lng: e.lng ?? null,
+            issuedAt: e.issuedAt,
+            formattedTimestamp: formatEventTimestamp(e),
+            stats: this.flattenEventStats(e.properties),
+        }));
+
+        const seedStats = this.flattenEventStats(input.currentSeed.properties);
+
         return this.callOpenAI(
             [
                 {
                     role: 'system',
                     content: `${PLAIN_ENGLISH_STYLE_RULES}
 
-You are summarizing up to 3 past ${input.category} events similar to today's active situation. Cite specific event names, friendly dates (e.g. "June 12, 2023, 4:15 PM"), locations, fatalities, injuries, property/crop damage, and federal aid figures as found in the data. Wrap key facts in **double asterisks**.
+You are summarizing up to 3 past ${input.category} events similar to today's active situation. Wrap key facts in **double asterisks**.
+
+DATA SOURCE — PAST_EVENT_STATS:
+Each entry in PAST_EVENT_STATS contains a "stats" object. Every key-value pair in "stats" is a meaningful data point already extracted from the event's properties (nulls, zeros, and empty values were removed before sending). The keys use dot-notation paths (e.g. "fema_declaration.totalFederalAidUsd", "landslide.deathsDirect", "storm.intensity.display", "flood.affectedCounties"). You do not need to know the category schema — just read every key-value pair and use the values.
+
+RULES:
+1. Every value present in "stats" MUST be used in the appropriate bullet. Never drop a data point.
+2. If "stats" is empty for a past event, describe what this category of hazard is known to cause from domain knowledge.
+3. Coordinates (lat/lng) are provided when available — use them to name the place in plain English (e.g. "near downtown Memphis" not raw numbers). Never output raw coordinates.
+4. Use friendly dates from "formattedTimestamp" (e.g. "May 22, 2026, 3:45 PM").
+5. Classify each value as damage/loss (deaths, injuries, property damage, crop damage, acres burned, structures destroyed) OR procedural (federal aid amounts, programs activated, declaration numbers, evacuation orders, shelter activations) and put it in the correct bullet list.
 
 Return JSON with exactly these keys:
-- matched_event: A single sentence identifying the closest comparable past event type. It must state: the event name or type, the location, the friendly date and time (e.g. "June 12, 2023, 4:15 PM"), and the most impactful statistic from the SEED_PROPERTIES (e.g. intensity level, femaDisasterNumber, total federal aid, deaths, injuries, property damage, acres burned). Format example: "**[Event Name]** — **[Location]**, **[Date/Time]** — **[key stat]**". Wrap specific facts in **double asterisks**.
-- similarity_summary: 1-2 plain sentences explaining why today's conditions resemble that past situation.
-- past_damages: string[] — Bullets describing the physical damage and human impact this type of hazard has caused in the past. Prefer exact figures from the event data (deaths, injuries, property damage in dollars, acres burned, structures destroyed) when they are present. When the event data contains no damage statistics (this is common for weather advisories such as marine, coastal, storm, or hazardous alerts, which do not carry post-event reports), write what this category of hazard is known to cause based on domain knowledge — for example capsizings and vessel losses for marine events, respiratory illness and hospital visits for hazardous air quality, structural damage and power outages for storms. Always write at least 2 meaningful bullets. Do NOT include any response actions or procedures — those belong in past_procedures.
-- past_procedures: string[] — Bullets describing what responders and officials have done in response to this type of hazard. Prefer specific actions from the event data (emergency declarations, federal aid disbursements with exact dollar amounts, evacuation orders, shelter activations). When the event data lacks procedural detail, describe the typical response steps taken for this category of hazard based on domain knowledge. Always write at least 2 meaningful bullets. Do NOT include damage statistics here — those belong in past_damages.`,
+- matched_event: One sentence identifying the closest past event. Must include: event name, location (use lat/lng to name it plainly if location string is vague), friendly date, and the single most impactful stat from PAST_EVENT_STATS[0].stats. Format: "**[Name]** — **[Location]**, **[Date]** — **[key stat]**".
+- similarity_summary: 1-2 sentences explaining why today resembles that past situation.
+- past_damages: string[] — One bullet per past event that has damage/loss data. Use every damage/casualty value from "stats". For events with no damage stats, write what the category is known to cause. Minimum 2 bullets. No response actions here.
+- past_procedures: string[] — One bullet per past event that has procedural data. Use every aid/program/declaration value from "stats". Fall back to typical response steps only when stats has no procedural data. Minimum 2 bullets. No damage stats here.`,
                 },
                 {
                     role: 'user',
-                    content: `CURRENT SEED EVENT:\n${JSON.stringify(this.projectEventForAI(input.currentSeed))}\n\nSEED_PROPERTIES (use these raw fields for matched_event statistics):\n${JSON.stringify(input.currentSeed.properties ?? {})}\n\nSIMILAR PAST EVENTS:\n${JSON.stringify(input.similarPastEvents.map((e) => this.projectEventForAI(e)))}`,
+                    content: `CURRENT SEED EVENT:\n${JSON.stringify(this.projectEventForAI(input.currentSeed))}\n\nSEED_STATS (meaningful data points from current event):\n${JSON.stringify(seedStats)}\n\nPAST_EVENT_STATS (all meaningful data points per past event — use every value):\n${JSON.stringify(pastStats)}`,
                 },
             ],
             fallback,
-            { max_tokens: 900 },
+            { max_tokens: 1200 },
         );
     }
 
