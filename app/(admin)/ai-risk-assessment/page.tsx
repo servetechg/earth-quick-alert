@@ -20,10 +20,10 @@ import {
   saveCachedAiRiskReport,
 } from "@/lib/risk-assessment/client-report-cache";
 import {
-  Sparkles, ShieldAlert, FileDown, Loader2,
+  Sparkles, ShieldAlert, FileDown, Loader2, Mail,
   Activity, Users, AlertTriangle, Gauge, CheckCircle2,
   History, TrendingDown, ClipboardList, Radio, Lightbulb,
-  RefreshCw, MapPin, ChevronDown, ChevronUp, BookOpen,
+  RefreshCw, MapPin, ChevronDown, ChevronUp, BookOpen, Check,
 } from "lucide-react";
 import jsPDF from "jspdf";
 import {
@@ -32,6 +32,14 @@ import {
 } from "recharts";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { cn } from "@/lib/utils";
 import type {
   RiskSummaryPayload, SeverityBucket, HistoricalTabPayload,
   RecommendationItem, HistoricalAnalysis, EventGroupSummary, BulletWithRefs,
@@ -296,16 +304,56 @@ function HistoricalAnalysisBody({
 
 // ─── Incident detail caches (client-side, 10 min) ────────────────────────────
 
-const incidentGroupsCache = new Map<string, { data: IncidentDetailResponse; expiresAt: number }>();
+type IncidentNarrative = import('@/lib/services/openai-service').IncidentDetailNarrative;
 type IncidentPastContext = import('@/app/api/risk-assessment/incident-details/route').IncidentPastContext;
+
+const incidentGroupsCache = new Map<string, { data: IncidentDetailResponse; expiresAt: number }>();
 const incidentNarrativeCache = new Map<string, {
   data: { narrative: IncidentNarrative; pastContext: IncidentPastContext | null };
   expiresAt: number;
 }>();
 
+type IncidentNarrativeBundle = {
+  narrative: IncidentNarrative;
+  pastContext: IncidentPastContext | null;
+};
+
+function groupMemberKey(memberIds: string[]): string {
+  return memberIds.slice().sort().join(',');
+}
+
+async function fetchGroupNarrativeBundle(memberIds: string[]): Promise<IncidentNarrativeBundle | null> {
+  const cacheKey = groupMemberKey(memberIds);
+  const cached = incidentNarrativeCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return cached.data;
+
+  const res = await fetch('/api/risk-assessment/incident-details', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ eventIds: memberIds }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message ?? err.error ?? 'Failed to load incident summary');
+  }
+  const data = await res.json() as IncidentDetailResponse;
+  if (!data.narrative) return null;
+
+  const bundle: IncidentNarrativeBundle = {
+    narrative: data.narrative,
+    pastContext: data.pastContext ?? null,
+  };
+  incidentNarrativeCache.set(cacheKey, { data: bundle, expiresAt: Date.now() + 10 * 60 * 1000 });
+  return bundle;
+}
+
+function narrativeTextForPdf(body: unknown): string {
+  return stripEmphasis(dropAbsenceSentences(normalizeAiBullet(body)) ?? '');
+}
+
 // ─── LearnMoreButton ──────────────────────────────────────────────────────────
 
-function LearnMoreButton({ eventIds, bulletText }: { eventIds: string[]; bulletText: string }) {
+function LearnMoreButton({ eventIds, bulletText, canSendEmail }: { eventIds: string[]; bulletText: string; canSendEmail: boolean }) {
   const [open, setOpen] = useState(false);
   if (eventIds.length === 0) return null;
   return (
@@ -324,61 +372,29 @@ function LearnMoreButton({ eventIds, bulletText }: { eventIds: string[]; bulletT
         onOpenChange={setOpen}
         eventIds={eventIds}
         bulletText={bulletText}
+        canSendEmail={canSendEmail}
       />
     </>
   );
 }
 
-// ─── GroupAccordionItem — one incident, fetches its own narrative on open ─────
-
-type IncidentNarrative = import('@/lib/services/openai-service').IncidentDetailNarrative;
+// ─── GroupAccordionItem — one incident, narrative loaded by dialog ────────────
 
 function GroupAccordionItem({
   group, isOpen, onToggle, groupIndex, totalGroups,
+  narrativeBundle, summaryLoading, summaryError,
 }: {
   group: EventGroupSummary;
   isOpen: boolean;
   onToggle: () => void;
   groupIndex: number;
   totalGroups: number;
+  narrativeBundle?: IncidentNarrativeBundle | null;
+  summaryLoading?: boolean;
+  summaryError?: string | null;
 }) {
-  const [narrative, setNarrative] = useState<IncidentNarrative | null>(null);
-  const [pastContext, setPastContext] = useState<IncidentPastContext | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!isOpen || narrative || loading || error) return;
-    const cacheKey = group.memberIds.slice().sort().join(',');
-    const cached = incidentNarrativeCache.get(cacheKey);
-    if (cached && cached.expiresAt > Date.now()) {
-      setNarrative(cached.data.narrative);
-      setPastContext(cached.data.pastContext);
-      return;
-    }
-    setLoading(true);
-    fetch('/api/risk-assessment/incident-details', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ eventIds: group.memberIds }),
-    })
-      .then(async (r) => {
-        if (!r.ok) throw new Error((await r.json()).message ?? 'Failed to load');
-        return r.json() as Promise<IncidentDetailResponse>;
-      })
-      .then((d) => {
-        if (d.narrative) {
-          incidentNarrativeCache.set(cacheKey, {
-            data: { narrative: d.narrative, pastContext: d.pastContext ?? null },
-            expiresAt: Date.now() + 10 * 60 * 1000,
-          });
-          setNarrative(d.narrative);
-          setPastContext(d.pastContext ?? null);
-        }
-      })
-      .catch((e: Error) => setError(e.message ?? 'Failed to load details'))
-      .finally(() => setLoading(false));
-  }, [isOpen, group.memberIds, narrative, loading, error]);
+  const narrative = narrativeBundle?.narrative ?? null;
+  const pastContext = narrativeBundle?.pastContext ?? null;
 
   const src = SOURCE_LABEL_MAP[group.source] ?? { label: group.source, tone: 'bg-slate-50 text-slate-700 border-slate-200' };
 
@@ -414,15 +430,15 @@ function GroupAccordionItem({
           {/* Full chip strip */}
           <EventChipStrip group={group} />
 
-          {loading && (
+          {summaryLoading && (
             <div className="flex items-center gap-2 text-sm text-slate-500 py-4">
               <Loader2 className="h-4 w-4 animate-spin" />
               Generating in-depth summary…
             </div>
           )}
 
-          {error && (
-            <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>
+          {summaryError && (
+            <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{summaryError}</div>
           )}
 
           {narrative && (
@@ -464,16 +480,20 @@ function GroupAccordionItem({
 // ─── IncidentDetailDialog ─────────────────────────────────────────────────────
 
 function IncidentDetailDialog({
-  open, onOpenChange, eventIds, bulletText,
+  open, onOpenChange, eventIds, bulletText, canSendEmail,
 }: {
   open: boolean;
   onOpenChange: (b: boolean) => void;
   eventIds: string[];
   bulletText: string;
+  canSendEmail: boolean;
 }) {
   const [groups, setGroups] = useState<EventGroupSummary[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [narrativeBundles, setNarrativeBundles] = useState<Map<string, IncidentNarrativeBundle>>(new Map());
+  const [summariesLoading, setSummariesLoading] = useState(false);
+  const [summariesError, setSummariesError] = useState<string | null>(null);
   // Only one accordion item open at a time; null = all closed
   const [openGroupKey, setOpenGroupKey] = useState<string | null>(null);
 
@@ -508,9 +528,59 @@ function IncidentDetailDialog({
       .finally(() => setLoading(false));
   }, [open, eventIds]);
 
+  useEffect(() => {
+    if (!open || groups.length === 0) return;
+
+    let cancelled = false;
+    setSummariesLoading(true);
+    setSummariesError(null);
+    setNarrativeBundles(new Map());
+
+    Promise.all(
+      groups.map(async (g) => {
+        const key = groupMemberKey(g.memberIds);
+        const bundle = await fetchGroupNarrativeBundle(g.memberIds);
+        return { key, bundle };
+      }),
+    )
+      .then((results) => {
+        if (cancelled) return;
+        const map = new Map<string, IncidentNarrativeBundle>();
+        for (const { key, bundle } of results) {
+          if (bundle) map.set(key, bundle);
+        }
+        setNarrativeBundles(map);
+        if (map.size !== groups.length) {
+          setSummariesError('Some incident summaries could not be generated. Email will unlock when all are ready.');
+        }
+      })
+      .catch((e: Error) => {
+        if (!cancelled) {
+          setSummariesError(e.message ?? 'Failed to generate incident summaries.');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setSummariesLoading(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [open, groups]);
+
+  const summariesReady = groups.length > 0
+    && !summariesLoading
+    && !summariesError
+    && groups.every((g) => narrativeBundles.has(groupMemberKey(g.memberIds)));
+
   // Reset accordion state when dialog closes
   useEffect(() => {
-    if (!open) { setOpenGroupKey(null); setGroups([]); setError(null); }
+    if (!open) {
+      setOpenGroupKey(null);
+      setGroups([]);
+      setError(null);
+      setNarrativeBundles(new Map());
+      setSummariesLoading(false);
+      setSummariesError(null);
+    }
   }, [open]);
 
   return (
@@ -537,7 +607,8 @@ function IncidentDetailDialog({
         {groups.length > 0 && (
           <div className="space-y-2">
             {groups.map((g) => {
-              const key = g.memberIds.slice().sort().join(',');
+              const key = groupMemberKey(g.memberIds);
+              const bundle = narrativeBundles.get(key);
               return (
                 <GroupAccordionItem
                   key={key}
@@ -546,9 +617,41 @@ function IncidentDetailDialog({
                   onToggle={() => setOpenGroupKey(openGroupKey === key ? null : key)}
                   groupIndex={groups.indexOf(g)}
                   totalGroups={groups.length}
+                  narrativeBundle={bundle}
+                  summaryLoading={summariesLoading && !bundle}
+                  summaryError={summariesError && !bundle ? summariesError : null}
                 />
               );
             })}
+            {canSendEmail && (
+              <div className="flex flex-col items-end gap-2 border-t border-slate-100 pt-4">
+                {(summariesLoading || !summariesReady) && (
+                  <p className="text-xs text-slate-500">
+                    {summariesLoading
+                      ? 'Generating full incident summaries… Send Email will unlock when ready.'
+                      : summariesError ?? 'Waiting for all incident summaries before sending.'}
+                  </p>
+                )}
+                <SendReportEmailButton
+                  disabled={!summariesReady}
+                  getPdfPayload={() => {
+                    if (!summariesReady) return null;
+                    const details = groups.map((g) => ({
+                      group: g,
+                      bundle: narrativeBundles.get(groupMemberKey(g.memberIds)) ?? null,
+                    }));
+                    const doc = createIncidentBriefPdf(bulletText, details);
+                    const date = new Date().toISOString().slice(0, 10);
+                    return {
+                      pdfBase64: pdfDocToBase64(doc),
+                      filename: `Ready2Go-Incident-Brief-${date}.pdf`,
+                      reportTitle: 'Incident Detail Brief',
+                      summaryLine: `${groups.length} related incident group(s) · ${stripEmphasis(bulletText).slice(0, 180)}`,
+                    };
+                  }}
+                />
+              </div>
+            )}
           </div>
         )}
       </DialogContent>
@@ -594,7 +697,7 @@ function DetailBulletSection({ title, items }: { title: string; items?: string[]
 
 // ─── Category sub-block with scroll + collapse ────────────────────────────────
 
-function CategorySubBlock({ cat }: { cat: SeverityBucket['categories'][number] }) {
+function CategorySubBlock({ cat, canSendEmail }: { cat: SeverityBucket['categories'][number]; canSendEmail: boolean }) {
   const COLLAPSE_AFTER = 1;
   const [expanded, setExpanded] = useState(false);
   const bullets: BulletWithRefs[] = (cat.bullets ?? [])
@@ -626,7 +729,7 @@ function CategorySubBlock({ cat }: { cat: SeverityBucket['categories'][number] }
               </div>
               {groups[i] && <div className="pl-3.5"><EventChipStrip group={groups[i]} /></div>}
               <div className="pl-3.5">
-                <LearnMoreButton eventIds={b.eventIds} bulletText={b.text} />
+                <LearnMoreButton eventIds={b.eventIds} bulletText={b.text} canSendEmail={canSendEmail} />
               </div>
             </li>
           ))}
@@ -656,7 +759,7 @@ function CategorySubBlock({ cat }: { cat: SeverityBucket['categories'][number] }
 
 // ─── Severity Levels grid ─────────────────────────────────────────────────────
 
-function SeverityLevelGrid({ buckets, loading }: { buckets: SeverityBucket[]; loading: boolean }) {
+function SeverityLevelGrid({ buckets, loading, canSendEmail }: { buckets: SeverityBucket[]; loading: boolean; canSendEmail: boolean }) {
   if (loading) {
     return (
       <Card className="rounded-2xl bg-white p-8 text-center shadow-xl shadow-slate-200/50 border-slate-100">
@@ -692,7 +795,7 @@ function SeverityLevelGrid({ buckets, loading }: { buckets: SeverityBucket[]; lo
             </div>
             <div className="space-y-4">
               {bucket.categories.map((cat) => (
-                <CategorySubBlock key={cat.category} cat={cat} />
+                <CategorySubBlock key={cat.category} cat={cat} canSendEmail={canSendEmail} />
               ))}
             </div>
           </Card>
@@ -783,7 +886,54 @@ function HistoricalAnalysisSection({
 
 // ─── PDF export ───────────────────────────────────────────────────────────────
 
-function buildPdf(
+type PdfEmailPayload = {
+  pdfBase64: string;
+  filename: string;
+  reportTitle: string;
+  summaryLine?: string;
+};
+
+type ReportEmailAudience = 'sub-admin' | 'responder' | 'both';
+
+const REPORT_EMAIL_AUDIENCE_LABELS: Record<ReportEmailAudience, string> = {
+  'sub-admin': 'Sub-admins only',
+  responder: 'Responders only',
+  both: 'Sub-admins & responders',
+};
+
+const REPORT_EMAIL_AUDIENCE_SHORT: Record<ReportEmailAudience, string> = {
+  'sub-admin': 'Sub-admins',
+  responder: 'Responders',
+  both: 'All recipients',
+};
+
+function pdfDocToBase64(doc: jsPDF): string {
+  const bytes = new Uint8Array(doc.output('arraybuffer'));
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary);
+}
+
+function writePdfHeader(doc: jsPDF, title: string, rightLines: string[]) {
+  const margin = 48;
+  const pageW = doc.internal.pageSize.getWidth();
+  doc.setFillColor(35, 56, 102);
+  doc.rect(0, 0, pageW, 70, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(20);
+  doc.text('Ready2Go', margin, 32);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  doc.text(title, margin, 50);
+  doc.setFontSize(9);
+  rightLines.forEach((line, i) => {
+    doc.text(line, pageW - margin, 32 + i * 18, { align: 'right' });
+  });
+  doc.setTextColor(20, 25, 40);
+}
+
+function createRiskReportPdf(
   summary: RiskSummaryPayload,
   severityBuckets: SeverityBucket[],
   tabDataMap: Map<string, HistoricalTabPayload>,
@@ -795,18 +945,11 @@ function buildPdf(
 
   const ensure = (h: number) => { if (y + h > pageH - margin) { doc.addPage(); y = margin; } };
 
-  // Header
-  doc.setFillColor(35, 56, 102);
-  doc.rect(0, 0, pageW, 70, "F");
-  doc.setTextColor(255, 255, 255); doc.setFont("helvetica", "bold"); doc.setFontSize(20);
-  doc.text("Ready2Go", margin, 32);
-  doc.setFont("helvetica", "normal"); doc.setFontSize(10);
-  doc.text("Situational Risk Assessment Report", margin, 50);
-  doc.setFontSize(9);
-  doc.text(`Generated: ${new Date(summary.generated_at).toLocaleString()}`, pageW - margin, 32, { align: "right" });
-  doc.text(`Overall Risk: ${summary.overall_risk_level}`, pageW - margin, 50, { align: "right" });
+  writePdfHeader(doc, 'Situational Risk Assessment Report', [
+    `Generated: ${new Date(summary.generated_at).toLocaleString()}`,
+    `Overall Risk: ${summary.overall_risk_level}`,
+  ]);
   y = 100;
-  doc.setTextColor(20, 25, 40);
 
   const writeKv = (label: string, value: string) => {
     ensure(18); doc.setFont("helvetica", "bold"); doc.setFontSize(10); doc.setTextColor(80, 90, 110);
@@ -830,14 +973,12 @@ function buildPdf(
     y += 12;
   };
 
-  // Severity Levels
   for (const bucket of severityBuckets) {
     for (const cat of bucket.categories) {
       writeBullets(`${bucket.severity} — ${humanizeCategory(cat.category)}`, (cat.bullets ?? []).map((b) => b.text));
     }
   }
 
-  // Historical tabs
   ensure(60);
   doc.setFont("helvetica", "bold"); doc.setFontSize(13); doc.setTextColor(35, 56, 102);
   doc.text("Historical Context & Mitigation Strategy", margin, y); y += 8;
@@ -859,15 +1000,260 @@ function buildPdf(
       writeBullets(`${humanizeCategory(cat)} — Strategic Actions`, payload.recommendations_list.map((r) => `[${r.priority}] Step ${r.step ?? 1}: ${stripEmphasis(r.action)}`));
     }
     y += 6;
-  };
+  }
 
-  // Footer
   const pageCount = doc.getNumberOfPages();
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i); doc.setFontSize(8); doc.setTextColor(140, 150, 170);
     doc.text(`Ready2Go · Confidential Operational Report · Page ${i} of ${pageCount}`, pageW / 2, pageH - 20, { align: "center" });
   }
-  doc.save(`Ready2Go-Risk-Report-${new Date(summary.generated_at).toISOString().slice(0, 10)}.pdf`);
+  return doc;
+}
+
+type IncidentBriefPdfDetail = {
+  group: EventGroupSummary;
+  bundle: IncidentNarrativeBundle | null;
+};
+
+function writePdfTextBlock(
+  doc: jsPDF,
+  margin: number,
+  contentW: number,
+  pageH: number,
+  yRef: { y: number },
+  title: string,
+  body: string,
+) {
+  const ensure = (h: number) => {
+    if (yRef.y + h > pageH - margin) { doc.addPage(); yRef.y = margin; }
+  };
+  if (!body.trim()) return;
+
+  ensure(30);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  doc.setTextColor(35, 56, 102);
+  doc.text(title, margin, yRef.y);
+  yRef.y += 12;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  doc.setTextColor(40, 45, 60);
+  doc.splitTextToSize(body, contentW).forEach((line: string) => {
+    ensure(14);
+    doc.text(line, margin, yRef.y);
+    yRef.y += 13;
+  });
+  yRef.y += 8;
+}
+
+function createIncidentBriefPdf(bulletText: string, details: IncidentBriefPdfDetail[]) {
+  const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+  const margin = 48;
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const contentW = pageW - margin * 2;
+  const yRef = { y: margin };
+  const ensure = (h: number) => { if (yRef.y + h > pageH - margin) { doc.addPage(); yRef.y = margin; } };
+
+  writePdfHeader(doc, 'Incident Detail Brief', [
+    `Generated: ${new Date().toLocaleString()}`,
+    `${details.length} incident group(s)`,
+  ]);
+  yRef.y = 100;
+
+  writePdfTextBlock(doc, margin, contentW, pageH, yRef, 'AI Summary', stripEmphasis(bulletText));
+  yRef.y += 4;
+
+  details.forEach(({ group, bundle }, index) => {
+    ensure(50);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.setTextColor(35, 56, 102);
+    doc.text(`Incident ${index + 1}: ${stripEmphasis(group.name)}`, margin, yRef.y);
+    yRef.y += 14;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(40, 45, 60);
+    const meta = [
+      `Severity: ${group.severity}`,
+      `Location: ${group.primaryLocation}${group.state ? `, ${group.state}` : ''}`,
+      `Source: ${SOURCE_LABEL_MAP[group.source]?.label ?? group.source}`,
+      `Updated: ${group.formattedTimestamp}`,
+    ];
+    if (group.affectedCounties.length) meta.push(`Counties: ${group.affectedCounties.join(', ')}`);
+    meta.forEach((line) => {
+      ensure(14);
+      doc.text(line, margin, yRef.y);
+      yRef.y += 13;
+    });
+    yRef.y += 6;
+
+    const narrative = bundle?.narrative;
+    if (narrative) {
+      writePdfTextBlock(doc, margin, contentW, pageH, yRef, 'Overview', narrativeTextForPdf(narrative.overview));
+      writePdfTextBlock(doc, margin, contentW, pageH, yRef, 'Current Status', narrativeTextForPdf(narrative.currentStatus));
+      writePdfTextBlock(doc, margin, contentW, pageH, yRef, 'Affected Areas', narrativeTextForPdf(narrative.affectedAreas));
+      writePdfTextBlock(doc, margin, contentW, pageH, yRef, 'Key Statistics', narrativeTextForPdf(narrative.keyStatistics));
+      writePdfTextBlock(doc, margin, contentW, pageH, yRef, 'Historical Context', narrativeTextForPdf(narrative.historicalContext));
+    }
+
+    const pastContext = bundle?.pastContext;
+    if (pastContext?.matchedEvent) {
+      writePdfTextBlock(doc, margin, contentW, pageH, yRef, 'Closest Past Incident', narrativeTextForPdf(pastContext.matchedEvent));
+    }
+    if (pastContext?.pastDamages?.length) {
+      writePdfTextBlock(
+        doc, margin, contentW, pageH, yRef,
+        'Past Damages / Losses',
+        pastContext.pastDamages.map((s) => `• ${narrativeTextForPdf(s)}`).join('\n'),
+      );
+    }
+    if (pastContext?.pastProcedures?.length) {
+      writePdfTextBlock(
+        doc, margin, contentW, pageH, yRef,
+        'Past Procedures',
+        pastContext.pastProcedures.map((s) => `• ${narrativeTextForPdf(s)}`).join('\n'),
+      );
+    }
+
+    yRef.y += 10;
+  });
+
+  const pageCount = doc.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setFontSize(8);
+    doc.setTextColor(140, 150, 170);
+    doc.text(`Ready2Go · Confidential Operational Report · Page ${i} of ${pageCount}`, pageW / 2, pageH - 20, { align: 'center' });
+  }
+  return doc;
+}
+
+function buildPdf(
+  summary: RiskSummaryPayload,
+  severityBuckets: SeverityBucket[],
+  tabDataMap: Map<string, HistoricalTabPayload>,
+) {
+  createRiskReportPdf(summary, severityBuckets, tabDataMap)
+    .save(`Ready2Go-Risk-Report-${new Date(summary.generated_at).toISOString().slice(0, 10)}.pdf`);
+}
+
+function SendReportEmailButton({
+  disabled,
+  getPdfPayload,
+  className,
+}: {
+  disabled?: boolean;
+  getPdfPayload: () => PdfEmailPayload | null;
+  className?: string;
+}) {
+  const { me } = useUser();
+  const [sending, setSending] = useState(false);
+  const [audience, setAudience] = useState<ReportEmailAudience>('both');
+  const showAudiencePicker = me?.role === 'super-admin';
+  const isDisabled = Boolean(disabled || sending);
+
+  const handleSend = async () => {
+    const payload = getPdfPayload();
+    if (!payload) return;
+    setSending(true);
+    try {
+      const res = await fetch('/api/risk-assessment/send-report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...payload,
+          ...(showAudiencePicker ? { audience } : {}),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? 'Failed to send report email');
+      toast.success(`Report emailed to ${data.sentCount} recipient(s).`, {
+        description: data.partial ? 'Some recipients could not be reached.' : undefined,
+      });
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : 'Failed to send report email.');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  if (!showAudiencePicker) {
+    return (
+      <Button
+        type="button"
+        onClick={handleSend}
+        disabled={isDisabled}
+        variant="outline"
+        className={className ?? 'h-11 rounded-xl border-slate-200 px-5 text-sm font-bold'}
+      >
+        {sending
+          ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Sending…</>
+          : <><Mail className="mr-2 h-4 w-4" />Send Email Report</>}
+      </Button>
+    );
+  }
+
+  return (
+    <div
+      className={cn(
+        'inline-flex h-11 items-stretch overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs',
+        isDisabled && 'pointer-events-none opacity-50',
+        className,
+      )}
+    >
+      <button
+        type="button"
+        onClick={handleSend}
+        disabled={isDisabled}
+        className="flex min-w-0 items-center gap-2 px-4 text-sm font-bold text-slate-800 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed"
+      >
+        {sending ? (
+          <>
+            <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+            <span>Sending…</span>
+          </>
+        ) : (
+          <>
+            <Mail className="h-4 w-4 shrink-0" />
+            <span className="truncate">Send Email Report</span>
+            <span className="hidden text-xs font-semibold text-slate-500 sm:inline">
+              · {REPORT_EMAIL_AUDIENCE_SHORT[audience]}
+            </span>
+          </>
+        )}
+      </button>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            disabled={isDisabled}
+            className="flex items-center justify-center border-l border-slate-200 px-2.5 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed"
+            aria-label="Choose email recipients"
+          >
+            <ChevronDown className="h-4 w-4 text-slate-500" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-56">
+          <DropdownMenuLabel className="text-xs font-bold uppercase tracking-wider text-slate-500">
+            Send to
+          </DropdownMenuLabel>
+          {(Object.entries(REPORT_EMAIL_AUDIENCE_LABELS) as [ReportEmailAudience, string][]).map(
+            ([value, label]) => (
+              <DropdownMenuItem
+                key={value}
+                onSelect={() => setAudience(value)}
+                className="flex items-center gap-2 text-sm font-semibold"
+              >
+                <span className="flex-1">{label}</span>
+                {audience === value && <Check className="h-4 w-4 text-[#33375D]" />}
+              </DropdownMenuItem>
+            ),
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  );
 }
 
 // ─── Main page ────────────────────────────────────────────────────────────────
@@ -993,12 +1379,25 @@ export default function RiskAssessment() {
   }, [scopeBody, fetchHistoricalCategory, reportCacheKey]);
 
   const canDownload = summary !== null && !loadingSeverity && loadingCategories.size === 0;
+  const canSendEmail = me?.role === 'super-admin' || me?.role === 'sub-admin';
 
   const downloadPdf = () => {
     if (!summary) return;
     toast.success("Generating PDF Report…");
     buildPdf(summary, severityBuckets, tabDataMap);
   };
+
+  const fullReportPdfPayload = useCallback((): PdfEmailPayload | null => {
+    if (!summary) return null;
+    const doc = createRiskReportPdf(summary, severityBuckets, tabDataMap);
+    const date = new Date(summary.generated_at).toISOString().slice(0, 10);
+    return {
+      pdfBase64: pdfDocToBase64(doc),
+      filename: `Ready2Go-Risk-Report-${date}.pdf`,
+      reportTitle: 'Situational Risk Assessment Report',
+      summaryLine: `Overall risk: ${summary.overall_risk_level} · ${summary.alerts_count} active incident(s) · AI confidence ${summary.ai_confidence}%`,
+    };
+  }, [summary, severityBuckets, tabDataMap]);
 
   const isGenerating = loadingSummary || loadingSeverity || loadingCategories.size > 0;
   const hasReport = summary !== null;
@@ -1028,6 +1427,12 @@ export default function RiskAssessment() {
               className="h-11 rounded-xl border-slate-200 px-5 text-sm font-bold">
               <FileDown className="mr-2 h-4 w-4" />Download Full PDF Report
             </Button>
+            {canSendEmail && (
+              <SendReportEmailButton
+                disabled={!canDownload}
+                getPdfPayload={fullReportPdfPayload}
+              />
+            )}
           </div>
         </div>
       </Card>
@@ -1136,7 +1541,7 @@ export default function RiskAssessment() {
           </Card>
 
           {/* Severity Levels */}
-          <SeverityLevelGrid buckets={severityBuckets} loading={loadingSeverity} />
+          <SeverityLevelGrid buckets={severityBuckets} loading={loadingSeverity} canSendEmail={canSendEmail} />
 
           {/* Historical Context */}
           <HistoricalAnalysisSection
