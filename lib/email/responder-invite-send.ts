@@ -42,18 +42,34 @@ function smtpInviteFromAddress(): string | undefined {
     return f || undefined;
 }
 
-async function sendResponderInviteViaSmtp(params: {
+export type OperationalEmailAttachment = {
+    filename: string;
+    content: Buffer;
+    contentType?: string;
+};
+
+/** Shared SMTP delivery for operational messages (invites, reports, etc.). */
+export async function sendOperationalEmail(params: {
     to: string;
     subject: string;
     text: string;
+    html?: string;
+    attachments?: OperationalEmailAttachment[];
 }): Promise<{ sent: boolean; error?: string }> {
     const from = smtpInviteFromAddress();
     if (!from) {
         return {
             sent: false,
             error:
-                'No From address for invite email. Set RESPONDER_INVITE_SMTP_FROM (recommended) or SMTP_FROM to an address your SMTP server allows.',
+                'No From address configured. Set RESPONDER_INVITE_SMTP_FROM (recommended) or SMTP_FROM.',
         };
+    }
+
+    if (!smtpInviteConfigured()) {
+        if (process.env.NODE_ENV === 'development') {
+            console.info('[operational-email] SMTP not configured:', { to: params.to, subject: params.subject });
+        }
+        return { sent: false, error: `SMTP is not configured. ${SMTP_CONFIG_HINT}` };
     }
 
     try {
@@ -75,6 +91,8 @@ async function sendResponderInviteViaSmtp(params: {
             to: params.to,
             subject: params.subject,
             text: params.text,
+            html: params.html,
+            attachments: params.attachments,
         });
         return { sent: true };
     } catch (e) {
@@ -112,5 +130,5 @@ export async function sendResponderInviteEmail(params: {
         };
     }
 
-    return sendResponderInviteViaSmtp({ to, subject, text });
+    return sendOperationalEmail({ to, subject, text });
 }
