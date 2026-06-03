@@ -59,17 +59,16 @@ export async function POST(req: NextRequest) {
         let lng: number | undefined;
 
         try {
-            const url = `https://photon.komoot.io/api?q=${encodeURIComponent(location)}&limit=1`;
+            const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(location)}`;
             const response = await fetch(url, {
-                headers: { 'Accept': 'application/json' }
+                headers: { 'Accept': 'application/json', 'User-Agent': 'EmergencyDashboard/1.0 (info@servetechglobal.com)' }
             });
 
             if (response.ok) {
                 const data = await response.json();
-                if (data.features && data.features.length > 0) {
-                    const feature = data.features[0];
-                    lng = feature.geometry.coordinates[0];
-                    lat = feature.geometry.coordinates[1];
+                if (Array.isArray(data) && data.length > 0) {
+                    lng = Number(data[0].lon);
+                    lat = Number(data[0].lat);
                 }
             }
         } catch (err) {
