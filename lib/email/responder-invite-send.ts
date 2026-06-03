@@ -1,18 +1,8 @@
-import nodemailer from 'nodemailer';
+import { getAppOrigin, buildResponderSignupUrl } from '@/lib/email/app-origin';
+import { emailDeliveryConfigured, SMTP_CONFIG_HINT } from '@/lib/email/config';
+import { sendOperationalEmail } from '@/lib/email/operational-mail';
 
-export function getAppOrigin(): string {
-    if (process.env.NODE_ENV === 'production') {
-        return 'https://earthquickalert.vercel.app';
-    }
-    const base = process.env.NEXT_PUBLIC_APP_URL;
-    if (base) return base.replace(/\/$/, '');
-    if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL.replace(/\/$/, '')}`;
-    return 'http://localhost:3000';
-}
-
-export function buildResponderSignupUrl(token: string): string {
-    return `${getAppOrigin()}/signup?responderInvite=${encodeURIComponent(token)}`;
-}
+export { getAppOrigin, buildResponderSignupUrl };
 
 function buildInviteSubjectAndText(roleLabel: string, signupUrl: string) {
     const subject = 'You are invited to Ready2Go — complete your responder account';
@@ -28,83 +18,7 @@ function buildInviteSubjectAndText(roleLabel: string, signupUrl: string) {
     return { subject, text };
 }
 
-/** True when `RESPONDER_INVITE_SMTP_URL` or host-based SMTP credentials are set. */
-function smtpInviteConfigured(): boolean {
-    if (process.env.RESPONDER_INVITE_SMTP_URL?.trim()) return true;
-    const host = process.env.SMTP_HOST?.trim();
-    const user = process.env.SMTP_USER?.trim();
-    const pass = process.env.SMTP_PASS;
-    return Boolean(host && user && pass != null && String(pass).length > 0);
-}
-
-function smtpInviteFromAddress(): string | undefined {
-    const f = process.env.RESPONDER_INVITE_SMTP_FROM?.trim() || process.env.SMTP_FROM?.trim();
-    return f || undefined;
-}
-
-export type OperationalEmailAttachment = {
-    filename: string;
-    content: Buffer;
-    contentType?: string;
-};
-
-/** Shared SMTP delivery for operational messages (invites, reports, etc.). */
-export async function sendOperationalEmail(params: {
-    to: string;
-    subject: string;
-    text: string;
-    html?: string;
-    attachments?: OperationalEmailAttachment[];
-}): Promise<{ sent: boolean; error?: string }> {
-    const from = smtpInviteFromAddress();
-    if (!from) {
-        return {
-            sent: false,
-            error:
-                'No From address configured. Set RESPONDER_INVITE_SMTP_FROM (recommended) or SMTP_FROM.',
-        };
-    }
-
-    if (!smtpInviteConfigured()) {
-        if (process.env.NODE_ENV === 'development') {
-            console.info('[operational-email] SMTP not configured:', { to: params.to, subject: params.subject });
-        }
-        return { sent: false, error: `SMTP is not configured. ${SMTP_CONFIG_HINT}` };
-    }
-
-    try {
-        const url = process.env.RESPONDER_INVITE_SMTP_URL?.trim();
-        const transporter = url
-            ? nodemailer.createTransport(url)
-            : nodemailer.createTransport({
-                  host: process.env.SMTP_HOST!.trim(),
-                  port: Number(process.env.SMTP_PORT || '587'),
-                  secure: process.env.SMTP_SECURE === 'true' || Number(process.env.SMTP_PORT || '0') === 465,
-                  auth: {
-                      user: process.env.SMTP_USER!.trim(),
-                      pass: String(process.env.SMTP_PASS ?? ''),
-                  },
-              });
-
-        await transporter.sendMail({
-            from,
-            to: params.to,
-            subject: params.subject,
-            text: params.text,
-            html: params.html,
-            attachments: params.attachments,
-        });
-        return { sent: true };
-    } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        return { sent: false, error: msg };
-    }
-}
-
-const SMTP_CONFIG_HINT =
-    'Set RESPONDER_INVITE_SMTP_URL (or SMTP_HOST, SMTP_USER, SMTP_PASS) and RESPONDER_INVITE_SMTP_FROM (or SMTP_FROM).';
-
-/** Deliver responder invite email via SMTP (Nodemailer) only. */
+/** Deliver responder invite email via Resend or SMTP. */
 export async function sendResponderInviteEmail(params: {
     to: string;
     signupUrl: string;
@@ -117,18 +31,22 @@ export async function sendResponderInviteEmail(params: {
 
     const { subject, text } = buildInviteSubjectAndText(params.roleLabel, params.signupUrl);
 
-    if (!smtpInviteConfigured()) {
+    if (!emailDeliveryConfigured()) {
         if (process.env.NODE_ENV === 'development') {
             console.info(
-                `[responder-invite] SMTP not configured (${SMTP_CONFIG_HINT}). Signup link:`,
+                `[responder-invite] Email not configured (${SMTP_CONFIG_HINT}). Signup link:`,
                 params.signupUrl,
             );
         }
         return {
             sent: false,
-            error: `SMTP is not configured for responder invites. ${SMTP_CONFIG_HINT}`,
+            error: `Email is not configured for responder invites. ${SMTP_CONFIG_HINT}`,
         };
     }
 
     return sendOperationalEmail({ to, subject, text });
 }
+
+/** @deprecated Use sendOperationalEmail from @/lib/email/operational-mail */
+export { sendOperationalEmail } from '@/lib/email/operational-mail';
+export type { OperationalEmailAttachment } from '@/lib/email/types';
