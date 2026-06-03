@@ -907,6 +907,27 @@ const REPORT_EMAIL_AUDIENCE_SHORT: Record<ReportEmailAudience, string> = {
   both: 'All recipients',
 };
 
+async function pollReportEmailJob(jobId: string) {
+  const maxAttempts = 180;
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    const res = await fetch(`/api/risk-assessment/send-report/${jobId}`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error ?? 'Failed to check email delivery status');
+    if (data.status === 'completed' || data.status === 'partial' || data.status === 'failed') {
+      return data as {
+        status: string;
+        sentCount: number;
+        failedCount: number;
+        totalCount: number;
+        provider?: string;
+        lastError?: string | null;
+      };
+    }
+  }
+  throw new Error('Email delivery is still in progress. Check again shortly or review Inngest/Vercel logs.');
+}
+
 function pdfDocToBase64(doc: jsPDF): string {
   const bytes = new Uint8Array(doc.output('arraybuffer'));
   let binary = '';
@@ -1167,9 +1188,21 @@ function SendReportEmailButton({
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? 'Failed to send report email');
-      toast.success(`Report emailed to ${data.sentCount} recipient(s).`, {
-        description: data.partial ? 'Some recipients could not be reached.' : undefined,
+      if (!res.ok) throw new Error(data.error ?? 'Failed to queue report email');
+
+      toast.info(`Queuing report for ${data.recipientCount} recipient(s)…`, {
+        description: 'Inngest is sending in batches via Resend on Vercel.',
+      });
+
+      const result = await pollReportEmailJob(data.jobId);
+      if (result.status === 'failed') {
+        throw new Error(result.lastError ?? 'Failed to send report emails.');
+      }
+
+      toast.success(`Report emailed to ${result.sentCount} recipient(s).`, {
+        description: result.status === 'partial'
+          ? `${result.failedCount} recipient(s) could not be reached.`
+          : undefined,
       });
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : 'Failed to send report email.');
