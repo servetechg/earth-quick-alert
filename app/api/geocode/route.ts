@@ -12,13 +12,13 @@ export async function GET(req: Request) {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
 
-        // Photon geocoding - no API key required, more lenient usage policy
-        const url = `https://photon.komoot.io/api?q=${encodeURIComponent(address)}&limit=1`;
+        // Nominatim (OpenStreetMap) geocoding - free, no API key required
+        const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(address)}`;
 
         const response = await fetch(url, {
             headers: {
                 'Accept': 'application/json',
-                'User-Agent': 'EmergencyDashboard/1.0'
+                'User-Agent': 'EmergencyDashboard/1.0 (info@servetechglobal.com)'
             },
             signal: controller.signal
         });
@@ -34,11 +34,10 @@ export async function GET(req: Request) {
 
         const data = await response.json();
 
-        if (data.features && data.features.length > 0) {
-            const feature = data.features[0];
+        if (Array.isArray(data) && data.length > 0) {
             return NextResponse.json({
-                lat: feature.geometry.coordinates[1],
-                lng: feature.geometry.coordinates[0]
+                lat: Number(data[0].lat),
+                lng: Number(data[0].lon)
             });
         }
 

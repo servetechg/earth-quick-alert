@@ -54,20 +54,20 @@ export async function geocodeLocation(location: string): Promise<NamedCoordinate
     }
 
     try {
-        const url = `https://photon.komoot.io/api?q=${encodeURIComponent(trimmed)}&limit=1`;
+        const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(trimmed)}`;
         const response = await fetch(url, {
-            headers: { Accept: 'application/json' },
+            headers: { Accept: 'application/json', 'User-Agent': 'EmergencyDashboard/1.0 (info@servetechglobal.com)' },
             next: { revalidate: 60 * 60 },
         });
 
         if (!response.ok) return null;
         const data = await response.json();
-        const feature = Array.isArray(data.features) ? data.features[0] : undefined;
-        if (!feature || !feature.geometry || !Array.isArray(feature.geometry.coordinates)) return null;
+        const result = Array.isArray(data) ? data[0] : undefined;
+        if (!result || result.lat == null || result.lon == null) return null;
 
         return {
-            lat: Number(feature.geometry.coordinates[1]),
-            lon: Number(feature.geometry.coordinates[0]),
+            lat: Number(result.lat),
+            lon: Number(result.lon),
             name: trimmed,
         };
     } catch (error) {

@@ -60,31 +60,29 @@ export async function GET(req: Request) {
 
 async function handleTextSearch(query: string) {
     try {
-        const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=6&lang=en`;
+        const url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=6&accept-language=en&q=${encodeURIComponent(query)}`;
         const response = await fetch(url, {
-            headers: { 'Accept': 'application/json' },
+            headers: { 'Accept': 'application/json', 'User-Agent': 'EmergencyDashboard/1.0 (info@servetechglobal.com)' },
             next: { revalidate: 60 },
         });
 
-        if (!response.ok) throw new Error(`Photon API returned ${response.status}`);
+        if (!response.ok) throw new Error(`Nominatim API returned ${response.status}`);
 
         const data = await response.json();
 
-        if (data.features?.length > 0) {
-            const results = data.features.map((feature: any) => {
-                const p = feature.properties;
-                const parts = [p.name, p.city || p.town || p.village, p.state, p.country].filter(Boolean);
-                const displayName = [...new Set(parts)].join(', ');
+        if (Array.isArray(data) && data.length > 0) {
+            const results = data.map((item: any) => {
+                const a = item.address || {};
                 return {
-                    place_id: `${feature.geometry.coordinates[0]}_${feature.geometry.coordinates[1]}`,
-                    display_name: displayName,
-                    lat: feature.geometry.coordinates[1].toString(),
-                    lon: feature.geometry.coordinates[0].toString(),
+                    place_id: `${item.lon}_${item.lat}`,
+                    display_name: item.display_name,
+                    lat: item.lat.toString(),
+                    lon: item.lon.toString(),
                     address: {
-                        name: p.name,
-                        city: p.city || p.town || p.village || p.county,
-                        state: p.state,
-                        country: p.country,
+                        name: a.name || a.amenity || a.building || a.road,
+                        city: a.city || a.town || a.village || a.county,
+                        state: a.state,
+                        country: a.country,
                     },
                 };
             });

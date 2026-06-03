@@ -228,7 +228,7 @@ export default function EmergencyPlanPage() {
 
     const fetchPlans = async () => {
         try {
-            const res = await fetch('/api/admin/emergency-plans')
+            const res = await fetch('/api/admin/continuity-plans')
             if (res.status === 401) {
                 toast.error('Unauthorized')
                 return
@@ -261,7 +261,7 @@ export default function EmergencyPlanPage() {
 
     const loadAuditSummary = async () => {
         try {
-            const res = await fetch('/api/admin/emergency-plans/audit-summary', { cache: 'no-store' })
+            const res = await fetch('/api/admin/continuity-plans/audit-summary', { cache: 'no-store' })
             const body = await res.json().catch(() => ({}))
             if (res.ok && body.success && body.data) setAuditSummary(body.data as AuditSummary)
         } catch (err) {
@@ -272,7 +272,7 @@ export default function EmergencyPlanPage() {
     const refreshAuditSummary = async () => {
         setAuditLoading(true)
         try {
-            const res = await fetch('/api/admin/emergency-plans/audit-summary', {
+            const res = await fetch('/api/admin/continuity-plans/audit-summary', {
                 method: 'POST',
                 cache: 'no-store',
             })
@@ -380,7 +380,7 @@ export default function EmergencyPlanPage() {
                 try {
                     const fd = new FormData()
                     fd.append('file', file)
-                    const res = await fetch('/api/admin/emergency-plans', { method: 'POST', body: fd })
+                    const res = await fetch('/api/admin/continuity-plans', { method: 'POST', body: fd })
                     const body = await res.json().catch(() => ({}))
                     if (!res.ok) {
                         failed.push(`${file.name}: ${body.error || body.message || res.statusText}`)
@@ -435,7 +435,7 @@ export default function EmergencyPlanPage() {
             if (trimmedOverview !== (current?.overview || '')) patchPayload.overview = trimmedOverview
             if (editPlanCategory !== currentCategory && stored) patchPayload.category = stored
             if (Object.keys(patchPayload).length) {
-                const patchRes = await fetch('/api/admin/emergency-plans', {
+                const patchRes = await fetch('/api/admin/continuity-plans', {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ planId: editPlanId, ...patchPayload }),
@@ -443,7 +443,7 @@ export default function EmergencyPlanPage() {
                 const patchBody = await patchRes.json().catch(() => ({}))
                 if (!patchRes.ok) throw new Error(patchBody.error || 'Could not update plan')
             }
-            const res = await fetch('/api/admin/emergency-plans/steps', {
+            const res = await fetch('/api/admin/continuity-plans/steps', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ planId: editPlanId, steps }),
@@ -465,7 +465,7 @@ export default function EmergencyPlanPage() {
         if (!deleteTarget) return
         setDeleting(true)
         try {
-            const res = await fetch('/api/admin/emergency-plans/attachment', {
+            const res = await fetch('/api/admin/continuity-plans/attachment', {
                 method: 'DELETE',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
