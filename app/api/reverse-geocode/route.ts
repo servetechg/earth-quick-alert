@@ -13,13 +13,13 @@ export async function GET(req: Request) {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
 
-        // Photon reverse geocoding - no key required, no rate-limiting issues
-        const url = `https://photon.komoot.io/reverse?lat=${lat}&lon=${lng}&limit=1`;
+        // Nominatim (OpenStreetMap) — free, no API key required
+        const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&limit=1`;
 
         const response = await fetch(url, {
             headers: {
                 'Accept': 'application/json',
-                'User-Agent': 'EmergencyDashboard/1.0'
+                'User-Agent': 'EmergencyDashboard/1.0 (info@servetechglobal.com)'
             },
             signal: controller.signal,
             next: { revalidate: 3600 } // Cache for 1 hour to reduce outgoing requests
@@ -29,18 +29,24 @@ export async function GET(req: Request) {
 
         if (!response.ok) {
             return NextResponse.json(
-                { error: `Geocoding service returned ${response.status}` }, 
+                { error: `Geocoding service returned ${response.status}` },
                 { status: response.status === 404 ? 404 : 502 }
             );
         }
 
         const data = await response.json();
 
-        if (data.features && data.features.length > 0) {
-            const p = data.features[0].properties;
-            const parts = [p.name, p.city || p.town || p.village, p.state, p.country].filter(Boolean);
-            const name = [...new Set(parts)].join(', ');
-            return NextResponse.json({ name, address: p });
+        if (data && data.display_name) {
+            const a = data.address || {};
+            const parts = [
+                a.amenity || a.building || a.road,
+                a.suburb || a.neighbourhood,
+                a.city || a.town || a.village || a.county,
+                a.state,
+                a.country,
+            ].filter(Boolean);
+            const name = [...new Set(parts)].join(', ') || data.display_name;
+            return NextResponse.json({ name, address: a });
         }
 
         return NextResponse.json({ error: 'No results found for these coordinates' }, { status: 404 });
