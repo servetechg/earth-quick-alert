@@ -14,6 +14,7 @@ import {
     fetchSubAdminLeaderMarkers,
 } from '@/lib/services/situational-map-markers';
 import { resolveSubAdminJurisdiction } from '@/lib/sub-admin/jurisdiction';
+import { resolveDemoSessionContext, getDemoSituationalMapPayload } from '@/lib/demo/provider';
 
 function mapCitizensToClient(
     rows: Awaited<ReturnType<typeof fetchNationwideCitizenMarkers>>
@@ -69,6 +70,30 @@ export async function GET(req: Request) {
         const role = String(session.user.role ?? '').toLowerCase();
         const userId = session.user.id as string;
         const scopeState = new URL(req.url).searchParams.get('scopeState')?.trim() || undefined;
+
+        const demoCtx = await resolveDemoSessionContext(userId, session.user.email as string);
+        if (demoCtx && role === 'sub-admin') {
+            const demo = getDemoSituationalMapPayload();
+            const stats = alignedIncidentStatsFromCards(demo.alignedRows);
+            const incidents = await resolveHeatPointsFromAlignedRows(demo.alignedRows);
+            return NextResponse.json({
+                incidents,
+                alignedEventCount: stats.alignedEventCount,
+                incidentCount: stats.alignedEventCount,
+                heatPointCount: incidents.length,
+                majorIncidents: stats.major_incidents,
+                minorIncidents: stats.minor_incidents,
+                citizens: demo.citizens,
+                responders: demo.responders,
+                leaders: [],
+                coverage: demo.coverage,
+                tornadoPath: demo.tornadoPath,
+                scope: 'state',
+                demo: true,
+                scenarioId: demo.scenarioId,
+                scenarioTitle: demo.scenarioTitle,
+            });
+        }
 
         const rows = await fetchAlignedUnifiedEventFeed({ userId, role });
         const stats = alignedIncidentStatsFromCards(rows as Record<string, unknown>[]);

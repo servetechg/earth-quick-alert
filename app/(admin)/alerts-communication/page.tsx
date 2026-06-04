@@ -139,6 +139,53 @@ const SOURCE_BADGE_STYLES: Record<string, { label: string; className: string }> 
   seed: { label: 'Seed', className: 'border-zinc-300 bg-zinc-50 text-zinc-700' },
 }
 
+function formatPropertyValue(value: unknown): string {
+  if (value == null) return '—'
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    return String(value)
+  }
+  if (Array.isArray(value)) {
+    return value.map((v) => formatPropertyValue(v)).join(', ')
+  }
+  if (typeof value === 'object') {
+    return Object.entries(value as Record<string, unknown>)
+      .map(([k, v]) => `${k.replace(/([A-Z])/g, ' $1').trim()}: ${formatPropertyValue(v)}`)
+      .join(' · ')
+  }
+  return String(value)
+}
+
+function formatAlertProperties(properties: Record<string, unknown>): string[] {
+  const lines: string[] = []
+  for (const [blockKey, blockVal] of Object.entries(properties)) {
+    if (blockKey === 'demo' && blockVal && typeof blockVal === 'object') {
+      const demo = blockVal as Record<string, unknown>
+      if (demo.rating && typeof demo.rating === 'object') {
+        lines.push(`Rating: ${formatPropertyValue(demo.rating)}`)
+      }
+      if (demo.impacts && typeof demo.impacts === 'object') {
+        lines.push(`Impacts: ${formatPropertyValue(demo.impacts)}`)
+      }
+      if (demo.meteorology && typeof demo.meteorology === 'object') {
+        lines.push(`Meteorology: ${formatPropertyValue(demo.meteorology)}`)
+      }
+      if (Array.isArray(demo.affectedAreas)) {
+        lines.push(`Affected areas: ${(demo.affectedAreas as string[]).join(', ')}`)
+      }
+      continue
+    }
+    if (blockVal && typeof blockVal === 'object' && !Array.isArray(blockVal)) {
+      for (const [k, v] of Object.entries(blockVal as Record<string, unknown>)) {
+        const label = `${blockKey} · ${k.replace(/([A-Z])/g, ' $1').trim()}`
+        lines.push(`${label}: ${formatPropertyValue(v)}`)
+      }
+    } else {
+      lines.push(`${blockKey}: ${formatPropertyValue(blockVal)}`)
+    }
+  }
+  return lines
+}
+
 export default function AlertsCommunicationPage() {
   const [notificationPrefs, setNotificationPrefs] = useState<Record<string, boolean>>({
     push: true,
@@ -519,6 +566,11 @@ export default function AlertsCommunicationPage() {
                           </div>
                         )}
                       </div>
+                      {alert.description && (
+                        <p className="text-[13px] font-medium text-slate-600 leading-relaxed mt-3 line-clamp-3">
+                          {alert.description}
+                        </p>
+                      )}
                     </div>
 
                     <div className="flex items-center justify-between pt-4 border-t border-slate-50">
@@ -595,34 +647,94 @@ export default function AlertsCommunicationPage() {
                 </div>
               </Card>
 
-              {/* Alerts Details Sidepanel */}
+              {/* Alert detail — selected feed item or NWS info fallback */}
               <Card className="bg-white border-slate-100 rounded-[24px] p-6 shadow-sm">
-                <h3 className="text-[20px] font-black text-slate-900 mb-5">Alerts Details</h3>
+                <h3 className="text-[20px] font-black text-slate-900 mb-5">
+                  {selectedAlert ? 'Selected Alert' : 'Alerts Details'}
+                </h3>
 
-                <div className="bg-[#F0F4FF] rounded-[20px] p-6 space-y-6">
-                  <div className="flex items-center gap-4">
-                    {/* <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-sm border border-blue-50">
-                    <Image src="https://www.weather.gov/assets/images/nws_logo.png" alt="NWS" width={32} height={32} />
-                  </div> */}
-                    <h4 className="text-[17px] font-black text-slate-900 leading-tight">National Weather Service</h4>
+                {selectedAlert ? (
+                  <div className="space-y-5">
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Event</p>
+                      <p className="text-[16px] font-black text-slate-900 leading-tight">{selectedAlert.name}</p>
+                      <p className="text-[12px] font-bold text-slate-500 mt-1">{displayLocation(selectedAlert)}</p>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      <span className="px-2.5 py-1 rounded-md text-[10px] font-black uppercase border bg-slate-50 text-slate-700 border-slate-200">
+                        {selectedAlert.severity}
+                      </span>
+                      <span className="px-2.5 py-1 rounded-md text-[10px] font-black uppercase border bg-slate-50 text-slate-700 border-slate-200">
+                        {selectedAlert.type}
+                      </span>
+                      <span className="px-2.5 py-1 rounded-md text-[10px] font-black uppercase border bg-slate-50 text-slate-700 border-slate-200">
+                        {selectedAlert.status}
+                      </span>
+                    </div>
+
+                    {selectedAlert.description && (
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Description</p>
+                        <p className="text-[13px] font-bold text-slate-700 leading-relaxed">{selectedAlert.description}</p>
+                      </div>
+                    )}
+
+                    {selectedAlert.instructions && selectedAlert.instructions.length > 0 && (
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Instructions</p>
+                        <ul className="space-y-2">
+                          {selectedAlert.instructions.map((inst, idx) => (
+                            <li key={idx} className="flex gap-2 items-start text-[13px] font-bold text-slate-700 leading-snug">
+                              <span className="text-slate-400 shrink-0">{idx + 1}.</span>
+                              <span>{inst}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {selectedAlert.properties && Object.keys(selectedAlert.properties).length > 0 && (
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Event Data</p>
+                        <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-3 space-y-2 max-h-[240px] overflow-y-auto custom-scrollbar">
+                          {formatAlertProperties(selectedAlert.properties).map((line, idx) => (
+                            <p key={idx} className="text-[12px] font-bold text-slate-600 leading-snug">{line}</p>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex items-center gap-2 text-slate-400 pt-2 border-t border-slate-100">
+                      <Clock size={12} />
+                      <span className="text-[10px] font-black uppercase tracking-wider">
+                        Issued {selectedAlert.issuedAt} · Expires {selectedAlert.expiresAt}
+                      </span>
+                    </div>
                   </div>
+                ) : (
+                  <div className="bg-[#F0F4FF] rounded-[20px] p-6 space-y-6">
+                    <div className="flex items-center gap-4">
+                      <h4 className="text-[17px] font-black text-slate-900 leading-tight">National Weather Service</h4>
+                    </div>
 
-                  <ul className="space-y-4">
-                    {[
-                      "Official, government-issued weather alerts",
-                      "Real-time updates during active weather events",
-                      "Timely watches, warnings, and advisories for your area",
-                      "Reliable information designed to support quick decision-making"
-                    ].map((point, idx) => (
-                      <li key={idx} className="flex gap-3 items-start group">
-                        <div className="w-1.5 h-1.5 rounded-full bg-slate-900 mt-1.5 shrink-0" />
-                        <p className="text-[14px] font-bold text-slate-700 leading-snug tracking-tight">
-                          {point}
-                        </p>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+                    <ul className="space-y-4">
+                      {[
+                        "Official, government-issued weather alerts",
+                        "Real-time updates during active weather events",
+                        "Timely watches, warnings, and advisories for your area",
+                        "Reliable information designed to support quick decision-making"
+                      ].map((point, idx) => (
+                        <li key={idx} className="flex gap-3 items-start group">
+                          <div className="w-1.5 h-1.5 rounded-full bg-slate-900 mt-1.5 shrink-0" />
+                          <p className="text-[14px] font-bold text-slate-700 leading-snug tracking-tight">
+                            {point}
+                          </p>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </Card>
 
               {/* Notification Preferences Sidepanel */}

@@ -447,6 +447,9 @@ function GroupAccordionItem({
               <DetailSection title="Current Status" body={narrative.currentStatus} />
               <DetailSection title="Affected Areas" body={narrative.affectedAreas} />
               <DetailSection title="Key Statistics" body={narrative.keyStatistics} />
+              {narrative.pathSegments && narrative.pathSegments.length > 0 && (
+                <DetailBulletSection title="Tornado Path Segments" items={narrative.pathSegments} />
+              )}
               {narrative.historicalContext && <DetailSection title="Historical Context" body={narrative.historicalContext} />}
 
               {pastContext && (pastContext.matchedEvent || (pastContext.pastDamages?.length ?? 0) > 0 || (pastContext.pastProcedures?.length ?? 0) > 0) && (

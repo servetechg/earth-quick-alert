@@ -147,6 +147,8 @@ export interface IncidentDetailNarrative {
     affectedAreas: string;
     keyStatistics: string;
     historicalContext: string;
+    /** Optional survey/path segment lines (demo scenarios). */
+    pathSegments?: string[];
 }
 
 export class OpenAIService {

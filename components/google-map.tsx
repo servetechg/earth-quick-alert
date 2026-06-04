@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useMemo, useCallback, useState, useRef } from 'react'
-import { GoogleMap as GoogleMapComponent, useJsApiLoader, Marker, InfoWindow, Circle } from '@react-google-maps/api'
+import { GoogleMap as GoogleMapComponent, useJsApiLoader, Marker, InfoWindow, Circle, Polyline } from '@react-google-maps/api'
 import { GoogleMapsOverlay } from '@deck.gl/google-maps'
 import { HeatmapLayer } from '@deck.gl/aggregation-layers'
 import { GOOGLE_MAPS_API_KEY, GOOGLE_MAPS_LIBRARIES, GOOGLE_MAPS_LOADER_ID } from '@/lib/constants/google-maps-config'
@@ -48,6 +48,14 @@ export interface CoverageCircleSpec {
     label?: string
 }
 
+export interface MapPolylineSpec {
+    path: { lat: number; lng: number }[]
+    strokeColor?: string
+    strokeWeight?: number
+    strokeOpacity?: number
+    label?: string
+}
+
 interface GoogleMapProps {
     address?: string
     markers?: MapMarker[]
@@ -59,6 +67,8 @@ interface GoogleMapProps {
     stateBounds?: MapStateBounds | null
     /** Sub-admin license service area (miles stored server-side; pass meters here). */
     coverageCircle?: CoverageCircleSpec | null
+    /** Optional polylines (e.g. tornado survey path in demo mode). */
+    polylines?: MapPolylineSpec[]
 }
 
 const containerStyle = {
@@ -114,6 +124,7 @@ export function GoogleMap({
     showHeatmap = false,
     stateBounds = null,
     coverageCircle = null,
+    polylines = [],
 }: GoogleMapProps) {
     const { isLoaded } = useJsApiLoader({
         id: GOOGLE_MAPS_LOADER_ID,
@@ -357,6 +368,30 @@ export function GoogleMap({
                             }}
                         />
                     )}
+
+                {polylines.map((line, idx) => {
+                    const path = line.path.filter(
+                        (p) =>
+                            Number.isFinite(p.lat) &&
+                            Number.isFinite(p.lng) &&
+                            !Number.isNaN(p.lat) &&
+                            !Number.isNaN(p.lng),
+                    )
+                    if (path.length < 2) return null
+                    return (
+                        <Polyline
+                            key={`polyline-${idx}-${line.label ?? 'path'}`}
+                            path={path}
+                            options={{
+                                strokeColor: line.strokeColor ?? '#DC2626',
+                                strokeOpacity: line.strokeOpacity ?? 0.9,
+                                strokeWeight: line.strokeWeight ?? 4,
+                                geodesic: true,
+                                zIndex: 2,
+                            }}
+                        />
+                    )
+                })}
 
                 {validMarkers.map((marker) => (
                     <React.Fragment key={marker.id}>

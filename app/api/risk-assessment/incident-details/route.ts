@@ -8,6 +8,7 @@ import { pickSeedEvent, findSimilarPastEvents, computeMatchConfidence } from '@/
 import { normalizeUnifiedEventCategory } from '@/lib/unified-event/category-infer';
 import type { UnifiedEventDoc } from '@/lib/services/unified-event-repo';
 import type { EventGroupSummary } from '@/lib/types/risk-assessment';
+import { resolveDemoSessionContext, buildDemoIncidentDetails } from '@/lib/demo/provider';
 
 const ALLOWED_ROLES = new Set([
     'admin', 'super-admin', 'sub-admin', 'eoc-manager',
@@ -51,6 +52,15 @@ export async function POST(req: Request) {
         if (eventIds.length === 0) {
             return NextResponse.json({ error: 'eventIds required' }, { status: 400 });
         }
+
+        const demoCtx = await resolveDemoSessionContext(
+            session.user.id as string,
+            session.user.email as string,
+        );
+        if (demoCtx) {
+            return NextResponse.json(buildDemoIncidentDetails(eventIds));
+        }
+
         const groupsOnly = body.groupsOnly === true;
 
         const cacheKey = `det:${groupsOnly ? 'g:' : 'n:'}${eventIds.slice().sort().join(',')}`;

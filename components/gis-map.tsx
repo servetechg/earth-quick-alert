@@ -30,7 +30,7 @@ import {
   AlertOctagon,
   X,
 } from 'lucide-react'
-import { GoogleMap, type CoverageCircleSpec, type MapStateBounds } from '@/components/google-map'
+import { GoogleMap, type CoverageCircleSpec, type MapPolylineSpec, type MapStateBounds } from '@/components/google-map'
 import type { UnifiedEventHeatPoint } from '@/lib/geo/unified-event-heatmap'
 import { cn } from '@/lib/utils'
 import { getUsStateBbox } from '@/lib/constants/us-state-bounding-boxes'
@@ -115,6 +115,7 @@ export function GISMap({
   const [unifiedIncidents, setUnifiedIncidents] = useState<UnifiedEventHeatPoint[]>([])
   const [incidentHeatCount, setIncidentHeatCount] = useState(0)
   const [coverageCircle, setCoverageCircle] = useState<CoverageCircleSpec | null>(null)
+  const [mapPolylines, setMapPolylines] = useState<MapPolylineSpec[]>([])
   const [situationalLoading, setSituationalLoading] = useState(false)
   const [mapLayers, setMapLayers] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(DEFAULT_MAP_LAYERS.map((layer) => [layer.id, true])),
@@ -256,22 +257,50 @@ export function GISMap({
           data.coverage?.radiusMeters
         ) {
           const mile = data.coverage.radiusMile
+          const isDemoStateWide = data.demo === true && data.coverage?.stateWide === true
           setCoverageCircle({
             center: data.coverage.center,
             radiusMeters: data.coverage.radiusMeters,
-            label:
-              typeof mile === 'number'
+            label: isDemoStateWide
+              ? `Arkansas demo coverage`
+              : typeof mile === 'number'
                 ? `License coverage · ${mile} mi`
                 : 'License coverage',
           })
           if (
             Number.isFinite(data.coverage.center.lat) &&
-            Number.isFinite(data.coverage.center.lng)
+            Number.isFinite(data.coverage.center.lng) &&
+            !data.tornadoPath?.coordinates?.length
           ) {
             setMapCenter(data.coverage.center)
           }
         } else {
           setCoverageCircle(null)
+        }
+
+        const tornadoPath = data.tornadoPath as
+          | { type?: string; coordinates?: [number, number][] }
+          | undefined
+        if (tornadoPath?.coordinates && tornadoPath.coordinates.length >= 2) {
+          const path = tornadoPath.coordinates.map(([lng, lat]) => ({ lat, lng }))
+          setMapPolylines([
+            {
+              path,
+              strokeColor: '#DC2626',
+              strokeWeight: 5,
+              strokeOpacity: 0.92,
+              label: typeof data.scenarioTitle === 'string' ? data.scenarioTitle : 'Tornado path',
+            },
+          ])
+          const lats = path.map((p) => p.lat)
+          const lngs = path.map((p) => p.lng)
+          setMapCenter({
+            lat: (Math.min(...lats) + Math.max(...lats)) / 2,
+            lng: (Math.min(...lngs) + Math.max(...lngs)) / 2,
+          })
+          setMapZoom(10)
+        } else {
+          setMapPolylines([])
         }
       } catch (e) {
         console.error('Situational map feed:', e)
@@ -732,6 +761,7 @@ export function GISMap({
           showHeatmap={showHeatmap}
           stateBounds={stateBoundsRestriction}
           coverageCircle={showLayersPanel ? coverageCircle : null}
+          polylines={mapPolylines}
         />
 
         {isSearchingInfra && (
