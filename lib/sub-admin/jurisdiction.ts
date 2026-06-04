@@ -5,6 +5,7 @@ import { calculateDistance } from '@/lib/services/mock-map-service';
 import { geocodeLocation } from '@/lib/services/location-matching';
 import { normalizeStateToUsps } from '@/lib/utils/us-state-usps';
 import { parseLocations } from '@/lib/utils/alert-communication-hydrate';
+import { maybeDemoJurisdictionOverride } from '@/lib/demo/provider';
 
 export type SubAdminJurisdiction = {
     stateRaw: string;
@@ -89,6 +90,9 @@ async function resolveSubAdminJurisdictionUncached(
 export async function resolveSubAdminJurisdiction(
     userId: string
 ): Promise<SubAdminJurisdiction | null> {
+    const demoOverride = await maybeDemoJurisdictionOverride(userId);
+    if (demoOverride) return demoOverride;
+
     const cached = jurisdictionCache.get(userId);
     if (cached && cached.expiresAt > Date.now()) {
         return cached.data;

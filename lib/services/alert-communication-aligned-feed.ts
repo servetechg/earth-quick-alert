@@ -15,6 +15,7 @@ import { hydrateAlertCommunicationRows } from '@/lib/utils/alert-communication-h
 import type { DistroPoint } from '@/lib/types/risk-assessment';
 import type { UnifiedEventCategory } from '@/lib/unified-event/types';
 import User from '@/models/User';
+import { resolveDemoSessionContext, getDemoFeedEntry } from '@/lib/demo/provider';
 
 const FEED_CACHE_TTL_MS = 60_000;
 
@@ -115,6 +116,21 @@ async function loadAlignedUnifiedEvents(options: {
     syncFeeds?: boolean;
 }): Promise<FeedCacheEntry> {
     const key = feedCacheKey(options.userId, options.role);
+
+    // DEMO: presentation feed for arkansas@admin.com when simulation cookie is set.
+    if (options.userId) {
+        const u = await User.findById(options.userId).select('email').lean();
+        const demoCtx = await resolveDemoSessionContext(options.userId, u?.email as string | undefined);
+        if (demoCtx) {
+            const demo = getDemoFeedEntry();
+            return {
+                docs: demo.docs,
+                cards: demo.cards,
+                expiresAt: Date.now() + FEED_CACHE_TTL_MS,
+            };
+        }
+    }
+
     const cached = feedCache.get(key);
     if (cached && cached.expiresAt > Date.now() && !options.syncFeeds) {
         return cached;

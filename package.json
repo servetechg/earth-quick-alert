@@ -9,7 +9,8 @@
     "start": "next start",
     "worker:ingest": "npx tsx server/workers/ingestion-worker.ts",
     "worker:stream": "npx tsx server/workers/stream-worker.ts",
-    "db:init-continuity": "node scripts/init-continuity-collections.js"
+    "db:init-continuity": "node scripts/init-continuity-collections.js",
+    "inngest:dev": "npx inngest-cli@latest dev -u http://localhost:3000/api/inngest"
   },
   "dependencies": {
     "@deck.gl/aggregation-layers": "^9.3.2",

@@ -26,6 +26,7 @@ export type UnifiedEventAlertCard = {
     lat?: number | null;
     lng?: number | null;
     intensity?: unknown;
+    properties?: Record<string, unknown>;
     createdAt?: string;
     updatedAt?: string;
 };

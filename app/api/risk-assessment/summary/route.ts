@@ -6,6 +6,7 @@ import { resolveRiskIngestScopeForSession } from '@/lib/risk-assessment/resolve-
 import { fetchAlignedUnifiedEventDocsForSession, fetchAlignedUnifiedEventFeed } from '@/lib/services/alert-communication-aligned-feed';
 import { applyRiskReportToAlignedAlertFeed } from '@/lib/services/risk-report-alert-alignment';
 import { openaiService } from '@/lib/services/openai-service';
+import { resolveDemoSessionContext, buildDemoSummaryResponse } from '@/lib/demo/provider';
 
 const ALLOWED_ROLES = new Set([
     'admin', 'super-admin', 'sub-admin', 'eoc-manager',
@@ -22,6 +23,14 @@ export async function GET(req: Request) {
         const role = session?.user?.role as string | undefined;
         if (!session?.user?.email || !role || !ALLOWED_ROLES.has(role)) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        const demoCtx = await resolveDemoSessionContext(
+            session.user.id as string,
+            session.user.email as string,
+        );
+        if (demoCtx) {
+            return NextResponse.json(buildDemoSummaryResponse());
         }
 
         const url = new URL(req.url);
