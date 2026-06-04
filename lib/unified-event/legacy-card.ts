@@ -29,6 +29,7 @@ export function unifiedEventToLegacyAlertCard(row: Record<string, unknown>): Rec
         lat: row.lat ?? null,
         lng: row.lng ?? null,
         intensity,
+        properties: props,
         createdAt: row.createdAt,
         updatedAt: row.updatedAt,
     };

@@ -7,6 +7,7 @@ import { Header } from '@/components/header'
 import { SessionIdleWatcher } from '@/components/session-idle-watcher'
 import { AdminPageLoader } from '@/components/admin-page-loader'
 import { notifyAuthSessionChanged } from '@/lib/sync-client-user-profile'
+import { DemoSimulationBar } from '@/components/demo/demo-simulation-bar'
 
 export default function AdminLayout({
     children,
@@ -91,6 +92,7 @@ export default function AdminLayout({
                     hideSearch={userRole === 'super-admin'}
                     hideNotificationBell={isHospitalResponder}
                 />
+                <DemoSimulationBar />
                 <div ref={scrollContainerRef} className="flex-1 overflow-auto">
                     {children}
                 </div>

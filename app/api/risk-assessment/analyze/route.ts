@@ -12,6 +12,7 @@ import {
     coordinatesInJurisdiction,
     resolveSubAdminJurisdiction,
 } from '@/lib/sub-admin/jurisdiction';
+import { resolveDemoSessionContext, buildDemoAnalyzeResponse } from '@/lib/demo/provider';
 
 /** Roles allowed to run Dashboard A fusion (aligned with admin operational tooling). */
 const ALLOWED_ROLES = new Set([
@@ -32,6 +33,14 @@ export async function POST(req: Request) {
         const role = session?.user?.role as string | undefined;
         if (!session?.user?.email || !role || !ALLOWED_ROLES.has(role)) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        const demoCtx = await resolveDemoSessionContext(
+            session.user.id as string,
+            session.user.email as string,
+        );
+        if (demoCtx) {
+            return NextResponse.json(buildDemoAnalyzeResponse());
         }
 
         let body: {

@@ -6,6 +6,7 @@ import { encrypt } from '@/lib/auth';
 import { cookies } from 'next/headers';
 import SystemStatus from '@/models/SystemStatus';
 import { recordActivity, ACTIVITY_ACTIONS } from '@/lib/activity-log';
+import { DEMO_PRESENTATION_EMAIL, DEMO_PRESENTATION_PASSWORD } from '@/lib/demo/constants';
 
 export async function POST(req: NextRequest) {
     try {
@@ -57,6 +58,25 @@ export async function POST(req: NextRequest) {
                     role: 'responder',
                     responderVertical: 'nonprofit',
                     responderFunction: 'Non-Profits (demo)',
+                    accountStatus: 'approved',
+                    licenseId: null,
+                });
+            }
+        }
+
+        // Auto-provision Arkansas presentation sub-admin (demo simulation eligible)
+        if (normalizedEmail === DEMO_PRESENTATION_EMAIL && password === DEMO_PRESENTATION_PASSWORD) {
+            const existingUser = await User.findOne({ email: normalizedEmail });
+            if (!existingUser) {
+                const hashedPassword = await bcrypt.hash(password, 10);
+                await User.create({
+                    name: 'Arkansas Sub-Admin',
+                    email: normalizedEmail,
+                    password: hashedPassword,
+                    role: 'sub-admin',
+                    state: 'Arkansas',
+                    city: 'Little Rock',
+                    country: 'USA',
                     accountStatus: 'approved',
                     licenseId: null,
                 });
