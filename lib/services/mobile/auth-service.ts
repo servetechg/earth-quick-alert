@@ -3,6 +3,7 @@ import User from '@/models/User';
 import UserProfile from '@/models/UserProfile';
 import AuthPasswordReset, { hashResetToken } from '@/models/AuthPasswordReset';
 import type { ApiUser, AuthResponse, UserProfilePayload } from '@/lib/types/mobile/auth';
+import { normalizeAlertLocationsForSave } from '@/lib/services/mobile/normalize-alert-locations';
 import { toApiUser } from '@/lib/auth/mobile/user-mapper';
 import {
     issueRefreshToken,
@@ -90,26 +91,29 @@ export async function saveUserProfile(
     profile: UserProfilePayload,
 ): Promise<void> {
     const address = profile.address;
+    const setDoc: Record<string, unknown> = {
+        address: {
+            streetAddress: address.streetAddress,
+            aptUnit: address.aptUnit ?? '',
+            city: address.city,
+            state: address.state,
+            zipCode: address.zipCode,
+            useCurrentLocation: address.useCurrentLocation,
+        },
+        householdSize: profile.householdSize,
+        ada: profile.ada,
+        medical: profile.medical,
+        pets: profile.pets,
+        transport: profile.transport,
+        lodging: profile.lodging,
+    };
+    if (profile.alertLocations !== undefined) {
+        setDoc.alertLocations = normalizeAlertLocationsForSave(profile.alertLocations);
+    }
+
     await UserProfile.findOneAndUpdate(
         { userId },
-        {
-            $set: {
-                address: {
-                    streetAddress: address.streetAddress,
-                    aptUnit: address.aptUnit ?? '',
-                    city: address.city,
-                    state: address.state,
-                    zipCode: address.zipCode,
-                    useCurrentLocation: address.useCurrentLocation,
-                },
-                householdSize: profile.householdSize,
-                ada: profile.ada,
-                medical: profile.medical,
-                pets: profile.pets,
-                transport: profile.transport,
-                lodging: profile.lodging,
-            },
-        },
+        { $set: setDoc },
         { upsert: true, new: true },
     );
 
@@ -140,6 +144,7 @@ export async function loadUserProfile(userId: string) {
         pets: doc.pets,
         transport: doc.transport,
         lodging: doc.lodging,
+        alertLocations: doc.alertLocations ?? [],
     };
 }
 

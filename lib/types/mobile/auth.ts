@@ -5,8 +5,21 @@ export type ApiUser = {
     email: string;
     firstName: string;
     lastName: string;
+    phone?: string;
+    /** Cloudinary HTTPS URL; omitted when user has no photo */
+    profilePic?: string;
     emailVerified: boolean;
     profileComplete: boolean;
+};
+
+export type AlertLocationPayload = {
+    /** Client may send `loc-{timestamp}-…`; server replaces on save with UUID */
+    id?: string;
+    label: string;
+    city: string;
+    state: string;
+    /** Optional for alert-only locations; stored as `""` if omitted */
+    zipCode?: string;
 };
 
 export type AuthResponse = {
@@ -49,6 +62,7 @@ export type UserProfilePayload = {
     pets: ProfileRequirementSection;
     transport: ProfileRequirementSection;
     lodging: ProfileLodgingSection;
+    alertLocations?: AlertLocationPayload[];
 };
 
 export const OTP_PURPOSES = ['EMAIL_VERIFICATION', 'PASSWORD_RESET'] as const;
