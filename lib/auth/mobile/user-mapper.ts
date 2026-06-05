@@ -6,6 +6,9 @@ type UserLike = {
     firstName?: string;
     lastName?: string;
     name?: string;
+    phone?: string;
+    phoneNumber?: { number?: string } | string;
+    profilePic?: string;
     emailVerified?: boolean;
     profileComplete?: boolean;
 };
@@ -27,11 +30,27 @@ export function toApiUser(doc: UserLike): ApiUser {
         lastName = split.lastName;
     }
     const profileComplete = Boolean(doc.profileComplete);
+    let phone: string | undefined;
+    if (typeof doc.phone === 'string' && doc.phone.trim()) {
+        phone = doc.phone.trim();
+    } else if (doc.phoneNumber && typeof doc.phoneNumber === 'object' && doc.phoneNumber.number) {
+        phone = String(doc.phoneNumber.number).trim();
+    } else if (typeof doc.phoneNumber === 'string' && doc.phoneNumber.trim()) {
+        phone = doc.phoneNumber.trim();
+    }
+
+    const profilePic =
+        typeof doc.profilePic === 'string' && doc.profilePic.trim()
+            ? doc.profilePic.trim()
+            : undefined;
+
     return {
         id,
         email: doc.email,
         firstName,
         lastName,
+        ...(phone ? { phone } : {}),
+        ...(profilePic ? { profilePic } : {}),
         emailVerified: Boolean(doc.emailVerified),
         profileComplete,
     };
