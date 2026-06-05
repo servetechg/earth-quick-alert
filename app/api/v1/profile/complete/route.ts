@@ -33,7 +33,12 @@ export async function POST(req: NextRequest) {
             });
         }
 
-        await saveUserProfile(auth.userId, parsed.data.profile);
+        const profilePayload = {
+            ...parsed.data.profile,
+            alertLocations: parsed.data.profile.alertLocations ?? [],
+        };
+
+        await saveUserProfile(auth.userId, profilePayload);
         const updated = await User.findById(auth.userId);
         const profile = await loadUserProfile(auth.userId);
 
@@ -43,6 +48,12 @@ export async function POST(req: NextRequest) {
             profile,
         });
     } catch (e) {
+        const code = (e as { code?: string }).code;
+        if (code === 'LOCATION_LIMIT_EXCEEDED') {
+            return apiError('Maximum 5 alert locations allowed', 400, {
+                code: 'LOCATION_LIMIT_EXCEEDED',
+            });
+        }
         console.error('v1/profile/complete:', e);
         return apiError('Failed to save profile', 500);
     }

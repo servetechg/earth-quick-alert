@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { alertLocationOnboardingSchema } from '@/lib/validation/mobile/alert-locations';
 
 export const ADA_OPTIONS = [
     'Mobility (Wheelchair, Walker)',
@@ -120,5 +121,7 @@ export const profileCompleteSchema = z.object({
         pets: requirementSectionSchema(PETS_OPTIONS, 'pets'),
         transport: requirementSectionSchema(TRANSPORT_OPTIONS, 'transport'),
         lodging: lodgingSchema,
+        /** Optional — step 2 onboarding; omit or `[]` if user skipped */
+        alertLocations: z.array(alertLocationOnboardingSchema).max(5).optional(),
     }),
 });

@@ -2,6 +2,15 @@
 
 This document describes the REST API for the **React Native citizen app** (signup, OTP, onboarding, profile). It is separate from the web admin portal APIs (`/api/login`, `/api/signup`, etc.).
 
+**Dashboard APIs (implemented):** [mobile-api-v1-dashboard.md](./mobile-api-v1-dashboard.md)
+
+**App integration by tab:**
+
+- [Home](./mobile-integration-home-tab.md)
+- [Alerts](./mobile-integration-alerts-tab.md)
+- [Profile](./mobile-integration-profile-tab.md)
+- [Preparedness](./mobile-integration-preparedness-tab.md)
+
 ---
 
 ## Base URL
@@ -355,6 +364,8 @@ Clear tokens locally after success.
     "email": "...",
     "firstName": "...",
     "lastName": "...",
+    "phone": "+15551234567",
+    "profilePic": "https://res.cloudinary.com/.../earthquick/profiles/abc.jpg",
     "emailVerified": true,
     "profileComplete": false
   },
@@ -364,13 +375,37 @@ Clear tokens locally after success.
 
 When onboarding was completed, `profile` matches the structure saved by `profile/complete` (see below). Otherwise `profile` is `null`.
 
+`profilePic` and `phone` are omitted when not set.
+
 ---
 
-### 11. Complete profile (all 7 steps)
+### 10b. Profile photo
+
+**`POST /users/me/avatar`** — **Bearer required**
+
+| Item | Value |
+|------|--------|
+| Body | `multipart/form-data`, field `file` |
+| Types | `image/jpeg`, `image/png`, `image/webp` |
+| Max size | 2 MB |
+
+**Response `200`:** `{ "message": "Profile photo updated", "user": { /* ApiUser with profilePic */ } }`
+
+**`DELETE /users/me/avatar`** — **Bearer required**
+
+**Response `200`:** `{ "message": "Profile photo removed", "user": { /* ApiUser */ } }`
+
+See [mobile-integration-profile-tab.md](./mobile-integration-profile-tab.md) for React Native `FormData` example.
+
+---
+
+### 11. Complete profile (8-step onboarding — single submit)
 
 **`POST /profile/complete`** — **Bearer required**
 
 Requires `user.emailVerified === true`.
+
+Onboarding is **8 steps** in the app (address → alert locations → household → … → lodging), but the backend still receives **one** payload on the last step. See [mobile-api-v1-profile-complete-onboarding.md](./mobile-api-v1-profile-complete-onboarding.md) for frontend integration details.
 
 **Request**
 
@@ -385,6 +420,15 @@ Requires `user.emailVerified === true`.
       "zipCode": "78701",
       "useCurrentLocation": false
     },
+    "alertLocations": [
+      {
+        "id": "loc-optional-client-id",
+        "label": "Parents",
+        "city": "Chicago",
+        "state": "IL",
+        "zipCode": "60601"
+      }
+    ],
     "householdSize": 3,
     "ada": {
       "hasRequirement": false,
@@ -420,7 +464,8 @@ Requires `user.emailVerified === true`.
 
 | Section | Rules |
 |---------|--------|
-| **address** | `streetAddress`, `city`, `state` required; `zipCode` = `12345` or `12345-6789`; `useCurrentLocation` boolean |
+| **address** | `streetAddress`, `city`, `state` required; `zipCode` = `12345` or `12345-6789`; `useCurrentLocation` boolean (stored; no GPS coords yet) |
+| **alertLocations** | Optional; max 5; `label`, `city`, `state` required; `zipCode` optional; no street address; server replaces `id` with UUID |
 | **householdSize** | Integer 1–50 |
 | **ada / medical / pets / transport** | `hasRequirement` required (boolean, not null). If `true`: `selectedOptions` min 1; if `"Other"` selected → `otherDetails` required |
 | **lodging** | `selectedOptions` min 1; if `"Other"` → `otherDetails` required |
@@ -443,13 +488,15 @@ Requires `user.emailVerified === true`.
 {
   "message": "Profile completed",
   "user": { "...": "...", "profileComplete": true },
-  "profile": { /* same as request.profile */ }
+  "profile": { /* saved profile; alertLocations ids are server UUIDs */ }
 }
 ```
 
-**Errors:** `400` field errors, `401`, `403` `EMAIL_NOT_VERIFIED`.
+**Errors:** `400` field errors, `400` `LOCATION_LIMIT_EXCEEDED`, `401`, `403` `EMAIL_NOT_VERIFIED`.
 
 Idempotent: calling again **updates** the full profile for the same user.
+
+`GET /users/me` returns `profile.alertLocations` (array, may be empty) when profile is complete.
 
 ---
 
@@ -556,6 +603,8 @@ export type ApiUser = {
   email: string;
   firstName: string;
   lastName: string;
+  phone?: string;
+  profilePic?: string;
   emailVerified: boolean;
   profileComplete: boolean;
 };
