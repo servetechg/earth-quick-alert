@@ -1,23 +1,19 @@
 const CATEGORY_LABELS: Record<string, string> = {
-  individual_evacuation: 'Individual Evacuation',
-  community_evacuation: 'Community Evacuation',
-  shelter_in_place: 'General Shelter-in-Place',
-  active_shooter: 'Active Shooter Preparedness',
-  pets_household: 'Planning for Household Pets',
-  pets_large: 'Planning for Large Animals',
-  identity_theft: 'Identity Theft Protection',
-  choking_first_aid: 'Choking First Aid',
+  general_evacuation_information: 'General Evacuation Information',
+  general_shelter_in_place_information: 'General Shelter in Place Information',
+  active_shooter: 'Active Shooter',
+  emergency_planning_for_house_pets: 'Emergency Planning for House Pets',
+  emergency_planning_for_large_animal_pets: 'Emergency Planning for Large Animal Pets',
+  personal_identity_theft: 'Personal Identity Theft',
 };
 
 const CATEGORY_ORDER = [
-  'individual_evacuation',
-  'community_evacuation',
-  'shelter_in_place',
+  'general_evacuation_information',
+  'general_shelter_in_place_information',
   'active_shooter',
-  'pets_household',
-  'pets_large',
-  'identity_theft',
-  'choking_first_aid',
+  'emergency_planning_for_house_pets',
+  'emergency_planning_for_large_animal_pets',
+  'personal_identity_theft',
 ];
 
 export function getPreparednessCategoryLabel(category: string): string {
