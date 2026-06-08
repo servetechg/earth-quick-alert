@@ -3,9 +3,13 @@ import { getSession } from '@/lib/auth';
 import dbConnect from '@/lib/mongodb';
 import { runDashboardIngest } from '@/lib/services/risk-ingest-service';
 import { openaiService } from '@/lib/services/openai-service';
-import { countReady2GoReachableUsers } from '@/lib/services/ready2go-reachable-users';
+import { listUsersInAlignedAlertAreas } from '@/lib/services/users-in-aligned-alert-areas';
+import {
+    buildPopulationAtRiskCacheKey,
+    setPopulationAtRiskCache,
+} from '@/lib/services/population-at-risk-cache';
 import { recordActivity, ACTIVITY_ACTIONS } from '@/lib/activity-log';
-import { fetchAlignedUnifiedEventFeed } from '@/lib/services/alert-communication-aligned-feed';
+import { fetchAlignedUnifiedEventFeed, fetchPopulationAtRiskAlignedEventFeed } from '@/lib/services/alert-communication-aligned-feed';
 import { applyRiskReportToAlignedAlertFeed } from '@/lib/services/risk-report-alert-alignment';
 import { resolveRiskIngestScopeForSession } from '@/lib/risk-assessment/resolve-ingest-scope';
 import {
@@ -90,24 +94,32 @@ export async function POST(req: Request) {
             };
         }
 
-        const reachable = await countReady2GoReachableUsers(exposure, jurisdiction);
         let report = await openaiService.synthesizeDashboardRiskReport(bundle);
-
-        const pop =
-            exposure != null
-                ? exposure.populationAffectedEstimate
-                : report.populations_at_risk;
-
-        report = {
-            ...report,
-            populations_at_risk: pop,
-            ready2go_users_reachable: reachable,
-        };
 
         const alignedAlerts = await fetchAlignedUnifiedEventFeed({
             userId: session.user.id as string | undefined,
             role,
         });
+        const populationAtRiskRows = await fetchPopulationAtRiskAlignedEventFeed({
+            userId: session.user.id as string | undefined,
+            role,
+        });
+        const usersAtRiskList = await listUsersInAlignedAlertAreas(
+            populationAtRiskRows,
+            jurisdiction,
+        );
+        setPopulationAtRiskCache(
+            buildPopulationAtRiskCacheKey(session.user.id as string, stateCd),
+            usersAtRiskList,
+        );
+        const usersAtRisk = usersAtRiskList.length;
+
+        report = {
+            ...report,
+            populations_at_risk: usersAtRisk,
+            ready2go_users_reachable: usersAtRisk,
+        };
+
         report = applyRiskReportToAlignedAlertFeed(report, alignedAlerts);
 
         if (body.recordActivity === true) {
@@ -134,7 +146,7 @@ export async function POST(req: Request) {
                 nwpsGaugeId: bundle.nwpsGaugeId,
                 usgsSite: bundle.usgsSite,
                 populationsAtRiskAcsEstimate: bundle.riskExposure?.populationAffectedEstimate ?? null,
-                reachableReady2GoUsers: reachable,
+                reachableReady2GoUsers: usersAtRisk,
                 riskExposureVintage: bundle.riskExposure?.censusVintageLabel ?? null,
                 /** Same live UnifiedEvent rows as Alerts & Communication after refresh + role filter. */
                 aligned_event_count: alignedAlerts.length,

@@ -3,9 +3,19 @@ import { getSession } from '@/lib/auth';
 import dbConnect from '@/lib/mongodb';
 import { computeRiskSnapshot } from '@/lib/services/risk-current-snapshot';
 import { resolveRiskIngestScopeForSession } from '@/lib/risk-assessment/resolve-ingest-scope';
-import { fetchAlignedUnifiedEventDocsForSession, fetchAlignedUnifiedEventFeed } from '@/lib/services/alert-communication-aligned-feed';
+import {
+    fetchAlignedUnifiedEventDocsForSession,
+    fetchAlignedUnifiedEventFeed,
+    fetchPopulationAtRiskAlignedEventFeed,
+} from '@/lib/services/alert-communication-aligned-feed';
 import { applyRiskReportToAlignedAlertFeed } from '@/lib/services/risk-report-alert-alignment';
 import { openaiService } from '@/lib/services/openai-service';
+import { listUsersInAlignedAlertAreas } from '@/lib/services/users-in-aligned-alert-areas';
+import {
+    buildPopulationAtRiskCacheKey,
+    setPopulationAtRiskCache,
+} from '@/lib/services/population-at-risk-cache';
+import { resolveSubAdminJurisdiction } from '@/lib/sub-admin/jurisdiction';
 import { resolveDemoSessionContext, buildDemoSummaryResponse } from '@/lib/demo/provider';
 
 const ALLOWED_ROLES = new Set([
@@ -43,10 +53,16 @@ export async function GET(req: Request) {
             { nationwide: bodyNationwide, stateCd: bodyStateCd },
         );
 
-        const cacheKey = `${session.user.id}:${scope.stateCd}:aligned-v3`;
+        const cacheKey = `${session.user.id}:${scope.stateCd}:aligned-v5-pop-state`;
         const cached = cache.get(cacheKey);
         if (cached && cached.expiresAt > Date.now()) {
-            return NextResponse.json(cached.data);
+            const data = cached.data as Record<string, unknown>;
+            const count = typeof data.populations_at_risk === 'number' ? data.populations_at_risk : 0;
+            const users = data.population_at_risk_users;
+            const hasUserList = Array.isArray(users) && users.length > 0;
+            if (count === 0 || hasUserList) {
+                return NextResponse.json(cached.data);
+            }
         }
 
         const events = await fetchAlignedUnifiedEventDocsForSession({
@@ -68,6 +84,23 @@ export async function GET(req: Request) {
             alignedCards,
         );
 
+        const jurisdiction =
+            role === 'sub-admin'
+                ? await resolveSubAdminJurisdiction(session.user.id as string)
+                : null;
+        const populationAtRiskRows = await fetchPopulationAtRiskAlignedEventFeed({
+            userId: session.user.id as string | undefined,
+            role,
+        });
+        const populationAtRiskUsers = await listUsersInAlignedAlertAreas(
+            populationAtRiskRows,
+            jurisdiction,
+        );
+        setPopulationAtRiskCache(
+            buildPopulationAtRiskCacheKey(session.user.id as string, scope.stateCd),
+            populationAtRiskUsers,
+        );
+
         // Strip raw event arrays from the response (only needed server-side)
         const { severity_buckets, ...rest } = snapshot;
         const response = {
@@ -76,6 +109,8 @@ export async function GET(req: Request) {
             major_incidents: aligned.major_incidents,
             minor_incidents: aligned.minor_incidents,
             incident_distribution: aligned.incident_distribution,
+            populations_at_risk: populationAtRiskUsers.length,
+            population_at_risk_users: populationAtRiskUsers,
             ai_available: aiAvailable,
             severity_buckets: severity_buckets.map((b) => ({
                 severity: b.severity,

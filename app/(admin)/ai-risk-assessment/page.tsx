@@ -23,7 +23,7 @@ import {
   Sparkles, ShieldAlert, FileDown, Loader2, Mail,
   Activity, Users, AlertTriangle, Gauge, CheckCircle2,
   History, TrendingDown, ClipboardList, Radio, Lightbulb,
-  RefreshCw, MapPin, ChevronDown, ChevronUp, BookOpen, Check,
+  RefreshCw, MapPin, ChevronDown, ChevronUp, BookOpen, Check, Eye,
 } from "lucide-react";
 import jsPDF from "jspdf";
 import {
@@ -157,12 +157,25 @@ function CircularConfidence({ value }: { value: number }) {
   );
 }
 
-function KpiCard({ label, icon: Icon, children }: { label: string; icon: ElementType; children: ReactNode }) {
+function KpiCard({
+  label,
+  icon: Icon,
+  children,
+  headerAction,
+}: {
+  label: string;
+  icon: ElementType;
+  children: ReactNode;
+  headerAction?: ReactNode;
+}) {
   return (
     <Card className="rounded-2xl bg-white p-5 shadow-xl shadow-slate-200/50 border-slate-100">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <p className="text-[11px] font-bold uppercase tracking-widest text-slate-500">{label}</p>
-        <Icon className="h-4 w-4 text-slate-400" />
+        <div className="flex items-center gap-1 shrink-0">
+          {headerAction}
+          <Icon className="h-4 w-4 text-slate-400" />
+        </div>
       </div>
       <div className="mt-3">{children}</div>
     </Card>
@@ -477,6 +490,157 @@ function GroupAccordionItem({
         </div>
       )}
     </div>
+  );
+}
+
+// ─── Population at Risk helpers ───────────────────────────────────────────────
+
+type PopulationAtRiskUser = NonNullable<RiskSummaryPayload['population_at_risk_users']>[number];
+
+async function fetchPopulationAtRiskUsers(scopeQuery: string): Promise<PopulationAtRiskUser[]> {
+  const res = await fetch(`/api/risk-assessment/population-at-risk?${scopeQuery}`);
+  if (!res.ok) return [];
+  const data = (await res.json()) as { users?: PopulationAtRiskUser[] };
+  return Array.isArray(data.users) ? data.users : [];
+}
+
+function withPopulationAtRiskUsers(
+  summary: RiskSummaryPayload,
+  users: PopulationAtRiskUser[],
+): RiskSummaryPayload {
+  if (users.length === 0) return summary;
+  return {
+    ...summary,
+    population_at_risk_users: users,
+    populations_at_risk: users.length,
+  };
+}
+
+function summaryMissingPopulationUsers(summary: RiskSummaryPayload): boolean {
+  return summary.populations_at_risk > 0 && !(summary.population_at_risk_users?.length);
+}
+
+// ─── PopulationAtRiskDialog ───────────────────────────────────────────────────
+
+function PopulationAtRiskDialog({
+  open,
+  onOpenChange,
+  users: initialUsers,
+  expectedCount,
+  scopeQuery,
+  onUsersLoaded,
+}: {
+  open: boolean;
+  onOpenChange: (b: boolean) => void;
+  users: NonNullable<RiskSummaryPayload['population_at_risk_users']>;
+  expectedCount: number;
+  scopeQuery: string;
+  onUsersLoaded?: (users: NonNullable<RiskSummaryPayload['population_at_risk_users']>) => void;
+}) {
+  const [users, setUsers] = useState(initialUsers);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setUsers(initialUsers);
+  }, [initialUsers]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    if (initialUsers.length > 0) {
+      setUsers(initialUsers);
+      setError(null);
+      setLoading(false);
+      return;
+    }
+
+    if (expectedCount <= 0) {
+      setUsers([]);
+      return;
+    }
+
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+
+    fetch(`/api/risk-assessment/population-at-risk?${scopeQuery}`)
+      .then(async (res) => {
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body.message ?? body.error ?? 'Failed to load users at risk');
+        }
+        return res.json() as Promise<{ users?: PopulationAtRiskUser[] }>;
+      })
+      .then((data) => {
+        if (cancelled) return;
+        const loaded = Array.isArray(data.users) ? data.users : [];
+        setUsers(loaded);
+        if (loaded.length > 0) onUsersLoaded?.(loaded);
+      })
+      .catch((e: unknown) => {
+        if (!cancelled) {
+          setError(e instanceof Error ? e.message : 'Failed to load users at risk');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, initialUsers, expectedCount, scopeQuery, onUsersLoaded]);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl max-h-[88vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="text-base font-extrabold text-slate-800">
+            Population at Risk
+          </DialogTitle>
+          <DialogDescription asChild>
+            <p className="text-sm text-slate-500">
+              Ready2Go users in active alert areas ({expectedCount.toLocaleString()} total)
+            </p>
+          </DialogDescription>
+        </DialogHeader>
+
+        {loading && (
+          <div className="flex items-center justify-center gap-2 py-10 text-sm text-slate-500">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Loading users…
+          </div>
+        )}
+
+        {error && !loading && (
+          <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            {error}
+          </div>
+        )}
+
+        {!loading && !error && users.length === 0 && (
+          <p className="py-8 text-center text-sm italic text-slate-400">
+            No Ready2Go users matched the current incident areas.
+          </p>
+        )}
+
+        {!loading && !error && users.length > 0 && (
+          <ul className="divide-y divide-slate-100 rounded-xl border border-slate-100 overflow-hidden">
+            {users.map((user) => (
+              <li key={user.id} className="bg-white px-4 py-3">
+                <p className="font-bold text-sm text-slate-800">{user.name}</p>
+                <p className="mt-0.5 text-xs text-slate-500">{user.email}</p>
+                <p className="mt-2 flex gap-1.5 text-xs leading-relaxed text-slate-600">
+                  <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" />
+                  <span>{user.address}</span>
+                </p>
+              </li>
+            ))}
+          </ul>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -1283,6 +1447,19 @@ export default function RiskAssessment() {
     return b;
   }, [ctx.role, ctx.stateCd]);
 
+  const scopeQuery = useMemo(() => {
+    const qs = new URLSearchParams();
+    if (scopeBody.stateCd) qs.set("stateCd", String(scopeBody.stateCd));
+    if (scopeBody.nationwide === false) qs.set("nationwide", "false");
+    return qs.toString();
+  }, [scopeBody]);
+
+  const [popAtRiskOpen, setPopAtRiskOpen] = useState(false);
+
+  const handlePopulationUsersLoaded = useCallback((users: PopulationAtRiskUser[]) => {
+    setSummary((prev) => (prev ? withPopulationAtRiskUsers(prev, users) : prev));
+  }, []);
+
   const reportCacheKey = useMemo(() => buildAiRiskReportCacheKey(scopeBody), [scopeBody]);
 
   useEffect(() => { setTimeout(() => setBootstrapping(false), 400); }, []);
@@ -1294,12 +1471,21 @@ export default function RiskAssessment() {
       setSummary(cached.summary);
       setSeverityBuckets(cached.severityBuckets ?? []);
       setTabDataMap(new Map(Object.entries(cached.tabDataMap ?? {})));
+
+      if (summaryMissingPopulationUsers(cached.summary)) {
+        fetchPopulationAtRiskUsers(scopeQuery)
+          .then((users) => {
+            if (users.length === 0) return;
+            setSummary((prev) => (prev ? withPopulationAtRiskUsers(prev, users) : prev));
+          })
+          .catch(() => { /* ignore */ });
+      }
     } else {
       setSummary(null);
       setSeverityBuckets([]);
       setTabDataMap(new Map());
     }
-  }, [reportCacheKey]);
+  }, [reportCacheKey, scopeQuery]);
 
   // Persist report as it loads (summary first, then severity + historical tabs).
   useEffect(() => {
@@ -1345,7 +1531,13 @@ export default function RiskAssessment() {
       if (scopeBody.nationwide === false) qs.set("nationwide", "false");
       const summaryRes = await fetch(`/api/risk-assessment/summary?${qs}`);
       if (!summaryRes.ok) throw new Error("Summary request failed");
-      const summaryData: RiskSummaryPayload = await summaryRes.json();
+      let summaryData: RiskSummaryPayload = await summaryRes.json();
+
+      if (summaryMissingPopulationUsers(summaryData)) {
+        const users = await fetchPopulationAtRiskUsers(qs.toString());
+        summaryData = withPopulationAtRiskUsers(summaryData, users);
+      }
+
       setSummary(summaryData);
       setLoadingSummary(false);
 
@@ -1498,12 +1690,28 @@ export default function RiskAssessment() {
               </div>
             </KpiCard>
 
-            <KpiCard label="Population at Risk" icon={Users}>
+            <KpiCard
+              label="Population at Risk"
+              icon={Users}
+              headerAction={
+                hasReport && summary!.populations_at_risk > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => setPopAtRiskOpen(true)}
+                    className="rounded-lg p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-[#33375D]"
+                    title="View users at risk"
+                    aria-label="View users at risk"
+                  >
+                    <Eye className="h-4 w-4" />
+                  </button>
+                ) : null
+              }
+            >
               <p className="text-3xl font-extrabold tabular-nums text-slate-800">
-                {summary!.populations_at_risk > 0 ? summary!.populations_at_risk.toLocaleString() : "—"}
+                {summary!.populations_at_risk.toLocaleString()}
               </p>
               <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
-                Estimated across affected zones
+                Ready2Go users in active alert areas
               </p>
             </KpiCard>
           </div>
@@ -1559,6 +1767,15 @@ export default function RiskAssessment() {
           </p>
         </div>
       )}
+
+      <PopulationAtRiskDialog
+        open={popAtRiskOpen}
+        onOpenChange={setPopAtRiskOpen}
+        users={summary?.population_at_risk_users ?? []}
+        expectedCount={summary?.populations_at_risk ?? 0}
+        scopeQuery={scopeQuery}
+        onUsersLoaded={handlePopulationUsersLoaded}
+      />
     </AdminPageShell>
   );
 }

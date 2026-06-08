@@ -40,6 +40,13 @@ export async function resolveHeatPointsFromAlignedRows(
             continue;
         }
 
+        const locationText =
+            typeof row.location === 'string' && row.location.trim()
+                ? row.location.trim()
+                : typeof row.locationSummary === 'string' && row.locationSummary.trim()
+                  ? row.locationSummary.trim()
+                  : undefined;
+
         points.push({
             id,
             lat,
@@ -52,6 +59,7 @@ export async function resolveHeatPointsFromAlignedRows(
             name: String(row.name ?? 'Event'),
             category: typeof row.category === 'string' ? row.category : undefined,
             source: typeof row.source === 'string' ? row.source : undefined,
+            location: locationText,
         });
     }
 

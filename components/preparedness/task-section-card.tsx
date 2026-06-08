@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Loader2, Pencil, Plus, Save, Send, Trash2 } from 'lucide-react';
 import type { PreparednessUiTask } from '@/lib/preparedness-tasks/client-types';
+import { getPreparednessCategoryLabel } from '@/lib/preparedness-tasks/category-labels';
 import type { ReactNode } from 'react';
 
 function formatTaskMetaDate(iso: string): string {
@@ -29,6 +30,58 @@ function superAdminTaskMetaLine(task: PreparednessUiTask): string | null {
   const raw = task.updatedAt?.trim();
   if (!raw) return null;
   return `Created by - Super Admin | Date: ${formatTaskMetaDate(raw)}`;
+}
+
+const INTERNAL_LINKS: Array<{ text: string; url: string }> = [
+  { text: 'Department of Homeland Security', url: 'https://www.dhs.gov/see-something-say-something' },
+  { text: 'DHS', url: 'https://www.dhs.gov/see-something-say-something' },
+  { text: 'ready.gov', url: 'https://www.ready.gov' },
+  { text: 'FEMA’s Preparing Makes Sense for Pet Owners.', url: 'https://www.fema.gov' },
+  { text: 'Prepare4Threats.org', url: 'https://www.prepare4threats.org' },
+  { text: 'IdentityTheft.gov', url: 'https://www.identitytheft.gov' },
+  { text: 'USA.gov', url: 'https://www.usa.gov' },
+  { text: 'pet friendly', url: 'https://www.gopetfriendly.com' },
+];
+
+const urlRegex = /(https?:\/\/[\w\-./?=&%#]+)/;
+
+function renderLinkedText(text: string): ReactNode[] {
+  const linkTextPattern = INTERNAL_LINKS.map((link) => link.text.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')).join('|');
+  const combinedRegex = new RegExp(`(${linkTextPattern})`, 'g');
+  const segments = text.split(urlRegex);
+
+  return segments.flatMap((segment, index) => {
+    if (urlRegex.test(segment)) {
+      return (
+        <a
+          key={`url-${index}`}
+          href={segment}
+          target="_blank"
+          rel="noreferrer"
+          className="text-blue-600 hover:text-blue-800 underline"
+        >
+          {segment}
+        </a>
+      );
+    }
+
+    const parts = segment.split(combinedRegex);
+    return parts.map((part, partIndex) => {
+      const matchedLink = INTERNAL_LINKS.find((link) => link.text === part);
+      if (!matchedLink) return part;
+      return (
+        <a
+          key={`link-${index}-${partIndex}`}
+          href={matchedLink.url}
+          target="_blank"
+          rel="noreferrer"
+          className="text-blue-600 hover:text-blue-800 underline"
+        >
+          {matchedLink.text}
+        </a>
+      );
+    });
+  });
 }
 
 type TaskSectionCardProps = {
@@ -74,6 +127,7 @@ export function TaskSectionCard({
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [pendingDeleteTaskId, setPendingDeleteTaskId] = useState<string | null>(null);
+  const categoryLabel = getPreparednessCategoryLabel(category);
 
   const handleAddTask = () => {
     const title = newTaskTitle.trim();
@@ -99,7 +153,9 @@ export function TaskSectionCard({
       <div className="flex items-center justify-between gap-4 mb-5">
         <div>
           <h3 className="text-xl font-black text-slate-900 tracking-tight">{title}</h3>
-          <p className="text-xs text-slate-500 mt-1">{category}</p>
+          {categoryLabel !== title ? (
+            <p className="text-xs text-slate-500 mt-1">{categoryLabel}</p>
+          ) : null}
         </div>
         <div className="w-8 h-8 rounded-full bg-orange-50 border border-orange-100 flex items-center justify-center text-orange-400">
           {headerIcon}
@@ -115,7 +171,7 @@ export function TaskSectionCard({
             <span className="text-slate-400 text-sm w-5 pt-2">{idx + 1}.</span>
             {readOnly ? (
               <div className="flex-1 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                {task.title}
+                <div className="text-slate-800">{renderLinkedText(task.title)}</div>
               </div>
             ) : isEditing(task.id) ? (
               <div className="flex-1 min-w-0 flex flex-col gap-1">
@@ -131,7 +187,7 @@ export function TaskSectionCard({
               </div>
             ) : (
               <div className="flex-1 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2 text-sm text-slate-700 min-w-0">
-                <div className="text-slate-800">{task.title}</div>
+                <div className="text-slate-800">{renderLinkedText(task.title)}</div>
                 {metaLine ? (
                   <p className="text-xs text-slate-500 mt-1 font-medium normal-case">{metaLine}</p>
                 ) : null}

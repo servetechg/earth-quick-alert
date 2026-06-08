@@ -700,11 +700,15 @@ export function GISMap({
       type: 'weather' as const,
       description: `${inc.severity} severity · ${inc.category || inc.source || 'unified event'}`,
       status: inc.severity,
+      location: inc.location,
+      category: inc.category,
     }))
   }, [showLayersPanel, unifiedMapFeed, unifiedIncidents])
 
   const mapMarkers = useMemo(() => {
-    if (stateScoped) return markers
+    const incidentMarkers =
+      showLayersPanel || unifiedMapFeed ? situationalMarkers : []
+    if (stateScoped) return [...markers, ...incidentMarkers]
     if (showLayersPanel || unifiedMapFeed) return [...markers, ...situationalMarkers]
     return markers
   }, [stateScoped, showLayersPanel, unifiedMapFeed, markers, situationalMarkers])

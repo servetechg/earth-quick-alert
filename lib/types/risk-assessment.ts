@@ -87,6 +87,13 @@ export interface RiskSummaryPayload {
   ai_confidence: number;
   ai_confidence_breakdown?: ConfidenceFactor[];
   populations_at_risk: number;
+  /** Ready2Go users in active alert areas — included with summary so the detail dialog opens instantly. */
+  population_at_risk_users?: Array<{
+    id: string;
+    name: string;
+    email: string;
+    address: string;
+  }>;
   sources_count: number;
   /** False when OPENAI_API_KEY is unset — UI shows a banner and deterministic fallbacks are used. Added by /summary route, not by computeRiskSnapshot. */
   ai_available?: boolean;
