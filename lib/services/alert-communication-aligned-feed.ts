@@ -205,6 +205,44 @@ export async function fetchAlignedUnifiedEventFeed(options: {
 /** @deprecated Use `fetchAlignedUnifiedEventFeed` */
 export const fetchAlignedAlertCommunicationFeed = fetchAlignedUnifiedEventFeed;
 
+/**
+ * Incident rows for Population at Risk KPI.
+ * Sub-admins: all current events in their **state** (not license-radius only), so users in the
+ * license area can match statewide alerts (e.g. Phoenix users vs AZ incidents, not only San Carlos).
+ * Super-admin / others: same nationwide feed as operational aligned feed.
+ */
+export async function fetchPopulationAtRiskAlignedEventFeed(options: {
+    userId?: string;
+    role: string;
+}): Promise<Record<string, unknown>[]> {
+    if (options.userId) {
+        const u = await User.findById(options.userId).select('email').lean();
+        const demoCtx = await resolveDemoSessionContext(
+            options.userId,
+            u?.email as string | undefined,
+        );
+        if (demoCtx) {
+            const demo = getDemoFeedEntry();
+            return demo.cards;
+        }
+    }
+
+    const role = String(options.role ?? '').toLowerCase();
+
+    if (role === 'sub-admin' && options.userId) {
+        const u = await User.findById(options.userId).select('state').lean();
+        const stateRaw = typeof u?.state === 'string' ? u.state.trim() : '';
+        let docs = await getCurrentEvents();
+        if (stateRaw) {
+            docs = filterDocsForSubAdminState(docs, stateRaw);
+        }
+        return docsToLegacyCards(docs);
+    }
+
+    const docs = await getCurrentEvents();
+    return docsToLegacyCards(docs);
+}
+
 type DistroCat =
     | 'flood'
     | 'tornado'
