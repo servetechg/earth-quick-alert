@@ -31,4 +31,5 @@ export type UnifiedEventHeatPoint = {
     name: string;
     category?: string;
     source?: string;
+    location?: string;
 };

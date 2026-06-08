@@ -5,6 +5,7 @@ import type { SeverityBucket, BulletWithRefs } from '@/lib/types/risk-assessment
 import { groupRelatedEvents, toEventGroupSummary } from '@/lib/services/event-grouping';
 import type { IncidentDetailResponse } from '@/app/api/risk-assessment/incident-details/route';
 import {
+    DEMO_CITIZEN_MARKERS,
     DEMO_HISTORICAL_ANALYSIS,
     DEMO_PATH_SEGMENTS,
     LITTLE_ROCK_TORNADO_2023,
@@ -19,7 +20,7 @@ export function buildDemoRiskSnapshot(): RiskSnapshot {
     return {
         ...snapshot,
         overall_risk_level: 'SEVERE',
-        populations_at_risk: 412_000,
+        populations_at_risk: 1_284,
         ai_confidence: 92,
         sources_count: alertCount,
     };
@@ -34,7 +35,7 @@ export function buildDemoRiskReport(): RiskReport {
         generated_at: new Date().toISOString(),
         overall_risk_level: 'SEVERE',
         ai_confidence: 92,
-        populations_at_risk: 412_000,
+        populations_at_risk: 1_284,
         ready2go_users_reachable: 1284,
         domain_severities: {
             meteorological: 'SEVERE',
@@ -166,6 +167,12 @@ export function buildDemoAnalyzeResponse() {
 export function buildDemoSummaryResponse() {
     const snapshot = buildDemoRiskSnapshot();
     const report = buildDemoRiskReport();
+    const populationAtRiskUsers = DEMO_CITIZEN_MARKERS.map((c, i) => ({
+        id: c.id,
+        name: c.title,
+        email: `citizen${i + 1}@demo.ready2go.app`,
+        address: c.location,
+    }));
     const { severity_buckets, ...rest } = snapshot;
     return {
         ...rest,
@@ -173,6 +180,8 @@ export function buildDemoSummaryResponse() {
         major_incidents: report.major_incidents,
         minor_incidents: report.minor_incidents,
         incident_distribution: report.incident_distribution,
+        populations_at_risk: populationAtRiskUsers.length,
+        population_at_risk_users: populationAtRiskUsers,
         ai_available: true,
         demo: true,
         scenarioId: DEMO_SCENARIO_ID,

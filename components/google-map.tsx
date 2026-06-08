@@ -33,6 +33,7 @@ interface MapMarker {
     color?: string
     icon?: string
     category?: string
+    location?: string
 }
 
 export interface MapStateBounds {
@@ -487,6 +488,14 @@ export function GoogleMap({
                                 <div className="text-[10px] text-slate-400 font-bold mb-2">
                                     Date: {new Date(selectedMarker.timestamp).toLocaleString()}
                                 </div>
+                            )}
+
+                            {selectedMarker.location && (
+                                <p className="text-xs text-slate-700 mb-2 leading-relaxed">
+                                    <span className="font-black uppercase text-[10px] text-slate-400 tracking-wide">Address</span>
+                                    <br />
+                                    {selectedMarker.location}
+                                </p>
                             )}
 
                             {selectedMarker.description && (
