@@ -4,9 +4,14 @@ import ContinuityPlan from '@/models/ContinuityPlan';
 import { getSession } from '@/lib/auth';
 import { uploadEmergencyPlanBuffer } from '@/lib/emergency-plan-cloudinary';
 import { openaiService } from '@/lib/services/openai-service';
+import {
+    analyzeCoopAttachmentIntegrity,
+    persistCoopAttachmentIntegrity,
+} from '@/lib/services/continuity-integrity-service';
 import { extractTextFromBuffer, FAST_TEXT_CAP } from '@/lib/emergency-plan-ai-integrity';
 
 export const runtime = 'nodejs';
+export const maxDuration = 300;
 
 const MAX_BYTES = 25 * 1024 * 1024;
 
@@ -343,68 +348,35 @@ export async function POST(req: Request) {
 
         if (attachmentId) {
             try {
-                if (process.env.INTEGRITY_BACKEND === 'python') {
-                    // Route the integrity analysis to the Python AI service. The tenant key
-                    // is derived from the uploading subadmin so the document is vectorized
-                    // and scored under that subadmin's Weaviate tenant only.
-                    const pythonUrl = process.env.PYTHON_URL;
-                    const pythonToken = process.env.PYTHON_INTEGRITY_TOKEN;
-                    if (pythonUrl && pythonToken) {
-                        await fetch(`${pythonUrl}/v1/integrity/analyze`, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                Authorization: `Bearer ${pythonToken}`,
-                            },
-                            body: JSON.stringify({
-                                tenantContext: {
-                                    tenantKey: `sub_${ownerUserId}`,
-                                    actorUserId: String(ownerUserId),
-                                },
-                                plan: {
-                                    planId: plan.planId,
-                                    label: plan.label,
-                                    overview: plan.overview,
-                                    category: plan.category,
-                                    steps: plan.steps,
-                                },
-                                attachment: {
-                                    attachmentId: String(attachmentId),
-                                    fileName: file.name,
-                                    fileExtension: ext,
-                                    fileMime: mime,
-                                    fileSizeBytes: buffer.length,
-                                    fileUrl: upload.secure_url,
-                                    cloudinaryPublicId: upload.public_id,
-                                    cloudinaryResourceType: upload.resource_type,
-                                },
-                            }),
-                        });
-                    }
-                } else {
-                    const result = await openaiService.analyzeCoopAttachmentIntegrity({
-                        planLabel: plan.label,
-                        planOverview: plan.overview || '',
+                const integrityResult = await analyzeCoopAttachmentIntegrity({
+                    ownerUserId: String(ownerUserId),
+                    plan: {
+                        planId: plan.planId,
+                        label: plan.label,
+                        overview: plan.overview || '',
+                        category: plan.category,
                         steps: Array.isArray(plan.steps) ? plan.steps.map(String) : [],
+                    },
+                    attachment: {
+                        attachmentId: String(attachmentId),
                         fileName: file.name,
                         fileExtension: ext,
+                        fileMime: mime,
                         fileSizeBytes: buffer.length,
-                        extractedText: extractedText || undefined,
-                        maxExcerptChars: FAST_TEXT_CAP,
-                    });
+                        fileUrl: upload.secure_url,
+                        cloudinaryPublicId: upload.public_id,
+                        cloudinaryResourceType: upload.resource_type,
+                    },
+                    extractedText: extractedText || undefined,
+                    maxExcerptChars: FAST_TEXT_CAP,
+                });
 
-                    await ContinuityPlan.updateOne(
-                        { ownerUserId, planId: resolvedPlanId, 'attachments._id': attachmentId },
-                        {
-                            $set: {
-                                'attachments.$.aiIntegrityStatus': result.status,
-                                'attachments.$.aiIntegrityScore': result.score,
-                                'attachments.$.aiIntegritySummary': result.summary,
-                                'attachments.$.aiIntegrityAnalyzedAt': new Date(),
-                            },
-                        }
-                    );
-                }
+                await persistCoopAttachmentIntegrity(
+                    String(ownerUserId),
+                    resolvedPlanId,
+                    attachmentId,
+                    integrityResult,
+                );
             } catch (aiErr) {
                 console.error('ContinuityPlan upload AI integrity:', aiErr);
             }
