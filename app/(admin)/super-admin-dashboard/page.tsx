@@ -308,6 +308,10 @@ export default function SuperAdminDashboard() {
                   : String(selectedSubAdmin.state).trim() || undefined
               }
               unifiedMapFeed
+              showLayersPanel
+              showCriticalInfraLayers
+              showDisasterZones
+              visibleTabs={['Citizens', 'Responders', 'Leaders']}
             />
           </div>
 

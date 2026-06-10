@@ -53,6 +53,11 @@ const LicenseSchema = new Schema({
         type: Number,
         default: 5,
     },
+    coverageType: {
+        type: String,
+        enum: ['state', 'radius'],
+        default: 'radius',
+    },
 }, {
     timestamps: true,
 });

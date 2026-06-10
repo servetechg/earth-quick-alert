@@ -5,6 +5,10 @@ import type { SeverityBucket, BulletWithRefs } from '@/lib/types/risk-assessment
 import { groupRelatedEvents, toEventGroupSummary } from '@/lib/services/event-grouping';
 import type { IncidentDetailResponse } from '@/app/api/risk-assessment/incident-details/route';
 import {
+    DEMO_CRITICAL_INFRA_MARKERS,
+    buildCriticalInfraAtRiskSummary,
+} from '@/lib/demo/critical-infrastructure-markers';
+import {
     DEMO_CITIZEN_MARKERS,
     DEMO_HISTORICAL_ANALYSIS,
     DEMO_PATH_SEGMENTS,
@@ -186,6 +190,14 @@ export function buildDemoSummaryResponse() {
         demo: true,
         scenarioId: DEMO_SCENARIO_ID,
         scenarioTitle: DEMO_SCENARIO_TITLE,
+        critical_infrastructure_at_risk: buildCriticalInfraAtRiskSummary(DEMO_CRITICAL_INFRA_MARKERS).map(
+            (row) => ({
+                sectorId: row.sectorId,
+                label: row.label,
+                facilitiesAtRisk: row.facilitiesAtRisk,
+                riskLevel: row.riskLevel,
+            }),
+        ),
         severity_buckets: severity_buckets.map((b) => ({
             severity: b.severity,
             categories: b.categories.map((c) => ({

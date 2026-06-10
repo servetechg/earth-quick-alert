@@ -23,7 +23,7 @@ import {
   Sparkles, ShieldAlert, FileDown, Loader2, Mail,
   Activity, Users, AlertTriangle, Gauge, CheckCircle2,
   History, TrendingDown, ClipboardList, Radio, Lightbulb,
-  RefreshCw, MapPin, ChevronDown, ChevronUp, BookOpen, Check, Eye,
+  RefreshCw, MapPin, ChevronDown, ChevronUp, BookOpen, Check, Eye, Building2,
 } from "lucide-react";
 import jsPDF from "jspdf";
 import {
@@ -1660,7 +1660,7 @@ export default function RiskAssessment() {
       {hasReport && (
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-8">
           {/* KPI Row */}
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
             <KpiCard label="Overall Threat Level" icon={ShieldAlert}>
               <Badge className={`text-sm font-extrabold uppercase tracking-wider ${overallTone(summary!.overall_risk_level)}`}>
                 {summary!.overall_risk_level}
@@ -1713,6 +1713,37 @@ export default function RiskAssessment() {
               <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
                 Ready2Go users in active alert areas
               </p>
+            </KpiCard>
+
+            <KpiCard label="Critical Infrastructure at Risk" icon={Building2}>
+              {summary!.critical_infrastructure_at_risk?.length ? (
+                <>
+                  <p className="text-3xl font-extrabold tabular-nums text-slate-800">
+                    {summary!.critical_infrastructure_at_risk.reduce(
+                      (n, r) => n + r.facilitiesAtRisk,
+                      0,
+                    )}
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {summary!.critical_infrastructure_at_risk
+                      .filter((r) => r.riskLevel === 'CRITICAL' || r.riskLevel === 'HIGH')
+                      .slice(0, 3)
+                      .map((r) => (
+                        <span
+                          key={r.sectorId}
+                          className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-red-50 text-red-700 border border-red-100"
+                        >
+                          {r.label.split(' ')[0]} · {r.facilitiesAtRisk}
+                        </span>
+                      ))}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className="text-3xl font-extrabold tabular-nums text-slate-400">—</p>
+                  <p className="mt-2 text-[11px] text-slate-500">Enable Dashboard A CI layers on map</p>
+                </>
+              )}
             </KpiCard>
           </div>
 

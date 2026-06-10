@@ -44,6 +44,11 @@ export async function getCurrentEventsForJurisdiction(
     jurisdiction: SubAdminJurisdiction
 ): Promise<UnifiedEventDoc[]> {
     await dbConnect();
+
+    if (jurisdiction.coverageType === 'state') {
+        return getCurrentEvents({ stateCd: jurisdiction.stateCode || undefined });
+    }
+
     const { minLat, maxLat, minLng, maxLng } = jurisdictionLatLngBBox(jurisdiction);
 
     const filter: Record<string, unknown> = {

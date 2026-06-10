@@ -5,6 +5,11 @@ import { GoogleMap as GoogleMapComponent, useJsApiLoader, Marker, InfoWindow, Ci
 import { GoogleMapsOverlay } from '@deck.gl/google-maps'
 import { HeatmapLayer } from '@deck.gl/aggregation-layers'
 import { GOOGLE_MAPS_API_KEY, GOOGLE_MAPS_LIBRARIES, GOOGLE_MAPS_LOADER_ID } from '@/lib/constants/google-maps-config'
+import {
+    coverageCircleLatLngBounds,
+    coverageCirclePath,
+    type LatLngPoint,
+} from '@/lib/geo/license-coverage-radius'
 
 type DeckHeatPoint = { position: [number, number]; weight: number }
 
@@ -34,6 +39,22 @@ interface MapMarker {
     icon?: string
     category?: string
     location?: string
+    /** Link to AI risk report for this incident (Dashboard A). */
+    riskReportHref?: string
+    incidentId?: string
+}
+
+export interface MapDisasterZoneCircleSpec {
+    id: string
+    center: { lat: number; lng: number }
+    radiusMeters: number
+    fillColor?: string
+    fillOpacity?: number
+    strokeColor?: string
+    strokeWeight?: number
+    label: string
+    /** Map position for the zone label marker */
+    labelPosition: { lat: number; lng: number }
 }
 
 export interface MapStateBounds {
@@ -68,8 +89,12 @@ interface GoogleMapProps {
     stateBounds?: MapStateBounds | null
     /** Sub-admin license service area (miles stored server-side; pass meters here). */
     coverageCircle?: CoverageCircleSpec | null
+    /** Fit and restrict pan/zoom to the license radius (sub-admin radius licenses). */
+    lockToCoverage?: boolean
     /** Optional polylines (e.g. tornado survey path in demo mode). */
     polylines?: MapPolylineSpec[]
+    /** Concentric disaster impact circles (Zone A / B / C). */
+    disasterZoneCircles?: MapDisasterZoneCircleSpec[]
 }
 
 const containerStyle = {
@@ -102,6 +127,20 @@ function toLatLngBounds(bounds: MapStateBounds) {
     )
 }
 
+function geoBoundsToMapStateBounds(bounds: { northeast: LatLngPoint; southwest: LatLngPoint }): MapStateBounds {
+    return {
+        west: bounds.southwest.lng,
+        south: bounds.southwest.lat,
+        east: bounds.northeast.lng,
+        north: bounds.northeast.lat,
+    }
+}
+
+function coverageToMapBounds(coverage: CoverageCircleSpec): MapStateBounds {
+    const box = coverageCircleLatLngBounds(coverage.center, coverage.radiusMeters)
+    return geoBoundsToMapStateBounds(box)
+}
+
 function viewportExceedsStateBounds(map: google.maps.Map, bounds: MapStateBounds): boolean {
     const viewport = map.getBounds()
     if (!viewport) return false
@@ -125,7 +164,9 @@ export function GoogleMap({
     showHeatmap = false,
     stateBounds = null,
     coverageCircle = null,
+    lockToCoverage = false,
     polylines = [],
+    disasterZoneCircles = [],
 }: GoogleMapProps) {
     const { isLoaded } = useJsApiLoader({
         id: GOOGLE_MAPS_LOADER_ID,
@@ -142,8 +183,22 @@ export function GoogleMap({
     const [map, setMap] = React.useState<google.maps.Map | null>(null)
     const deckOverlayRef = useRef<GoogleMapsOverlay | null>(null)
     const stateBoundsFittedRef = useRef(false)
+    const coverageBoundsFittedRef = useRef(false)
     const stateMinZoomRef = useRef<number | null>(null)
+    const coverageMinZoomRef = useRef<number | null>(null)
     const lastZoomRef = useRef<number | null>(null)
+
+    const coverageMapBounds = useMemo((): MapStateBounds | null => {
+        if (!lockToCoverage || !coverageCircle) return null
+        if (
+            !Number.isFinite(coverageCircle.center.lat) ||
+            !Number.isFinite(coverageCircle.center.lng) ||
+            !(coverageCircle.radiusMeters > 0)
+        ) {
+            return null
+        }
+        return coverageToMapBounds(coverageCircle)
+    }, [lockToCoverage, coverageCircle])
 
     const onLoad = useCallback(function callback(map: google.maps.Map) {
         setMap(map)
@@ -166,11 +221,11 @@ export function GoogleMap({
         [heatPoints],
     )
 
-    // Smooth pan when center changes (skip when locked to state — fitBounds owns the view)
+    // Smooth pan when center changes (skip when locked to state or coverage — fitBounds owns the view)
     React.useEffect(() => {
-        if (!map || !center || stateBounds) return
+        if (!map || !center || stateBounds || coverageMapBounds) return
         map.panTo(center)
-    }, [map, center, stateBounds])
+    }, [map, center, stateBounds, coverageMapBounds])
 
     const applyStateMinZoom = useCallback((targetMap: google.maps.Map, bounds: MapStateBounds) => {
         const tighten = (attempt: number) => {
@@ -187,17 +242,51 @@ export function GoogleMap({
         tighten(0)
     }, [])
 
-    const fitStateView = useCallback(
-        (targetMap: google.maps.Map, bounds: MapStateBounds) => {
+    const fitBoundedView = useCallback(
+        (
+            targetMap: google.maps.Map,
+            bounds: MapStateBounds,
+            onIdle: (targetMap: google.maps.Map, bounds: MapStateBounds) => void,
+            padding = 8,
+        ) => {
             const latLngBounds = toLatLngBounds(bounds)
             const { west, south, east, north } = bounds
             targetMap.setCenter({ lat: (south + north) / 2, lng: (west + east) / 2 })
-            targetMap.fitBounds(latLngBounds, 8)
+            targetMap.fitBounds(latLngBounds, padding)
             google.maps.event.addListenerOnce(targetMap, 'idle', () => {
-                applyStateMinZoom(targetMap, bounds)
+                onIdle(targetMap, bounds)
             })
         },
-        [applyStateMinZoom],
+        [],
+    )
+
+    const fitStateView = useCallback(
+        (targetMap: google.maps.Map, bounds: MapStateBounds) => {
+            fitBoundedView(targetMap, bounds, applyStateMinZoom)
+        },
+        [applyStateMinZoom, fitBoundedView],
+    )
+
+    const applyCoverageMinZoom = useCallback((targetMap: google.maps.Map, bounds: MapStateBounds) => {
+        const tighten = (attempt: number) => {
+            const z = targetMap.getZoom() ?? 8
+            if (!viewportExceedsStateBounds(targetMap, bounds) || attempt >= 5) {
+                coverageMinZoomRef.current = z
+                lastZoomRef.current = z
+                targetMap.setOptions({ minZoom: z })
+                return
+            }
+            targetMap.setZoom(z + 1)
+            google.maps.event.addListenerOnce(targetMap, 'idle', () => tighten(attempt + 1))
+        }
+        tighten(0)
+    }, [])
+
+    const fitCoverageView = useCallback(
+        (targetMap: google.maps.Map, bounds: MapStateBounds) => {
+            fitBoundedView(targetMap, bounds, applyCoverageMinZoom, 24)
+        },
+        [applyCoverageMinZoom, fitBoundedView],
     )
 
     // Apply state boundary restriction; warn only on zoom-out past full-state view
@@ -207,12 +296,77 @@ export function GoogleMap({
         if (!stateBounds) {
             stateBoundsFittedRef.current = false
             stateMinZoomRef.current = null
-            lastZoomRef.current = null
-            map.setOptions({ restriction: null, minZoom: undefined })
+            if (!coverageMapBounds) {
+                lastZoomRef.current = null
+                map.setOptions({ restriction: null, minZoom: undefined })
+            }
+        } else {
+            const latLngBounds = toLatLngBounds(stateBounds)
+            map.setOptions({
+                restriction: {
+                    latLngBounds,
+                    strictBounds: true,
+                },
+            })
+
+            if (!stateBoundsFittedRef.current) {
+                fitStateView(map, stateBounds)
+                stateBoundsFittedRef.current = true
+            }
+
+            const resetToStateView = () => {
+                fitStateView(map, stateBounds)
+            }
+
+            const onDragEnd = () => {
+                if (viewportExceedsStateBounds(map, stateBounds)) {
+                    resetToStateView()
+                }
+            }
+
+            const onZoomChanged = () => {
+                const current = map.getZoom()
+                if (current == null) return
+                const minZoom = stateMinZoomRef.current
+                const prev = lastZoomRef.current
+
+                const zoomedOut = prev != null && current < prev
+                const belowMin = minZoom != null && current < minZoom
+                const viewportTooWide = viewportExceedsStateBounds(map, stateBounds)
+
+                if (zoomedOut && (belowMin || viewportTooWide)) {
+                    if (minZoom != null) {
+                        map.setZoom(minZoom)
+                    } else {
+                        resetToStateView()
+                    }
+                } else if (viewportTooWide) {
+                    resetToStateView()
+                }
+
+                lastZoomRef.current = map.getZoom() ?? current
+            }
+
+            const zoomListener = map.addListener('zoom_changed', onZoomChanged)
+            const dragEndListener = map.addListener('dragend', onDragEnd)
+
+            return () => {
+                google.maps.event.removeListener(zoomListener)
+                google.maps.event.removeListener(dragEndListener)
+            }
+        }
+    }, [map, stateBounds, fitStateView, coverageMapBounds])
+
+    // Lock sub-admin license radius: fit full circle and restrict pan/zoom to its bbox
+    React.useEffect(() => {
+        if (!map || !coverageMapBounds) {
+            coverageBoundsFittedRef.current = false
+            coverageMinZoomRef.current = null
             return
         }
 
-        const latLngBounds = toLatLngBounds(stateBounds)
+        const bounds = coverageMapBounds
+        const latLngBounds = toLatLngBounds(bounds)
         map.setOptions({
             restriction: {
                 latLngBounds,
@@ -220,39 +374,39 @@ export function GoogleMap({
             },
         })
 
-        if (!stateBoundsFittedRef.current) {
-            fitStateView(map, stateBounds)
-            stateBoundsFittedRef.current = true
+        if (!coverageBoundsFittedRef.current) {
+            fitCoverageView(map, bounds)
+            coverageBoundsFittedRef.current = true
         }
 
-        const resetToStateView = () => {
-            fitStateView(map, stateBounds)
+        const resetToCoverageView = () => {
+            fitCoverageView(map, bounds)
         }
 
         const onDragEnd = () => {
-            if (viewportExceedsStateBounds(map, stateBounds)) {
-                resetToStateView()
+            if (viewportExceedsStateBounds(map, bounds)) {
+                resetToCoverageView()
             }
         }
 
         const onZoomChanged = () => {
             const current = map.getZoom()
             if (current == null) return
-            const minZoom = stateMinZoomRef.current
+            const minZoom = coverageMinZoomRef.current
             const prev = lastZoomRef.current
 
             const zoomedOut = prev != null && current < prev
             const belowMin = minZoom != null && current < minZoom
-            const viewportTooWide = viewportExceedsStateBounds(map, stateBounds)
+            const viewportTooWide = viewportExceedsStateBounds(map, bounds)
 
             if (zoomedOut && (belowMin || viewportTooWide)) {
                 if (minZoom != null) {
                     map.setZoom(minZoom)
                 } else {
-                    resetToStateView()
+                    resetToCoverageView()
                 }
             } else if (viewportTooWide) {
-                resetToStateView()
+                resetToCoverageView()
             }
 
             lastZoomRef.current = map.getZoom() ?? current
@@ -265,13 +419,25 @@ export function GoogleMap({
             google.maps.event.removeListener(zoomListener)
             google.maps.event.removeListener(dragEndListener)
         }
-    }, [map, stateBounds, fitStateView])
+    }, [map, coverageMapBounds, fitCoverageView])
 
     React.useEffect(() => {
         stateBoundsFittedRef.current = false
         stateMinZoomRef.current = null
-        lastZoomRef.current = null
-    }, [stateBounds?.west, stateBounds?.south, stateBounds?.east, stateBounds?.north])
+        if (!coverageMapBounds) {
+            lastZoomRef.current = null
+        }
+    }, [stateBounds?.west, stateBounds?.south, stateBounds?.east, stateBounds?.north, coverageMapBounds])
+
+    React.useEffect(() => {
+        coverageBoundsFittedRef.current = false
+        coverageMinZoomRef.current = null
+    }, [
+        lockToCoverage,
+        coverageCircle?.center.lat,
+        coverageCircle?.center.lng,
+        coverageCircle?.radiusMeters,
+    ])
 
     // Clear selected marker if it's no longer in the markers list (e.g. when switching tabs)
     React.useEffect(() => {
@@ -338,7 +504,7 @@ export function GoogleMap({
             <GoogleMapComponent
                 mapContainerStyle={containerStyle}
                 center={mapCenter}
-                zoom={stateBounds ? undefined : zoom}
+                zoom={stateBounds || coverageMapBounds ? undefined : zoom}
                 onLoad={onLoad}
                 onUnmount={onUnmount}
                 options={{
@@ -355,20 +521,54 @@ export function GoogleMap({
                     Number.isFinite(coverageCircle.center.lat) &&
                     Number.isFinite(coverageCircle.center.lng) &&
                     coverageCircle.radiusMeters > 0 && (
-                        <Circle
-                            center={coverageCircle.center}
-                            radius={coverageCircle.radiusMeters}
+                        <Polyline
+                            path={coverageCirclePath(
+                                coverageCircle.center,
+                                coverageCircle.radiusMeters,
+                            )}
                             options={{
                                 strokeColor: '#33375D',
-                                strokeOpacity: 0.85,
+                                strokeOpacity: 0.95,
                                 strokeWeight: 2,
-                                fillColor: '#33375D',
-                                fillOpacity: 0.06,
+                                geodesic: true,
                                 clickable: false,
-                                zIndex: 1,
+                                zIndex: 2,
                             }}
                         />
                     )}
+
+                {disasterZoneCircles.map((zone) => (
+                    <React.Fragment key={`dz-${zone.id}`}>
+                        <Circle
+                            center={zone.center}
+                            radius={zone.radiusMeters}
+                            options={{
+                                fillColor: zone.fillColor ?? '#DC2626',
+                                fillOpacity: zone.fillOpacity ?? 0.2,
+                                strokeColor: zone.strokeColor ?? '#991B1B',
+                                strokeWeight: zone.strokeWeight ?? 2,
+                                strokeOpacity: 0.95,
+                                clickable: false,
+                                zIndex: zone.id === 'zone_a' ? 5 : zone.id === 'zone_b' ? 4 : 3,
+                            }}
+                        />
+                        <Marker
+                            position={zone.labelPosition}
+                            clickable={false}
+                            icon={{
+                                path: google.maps.SymbolPath.CIRCLE,
+                                scale: 0,
+                            }}
+                            label={{
+                                text: zone.label,
+                                color: '#3A3D41',
+                                fontSize: '13px',
+                                fontWeight: 'bold',
+                            }}
+                            zIndex={10}
+                        />
+                    </React.Fragment>
+                ))}
 
                 {polylines.map((line, idx) => {
                     const path = line.path.filter(
@@ -508,6 +708,15 @@ export function GoogleMap({
                                 <p className="text-xs font-bold text-orange-600 mb-2">
                                     Magnitude: {selectedMarker.mag.toFixed(1)}
                                 </p>
+                            )}
+
+                            {selectedMarker.riskReportHref && (
+                                <a
+                                    href={selectedMarker.riskReportHref}
+                                    className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wide text-[#33375D] hover:underline"
+                                >
+                                    View AI Risk Report →
+                                </a>
                             )}
 
                             {selectedMarker.alerts && selectedMarker.alerts.length > 0 && (

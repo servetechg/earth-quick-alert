@@ -148,6 +148,11 @@ const UserSchema = new Schema({
         type: Boolean,
         default: false,
     },
+    requestedLicenseType: {
+        type: String,
+        enum: ['state', 'radius'],
+        default: 'radius',
+    },
     requestedOrgName: {
         type: String,
         default: '',

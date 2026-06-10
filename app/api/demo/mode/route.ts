@@ -4,9 +4,8 @@ import { getSession } from '@/lib/auth';
 import {
     clearDemoSimulationCookieOptions,
     demoSimulationCookieOptions,
-    DEMO_SIMULATION_MAX_AGE_SEC,
 } from '@/lib/demo/cookie';
-import { DEMO_SCENARIO_TITLE, DEMO_PRESENTATION_EMAIL } from '@/lib/demo/constants';
+import { DEMO_SCENARIO_TITLE, DEMO_PRESENTATION_EMAIL, DEMO_SIMULATION_MAX_AGE_SEC } from '@/lib/demo/constants';
 import { isDemoEligibleEmail } from '@/lib/demo/eligibility';
 
 export async function GET() {

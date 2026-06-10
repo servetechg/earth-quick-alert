@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useMemo, useId } from 'react'
+import React, { useState, useEffect, useMemo, useId, useCallback } from 'react'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -16,8 +16,6 @@ import {
   Navigation,
   Loader2,
   Globe,
-  Map as MapIcon,
-  Maximize2,
   Settings,
   Radar,
   CloudRain,
@@ -37,32 +35,26 @@ import { getUsStateBbox } from '@/lib/constants/us-state-bounding-boxes'
 import { normalizeStateToUsps } from '@/lib/utils/us-state-usps'
 import { ShieldCheck, Truck, Siren, Building2, MapPin } from 'lucide-react'
 import { geocodeAddress, calculateDistance } from '@/lib/services/mock-map-service'
+import { mapZoomForRadiusMiles, pointInCoverageCircle } from '@/lib/geo/license-coverage-radius'
 import { Switch } from '@/components/ui/switch'
 
-interface MapLayerDef {
-  id: string
-  label: string
-  Icon: React.ComponentType<React.SVGProps<SVGSVGElement> & { strokeWidth?: number }>
-  color: string
-}
+import { MapLayersDropdown } from '@/components/gis/map-layers-dropdown'
+import {
+  INFRASTRUCTURE_SUB_LAYERS,
+  buildDefaultMapLayerState,
+} from '@/lib/gis/map-layer-config'
+import { CRITICAL_INFRASTRUCTURE_SECTORS } from '@/lib/gis/critical-infrastructure-sectors'
+import {
+  boundsFromPath,
+  disasterZonesToMapCircles,
+  zoneLabelPosition,
+} from '@/lib/demo/disaster-zones-lrk'
+import type { MapDisasterZoneCircleSpec } from '@/components/google-map'
 
-const DEFAULT_MAP_LAYERS: MapLayerDef[] = [
-  { id: 'weather', label: 'Weather Radar', Icon: CloudRain, color: '#3B82F6' },
-  { id: 'risk', label: 'Risk Areas', Icon: AlertTriangle, color: '#0EA5E9' },
-  { id: 'flood', label: 'Flood Zones', Icon: Waves, color: '#A41E22' },
-  { id: 'shelters', label: 'Shelters', Icon: HomeIcon, color: '#16A34A' },
-  { id: 'hospitals', label: 'Hospitals', Icon: PlusSquare, color: '#22A9A1' },
-  { id: 'roads', label: 'Road Closures', Icon: Construction, color: '#DC2626' },
-  { id: 'power', label: 'Power Outages', Icon: Zap, color: '#EAB308' },
-  { id: 'water', label: 'Water Issues', Icon: Droplets, color: '#0EA5E9' },
-  { id: 'resources', label: 'Resource Sites', Icon: Boxes, color: '#16A34A' },
-  { id: 'incidents', label: 'Incident Reports', Icon: AlertOctagon, color: '#DC2626' },
-]
+type GisMapTab = 'Citizens' | 'Responders' | 'Leaders'
 
-type GisMapTab = 'Citizens' | 'Responders' | 'Leaders' | 'Infrastructure'
-
-const ALL_GIS_TABS: GisMapTab[] = ['Citizens', 'Responders', 'Leaders', 'Infrastructure']
-const SUB_ADMIN_GIS_TABS: GisMapTab[] = ['Citizens', 'Responders', 'Infrastructure']
+const ALL_GIS_TABS: GisMapTab[] = ['Citizens', 'Responders', 'Leaders']
+const SUB_ADMIN_GIS_TABS: GisMapTab[] = ['Citizens', 'Responders']
 
 interface GISMapProps {
   selectedLocation?: string
@@ -82,6 +74,10 @@ interface GISMapProps {
   scopeState?: string
   /** Load unified incident heat + map markers from `/api/admin/situational-map`. */
   unifiedMapFeed?: boolean
+  /** CISA 16 critical infrastructure sectors in layer filter (Dashboard A + B). */
+  showCriticalInfraLayers?: boolean
+  /** Demo — disaster zones A/B/C layer option (both dashboards). */
+  showDisasterZones?: boolean
 }
 
 export function GISMap({
@@ -94,6 +90,8 @@ export function GISMap({
   stateScoped = false,
   scopeState,
   unifiedMapFeed = false,
+  showCriticalInfraLayers = false,
+  showDisasterZones = false,
 }: GISMapProps) {
   const tabs = useMemo(() => {
     if (hideTabs) return [] as GisMapTab[]
@@ -105,7 +103,6 @@ export function GISMap({
   const [impactedUsers, setImpactedUsers] = useState<any[]>([])
   const [responders, setResponders] = useState<any[]>([])
   const [subAdmins, setSubAdmins] = useState<any[]>([])
-  const [dynamicInfra, setDynamicInfra] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isSearchingInfra, setIsSearchingInfra] = useState(false)
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number }>({ lat: 37.0902, lng: -95.7129 }) // Center of USA
@@ -115,12 +112,28 @@ export function GISMap({
   const [unifiedIncidents, setUnifiedIncidents] = useState<UnifiedEventHeatPoint[]>([])
   const [incidentHeatCount, setIncidentHeatCount] = useState(0)
   const [coverageCircle, setCoverageCircle] = useState<CoverageCircleSpec | null>(null)
+  const [coverageMeta, setCoverageMeta] = useState<{
+    coverageType: 'state' | 'radius'
+    stateWide?: boolean
+    radiusMile?: number
+  } | null>(null)
   const [mapPolylines, setMapPolylines] = useState<MapPolylineSpec[]>([])
   const [situationalLoading, setSituationalLoading] = useState(false)
   const [mapLayers, setMapLayers] = useState<Record<string, boolean>>(() =>
-    Object.fromEntries(DEFAULT_MAP_LAYERS.map((layer) => [layer.id, true])),
+    buildDefaultMapLayerState({
+      includeCriticalInfra: showCriticalInfraLayers,
+      includeDisasterZones: showDisasterZones,
+    }),
   )
-  const [layersPanelOpen, setLayersPanelOpen] = useState(true)
+  const [demoModeActive, setDemoModeActive] = useState(false)
+  const [scenarioDemo, setScenarioDemo] = useState(false)
+  const [tornadoPathPoints, setTornadoPathPoints] = useState<{ lat: number; lng: number }[]>([])
+  const [criticalInfraMarkers, setCriticalInfraMarkers] = useState<any[]>([])
+  const [isLoadingCriticalInfra, setIsLoadingCriticalInfra] = useState(false)
+
+  const infraCacheRef = React.useRef<Map<string, any>>(new Map())
+  const fetchedKeysRef = React.useRef<Set<string>>(new Set())
+  const [cacheTrigger, setCacheTrigger] = useState(0)
   const heatSwitchId = useId()
 
   const stateBoundsRestriction = useMemo((): MapStateBounds | null => {
@@ -133,6 +146,76 @@ export function GISMap({
     const [west, south, east, north] = bbox
     return { west, south, east, north }
   }, [focusState])
+
+  const lockToCoverageCircle = useMemo(() => {
+    if (!showLayersPanel || !coverageCircle) return false
+    if (coverageMeta?.stateWide) return false
+    if (coverageMeta?.coverageType === 'state') return false
+    return true
+  }, [showLayersPanel, coverageCircle, coverageMeta])
+
+  const tornadoCorridorBounds = useMemo((): MapStateBounds | null => {
+    if (tornadoPathPoints.length < 2) return null
+    return boundsFromPath(tornadoPathPoints, 0.1)
+  }, [tornadoPathPoints])
+
+  const isTornadoDemoView = scenarioDemo || (demoModeActive && tornadoPathPoints.length >= 2)
+
+  const mapStateBounds = useMemo((): MapStateBounds | null => {
+    if (lockToCoverageCircle) return null
+    if (isTornadoDemoView && tornadoCorridorBounds) return tornadoCorridorBounds
+    if (demoModeActive && unifiedMapFeed && !isTornadoDemoView) {
+      const ar = getUsStateBbox('AR')
+      if (ar) {
+        const [west, south, east, north] = ar
+        return { west, south, east, north }
+      }
+    }
+    return stateBoundsRestriction
+  }, [
+    lockToCoverageCircle,
+    isTornadoDemoView,
+    tornadoCorridorBounds,
+    demoModeActive,
+    unifiedMapFeed,
+    stateBoundsRestriction,
+  ])
+
+  useEffect(() => {
+    if (!unifiedMapFeed && !stateScoped) return
+    let cancelled = false
+    fetch('/api/demo/mode', { cache: 'no-store', credentials: 'include' })
+      .then((r) => r.json())
+      .then((data) => {
+        if (!cancelled) setDemoModeActive(Boolean(data.enabled))
+      })
+      .catch(() => {
+        if (!cancelled) setDemoModeActive(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [unifiedMapFeed, stateScoped])
+
+  useEffect(() => {
+    if (scenarioDemo || demoModeActive) {
+      setShowHeatmap(true)
+    }
+  }, [scenarioDemo, demoModeActive])
+
+  const markerInCoverage = useCallback(
+    (position?: { lat: number; lng: number } | null) => {
+      if (!lockToCoverageCircle || !coverageCircle) return true
+      if (!position) return false
+      return pointInCoverageCircle(
+        position.lat,
+        position.lng,
+        coverageCircle.center,
+        coverageCircle.radiusMeters,
+      )
+    },
+    [lockToCoverageCircle, coverageCircle],
+  )
 
   useEffect(() => {
     if (tabs.length > 0 && !tabs.includes(activeTab)) {
@@ -154,6 +237,7 @@ export function GISMap({
         if (!res.ok) return
         const data = await res.json()
         if (cancelled) return
+        setScenarioDemo(data.demo === true)
         setUnifiedIncidents(Array.isArray(data.incidents) ? data.incidents : [])
         setIncidentHeatCount(
           typeof data.alignedEventCount === 'number'
@@ -235,7 +319,6 @@ export function GISMap({
           )
 
         if (stateScoped && Array.isArray(data.citizens)) {
-          setDynamicInfra([])
           setImpactedUsers(mapCitizens(data.citizens))
         } else if (unifiedMapFeed && Array.isArray(data.citizens)) {
           setImpactedUsers(mapCitizens(data.citizens))
@@ -267,15 +350,29 @@ export function GISMap({
                 ? `License coverage · ${mile} mi`
                 : 'License coverage',
           })
+          setCoverageMeta({
+            coverageType:
+              data.coverage.coverageType === 'state' || isDemoStateWide ? 'state' : 'radius',
+            stateWide: isDemoStateWide,
+            radiusMile: typeof mile === 'number' ? mile : undefined,
+          })
           if (
             Number.isFinite(data.coverage.center.lat) &&
             Number.isFinite(data.coverage.center.lng) &&
             !data.tornadoPath?.coordinates?.length
           ) {
             setMapCenter(data.coverage.center)
+            if (
+              data.coverage.coverageType !== 'state' &&
+              !isDemoStateWide &&
+              typeof mile === 'number'
+            ) {
+              setMapZoom(mapZoomForRadiusMiles(mile))
+            }
           }
         } else {
           setCoverageCircle(null)
+          setCoverageMeta(null)
         }
 
         const tornadoPath = data.tornadoPath as
@@ -283,6 +380,7 @@ export function GISMap({
           | undefined
         if (tornadoPath?.coordinates && tornadoPath.coordinates.length >= 2) {
           const path = tornadoPath.coordinates.map(([lng, lat]) => ({ lat, lng }))
+          setTornadoPathPoints(path)
           setMapPolylines([
             {
               path,
@@ -300,6 +398,7 @@ export function GISMap({
           })
           setMapZoom(10)
         } else {
+          setTornadoPathPoints([])
           setMapPolylines([])
         }
       } catch (e) {
@@ -420,9 +519,19 @@ export function GISMap({
     let cancelled = false
 
     async function applyCenter() {
-      // Sub-admin: full state view is handled by GoogleMap fitBounds — do not zoom to city/metro
-      if (stateBoundsRestriction) {
-        const { west, south, east, north } = stateBoundsRestriction
+      if (lockToCoverageCircle && coverageCircle) {
+        const mile =
+          coverageMeta?.radiusMile ?? coverageCircle.radiusMeters / 1609.34
+        if (!cancelled) {
+          setMapCenter(coverageCircle.center)
+          setMapZoom(mapZoomForRadiusMiles(mile))
+        }
+        return
+      }
+
+      // Sub-admin state license: full state view is handled by GoogleMap fitBounds
+      if (mapStateBounds) {
+        const { west, south, east, north } = mapStateBounds
         if (!cancelled) {
           setMapCenter({ lat: (south + north) / 2, lng: (west + east) / 2 })
         }
@@ -510,136 +619,201 @@ export function GISMap({
     return () => {
       cancelled = true
     }
-  }, [selectedLocation, focusState, subAdmins, impactedUsers, stateBoundsRestriction])
+  }, [selectedLocation, focusState, subAdmins, impactedUsers, mapStateBounds, lockToCoverageCircle, coverageCircle, coverageMeta])
 
-  // Fetch Infrastructure when the "Infrastructure" tab is activated
+  // Google Places Infrastructure fetching and client-side caching
   useEffect(() => {
-    if (activeTab !== 'Infrastructure' || impactedUsers.length === 0) return;
+    let cancelled = false
 
-    // Avoid refetching if we already have results (optional, but good for performance)
-    // If you want to refresh every time, remove the next line:
-    if (dynamicInfra.length > 0) return;
+    // 1. Get unique search centers (unique user positions)
+    const searchCenters: { lat: number; lng: number }[] = []
+    for (const user of impactedUsers) {
+      if (!user.position || !markerInCoverage(user.position)) continue
+
+      const isIdentical = searchCenters.some((center) => {
+        const dist = calculateDistance(
+          user.position.lat,
+          user.position.lng,
+          center.lat,
+          center.lng
+        )
+        return dist < 0.5
+      })
+
+      if (!isIdentical) {
+        searchCenters.push(user.position)
+      }
+    }
+
+    // Fallbacks
+    if (searchCenters.length === 0 && coverageCircle?.center) {
+      searchCenters.push(coverageCircle.center)
+    } else if (searchCenters.length === 0 && mapCenter) {
+      searchCenters.push(mapCenter)
+    }
+
+    const enabledGoogleTypes = INFRASTRUCTURE_SUB_LAYERS.filter(
+      (layer) => mapLayers[layer.id]
+    )
+
+    if (enabledGoogleTypes.length === 0 || searchCenters.length === 0) {
+      return
+    }
 
     async function fetchNearbyInfra() {
       setIsSearchingInfra(true)
       try {
-        const types = ['hospital', 'pharmacy', 'gas_station', 'community_center', 'school']
-        const allResults: any[] = []
-        const seenIds = new Set()
+        let cacheUpdated = false
 
-        // 1. Get unique search centers (unique user positions)
-        const searchCenters: { lat: number, lng: number }[] = []
-        for (const user of impactedUsers) {
-          if (!user.position) continue;
+        await Promise.all(
+          searchCenters.map(async (center) => {
+            await Promise.all(
+              enabledGoogleTypes.map(async (layer) => {
+                const cacheKey = `${center.lat.toFixed(4)}_${center.lng.toFixed(4)}_${layer.placeType}`
+                if (fetchedKeysRef.current.has(cacheKey)) {
+                  return // Already fetched for this center & type
+                }
 
-          const isIdentical = searchCenters.some(center => {
-            const dist = calculateDistance(user.position.lat, user.position.lng, center.lat, center.lng);
-            return dist < 0.5;
-          });
+                try {
+                  const res = await fetch(
+                    `/api/places?lat=${center.lat}&lng=${center.lng}&type=${layer.placeType}&radius=2000`
+                  )
+                  if (res.ok) {
+                    const data = await res.json()
+                    const results = data.results || []
 
-          if (!isIdentical) {
-            searchCenters.push(user.position);
-          }
-        }
+                    if (cancelled) return
 
-        // 2. Fetch infrastructure for each type at each location
-        await Promise.all(searchCenters.map(async (center) => {
-          await Promise.all(types.map(async (type) => {
-            try {
-              const res = await fetch(`/api/places?lat=${center.lat}&lng=${center.lng}&type=${type}&radius=2000`)
-              if (res.ok) {
-                const data = await res.json()
-                const results = data.results || []
+                    results.forEach((place: any) => {
+                      if (!infraCacheRef.current.has(place.place_id)) {
+                        const placePos = place.geometry.location
+                        
+                        // Map category and icon mapping
+                        const category =
+                          layer.placeType === 'hospital'
+                            ? '🏥 Hospital'
+                            : layer.placeType === 'pharmacy'
+                              ? '💊 Pharmacy'
+                              : layer.placeType === 'fire_station'
+                                ? '🔥 Emergency Service'
+                                : '👮 Police Station'
 
-                results.forEach((place: any) => {
-                  if (!seenIds.has(place.place_id)) {
-                    seenIds.add(place.place_id)
+                        const icon =
+                          layer.placeType === 'hospital'
+                            ? 'hospital'
+                            : layer.placeType === 'pharmacy'
+                              ? 'pharmacy'
+                              : layer.placeType === 'fire_station'
+                                ? 'fire'
+                                : 'police'
 
-                    // Distinct styling based on type
-                    let color = '#10B981'; // Green for hospital (glyph uses red for icon hospital)
-                    let icon = 'hospital';
-                    if (type === 'pharmacy') {
-                      color = '#3B82F6'; // Blue for pharmacy
-                      icon = 'pharmacy';
-                    } else if (type === 'gas_station') {
-                      color = '#F59E0B'; // Amber for gas station
-                      icon = 'gas';
-                    } else if (type === 'community_center' || type === 'school') {
-                      color = '#06B6D4'; // Cyan for shelters/community
-                      icon = 'home';
-                    }
-
-                    const category = type === 'hospital' ? '🏥 Hospital' :
-                      type === 'pharmacy' ? '💊 Pharmacy' :
-                        type === 'gas_station' ? '⛽ Petrol Pump' :
-                          (type === 'community_center' || type === 'school') ? '🏠 Shelter' : '🏢 Infrastructure';
-
-                    allResults.push({
-                      id: place.place_id,
-                      position: place.geometry.location,
-                      title: place.name,
-                      type: 'infrastructure',
-                      category: category,
-                      status: (type === 'community_center' || type === 'school') ? 'Emergency Shelter' : `Verified ${type.replace('_', ' ')}`,
-                      description: (type === 'community_center' || type === 'school')
-                        ? 'Official Community Shelter Site'
-                        : place.vicinity || 'Real-time infrastructure',
-                      color: color,
-                      icon: icon,
-                      location: selectedLocation !== 'All' ? selectedLocation : 'USA'
+                        infraCacheRef.current.set(place.place_id, {
+                          id: place.place_id,
+                          position: placePos,
+                          title: place.name,
+                          type: 'infrastructure',
+                          placeType: layer.placeType,
+                          category: category,
+                          status: `Verified ${layer.label}`,
+                          description: place.vicinity || 'Real-time infrastructure',
+                          color: layer.color,
+                          icon: icon,
+                          location: selectedLocation !== 'All' ? selectedLocation : 'USA',
+                        })
+                        cacheUpdated = true
+                      }
                     })
+
+                    fetchedKeysRef.current.add(cacheKey)
                   }
-                })
-              }
-            } catch (err) {
-              console.warn(`Search failed for ${type} at ${center.lat},${center.lng}`, err);
-            }
-          }))
-        }));
+                } catch (err) {
+                  console.warn(`Search failed for ${layer.placeType} at ${center.lat},${center.lng}`, err)
+                }
+              })
+            )
+          })
+        )
 
-        // Demo waiver/evac only for super-admin national view
-        if (searchCenters.length > 0 && !stateScoped) {
-          const mainCenter = searchCenters[0];
-
-          // Add a Waiver
-          allResults.push({
-            id: 'waiver-1',
-            position: { lat: mainCenter.lat + 0.005, lng: mainCenter.lng + 0.005 },
-            title: 'Resource Allocation Waiver #442',
-            type: 'infrastructure',
-            category: '📜 Waiver',
-            status: 'Active Waiver',
-            description: 'Emergency waiver active for medical supply distribution.',
-            color: '#6366F1', // Indigo
-            icon: 'shield',
-            location: selectedLocation !== 'All' ? selectedLocation : 'USA'
-          });
-
-          // Add an Evacuation Route Start
-          allResults.push({
-            id: 'evac-route-1',
-            position: { lat: mainCenter.lat - 0.008, lng: mainCenter.lng - 0.002 },
-            title: 'Evacuation Route 7 - Checkpoint',
-            type: 'infrastructure',
-            category: '📍 Evacuation Point',
-            status: 'Route Active',
-            description: 'Primary evacuation corridor to North shelters.',
-            color: '#EC4899', // Pink
-            icon: 'navigation',
-            location: selectedLocation !== 'All' ? selectedLocation : 'USA'
-          });
+        if (cacheUpdated && !cancelled) {
+          setCacheTrigger((prev) => prev + 1)
         }
-
-        setDynamicInfra(allResults)
       } catch (error) {
         console.warn('Infra search error:', error)
       } finally {
-        setIsSearchingInfra(false)
+        if (!cancelled) {
+          setIsSearchingInfra(false)
+        }
       }
     }
 
-    fetchNearbyInfra()
-  }, [activeTab, impactedUsers.length, dynamicInfra.length, stateScoped])
+    void fetchNearbyInfra()
+
+    return () => {
+      cancelled = true
+    }
+  }, [
+    mapLayers.fire_station,
+    mapLayers.pharmacy,
+    mapLayers.hospital,
+    mapLayers.police,
+    impactedUsers,
+    coverageCircle,
+    mapCenter,
+    markerInCoverage,
+    selectedLocation,
+  ])
+
+  const enabledCriticalSectors = useMemo(() => {
+    if (!showCriticalInfraLayers) return [] as string[]
+    return CRITICAL_INFRASTRUCTURE_SECTORS.filter((s) => mapLayers[s.id]).map((s) => s.id)
+  }, [showCriticalInfraLayers, mapLayers])
+
+  useEffect(() => {
+    if (!showCriticalInfraLayers || enabledCriticalSectors.length === 0) {
+      setCriticalInfraMarkers([])
+      return
+    }
+
+    let cancelled = false
+    setIsLoadingCriticalInfra(true)
+
+    const center = demoModeActive
+      ? { lat: 34.7465, lng: -92.2896 }
+      : coverageCircle?.center ?? mapCenter
+
+    const qs = new URLSearchParams({
+      sectors: enabledCriticalSectors.join(','),
+      lat: String(center.lat),
+      lng: String(center.lng),
+      radius: demoModeActive ? '80000' : '35000',
+    })
+
+    fetch(`/api/admin/critical-infrastructure?${qs}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (!cancelled && Array.isArray(data.markers)) {
+          setCriticalInfraMarkers(data.markers)
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setCriticalInfraMarkers([])
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingCriticalInfra(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [
+    showCriticalInfraLayers,
+    enabledCriticalSectors.join(','),
+    demoModeActive,
+    coverageCircle?.center.lat,
+    coverageCircle?.center.lng,
+    mapCenter.lat,
+    mapCenter.lng,
+  ])
 
   const markers = useMemo(() => {
     let currentFiltered: any[] = []
@@ -648,7 +822,6 @@ export function GISMap({
       case 'Citizens': currentFiltered = impactedUsers; break;
       case 'Responders': currentFiltered = responders; break;
       case 'Leaders': currentFiltered = subAdmins; break;
-      case 'Infrastructure': currentFiltered = dynamicInfra; break;
       default: currentFiltered = [];
     }
 
@@ -662,20 +835,50 @@ export function GISMap({
       )
     }
 
-    return currentFiltered
-  }, [activeTab, impactedUsers, responders, subAdmins, dynamicInfra, selectedLocation])
-
-  const heatPoints = useMemo(() => {
-    if (unifiedIncidents.length > 0) {
-      return unifiedIncidents.map((inc) => ({
-        lat: inc.lat,
-        lng: inc.lng,
-        weight: inc.weight,
-      }))
+    if (lockToCoverageCircle) {
+      currentFiltered = currentFiltered.filter((m) => markerInCoverage(m.position))
     }
 
-    const base = [...impactedUsers, ...responders, ...dynamicInfra]
-      .filter((m: any) => m?.position && Number.isFinite(m.position.lat) && Number.isFinite(m.position.lng))
+    return currentFiltered
+  }, [activeTab, impactedUsers, responders, subAdmins, selectedLocation, lockToCoverageCircle, markerInCoverage])
+
+  /** Operational dashboards always show incidents/heatmap; Filter checkbox is optional elsewhere. */
+  const incidentsVisible = unifiedMapFeed || stateScoped || mapLayers.incidents
+
+  const heatPoints = useMemo(() => {
+    if (!showHeatmap || !incidentsVisible) return []
+
+    const inCoverage = (lat: number, lng: number) => {
+      if (!lockToCoverageCircle || !coverageCircle) return true
+      return pointInCoverageCircle(lat, lng, coverageCircle.center, coverageCircle.radiusMeters)
+    }
+
+    if (unifiedIncidents.length > 0) {
+      return unifiedIncidents
+        .filter((inc) => inCoverage(inc.lat, inc.lng))
+        .map((inc) => ({
+          lat: inc.lat,
+          lng: inc.lng,
+          weight: inc.weight,
+        }))
+    }
+
+    const enabledInfraMarkers = INFRASTRUCTURE_SUB_LAYERS.flatMap((layer) => {
+      if (mapLayers[layer.id]) {
+        return Array.from(infraCacheRef.current.values())
+          .filter((m: any) => m.placeType === layer.placeType)
+      }
+      return []
+    })
+
+    const base = [...impactedUsers, ...responders, ...enabledInfraMarkers]
+      .filter(
+        (m: any) =>
+          m?.position &&
+          Number.isFinite(m.position.lat) &&
+          Number.isFinite(m.position.lng) &&
+          inCoverage(m.position.lat, m.position.lng),
+      )
       .map((m: any, i: number) => ({
         lat: m.position.lat,
         lng: m.position.lng,
@@ -689,32 +892,135 @@ export function GISMap({
                 : 0.45 + ((i % 4) * 0.08),
       }))
     return base.slice(0, 24)
-  }, [showLayersPanel, unifiedIncidents, impactedUsers, responders, dynamicInfra])
+  }, [
+    showHeatmap,
+    incidentsVisible,
+    unifiedIncidents,
+    impactedUsers,
+    responders,
+    mapLayers,
+    lockToCoverageCircle,
+    coverageCircle,
+    cacheTrigger,
+  ])
 
   const situationalMarkers = useMemo(() => {
-    if (!showLayersPanel && !unifiedMapFeed) return []
-    return unifiedIncidents.map((inc) => ({
-      id: `unified-${inc.id}`,
-      position: { lat: inc.lat, lng: inc.lng },
-      title: inc.name,
-      type: 'weather' as const,
-      description: `${inc.severity} severity · ${inc.category || inc.source || 'unified event'}`,
-      status: inc.severity,
-      location: inc.location,
-      category: inc.category,
-    }))
-  }, [showLayersPanel, unifiedMapFeed, unifiedIncidents])
+    if (!incidentsVisible) return []
+    return unifiedIncidents
+      .filter((inc) => {
+        if (!lockToCoverageCircle || !coverageCircle) return true
+        return pointInCoverageCircle(
+          inc.lat,
+          inc.lng,
+          coverageCircle.center,
+          coverageCircle.radiusMeters,
+        )
+      })
+      .map((inc) => ({
+        id: `unified-${inc.id}`,
+        position: { lat: inc.lat, lng: inc.lng },
+        title: inc.name,
+        type: 'weather' as const,
+        description: `${inc.severity} severity · ${inc.category || inc.source || 'unified event'}`,
+        status: inc.severity,
+        location: inc.location,
+        category: inc.category,
+        incidentId: inc.id,
+        riskReportHref: `/ai-risk-assessment?incident=${encodeURIComponent(inc.id)}`,
+      }))
+  }, [incidentsVisible, unifiedIncidents, lockToCoverageCircle, coverageCircle])
 
   const mapMarkers = useMemo(() => {
-    const incidentMarkers =
-      showLayersPanel || unifiedMapFeed ? situationalMarkers : []
-    if (stateScoped) return [...markers, ...incidentMarkers]
-    if (showLayersPanel || unifiedMapFeed) return [...markers, ...situationalMarkers]
-    return markers
-  }, [stateScoped, showLayersPanel, unifiedMapFeed, markers, situationalMarkers])
+    const activeTabMarkers = markers
+    const enabledLayerMarkers: any[] = []
+
+    // 1. Incidents (always on super-admin unified feed)
+    if (incidentsVisible) {
+      enabledLayerMarkers.push(...situationalMarkers)
+    }
+
+    // 2. Google Places sub-layers
+    INFRASTRUCTURE_SUB_LAYERS.forEach((layer) => {
+      if (mapLayers[layer.id]) {
+        const markersForLayer = Array.from(infraCacheRef.current.values())
+          .filter((m: any) => m.placeType === layer.placeType)
+          .filter((m: any) => markerInCoverage(m.position))
+        enabledLayerMarkers.push(...markersForLayer)
+      }
+    })
+
+    // 3. CISA critical infrastructure (Dashboard A + B)
+    if (showCriticalInfraLayers) {
+      CRITICAL_INFRASTRUCTURE_SECTORS.forEach((sector) => {
+        if (mapLayers[sector.id]) {
+          const sectorMarkers = criticalInfraMarkers
+            .filter((m) => m.sectorId === sector.id)
+            .filter((m) => markerInCoverage({ lat: m.lat, lng: m.lng }))
+            .map((m) => ({
+              id: m.id,
+              position: { lat: m.lat, lng: m.lng },
+              title: m.title,
+              type: 'infrastructure' as const,
+              category: sector.label,
+              status: m.status,
+              location: m.location,
+              description: m.description,
+              color: sector.color,
+              icon: 'hospital',
+            }))
+          enabledLayerMarkers.push(...sectorMarkers)
+        }
+      })
+    }
+
+    return [...activeTabMarkers, ...enabledLayerMarkers]
+  }, [
+    markers,
+    mapLayers,
+    situationalMarkers,
+    cacheTrigger,
+    markerInCoverage,
+    showCriticalInfraLayers,
+    criticalInfraMarkers,
+  ])
+
+  const disasterZonesVisible = useMemo(() => {
+    const layerOn = mapLayers.disaster_zones || scenarioDemo
+    if (!layerOn) return false
+    if (scenarioDemo || demoModeActive) return true
+    if (showDisasterZones && tornadoPathPoints.length >= 2) return true
+    return false
+  }, [
+    mapLayers.disaster_zones,
+    scenarioDemo,
+    demoModeActive,
+    showDisasterZones,
+    tornadoPathPoints.length,
+  ])
+
+  const disasterZoneCircles = useMemo((): MapDisasterZoneCircleSpec[] => {
+    if (!disasterZonesVisible) return []
+    const path = tornadoPathPoints.length >= 2 ? tornadoPathPoints : undefined
+    const zones = disasterZonesToMapCircles(path)
+    return zones.map((z) => ({
+      id: z.id,
+      center: z.center,
+      radiusMeters: z.radiusMeters,
+      fillColor: z.fillColor,
+      fillOpacity: z.fillOpacity,
+      strokeColor: z.strokeColor,
+      strokeWeight: z.strokeWeight,
+      label: z.label,
+      labelPosition: zoneLabelPosition(z),
+    }))
+  }, [disasterZonesVisible, tornadoPathPoints])
 
   const displayHeatCount =
-    unifiedIncidents.length > 0 ? incidentHeatCount : heatPoints.length
+    unifiedIncidents.length > 0
+      ? incidentsVisible
+        ? incidentHeatCount
+        : 0
+      : heatPoints.length
   const usesUnifiedHeat = unifiedIncidents.length > 0
 
   return (
@@ -736,7 +1042,7 @@ export function GISMap({
         </div>
 
         {!hideTabs && tabs.length > 0 && (
-          <div className="flex bg-slate-50 p-1 rounded-2xl gap-0.5 overflow-x-auto no-scrollbar shrink-0">
+          <div className="flex bg-slate-50 p-1 rounded-2xl gap-0.5 overflow-x-auto no-scrollbar shrink-0 items-center">
             {tabs.map((tab) => (
               <button
                 key={tab}
@@ -751,6 +1057,14 @@ export function GISMap({
                 {tab}
               </button>
             ))}
+            {showLayersPanel && (
+              <MapLayersDropdown
+                layers={mapLayers}
+                onChange={setMapLayers}
+                showCriticalInfra={showCriticalInfraLayers}
+                showDisasterZones={showDisasterZones}
+              />
+            )}
           </div>
         )}
       </div>
@@ -763,12 +1077,14 @@ export function GISMap({
           center={mapCenter}
           heatPoints={heatPoints}
           showHeatmap={showHeatmap}
-          stateBounds={stateBoundsRestriction}
+          stateBounds={mapStateBounds}
           coverageCircle={showLayersPanel ? coverageCircle : null}
+          lockToCoverage={lockToCoverageCircle}
           polylines={mapPolylines}
+          disasterZoneCircles={disasterZoneCircles}
         />
 
-        {isSearchingInfra && (
+        {(isSearchingInfra || isLoadingCriticalInfra) && (
           <div className="absolute right-4 top-4 bg-white/90 backdrop-blur-md px-4 py-2 rounded-2xl shadow-2xl border border-slate-100 flex items-center gap-2 z-50 animate-in fade-in slide-in-from-top-2 duration-300">
             <Loader2 className="w-4 h-4 text-[#33375D] animate-spin" />
             <span className="text-[10px] font-black uppercase tracking-widest text-slate-600">Locating Facilities...</span>

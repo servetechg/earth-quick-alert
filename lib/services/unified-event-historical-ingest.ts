@@ -188,7 +188,7 @@ export async function ingestHistoricalFirms(): Promise<HistoricalSourceReport> {
                 description: event.description,
                 severity: brightness >= 330 ? 'High' : 'Moderate',
                 lat,
-                lng,
+                lng: lon,
                 properties: {
                     wildfire: {
                         intensity: Number.isFinite(frp)

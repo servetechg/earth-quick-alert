@@ -20,6 +20,7 @@ function SignupPageInner() {
   const [password, setPassword] = useState('')
   const [isSafe, setIsSafe] = useState(true)
   const [role, setRole] = useState('user')
+  const [requestedLicenseType, setRequestedLicenseType] = useState('radius')
   const [country, setCountry] = useState('')
   const [state, setState] = useState('')
   const [city, setCity] = useState('')
@@ -182,6 +183,7 @@ function SignupPageInner() {
           state,
           city,
           zipcode,
+          requestedLicenseType: role === 'sub-admin' ? requestedLicenseType : undefined,
           ...(responderInviteToken ? { responderInviteToken } : {}),
         }),
       })
@@ -343,6 +345,43 @@ function SignupPageInner() {
                         }`}
                     >
                       Authorized Admin
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {role === 'sub-admin' && (
+                <div className="space-y-4 p-6 bg-[#33375D]/5 border border-[#33375D]/10 rounded-3xl animate-in fade-in duration-300">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">
+                    License Location Coverage Scope
+                  </label>
+                  <div className="grid grid-cols-2 gap-4 mt-1">
+                    <button
+                      type="button"
+                      onClick={() => setRequestedLicenseType('state')}
+                      className={`py-3 px-2 rounded-2xl border text-[11px] font-black uppercase tracking-widest transition-all flex flex-col items-center justify-center gap-1.5 
+                        ${requestedLicenseType === 'state'
+                          ? 'bg-[#33375D] border-[#33375D] text-white shadow-lg'
+                          : 'bg-slate-50 border-slate-200 text-slate-500 hover:border-[#33375D]/30'
+                        }`}
+                    >
+                      <span>Whole State</span>
+                      {/* <span className={`text-[8px] font-bold normal-case tracking-normal text-center leading-tight mt-0.5 ${requestedLicenseType === 'state' ? 'text-slate-300' : 'text-slate-400'}`}>
+                        Alerts for entire state
+                      </span> */}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRequestedLicenseType('radius')}
+                      className={`py-3 px-2 rounded-2xl border text-[11px] font-black uppercase tracking-widest transition-all flex flex-col items-center justify-center gap-1.5 ${requestedLicenseType === 'radius'
+                        ? 'bg-[#33375D] border-[#33375D] text-white shadow-lg'
+                        : 'bg-slate-50 border-slate-200 text-slate-500 hover:border-[#33375D]/30'
+                        }`}
+                    >
+                      <span>Limited Radius</span>
+                      {/* <span className={`text-[8px] font-bold normal-case tracking-normal text-center leading-tight mt-0.5 ${requestedLicenseType === 'radius' ? 'text-slate-300' : 'text-slate-400'}`}>
+                        Within local radius
+                      </span> */}
                     </button>
                   </div>
                 </div>

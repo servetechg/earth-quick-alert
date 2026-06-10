@@ -97,6 +97,15 @@ export interface RiskSummaryPayload {
   sources_count: number;
   /** False when OPENAI_API_KEY is unset — UI shows a banner and deterministic fallbacks are used. Added by /summary route, not by computeRiskSnapshot. */
   ai_available?: boolean;
+  /** CISA critical infrastructure sectors with facilities at risk (Dashboard A). */
+  critical_infrastructure_at_risk?: CriticalInfraAtRiskRow[];
+}
+
+export interface CriticalInfraAtRiskRow {
+  sectorId: string;
+  label: string;
+  facilitiesAtRisk: number;
+  riskLevel: 'LOW' | 'MODERATE' | 'HIGH' | 'CRITICAL';
 }
 
 /** Payload returned by POST /api/risk-assessment/historical/[category] */

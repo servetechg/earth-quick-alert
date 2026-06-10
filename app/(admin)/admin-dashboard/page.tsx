@@ -203,8 +203,10 @@ export default function Dashboard() {
           <GISMap
             title="Live Situational Map"
             showLayersPanel
+            showCriticalInfraLayers
+            showDisasterZones
             stateScoped
-            visibleTabs={['Citizens', 'Responders', 'Infrastructure']}
+            visibleTabs={['Citizens', 'Responders']}
             selectedLocation={gisSelectedLocation}
             focusState={gisFocusState}
           />
