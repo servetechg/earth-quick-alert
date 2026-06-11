@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/v1/cron/profile-incomplete-reminders",
+      "schedule": "*/5 * * * *"
+    }
+  ]
+}

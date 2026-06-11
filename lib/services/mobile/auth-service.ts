@@ -110,6 +110,18 @@ export async function saveUserProfile(
     if (profile.alertLocations !== undefined) {
         setDoc.alertLocations = normalizeAlertLocationsForSave(profile.alertLocations);
     }
+    if (profile.isPrimaryAddress !== undefined) {
+        setDoc.isPrimaryAddress = profile.isPrimaryAddress;
+    }
+    if (profile.allowResidenceInspection !== undefined) {
+        setDoc.allowResidenceInspection = profile.allowResidenceInspection;
+    }
+    if (profile.proofOfOwnership !== undefined) {
+        setDoc.proofOfOwnership = profile.proofOfOwnership;
+    }
+    if (profile.proofOfResidency !== undefined) {
+        setDoc.proofOfResidency = profile.proofOfResidency;
+    }
 
     await UserProfile.findOneAndUpdate(
         { userId },
@@ -145,6 +157,28 @@ export async function loadUserProfile(userId: string) {
         transport: doc.transport,
         lodging: doc.lodging,
         alertLocations: doc.alertLocations ?? [],
+        ...(doc.isPrimaryAddress !== undefined ? { isPrimaryAddress: doc.isPrimaryAddress } : {}),
+        ...(doc.allowResidenceInspection !== undefined
+            ? { allowResidenceInspection: doc.allowResidenceInspection }
+            : {}),
+        ...(doc.proofOfOwnership
+            ? {
+                  proofOfOwnership: {
+                      url: doc.proofOfOwnership.url,
+                      fileName: doc.proofOfOwnership.fileName,
+                      mimeType: doc.proofOfOwnership.mimeType,
+                  },
+              }
+            : {}),
+        ...(doc.proofOfResidency
+            ? {
+                  proofOfResidency: {
+                      url: doc.proofOfResidency.url,
+                      fileName: doc.proofOfResidency.fileName,
+                      mimeType: doc.proofOfResidency.mimeType,
+                  },
+              }
+            : {}),
     };
 }
 

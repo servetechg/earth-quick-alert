@@ -1,5 +1,18 @@
 import { z } from 'zod';
 import { alertLocationOnboardingSchema } from '@/lib/validation/mobile/alert-locations';
+import { PROFILE_DOCUMENT_KINDS } from '@/lib/types/mobile/profile-document';
+
+export const profileDocumentRefSchema = z.object({
+    url: z.string().url('Invalid document URL'),
+    fileName: z.string().trim().min(1, 'fileName is required'),
+    mimeType: z.string().optional(),
+    publicId: z.string().optional(),
+    resourceType: z.enum(['image', 'raw']).optional(),
+});
+
+export function isProfileDocumentKind(value: string): value is (typeof PROFILE_DOCUMENT_KINDS)[number] {
+    return (PROFILE_DOCUMENT_KINDS as readonly string[]).includes(value);
+}
 
 export const ADA_OPTIONS = [
     'Mobility (Wheelchair, Walker)',
@@ -123,5 +136,9 @@ export const profileCompleteSchema = z.object({
         lodging: lodgingSchema,
         /** Optional — step 2 onboarding; omit or `[]` if user skipped */
         alertLocations: z.array(alertLocationOnboardingSchema).max(5).optional(),
+        isPrimaryAddress: z.boolean().optional(),
+        allowResidenceInspection: z.boolean().optional(),
+        proofOfOwnership: profileDocumentRefSchema.nullable().optional(),
+        proofOfResidency: profileDocumentRefSchema.nullable().optional(),
     }),
 });
