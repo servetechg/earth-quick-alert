@@ -2,6 +2,7 @@ import connectDB from '@/lib/mongodb';
 import IncidentReport from '@/models/IncidentReport';
 import { geocodeLocation } from '@/lib/services/location-matching';
 import { loadUserProfile } from '@/lib/services/mobile/auth-service';
+import { buildGisMapLayers } from '@/lib/services/mobile/gis-map-layers';
 import { buildUserZones, paginate } from '@/lib/services/mobile/zone-utils';
 import {
     buildStatusFromAlerts,
@@ -106,34 +107,30 @@ export async function getEmergencyMap(userId: string): Promise<EmergencyMapRespo
     const alerts = await getAllMobileAlertsForUser(userId);
     const incidents = await getEmergencyIncidents(userId);
 
-    const markers = [
-        ...alerts.slice(0, 8).map((a, i) => ({
-            id: `alert-${a.id}`,
-            lat: geo.lat + (i * 0.01 - 0.04),
-            lng: geo.lon + (i * 0.008 - 0.03),
+    const { mapMarkers, mapOverlays } = await buildGisMapLayers(
+        profile,
+        alerts.map((a) => ({
+            id: a.id,
             title: a.title,
-            type: 'alert' as const,
+            description: a.description,
             severity: a.severity,
+            location: a.location,
         })),
-        ...incidents
-            .filter((inc) => inc.lat != null && inc.lng != null)
-            .map((inc) => ({
-                id: `inc-${inc.id}`,
-                lat: inc.lat!,
-                lng: inc.lng!,
-                title: inc.title,
-                type: 'incident' as const,
-                severity: inc.severity,
-            })),
-    ];
+        incidents,
+    );
+
+    const latitudeDelta = zones.length > 1 ? 0.35 : 0.15;
+    const longitudeDelta = zones.length > 1 ? 0.35 : 0.15;
 
     return {
         mapRegion: {
             latitude: geo.lat,
             longitude: geo.lon,
-            latitudeDelta: 0.15,
-            longitudeDelta: 0.15,
+            latitudeDelta,
+            longitudeDelta,
         },
-        markers,
+        mapMarkers,
+        mapOverlays,
+        markers: mapMarkers,
     };
 }

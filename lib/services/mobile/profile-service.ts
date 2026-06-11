@@ -67,6 +67,26 @@ export async function patchMobileProfile(
         transport: partial.transport ?? existing.transport,
         lodging: partial.lodging ?? existing.lodging,
         alertLocations: partial.alertLocations ?? existing.alertLocations ?? [],
+        ...(partial.isPrimaryAddress !== undefined
+            ? { isPrimaryAddress: partial.isPrimaryAddress }
+            : existing.isPrimaryAddress !== undefined
+              ? { isPrimaryAddress: existing.isPrimaryAddress }
+              : {}),
+        ...(partial.allowResidenceInspection !== undefined
+            ? { allowResidenceInspection: partial.allowResidenceInspection }
+            : existing.allowResidenceInspection !== undefined
+              ? { allowResidenceInspection: existing.allowResidenceInspection }
+              : {}),
+        ...(partial.proofOfOwnership !== undefined
+            ? { proofOfOwnership: partial.proofOfOwnership }
+            : existing.proofOfOwnership
+              ? { proofOfOwnership: existing.proofOfOwnership }
+              : {}),
+        ...(partial.proofOfResidency !== undefined
+            ? { proofOfResidency: partial.proofOfResidency }
+            : existing.proofOfResidency
+              ? { proofOfResidency: existing.proofOfResidency }
+              : {}),
     };
 
     await saveUserProfile(userId, merged);
