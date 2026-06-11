@@ -25,13 +25,39 @@ export type EmergencyIncident = {
     lng?: number;
 };
 
+export type GisMapLayerId =
+    | 'weatherRadar'
+    | 'riskAreas'
+    | 'floodZones'
+    | 'shelters'
+    | 'hospitals'
+    | 'roadClosures'
+    | 'powerOutages'
+    | 'waterIssues'
+    | 'resourceSites'
+    | 'incidentReports';
+
 export type EmergencyMapMarker = {
     id: string;
-    lat: number;
-    lng: number;
+    latitude: number;
+    longitude: number;
     title: string;
-    type: 'incident' | 'alert' | 'user';
+    description?: string;
+    layer: GisMapLayerId;
     severity?: string;
+    /** @deprecated Legacy flat coords — use latitude/longitude */
+    lat?: number;
+    lng?: number;
+    /** @deprecated Legacy type — use layer */
+    type?: 'incident' | 'alert' | 'user';
+};
+
+export type EmergencyMapOverlay = {
+    id: string;
+    layer: Extract<GisMapLayerId, 'weatherRadar' | 'riskAreas' | 'floodZones'>;
+    coordinates: Array<{ latitude: number; longitude: number }>;
+    fillColor?: string;
+    strokeColor?: string;
 };
 
 export type EmergencyMapResponse = {
@@ -41,5 +67,8 @@ export type EmergencyMapResponse = {
         latitudeDelta: number;
         longitudeDelta: number;
     };
-    markers: EmergencyMapMarker[];
+    mapMarkers: EmergencyMapMarker[];
+    mapOverlays: EmergencyMapOverlay[];
+    /** @deprecated Use mapMarkers */
+    markers?: EmergencyMapMarker[];
 };

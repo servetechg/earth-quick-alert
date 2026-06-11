@@ -9,6 +9,7 @@ import {
     issuePasswordResetToken,
     isMobileUserRole,
 } from '@/lib/services/mobile/auth-service';
+import { scheduleProfileIncompleteReminder } from '@/lib/services/mobile/profile-incomplete-reminder-service';
 
 export const dynamic = 'force-dynamic';
 
@@ -43,6 +44,9 @@ export async function POST(req: NextRequest) {
             }
             user.emailVerified = true;
             await user.save();
+            if (!user.profileComplete) {
+                await scheduleProfileIncompleteReminder(user._id.toString());
+            }
             const auth = await buildAuthResponse(user);
             return apiJson(auth);
         }

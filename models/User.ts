@@ -22,6 +22,21 @@ const UserSchema = new Schema({
         type: Boolean,
         default: false,
     },
+    /** Expo push token for Ready2Go mobile remote notifications */
+    expoPushToken: {
+        type: String,
+        default: '',
+    },
+    /** Set when the post-signup incomplete-profile reminder email/push was sent */
+    profileIncompleteReminderSentAt: {
+        type: Date,
+        default: null,
+    },
+    /** When to send the incomplete-profile reminder (set after email OTP verification) */
+    profileIncompleteReminderDueAt: {
+        type: Date,
+        default: null,
+    },
     email: {
         type: String,
         required: [true, 'Please provide an email'],

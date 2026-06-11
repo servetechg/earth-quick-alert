@@ -8,6 +8,7 @@ import {
     geocodeLocation,
     locationMatchesAlertAreas,
 } from '@/lib/services/location-matching';
+import { fetchUnifiedEventsForMobileUser } from '@/lib/services/mobile/unified-event-mobile-alerts';
 import { buildUserZones, type UserZone } from '@/lib/services/mobile/zone-utils';
 import type { UserProfilePayload } from '@/lib/types/mobile/auth';
 import type { MobileAlertSeverity, MobileWeatherAlert } from '@/lib/types/mobile/alerts';
@@ -246,18 +247,31 @@ export async function fetchMobileAlertsForUser(
             affectedAreas: (alert.affectedAreas as string[]) || [],
         })) as Alert[];
 
-    const allAlerts: Alert[] = [
-        ...Array.from(mergedWeatherMap.values()),
-        ...earthquakeAlerts,
-        ...communityAlerts,
-    ];
+    const unifiedAlerts = await fetchUnifiedEventsForMobileUser(profile);
 
+    const merged = new Map<string, Alert & { sourceDisplay?: string }>();
+    const titleDedupe = new Set<string>();
+
+    const addAlert = (alert: Alert & { sourceDisplay?: string }) => {
+        if (merged.has(alert.id)) return;
+        const titleKey = `${alert.title.toLowerCase().trim()}|${alert.timestamp.slice(0, 13)}`;
+        if (titleDedupe.has(titleKey)) return;
+        titleDedupe.add(titleKey);
+        merged.set(alert.id, alert);
+    };
+
+    for (const alert of unifiedAlerts) addAlert(alert);
+    for (const alert of Array.from(mergedWeatherMap.values())) addAlert(alert);
+    for (const alert of earthquakeAlerts) addAlert(alert);
+    for (const alert of communityAlerts) addAlert(alert);
+
+    const allAlerts = Array.from(merged.values());
     allAlerts.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
     return allAlerts;
 }
 
 export function alertToMobileItem(
-    alert: Alert,
+    alert: Alert & { sourceDisplay?: string },
     zones: UserZone[],
     readMap: Map<string, boolean>,
 ): MobileWeatherAlert {
@@ -269,7 +283,7 @@ export function alertToMobileItem(
         severity,
         title: alert.title,
         location: pickLocation(alert, zones),
-        source: sourceLabel(alert.source),
+        source: alert.sourceDisplay ?? sourceLabel(alert.source),
         issuedAt,
         expiresAt,
         expiresLabel: expiresLabel(expiresAt),

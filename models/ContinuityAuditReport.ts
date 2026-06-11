@@ -25,12 +25,13 @@ const ContinuityAuditReportSchema = new Schema(
             analyzed: { type: Number, default: 0 },
         },
         integrity: {
-            inSync: { type: Number, default: 0 },
-            reviewing: { type: Number, default: 0 },
-            deviation: { type: Number, default: 0 },
+            compliant: { type: Number, default: 0 },
+            underReview: { type: Number, default: 0 },
+            nonCompliant: { type: Number, default: 0 },
             unanalyzed: { type: Number, default: 0 },
         },
         generatedAt: { type: Date, default: Date.now },
+        degraded: { type: Boolean, default: false },
     },
     { timestamps: true }
 );

@@ -11,6 +11,7 @@ type UserLike = {
     profilePic?: string;
     emailVerified?: boolean;
     profileComplete?: boolean;
+    createdAt?: Date | string;
 };
 
 export function splitName(name: string): { firstName: string; lastName: string } {
@@ -44,6 +45,13 @@ export function toApiUser(doc: UserLike): ApiUser {
             ? doc.profilePic.trim()
             : undefined;
 
+    const createdAt =
+        doc.createdAt instanceof Date
+            ? doc.createdAt.toISOString()
+            : typeof doc.createdAt === 'string' && doc.createdAt.trim()
+              ? doc.createdAt
+              : undefined;
+
     return {
         id,
         email: doc.email,
@@ -53,5 +61,6 @@ export function toApiUser(doc: UserLike): ApiUser {
         ...(profilePic ? { profilePic } : {}),
         emailVerified: Boolean(doc.emailVerified),
         profileComplete,
+        ...(createdAt ? { createdAt } : {}),
     };
 }
