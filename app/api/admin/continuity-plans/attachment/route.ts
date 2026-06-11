@@ -9,7 +9,7 @@ import { getSession } from '@/lib/auth';
 import { destroyEmergencyPlanAsset } from '@/lib/emergency-plan-cloudinary';
 import type { EmergencyPlanCloudinaryResource } from '@/lib/emergency-plan-cloudinary';
 import {
-    rescanIntegrityAttachments,
+    deleteIntegrityAttachments,
     usePythonIntegrityBackend,
 } from '@/lib/services/python-integrity-client';
 
@@ -78,11 +78,11 @@ export async function DELETE(req: Request) {
 
         let aiCleanupOk = true;
         if (usePythonIntegrityBackend()) {
-            const rescan = await rescanIntegrityAttachments(String(ownerUserId), [attachmentId], true);
-            if (!rescan) {
+            const purge = await deleteIntegrityAttachments(String(ownerUserId), [attachmentId]);
+            if (!purge) {
                 aiCleanupOk = false;
                 console.warn(
-                    `[continuity-delete] Python rescan failed for attachmentId=${attachmentId} — continuing with vault delete`,
+                    `[continuity-delete] Python purge failed for attachmentId=${attachmentId} — continuing with vault delete`,
                 );
             }
         }

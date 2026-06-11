@@ -22,6 +22,16 @@ export async function persistCoopAttachmentIntegrity(
     attachmentId: unknown,
     result: CoopIntegrityAnalysisResult,
 ): Promise<void> {
+    const c = result.componentScores;
+    const components = c
+        ? {
+              content: typeof c.content === 'number' ? c.content : null,
+              name: typeof c.name === 'number' ? c.name : null,
+              quality: typeof c.quality === 'number' ? c.quality : null,
+              duplication: typeof c.duplication === 'number' ? c.duplication : null,
+          }
+        : undefined;
+
     await ContinuityPlan.updateOne(
         { ownerUserId, planId, 'attachments._id': attachmentId },
         {
@@ -30,6 +40,7 @@ export async function persistCoopAttachmentIntegrity(
                 'attachments.$.aiIntegrityScore': result.score,
                 'attachments.$.aiIntegritySummary': result.summary,
                 'attachments.$.aiIntegrityAnalyzedAt': result.analyzedAt,
+                ...(components ? { 'attachments.$.aiIntegrityComponents': components } : {}),
             },
         },
     );

@@ -52,6 +52,7 @@ import { integrityPresentation } from '@/lib/constants/integrity-status'
 import { AdminPageShell } from '@/components/admin-page-shell'
 import { AdminPageHeader } from '@/components/admin-page-header'
 import { AdminPageLoader } from '@/components/admin-page-loader'
+import { DocumentDetailModal, type DetailAttachment } from '@/components/continuity/document-detail-modal'
 
 type EmergencyAttachment = {
     _id?: string
@@ -65,6 +66,12 @@ type EmergencyAttachment = {
     aiIntegrityScore?: number
     aiIntegritySummary?: string
     aiIntegrityAnalyzedAt?: string
+    aiIntegrityComponents?: {
+        content?: number | null
+        name?: number | null
+        quality?: number | null
+        duplication?: number | null
+    }
 }
 
 type PlanCategory = 'response' | 'coop' | 'bcp' | 'compliance'
@@ -241,6 +248,9 @@ export default function EmergencyPlanPage() {
     )
     const [deleting, setDeleting] = useState(false)
 
+    const [analyzingIds, setAnalyzingIds] = useState<Set<string>>(new Set())
+    const [detailTarget, setDetailTarget] = useState<{ planId: string; attachmentId: string } | null>(null)
+
     const fetchPlans = async () => {
         try {
             const res = await fetch('/api/admin/continuity-plans')
@@ -362,6 +372,25 @@ export default function EmergencyPlanPage() {
         })
     }, [flattenedRows, search, selectedCategoryIdx, plans])
 
+    const detailAttachment = useMemo<DetailAttachment | null>(() => {
+        if (!detailTarget) return null
+        const plan = plans[detailTarget.planId]
+        const att = plan?.attachments.find((a) => a._id === detailTarget.attachmentId)
+        if (!plan || !att) return null
+        return {
+            _id: att._id,
+            fileName: att.fileName,
+            fileUrl: att.fileUrl,
+            planId: detailTarget.planId,
+            planLabel: plan.label,
+            aiIntegrityStatus: att.aiIntegrityStatus,
+            aiIntegrityScore: att.aiIntegrityScore,
+            aiIntegritySummary: att.aiIntegritySummary,
+            aiIntegrityAnalyzedAt: att.aiIntegrityAnalyzedAt,
+            aiIntegrityComponents: att.aiIntegrityComponents,
+        }
+    }, [detailTarget, plans])
+
     const handlePickFile = () => fileRef.current?.click()
 
     const onFileChosen = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -387,6 +416,68 @@ export default function EmergencyPlanPage() {
         setSelectedUploadFiles((prev) => prev.filter((_, i) => i !== idx))
     }
 
+    /** Merge an analysis result into a single attachment in `plans` state. */
+    const applyAnalysis = (
+        planId: string,
+        attachmentId: string,
+        data: {
+            status?: string
+            score?: number
+            summary?: string
+            analyzedAt?: string
+            componentScores?: EmergencyAttachment['aiIntegrityComponents'] | null
+        }
+    ) => {
+        setPlans((prev) => {
+            const plan = prev[planId]
+            if (!plan) return prev
+            const attachments = plan.attachments.map((a) =>
+                a._id === attachmentId
+                    ? {
+                          ...a,
+                          aiIntegrityStatus: data.status ?? a.aiIntegrityStatus,
+                          aiIntegrityScore: typeof data.score === 'number' ? data.score : a.aiIntegrityScore,
+                          aiIntegritySummary: data.summary ?? a.aiIntegritySummary,
+                          aiIntegrityAnalyzedAt:
+                              typeof data.analyzedAt === 'string'
+                                  ? data.analyzedAt
+                                  : new Date().toISOString(),
+                          aiIntegrityComponents: data.componentScores ?? a.aiIntegrityComponents,
+                      }
+                    : a
+            )
+            return { ...prev, [planId]: { ...plan, attachments } }
+        })
+    }
+
+    /** Analyze (force=re-analyze) one attachment; runs independently so docs never block each other. */
+    const analyzeAttachment = async (planId: string, attachmentId: string, opts?: { force?: boolean }) => {
+        if (!attachmentId) return
+        setAnalyzingIds((s) => new Set(s).add(attachmentId))
+        try {
+            const res = await fetch('/api/admin/continuity-plans/analyze', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ planId, attachmentId, force: opts?.force ?? false }),
+            })
+            const body = await res.json().catch(() => ({}))
+            if (res.ok && body.success && body.data) {
+                applyAnalysis(planId, attachmentId, body.data)
+                setAuditSummary(null)
+            } else if (!res.ok) {
+                toast.error(body.error || 'Analysis failed')
+            }
+        } catch {
+            toast.error('Analysis request failed')
+        } finally {
+            setAnalyzingIds((s) => {
+                const n = new Set(s)
+                n.delete(attachmentId)
+                return n
+            })
+        }
+    }
+
     const submitUpload = async () => {
         if (!selectedUploadFiles.length) {
             toast.info('Pick at least one continuity file')
@@ -394,33 +485,52 @@ export default function EmergencyPlanPage() {
             return
         }
         setUploading(true)
-        let attached = 0
-        let created = 0
-        const failed: string[] = []
         try {
-            for (const file of selectedUploadFiles) {
-                try {
+            const results = await Promise.allSettled(
+                selectedUploadFiles.map(async (file) => {
                     const fd = new FormData()
                     fd.append('file', file)
                     const res = await fetch('/api/admin/continuity-plans', { method: 'POST', body: fd })
                     const body = await res.json().catch(() => ({}))
                     if (!res.ok) {
-                        failed.push(`${file.name}: ${body.error || body.message || res.statusText}`)
-                        continue
+                        throw new Error(`${file.name}: ${body.error || body.message || res.statusText}`)
                     }
-                    if (body.attachedToExistingPlan) attached++
+                    return body as {
+                        attachedToExistingPlan?: boolean
+                        planId?: string
+                        attachmentId?: string | null
+                    }
+                })
+            )
+
+            let created = 0
+            let attached = 0
+            const failed: string[] = []
+            const toAnalyze: Array<{ planId: string; attachmentId: string }> = []
+            for (const r of results) {
+                if (r.status === 'fulfilled') {
+                    if (r.value.attachedToExistingPlan) attached++
                     else created++
-                } catch (err) {
-                    failed.push(`${file.name}: ${err instanceof Error ? err.message : 'network error'}`)
+                    if (r.value.planId && r.value.attachmentId) {
+                        toAnalyze.push({ planId: r.value.planId, attachmentId: r.value.attachmentId })
+                    }
+                } else {
+                    failed.push(r.reason instanceof Error ? r.reason.message : String(r.reason))
                 }
             }
+
             if (created) toast.success(`Created ${created} new plan${created === 1 ? '' : 's'} from upload${created === 1 ? '' : 's'}`)
             if (attached) toast.success(`Attached ${attached} file${attached === 1 ? '' : 's'} to existing plan${attached === 1 ? '' : 's'}`)
             if (failed.length) toast.error(`${failed.length} upload${failed.length === 1 ? '' : 's'} failed — ${failed[0]}`)
+
             if (created + attached > 0) {
                 setSelectedUploadFiles([])
                 setUploadOpen(false)
                 await fetchPlans()
+                // Kick off analysis for every new attachment concurrently — no doc waits for another.
+                toAnalyze.forEach(({ planId, attachmentId }) => {
+                    void analyzeAttachment(planId, attachmentId)
+                })
             }
         } finally {
             setUploading(false)
@@ -661,7 +771,20 @@ export default function EmergencyPlanPage() {
 
                                     return (
                                         <tr key={`${doc.planId}-${attachmentId}`} className="group hover:bg-blue-50/30 transition-colors">
-                                            <td className="px-6 py-5">
+                                            <td
+                                                className="px-6 py-5 cursor-pointer"
+                                                role="button"
+                                                tabIndex={0}
+                                                onClick={() =>
+                                                    attachmentId && setDetailTarget({ planId: doc.planId, attachmentId })
+                                                }
+                                                onKeyDown={(e) => {
+                                                    if ((e.key === 'Enter' || e.key === ' ') && attachmentId) {
+                                                        e.preventDefault()
+                                                        setDetailTarget({ planId: doc.planId, attachmentId })
+                                                    }
+                                                }}
+                                            >
                                                 <div className="flex items-center gap-4">
                                                     <div className="w-11 h-11 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-center text-slate-400 group-hover:text-[#33375D] group-hover:bg-white group-hover:shadow-sm transition-all">
                                                         <FileText size={20} />
@@ -694,7 +817,12 @@ export default function EmergencyPlanPage() {
                                             </td>
                                             <td className="px-6 py-5 text-center min-w-[200px]">
                                                 <div className="flex flex-col items-center gap-1 max-w-[240px] mx-auto">
-                                                    {!doc.aiIntegrityAnalyzedAt && !doc.aiIntegrityStatus ? (
+                                                    {attachmentId && analyzingIds.has(attachmentId) ? (
+                                                        <span className="inline-flex items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.2em] text-slate-500">
+                                                            <Loader2 className="h-3 w-3 animate-spin" />
+                                                            Analyzing…
+                                                        </span>
+                                                    ) : !doc.aiIntegrityAnalyzedAt && !doc.aiIntegrityStatus ? (
                                                         <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-[0.2em] text-slate-400">
                                                             Not analyzed
                                                             <FieldTooltip label="Not analyzed" text={INTEGRITY_TOOLTIPS.notAnalyzed} />
@@ -1098,6 +1226,16 @@ export default function EmergencyPlanPage() {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+
+            <DocumentDetailModal
+                open={Boolean(detailTarget)}
+                attachment={detailAttachment}
+                analyzing={Boolean(detailTarget && analyzingIds.has(detailTarget.attachmentId))}
+                onClose={() => setDetailTarget(null)}
+                onReanalyze={() =>
+                    detailTarget && analyzeAttachment(detailTarget.planId, detailTarget.attachmentId, { force: true })
+                }
+            />
         </AdminPageShell>
     )
 }

@@ -40,6 +40,13 @@ const ContinuityPlanSchema = new Schema({
         aiIntegrityScore: { type: Number },
         aiIntegritySummary: { type: String },
         aiIntegrityAnalyzedAt: { type: Date },
+        // Per-signal 0–100 breakdown from the AI service (content 50% / name 19% / quality 19% / duplication 12%).
+        aiIntegrityComponents: {
+            content: { type: Number },
+            name: { type: Number },
+            quality: { type: Number },
+            duplication: { type: Number },
+        },
     }],
 }, {
     timestamps: true,
