@@ -112,9 +112,31 @@ curl -H "Authorization: Bearer local-dev-secret" \
 
 ### 5. Production (Vercel)
 
-- Set `PROFILE_INCOMPLETE_REMINDER_MINUTES=30` and `CRON_SECRET`.
-- `vercel.json` runs the cron **every 5 minutes**; users are picked up once `createdAt` is older than the delay.
-- Configure SMTP env vars on Vercel.
+Vercel **Hobby** only allows cron jobs **once per day**, so this project does **not** use `vercel.json` crons. Use an external scheduler instead (every 5 minutes is fine).
+
+**Vercel environment variables:**
+
+```env
+PROFILE_INCOMPLETE_REMINDER_MINUTES=30
+CRON_SECRET=your-long-random-secret
+SMTP_HOST=...
+SMTP_USER=...
+SMTP_PASS=...
+SMTP_FROM=noreply@yourdomain.com
+```
+
+**External scheduler (e.g. [cron-job.org](https://cron-job.org)):**
+
+1. Create a free account and add a cron job.
+2. **URL:** `https://earthquickalert.vercel.app/api/v1/cron/profile-incomplete-reminders`
+3. **Schedule:** every 5 minutes (`*/5 * * * *` or the UI equivalent).
+4. **Request:** `GET` with header `Authorization: Bearer YOUR_CRON_SECRET`  
+   (or `x-cron-secret: YOUR_CRON_SECRET`).
+5. Save and run once manually; expect JSON with `"message": "Profile incomplete reminders processed"`.
+
+**Alternatives:** GitHub Actions `schedule`, Upstash QStash, or any uptime/cron service that can send an authenticated HTTP GET.
+
+**Vercel Pro:** you may re-add a `crons` entry in `vercel.json` with `*/5 * * * *` if you prefer built-in scheduling.
 
 ---
 
