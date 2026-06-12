@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import connectDB from '@/lib/mongodb';
 import ContinuityPlan from '@/models/ContinuityPlan';
+import ContinuityAuditReport from '@/models/ContinuityAuditReport';
 import { getSession } from '@/lib/auth';
 import { uploadEmergencyPlanBuffer } from '@/lib/emergency-plan-cloudinary';
 import { openaiService } from '@/lib/services/openai-service';
@@ -357,6 +358,11 @@ export async function POST(req: Request) {
         }
 
         const attachmentId = plan.attachments[plan.attachments.length - 1]?._id;
+
+        // Inventory changed — drop the cached audit so it can't show stale totals after new uploads.
+        await ContinuityAuditReport.deleteOne({ ownerUserId }).catch((e) => {
+            console.warn('[continuity-upload] failed to clear cached audit report:', e);
+        });
 
         return NextResponse.json({
             success: true,

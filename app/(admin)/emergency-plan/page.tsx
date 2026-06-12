@@ -40,7 +40,17 @@ import {
     Sparkles,
     Download,
     Info,
+    MoreVertical,
+    RefreshCw,
+    Eye,
 } from 'lucide-react'
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import {
     Tooltip,
     TooltipContent,
@@ -156,6 +166,15 @@ function resolveFileHref(fileUrl: string): string {
     return trimmed
 }
 
+/** First sentence of the `Overview:` section of a 3-section summary, trimmed for a one-line preview. */
+function overviewSnippet(summary: string | undefined): string {
+    if (!summary) return ''
+    const m = /overview\s*:?\s*([\s\S]*?)(?:\n\s*\n|what went well|areas for improvement|$)/i.exec(summary)
+    const body = (m ? m[1] : summary).replace(/\s+/g, ' ').trim()
+    if (!body) return ''
+    return body.length > 90 ? `${body.slice(0, 90).trimEnd()}…` : body
+}
+
 function FieldTooltip({ label, text }: { label: string; text: string }) {
     return (
         <TooltipProvider delayDuration={200}>
@@ -250,6 +269,7 @@ export default function EmergencyPlanPage() {
 
     const [analyzingIds, setAnalyzingIds] = useState<Set<string>>(new Set())
     const [detailTarget, setDetailTarget] = useState<{ planId: string; attachmentId: string } | null>(null)
+    const [highlightedId, setHighlightedId] = useState<string | null>(null)
 
     const fetchPlans = async () => {
         try {
@@ -391,6 +411,24 @@ export default function EmergencyPlanPage() {
         }
     }, [detailTarget, plans])
 
+    /** Jump from a similar-file entry in the modal to that document's row in the list. */
+    const handleSelectSimilar = (attachmentId: string) => {
+        if (!attachmentId) return
+        setDetailTarget(null)
+        // Clear filters so the target row is guaranteed to be in the list.
+        setSelectedCategoryIdx(null)
+        setSearch('')
+        setHighlightedId(attachmentId)
+        requestAnimationFrame(() => {
+            document
+                .getElementById(`coop-row-${attachmentId}`)
+                ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        })
+        window.setTimeout(() => {
+            setHighlightedId((cur) => (cur === attachmentId ? null : cur))
+        }, 2500)
+    }
+
     const handlePickFile = () => fileRef.current?.click()
 
     const onFileChosen = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -450,6 +488,29 @@ export default function EmergencyPlanPage() {
         })
     }
 
+    /** After a cache-hit analyze, surface a non-blocking notice if the file is an exact duplicate. */
+    const notifyIfDuplicate = async (attachmentId: string) => {
+        try {
+            const res = await fetch(
+                `/api/admin/continuity-plans/similar?attachmentId=${encodeURIComponent(attachmentId)}`,
+                { cache: 'no-store' },
+            )
+            const body = await res.json().catch(() => ({}))
+            const dup = Array.isArray(body?.data)
+                ? (body.data as Array<{ fileName?: string; exactDuplicate?: boolean }>).find(
+                      (s) => s.exactDuplicate,
+                  )
+                : undefined
+            if (dup) {
+                toast.warning(
+                    `Possible duplicate — identical to "${dup.fileName || 'an existing file'}" already in your vault.`,
+                )
+            }
+        } catch {
+            // best-effort only — never block the analyze flow
+        }
+    }
+
     /** Analyze (force=re-analyze) one attachment; runs independently so docs never block each other. */
     const analyzeAttachment = async (planId: string, attachmentId: string, opts?: { force?: boolean }) => {
         if (!attachmentId) return
@@ -464,6 +525,10 @@ export default function EmergencyPlanPage() {
             if (res.ok && body.success && body.data) {
                 applyAnalysis(planId, attachmentId, body.data)
                 setAuditSummary(null)
+                // A cache hit means identical bytes already exist — check for an exact duplicate and warn.
+                if (body.data.cacheHit === true) {
+                    void notifyIfDuplicate(attachmentId)
+                }
             } else if (!res.ok) {
                 toast.error(body.error || 'Analysis failed')
             }
@@ -605,7 +670,9 @@ export default function EmergencyPlanPage() {
             })
             const body = await res.json().catch(() => ({}))
             if (!res.ok) throw new Error(body.error || 'Delete failed')
-            if (body.aiCleanupOk === false) {
+            if (body.storageOk === false) {
+                toast.warning('Record removed, but the file could not be deleted from storage — check Cloudinary credentials.')
+            } else if (body.aiCleanupOk === false) {
                 toast.warning('Attachment removed; AI vector cleanup will retry on next analysis.')
             } else {
                 toast.success('Attachment purged')
@@ -723,13 +790,13 @@ export default function EmergencyPlanPage() {
                                 <th className="px-6 py-4 text-left text-[10px] font-black text-slate-500 uppercase tracking-widest">
                                     Resource Identifier
                                 </th>
-                                <th className="px-6 py-4 text-left text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                                <th className="px-6 py-4 text-left text-[10px] font-black text-slate-500 uppercase tracking-widest hidden md:table-cell">
                                     Category
                                 </th>
-                                <th className="px-6 py-4 text-left text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                                <th className="px-6 py-4 text-left text-[10px] font-black text-slate-500 uppercase tracking-widest hidden lg:table-cell">
                                     File Type
                                 </th>
-                                <th className="px-6 py-4 text-left text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                                <th className="px-6 py-4 text-left text-[10px] font-black text-slate-500 uppercase tracking-widest hidden sm:table-cell">
                                     Last Updated
                                 </th>
                                 <th className="px-6 py-4 text-center text-[10px] font-black text-slate-500 uppercase tracking-widest">
@@ -770,7 +837,16 @@ export default function EmergencyPlanPage() {
                                     const categoryMeta = DOCUMENT_CATEGORY_META.find(c => c.key === categoryKey)
 
                                     return (
-                                        <tr key={`${doc.planId}-${attachmentId}`} className="group hover:bg-blue-50/30 transition-colors">
+                                        <tr
+                                            key={`${doc.planId}-${attachmentId}`}
+                                            id={`coop-row-${attachmentId}`}
+                                            className={cn(
+                                                'group transition-colors scroll-mt-24',
+                                                highlightedId === attachmentId
+                                                    ? 'bg-blue-50/70 ring-2 ring-inset ring-[#33375D]/40'
+                                                    : 'hover:bg-blue-50/30'
+                                            )}
+                                        >
                                             <td
                                                 className="px-6 py-5 cursor-pointer"
                                                 role="button"
@@ -786,20 +862,20 @@ export default function EmergencyPlanPage() {
                                                 }}
                                             >
                                                 <div className="flex items-center gap-4">
-                                                    <div className="w-11 h-11 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-center text-slate-400 group-hover:text-[#33375D] group-hover:bg-white group-hover:shadow-sm transition-all">
+                                                    <div className="w-11 h-11 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-center text-slate-400 group-hover:text-[#33375D] group-hover:bg-white group-hover:shadow-sm transition-all shrink-0">
                                                         <FileText size={20} />
                                                     </div>
                                                     <div className="min-w-0">
                                                         <span className="text-sm font-black text-slate-900 group-hover:text-[#33375D] transition-colors block truncate">
                                                             {doc.fileName}
                                                         </span>
-                                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
+                                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5 truncate">
                                                             {doc.planLabel} · {doc.planId}
                                                         </p>
                                                     </div>
                                                 </div>
                                             </td>
-                                            <td className="px-6 py-5">
+                                            <td className="px-6 py-5 hidden md:table-cell">
                                                 <span className={cn(
                                                     "h-7 px-3 rounded-md border inline-flex items-center w-fit text-[10px] font-black uppercase tracking-widest border-transparent",
                                                     categoryMeta?.color, categoryMeta?.bg
@@ -807,38 +883,36 @@ export default function EmergencyPlanPage() {
                                                     {categoryMeta?.name || 'Unknown'}
                                                 </span>
                                             </td>
-                                            <td className="px-6 py-5">
+                                            <td className="px-6 py-5 hidden lg:table-cell">
                                                 <span className="h-7 px-3 rounded-md bg-slate-100 border border-slate-200 inline-flex items-center w-fit text-[10px] font-black text-slate-600 uppercase tracking-widest">
                                                     {fileMatrixLabel(doc.fileName)}
                                                 </span>
                                             </td>
-                                            <td className="px-6 py-5 text-xs font-bold italic text-slate-400">
+                                            <td className="px-6 py-5 text-xs font-bold italic text-slate-400 hidden sm:table-cell">
                                                 {auditLabel}
                                             </td>
                                             <td className="px-6 py-5 text-center min-w-[200px]">
-                                                <div className="flex flex-col items-center gap-1 max-w-[240px] mx-auto">
+                                                <div className="flex flex-col items-center gap-1 max-w-[260px] mx-auto">
                                                     {attachmentId && analyzingIds.has(attachmentId) ? (
                                                         <span className="inline-flex items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.2em] text-slate-500">
                                                             <Loader2 className="h-3 w-3 animate-spin" />
                                                             Analyzing…
                                                         </span>
                                                     ) : !doc.aiIntegrityAnalyzedAt && !doc.aiIntegrityStatus ? (
-                                                        <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-[0.2em] text-slate-400">
+                                                        <span className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400">
                                                             Not analyzed
-                                                            <FieldTooltip label="Not analyzed" text={INTEGRITY_TOOLTIPS.notAnalyzed} />
                                                         </span>
                                                     ) : (
                                                         <>
                                                             <span
                                                                 className={cn(
-                                                                    'inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-[0.2em]',
+                                                                    'text-[9px] font-black uppercase tracking-[0.2em]',
                                                                     integ.labelColor,
                                                                 )}
                                                             >
                                                                 {integ.label}
-                                                                <FieldTooltip label="Status" text={INTEGRITY_TOOLTIPS.status} />
                                                             </span>
-                                                            <div className="flex w-32 items-center gap-1">
+                                                            <div className="flex w-32 items-center gap-2">
                                                                 <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
                                                                     <div
                                                                         className={cn(
@@ -848,60 +922,91 @@ export default function EmergencyPlanPage() {
                                                                         style={{ width: `${integ.pct}%` }}
                                                                     />
                                                                 </div>
-                                                                <FieldTooltip label="Score" text={INTEGRITY_TOOLTIPS.score} />
+                                                                <span className="text-[10px] font-black tabular-nums text-slate-700">
+                                                                    {integ.pct}
+                                                                </span>
                                                             </div>
-                                                            {doc.aiIntegritySummary ? (
-                                                                <p className="mt-1 line-clamp-4 whitespace-pre-line text-[10px] font-medium leading-snug text-slate-500">
-                                                                    {doc.aiIntegritySummary}
+                                                            {overviewSnippet(doc.aiIntegritySummary) ? (
+                                                                <p className="mt-1 line-clamp-1 text-[10px] font-medium leading-snug text-slate-500">
+                                                                    {overviewSnippet(doc.aiIntegritySummary)}
                                                                 </p>
                                                             ) : null}
+                                                            <button
+                                                                type="button"
+                                                                onClick={() =>
+                                                                    attachmentId &&
+                                                                    setDetailTarget({ planId: doc.planId, attachmentId })
+                                                                }
+                                                                className="mt-0.5 text-[9px] font-black uppercase tracking-[0.2em] text-[#33375D] hover:underline"
+                                                            >
+                                                                View full analysis
+                                                            </button>
                                                         </>
                                                     )}
                                                 </div>
                                             </td>
                                             <td className="px-6 py-5 text-right">
-                                                <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <Button
-                                                        type="button"
-                                                        title="Download / view"
-                                                        size="icon"
-                                                        onClick={() =>
-                                                            window.open(
-                                                                resolveFileHref(doc.fileUrl),
-                                                                '_blank',
-                                                                'noopener,noreferrer'
-                                                            )
-                                                        }
-                                                        className="h-9 w-9 bg-[#33375D]/10 text-[#33375D] hover:bg-[#33375D] hover:text-white rounded-lg transition-colors"
-                                                    >
-                                                        <Download size={15} />
-                                                    </Button>
-                                                    <Button
-                                                        type="button"
-                                                        title="Edit protocol steps"
-                                                        size="icon"
-                                                        onClick={() => openEditSteps(doc)}
-                                                        className="h-9 w-9 bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-900 rounded-lg transition-colors"
-                                                    >
-                                                        <Edit size={15} />
-                                                    </Button>
-                                                    <Button
-                                                        type="button"
-                                                        title="Delete attachment"
-                                                        size="icon"
-                                                        disabled={!attachmentId}
-                                                        onClick={() =>
-                                                            setDeleteTarget({
-                                                                planId: doc.planId,
-                                                                attachmentId,
-                                                                fileName: doc.fileName,
-                                                            })
-                                                        }
-                                                        className="h-9 w-9 bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white rounded-lg transition-colors"
-                                                    >
-                                                        <Trash2 size={15} />
-                                                    </Button>
-                                                </div>
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                        <Button
+                                                            type="button"
+                                                            size="icon"
+                                                            variant="ghost"
+                                                            aria-label="Open actions menu"
+                                                            className="h-9 w-9 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-[#33375D]"
+                                                        >
+                                                            <MoreVertical size={18} />
+                                                        </Button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent align="end" className="w-44">
+                                                        <DropdownMenuItem
+                                                            disabled={!attachmentId}
+                                                            onClick={() =>
+                                                                attachmentId &&
+                                                                setDetailTarget({ planId: doc.planId, attachmentId })
+                                                            }
+                                                        >
+                                                            <Eye size={14} className="mr-2" /> View analysis
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem
+                                                            onClick={() =>
+                                                                window.open(
+                                                                    resolveFileHref(doc.fileUrl),
+                                                                    '_blank',
+                                                                    'noopener,noreferrer'
+                                                                )
+                                                            }
+                                                        >
+                                                            <Download size={14} className="mr-2" /> Download / view
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem
+                                                            disabled={!attachmentId || analyzingIds.has(attachmentId)}
+                                                            onClick={() =>
+                                                                attachmentId &&
+                                                                analyzeAttachment(doc.planId, attachmentId, { force: true })
+                                                            }
+                                                        >
+                                                            <RefreshCw size={14} className="mr-2" /> Re-analyze
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem onClick={() => openEditSteps(doc)}>
+                                                            <Edit size={14} className="mr-2" /> Edit plan
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuSeparator />
+                                                        <DropdownMenuItem
+                                                            disabled={!attachmentId}
+                                                            onClick={() =>
+                                                                setDeleteTarget({
+                                                                    planId: doc.planId,
+                                                                    attachmentId,
+                                                                    fileName: doc.fileName,
+                                                                })
+                                                            }
+                                                            className="text-rose-600 focus:text-rose-600"
+                                                        >
+                                                            <Trash2 size={14} className="mr-2" /> Delete
+                                                        </DropdownMenuItem>
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
                                             </td>
                                         </tr>
                                     )
@@ -936,7 +1041,6 @@ export default function EmergencyPlanPage() {
                                 )}
                             >
                                 Posture · {auditSummary.posture}
-                                <FieldTooltip label="Posture" text={INTEGRITY_TOOLTIPS.audit.posture} />
                             </span>
                         ) : null}
                         {auditSummary && auditSummary.totals.plans > 0 ? (
@@ -944,7 +1048,6 @@ export default function EmergencyPlanPage() {
                                 Avg integrity · {auditSummary.averageScore} / 100 · {auditSummary.totals.attachments} file
                                 {auditSummary.totals.attachments === 1 ? '' : 's'} across {auditSummary.totals.plans} plan
                                 {auditSummary.totals.plans === 1 ? '' : 's'}
-                                <FieldTooltip label="Average score" text={INTEGRITY_TOOLTIPS.audit.averageScore} />
                             </span>
                         ) : null}
                         <Button
@@ -1235,6 +1338,7 @@ export default function EmergencyPlanPage() {
                 onReanalyze={() =>
                     detailTarget && analyzeAttachment(detailTarget.planId, detailTarget.attachmentId, { force: true })
                 }
+                onSelectSimilar={handleSelectSimilar}
             />
         </AdminPageShell>
     )

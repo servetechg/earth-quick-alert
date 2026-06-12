@@ -18,7 +18,7 @@ import {
 import { cn } from '@/lib/utils'
 import { integrityPresentation } from '@/lib/constants/integrity-status'
 import { INTEGRITY_TOOLTIPS } from '@/lib/constants/integrity-tooltips'
-import { Loader2, ExternalLink, RefreshCw, Info, Files } from 'lucide-react'
+import { Loader2, ExternalLink, RefreshCw, Info, Files, CopyCheck } from 'lucide-react'
 
 export type ComponentScores = {
     content?: number | null
@@ -84,39 +84,57 @@ function InfoDot({ label, text }: { label: string; text: string }) {
 const COMPONENT_ROWS: ReadonlyArray<{
     key: keyof ComponentScores
     label: string
-    tooltip: string
+    bar: string
 }> = [
-    { key: 'content', label: 'Content match', tooltip: INTEGRITY_TOOLTIPS.componentScores.content },
-    { key: 'name', label: 'Filename match', tooltip: INTEGRITY_TOOLTIPS.componentScores.name },
-    { key: 'quality', label: 'Text quality', tooltip: INTEGRITY_TOOLTIPS.componentScores.quality },
-    { key: 'duplication', label: 'Uniqueness', tooltip: INTEGRITY_TOOLTIPS.componentScores.duplication },
+    { key: 'content', label: 'Content match', bar: 'bg-gradient-to-r from-indigo-400 to-indigo-600' },
+    { key: 'name', label: 'Filename match', bar: 'bg-gradient-to-r from-emerald-400 to-emerald-500' },
+    { key: 'quality', label: 'Text quality', bar: 'bg-gradient-to-r from-sky-400 to-blue-500' },
+    { key: 'duplication', label: 'Uniqueness', bar: 'bg-gradient-to-r from-amber-400 to-orange-500' },
 ]
+
+const SECTION_CANON: Record<string, string> = {
+    overview: 'Overview',
+    'what went well': 'What went well',
+    'areas for improvement': 'Areas for improvement',
+}
+
+/** Split a 3-section summary into labelled blocks; null when the labels aren't present. */
+function parseSummarySections(text: string): Array<{ heading: string; body: string }> | null {
+    if (!text) return null
+    const re = /(Overview|What went well|Areas for improvement)\s*:?\s*/gi
+    const matches = [...text.matchAll(re)]
+    if (!matches.length) return null
+    const out: Array<{ heading: string; body: string }> = []
+    for (let i = 0; i < matches.length; i++) {
+        const m = matches[i]
+        const start = (m.index ?? 0) + m[0].length
+        const end = i + 1 < matches.length ? matches[i + 1].index ?? text.length : text.length
+        const heading = SECTION_CANON[m[1].toLowerCase()] ?? m[1]
+        const body = text.slice(start, end).trim()
+        if (body) out.push({ heading, body })
+    }
+    return out.length ? out : null
+}
 
 function ComponentBar({
     label,
-    tooltip,
     value,
+    bar,
 }: {
     label: string
-    tooltip: string
     value?: number | null
+    bar: string
 }) {
     const has = typeof value === 'number' && Number.isFinite(value)
     const pct = has ? Math.min(100, Math.max(0, value as number)) : 0
     return (
         <div className="space-y-1">
             <div className="flex items-center justify-between">
-                <span className="inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-widest text-slate-500">
-                    {label}
-                    <InfoDot label={label} text={tooltip} />
-                </span>
+                <span className="text-[11px] font-bold uppercase tracking-widest text-slate-500">{label}</span>
                 <span className="text-xs font-black text-slate-900">{has ? Math.round(pct) : '—'}</span>
             </div>
             <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
-                <div
-                    className="h-full rounded-full bg-[#33375D] transition-all duration-700"
-                    style={{ width: `${pct}%` }}
-                />
+                <div className={cn('h-full rounded-full transition-all duration-700', bar)} style={{ width: `${pct}%` }} />
             </div>
         </div>
     )
@@ -128,12 +146,14 @@ export function DocumentDetailModal({
     analyzing,
     onClose,
     onReanalyze,
+    onSelectSimilar,
 }: {
     open: boolean
     attachment: DetailAttachment | null
     analyzing: boolean
     onClose: () => void
     onReanalyze: () => void
+    onSelectSimilar?: (attachmentId: string) => void
 }) {
     const [similar, setSimilar] = useState<SimilarRow[]>([])
     const [similarLoading, setSimilarLoading] = useState(false)
@@ -169,10 +189,11 @@ export function DocumentDetailModal({
     const integ = integrityPresentation(attachment.aiIntegrityStatus, attachment.aiIntegrityScore)
     const analyzed = Boolean(attachment.aiIntegrityAnalyzedAt || attachment.aiIntegrityStatus)
     const components = attachment.aiIntegrityComponents
+    const exactDuplicates = similar.filter((s) => s.exactDuplicate)
 
     return (
         <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-            <DialogContent className="border-slate-200 bg-white text-slate-900 sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogContent className="border-slate-200 bg-white text-slate-900 w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle className="break-all pr-6 text-lg font-black tracking-tight text-slate-900">
                         {attachment.fileName}
@@ -182,25 +203,60 @@ export function DocumentDetailModal({
                     </p>
                 </DialogHeader>
 
+                {/* Prominent exact-duplicate banner */}
+                {!analyzing && exactDuplicates.length > 0 ? (
+                    <div className="flex items-start gap-2.5 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3">
+                        <CopyCheck className="mt-0.5 h-4 w-4 shrink-0 text-rose-600" />
+                        <div className="text-xs font-medium leading-relaxed text-rose-700">
+                            <span className="font-black uppercase tracking-widest">Exact duplicate</span>
+                            {exactDuplicates.length === 1 ? (
+                                <>
+                                    {' '}— byte-for-byte identical to{' '}
+                                    <button
+                                        type="button"
+                                        onClick={() => onSelectSimilar?.(exactDuplicates[0].attachmentId)}
+                                        className="font-black underline underline-offset-2 hover:text-rose-900"
+                                    >
+                                        {exactDuplicates[0].fileName}
+                                    </button>
+                                    .
+                                </>
+                            ) : (
+                                <>
+                                    {' '}— identical to {exactDuplicates.length} other files in your vault
+                                    (see Similar files below).
+                                </>
+                            )}
+                        </div>
+                    </div>
+                ) : null}
+
                 {/* Verdict header */}
-                <div className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50/60 px-4 py-3">
-                    {analyzing ? (
-                        <span className="inline-flex items-center gap-2 text-sm font-black uppercase tracking-widest text-slate-500">
-                            <Loader2 className="h-4 w-4 animate-spin" /> Analyzing…
-                        </span>
-                    ) : analyzed ? (
-                        <span className={cn('inline-flex items-center gap-1 text-sm font-black uppercase tracking-widest', integ.labelColor)}>
-                            {integ.label}
-                            <InfoDot label="Status" text={INTEGRITY_TOOLTIPS.status} />
-                        </span>
-                    ) : (
-                        <span className="text-sm font-black uppercase tracking-widest text-slate-400">Not analyzed</span>
-                    )}
+                <div className="rounded-xl border border-slate-100 bg-slate-50/60 px-4 py-3">
+                    <div className="flex items-center justify-between">
+                        {analyzing ? (
+                            <span className="inline-flex items-center gap-2 text-sm font-black uppercase tracking-widest text-slate-500">
+                                <Loader2 className="h-4 w-4 animate-spin" /> Analyzing…
+                            </span>
+                        ) : analyzed ? (
+                            <span className={cn('inline-flex items-center gap-1 text-sm font-black uppercase tracking-widest', integ.labelColor)}>
+                                {integ.label}
+                                <InfoDot label="Score" text={INTEGRITY_TOOLTIPS.score} />
+                            </span>
+                        ) : (
+                            <span className="text-sm font-black uppercase tracking-widest text-slate-400">Not analyzed</span>
+                        )}
+                        {analyzed && !analyzing ? (
+                            <span className="text-sm font-black text-slate-900">Score {integ.pct} / 100</span>
+                        ) : null}
+                    </div>
                     {analyzed && !analyzing ? (
-                        <span className="inline-flex items-center gap-1 text-sm font-black text-slate-900">
-                            Score {integ.pct} / 100
-                            <InfoDot label="Score" text={INTEGRITY_TOOLTIPS.score} />
-                        </span>
+                        <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-200/70">
+                            <div
+                                className={cn('h-full rounded-full transition-all duration-700', integ.barColor)}
+                                style={{ width: `${integ.pct}%` }}
+                            />
+                        </div>
                     ) : null}
                 </div>
 
@@ -211,7 +267,7 @@ export function DocumentDetailModal({
                             <ComponentBar
                                 key={row.key}
                                 label={row.label}
-                                tooltip={row.tooltip}
+                                bar={row.bar}
                                 value={components[row.key]}
                             />
                         ))}
@@ -219,20 +275,34 @@ export function DocumentDetailModal({
                 ) : null}
 
                 {/* Summary */}
-                <div className="space-y-1.5 pt-1">
-                    <span className="inline-flex items-center gap-1 text-[11px] font-black uppercase tracking-widest text-slate-500">
-                        Summary
-                        <InfoDot label="Summary" text={INTEGRITY_TOOLTIPS.summary} />
-                    </span>
-                    {attachment.aiIntegritySummary ? (
-                        <p className="whitespace-pre-line text-sm font-medium leading-relaxed text-slate-600">
-                            {attachment.aiIntegritySummary}
-                        </p>
-                    ) : (
-                        <p className="text-sm font-medium text-slate-400">
-                            {analyzing ? 'Summary is being generated…' : 'No summary yet.'}
-                        </p>
-                    )}
+                <div className="space-y-2 pt-1">
+                    <span className="text-[11px] font-black uppercase tracking-widest text-slate-500">Summary</span>
+                    {(() => {
+                        const sections = parseSummarySections(attachment.aiIntegritySummary ?? '')
+                        if (sections) {
+                            return (
+                                <div className="space-y-2.5">
+                                    {sections.map((s) => (
+                                        <div key={s.heading} className="space-y-0.5">
+                                            <p className="text-[11px] font-black uppercase tracking-widest text-slate-700">
+                                                {s.heading}
+                                            </p>
+                                            <p className="text-sm font-medium leading-relaxed text-slate-600">{s.body}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            )
+                        }
+                        return attachment.aiIntegritySummary ? (
+                            <p className="whitespace-pre-line text-sm font-medium leading-relaxed text-slate-600">
+                                {attachment.aiIntegritySummary}
+                            </p>
+                        ) : (
+                            <p className="text-sm font-medium text-slate-400">
+                                {analyzing ? 'Summary is being generated…' : 'No summary yet.'}
+                            </p>
+                        )
+                    })()}
                 </div>
 
                 {/* Similar files */}
@@ -247,7 +317,13 @@ export function DocumentDetailModal({
                     ) : similar.length ? (
                         <div className="divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white">
                             {similar.map((s) => (
-                                <div key={s.attachmentId} className="flex items-center gap-3 px-3 py-2">
+                                <button
+                                    key={s.attachmentId}
+                                    type="button"
+                                    onClick={() => onSelectSimilar?.(s.attachmentId)}
+                                    className="flex w-full items-center gap-3 px-3 py-2 text-left transition-colors hover:bg-slate-50 focus:outline-none focus-visible:bg-slate-50"
+                                    title="Jump to this file in the list"
+                                >
                                     <div className="min-w-0 flex-1">
                                         <div className="truncate text-xs font-semibold text-slate-800" title={s.fileName}>
                                             {s.fileName}
@@ -257,14 +333,18 @@ export function DocumentDetailModal({
                                         </div>
                                     </div>
                                     {s.exactDuplicate ? (
-                                        <span className="shrink-0 rounded-md bg-rose-50 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-rose-600">
-                                            Exact duplicate
+                                        <>
+                                            <span className="shrink-0 rounded-md bg-rose-50 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-rose-600">
+                                                Exact duplicate
+                                            </span>
+                                            <span className="shrink-0 text-xs font-black text-slate-900">100%</span>
+                                        </>
+                                    ) : (
+                                        <span className="shrink-0 text-xs font-black text-slate-900">
+                                            {Math.round(s.similarity * 100)}% similar
                                         </span>
-                                    ) : null}
-                                    <span className="shrink-0 text-xs font-black text-slate-900">
-                                        {Math.round(s.similarity * 100)}%
-                                    </span>
-                                </div>
+                                    )}
+                                </button>
                             ))}
                         </div>
                     ) : (
@@ -272,7 +352,7 @@ export function DocumentDetailModal({
                     )}
                 </div>
 
-                <DialogFooter className="gap-2 sm:gap-2">
+                <DialogFooter className="flex-wrap gap-2 sm:gap-2">
                     <Button
                         type="button"
                         variant="outline"

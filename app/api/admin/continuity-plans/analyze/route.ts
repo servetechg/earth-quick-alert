@@ -132,6 +132,7 @@ export async function POST(req: Request) {
                 summary: result.summary,
                 analyzedAt: result.analyzedAt,
                 degraded: result.degraded === true,
+                cacheHit: result.cacheHit === true,
                 componentScores: result.componentScores ?? null,
             },
         });

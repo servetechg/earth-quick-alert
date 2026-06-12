@@ -162,6 +162,7 @@ function mapPythonAnalyzeToResult(data: PythonAnalyzeResponse): CoopIntegrityAna
         summary: String(data.summary || INTEGRITY_FALLBACK.summary).slice(0, 2000),
         analyzedAt,
         degraded: Boolean(data.details?.degraded),
+        cacheHit: Boolean(data.details?.cacheHit),
         componentScores: data.details?.componentScores,
     };
 }
@@ -180,50 +181,61 @@ async function pollIntegrityAnalysisResult(
     const headers = buildBearerHeaders();
 
     while (Date.now() < deadlineMs) {
-        const res = await fetch(pollUrl, {
-            method: 'GET',
-            headers,
-            signal: AbortSignal.timeout(30_000),
-        });
+        try {
+            const res = await fetch(pollUrl, {
+                method: 'GET',
+                headers,
+                // Per-poll cap: if a single /result request stalls (slow tunnel), abort just that
+                // attempt and retry on the next tick — never give up the whole wait.
+                signal: AbortSignal.timeout(20_000),
+            });
 
-        if (res.status === 404) {
+            if (res.status === 404) {
+                await sleep(POLL_INTERVAL_MS);
+                continue;
+            }
+
+            if (!res.ok) {
+                const errBody = await res.text().catch(() => '');
+                console.warn(
+                    `[continuity-integrity] poll HTTP ${res.status} for ${pollUrl}: ${errBody.slice(0, 200)}`,
+                );
+                await sleep(POLL_INTERVAL_MS);
+                continue;
+            }
+
+            const data = (await res.json()) as PythonAsyncAnalyzeResponse & PythonAnalyzeResponse;
+
+            if (data.state === 'processing') {
+                await sleep(POLL_INTERVAL_MS);
+                continue;
+            }
+
+            if (data.state === 'error') {
+                return fallbackResult(
+                    typeof data.detail === 'string' && data.detail.trim()
+                        ? data.detail.trim()
+                        : `Analysis job failed (attachmentId=${attachmentId})`,
+                );
+            }
+
+            if (data.state === 'done' && data.result) {
+                return mapPythonAnalyzeToResult(data.result);
+            }
+
+            if (typeof data.score === 'number' && data.summary) {
+                return mapPythonAnalyzeToResult(data);
+            }
+
             await sleep(POLL_INTERVAL_MS);
-            continue;
-        }
-
-        if (!res.ok) {
-            const errBody = await res.text().catch(() => '');
+        } catch (pollErr) {
+            // A single slow/aborted/failed poll must NOT end the wait — log and keep polling
+            // every POLL_INTERVAL_MS until the overall deadline. (The job keeps running in Python.)
             console.warn(
-                `[continuity-integrity] poll HTTP ${res.status} for ${pollUrl}: ${errBody.slice(0, 200)}`,
+                `[continuity-integrity] poll attempt failed (will retry): ${pollErr instanceof Error ? pollErr.message : String(pollErr)}`,
             );
             await sleep(POLL_INTERVAL_MS);
-            continue;
         }
-
-        const data = (await res.json()) as PythonAsyncAnalyzeResponse & PythonAnalyzeResponse;
-
-        if (data.state === 'processing') {
-            await sleep(POLL_INTERVAL_MS);
-            continue;
-        }
-
-        if (data.state === 'error') {
-            return fallbackResult(
-                typeof data.detail === 'string' && data.detail.trim()
-                    ? data.detail.trim()
-                    : `Analysis job failed (attachmentId=${attachmentId})`,
-            );
-        }
-
-        if (data.state === 'done' && data.result) {
-            return mapPythonAnalyzeToResult(data.result);
-        }
-
-        if (typeof data.score === 'number' && data.summary) {
-            return mapPythonAnalyzeToResult(data);
-        }
-
-        await sleep(POLL_INTERVAL_MS);
     }
 
     return null;
@@ -235,6 +247,7 @@ export type CoopIntegrityAnalysisResult = {
     summary: string;
     analyzedAt: Date;
     degraded?: boolean;
+    cacheHit?: boolean;
     componentScores?: {
         content?: number | null;
         name?: number | null;
@@ -459,7 +472,8 @@ export async function deleteIntegrityAttachments(
             method: 'DELETE',
             headers,
             body: rawBody,
-            signal: AbortSignal.timeout(30_000),
+            // Fail fast: delete should never hang the UI on an unreachable AI service.
+            signal: AbortSignal.timeout(15_000),
         });
         if (!res.ok) {
             console.error('python-integrity delete HTTP error:', res.status, await res.text().catch(() => ''));

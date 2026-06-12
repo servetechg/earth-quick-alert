@@ -87,6 +87,7 @@ export async function DELETE(req: Request) {
             }
         }
 
+        let storageOk = true;
         if (att.cloudinaryPublicId && att.cloudinaryResourceType) {
             try {
                 await destroyEmergencyPlanAsset(
@@ -94,11 +95,10 @@ export async function DELETE(req: Request) {
                     att.cloudinaryResourceType as EmergencyPlanCloudinaryResource
                 );
             } catch (e) {
-                console.error('Cloudinary destroy error:', e);
-                return NextResponse.json(
-                    { success: false, error: 'Failed to delete file from Cloudinary' },
-                    { status: 502 }
-                );
+                // Don't block the delete on a storage failure (e.g. bad Cloudinary credentials or an
+                // already-removed asset) — remove the DB record anyway and flag the storage miss.
+                storageOk = false;
+                console.error('Cloudinary destroy error (continuing with vault delete):', e);
             }
         } else if (typeof att.fileUrl === 'string' && att.fileUrl.startsWith('/uploads/')) {
             const rel = safeUploadsRelativePath(att.fileUrl);
@@ -113,16 +113,26 @@ export async function DELETE(req: Request) {
 
         await ContinuityPlan.updateOne({ ownerUserId, planId }, { $pull: { attachments: { _id: subdocId } } });
 
+        // Keep tables clean: when a plan loses its last attachment, remove the empty plan shell so
+        // it never inflates audit/plan counts.
+        let planRemoved = false;
+        const updated = await ContinuityPlan.findOne({ ownerUserId, planId });
+        if (updated && (!updated.attachments || updated.attachments.length === 0)) {
+            await ContinuityPlan.deleteOne({ ownerUserId, planId });
+            planRemoved = true;
+        }
+
         await ContinuityAuditReport.deleteOne({ ownerUserId }).catch((e) => {
             console.warn('[continuity-delete] failed to clear cached audit report:', e);
         });
 
-        const updated = await ContinuityPlan.findOne({ ownerUserId, planId });
         return NextResponse.json({
             success: true,
             message: 'Attachment deleted',
             aiCleanupOk,
-            data: updated,
+            storageOk,
+            planRemoved,
+            data: planRemoved ? null : updated,
         });
     } catch (error) {
         console.error('ContinuityPlan attachment DELETE error:', error);
