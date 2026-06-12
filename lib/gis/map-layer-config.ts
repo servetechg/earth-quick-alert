@@ -10,7 +10,6 @@ import {
   Boxes,
   AlertOctagon,
   Flame,
-  Pill,
   Siren,
 } from 'lucide-react'
 import { CRITICAL_INFRASTRUCTURE_SECTORS } from '@/lib/gis/critical-infrastructure-sectors'
@@ -35,6 +34,22 @@ export const TOP_LEVEL_MAP_LAYERS: MapLayerDef[] = [
   { id: 'water', label: 'Water Issues', Icon: Droplets, color: '#0EA5E9' },
   { id: 'resources', label: 'Resource Sites', Icon: Boxes, color: '#16A34A' },
   { id: 'incidents', label: 'Incident Reports', Icon: AlertOctagon, color: '#DC2626' },
+  {
+    id: 'fire_station',
+    label: 'Emergency Service Providers',
+    Icon: Flame,
+    color: '#EF4444',
+    isGooglePlace: true,
+    placeType: 'fire_station',
+  },
+  {
+    id: 'police',
+    label: 'Police Stations',
+    Icon: Siren,
+    color: '#1E3A8A',
+    isGooglePlace: true,
+    placeType: 'police',
+  },
 ]
 
 /** Demo — post-disaster zones A/B/C (Arkansas tornado scenario). */
@@ -45,12 +60,13 @@ export const DISASTER_ZONE_LAYER: MapLayerDef = {
   color: '#DC2626',
 }
 
-export const INFRASTRUCTURE_SUB_LAYERS: MapLayerDef[] = [
-  { id: 'fire_station', label: 'Emergency Service Providers', Icon: Flame, color: '#EF4444', isGooglePlace: true, placeType: 'fire_station' },
-  { id: 'pharmacy', label: 'Pharmacies', Icon: Pill, color: '#3B82F6', isGooglePlace: true, placeType: 'pharmacy' },
-  { id: 'hospital', label: 'Hospitals', Icon: PlusSquare, color: '#22A9A1', isGooglePlace: true, placeType: 'hospital' },
-  { id: 'police', label: 'Police Stations', Icon: Siren, color: '#1E3A8A', isGooglePlace: true, placeType: 'police' },
-]
+/** Google Places layers toggled from Map Layers (fire / police). */
+export const GOOGLE_PLACE_MAP_LAYERS: MapLayerDef[] = TOP_LEVEL_MAP_LAYERS.filter(
+  (layer) => layer.isGooglePlace,
+)
+
+/** @deprecated Use GOOGLE_PLACE_MAP_LAYERS */
+export const INFRASTRUCTURE_SUB_LAYERS = GOOGLE_PLACE_MAP_LAYERS
 
 export function buildDefaultMapLayerState(opts?: {
   includeCriticalInfra?: boolean
@@ -63,9 +79,6 @@ export function buildDefaultMapLayerState(opts?: {
   if (opts?.includeDisasterZones) {
     defaults[DISASTER_ZONE_LAYER.id] = false
   }
-  INFRASTRUCTURE_SUB_LAYERS.forEach((sub) => {
-    defaults[sub.id] = false
-  })
   if (opts?.includeCriticalInfra) {
     CRITICAL_INFRASTRUCTURE_SECTORS.forEach((sector) => {
       defaults[sector.id] = false

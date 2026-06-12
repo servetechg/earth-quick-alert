@@ -5,7 +5,8 @@ import { calculateDistance } from '@/lib/services/mock-map-service';
 import { geocodeLocation } from '@/lib/services/location-matching';
 import { normalizeStateToUsps, textMentionsUsState } from '@/lib/utils/us-state-usps';
 import { parseLocations } from '@/lib/utils/alert-communication-hydrate';
-import { maybeDemoJurisdictionOverride } from '@/lib/demo/provider';
+import { maybeDemoJurisdictionOverride, buildArkansasStateWideJurisdiction } from '@/lib/demo/provider';
+import { DEMO_PRESENTATION_EMAIL } from '@/lib/demo/constants';
 
 export type SubAdminJurisdiction = {
     stateRaw: string;
@@ -36,9 +37,14 @@ async function resolveSubAdminJurisdictionUncached(
     userId: string
 ): Promise<SubAdminJurisdiction | null> {
     const u = (await User.findById(userId)
-        .select('role state country city licenseId requestedLicenseType')
+        .select('role state country city licenseId requestedLicenseType email')
         .lean()) as any;
     if (!u || String(u.role) !== 'sub-admin') return null;
+
+    const email = String(u.email ?? '').trim().toLowerCase();
+    if (email === DEMO_PRESENTATION_EMAIL) {
+        return buildArkansasStateWideJurisdiction();
+    }
 
     const stateRaw = typeof u.state === 'string' ? u.state.trim() : '';
     if (!stateRaw) return null;

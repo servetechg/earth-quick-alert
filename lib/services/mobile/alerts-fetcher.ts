@@ -8,7 +8,10 @@ import {
     geocodeLocation,
     locationMatchesAlertAreas,
 } from '@/lib/services/location-matching';
-import { fetchUnifiedEventsForMobileUser } from '@/lib/services/mobile/unified-event-mobile-alerts';
+import {
+    fetchUnifiedEventsForMobileUser,
+    unifiedSourceDisplay,
+} from '@/lib/services/mobile/unified-event-mobile-alerts';
 import { buildUserZones, type UserZone } from '@/lib/services/mobile/zone-utils';
 import type { UserProfilePayload } from '@/lib/types/mobile/auth';
 import type { MobileAlertSeverity, MobileWeatherAlert } from '@/lib/types/mobile/alerts';
@@ -27,6 +30,8 @@ type WeatherAlertDoc = {
     areaDesc?: string;
     zones?: string[];
 };
+
+type UnifiedMobileAlert = Alert & { unifiedSource?: string; sourceDisplay?: string };
 
 function unique<T>(values: T[]): T[] {
     return Array.from(new Set(values));
@@ -64,18 +69,30 @@ function severityRank(s: MobileAlertSeverity): number {
     return 1;
 }
 
-function sourceLabel(source: AlertSource): string {
+function legacySourceLabel(source: AlertSource): string {
     if (source === AlertSource.WEATHER_API) return 'NWPS';
     if (source === AlertSource.EARTHQUAKE_API) return 'USGS';
     if (source === AlertSource.ADMIN_MANUAL) return 'COMMUNITY';
     return 'ALERT';
 }
 
+function resolveDisplaySource(alert: UnifiedMobileAlert): string {
+    if (alert.sourceDisplay) return alert.sourceDisplay;
+    if (alert.unifiedSource) return unifiedSourceDisplay(alert.unifiedSource);
+    return legacySourceLabel(alert.source);
+}
+
 function expiresLabel(expiresAt?: string): string {
-    if (!expiresAt) return 'EXPIRES: SEE GAUGE / NWPS';
+    if (!expiresAt) return 'EXPIRES: SEE ALERT DETAILS';
     const exp = new Date(expiresAt);
-    if (Number.isNaN(exp.getTime())) return 'EXPIRES: SEE GAUGE / NWPS';
-    return `EXPIRES: ${exp.toISOString().slice(0, 16).replace('T', ' ')} UTC`;
+    if (Number.isNaN(exp.getTime())) return `EXPIRES: ${expiresAt}`;
+    return `EXPIRES: ${exp.toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+    })}`;
 }
 
 function pickLocation(alert: Alert, zones: UserZone[]): string {
@@ -249,10 +266,10 @@ export async function fetchMobileAlertsForUser(
 
     const unifiedAlerts = await fetchUnifiedEventsForMobileUser(profile);
 
-    const merged = new Map<string, Alert & { sourceDisplay?: string }>();
+    const merged = new Map<string, UnifiedMobileAlert>();
     const titleDedupe = new Set<string>();
 
-    const addAlert = (alert: Alert & { sourceDisplay?: string }) => {
+    const addAlert = (alert: UnifiedMobileAlert) => {
         if (merged.has(alert.id)) return;
         const titleKey = `${alert.title.toLowerCase().trim()}|${alert.timestamp.slice(0, 13)}`;
         if (titleDedupe.has(titleKey)) return;
@@ -271,7 +288,7 @@ export async function fetchMobileAlertsForUser(
 }
 
 export function alertToMobileItem(
-    alert: Alert & { sourceDisplay?: string },
+    alert: UnifiedMobileAlert,
     zones: UserZone[],
     readMap: Map<string, boolean>,
 ): MobileWeatherAlert {
@@ -283,7 +300,7 @@ export function alertToMobileItem(
         severity,
         title: alert.title,
         location: pickLocation(alert, zones),
-        source: alert.sourceDisplay ?? sourceLabel(alert.source),
+        source: resolveDisplaySource(alert),
         issuedAt,
         expiresAt,
         expiresLabel: expiresLabel(expiresAt),
