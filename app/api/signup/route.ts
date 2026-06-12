@@ -29,6 +29,7 @@ export async function POST(req: NextRequest) {
         const state = String(body.state || '').trim();
         const city = String(body.city || '').trim();
         const zipcode = String(body.zipcode || '').trim();
+        const requestedLicenseType = String(body.requestedLicenseType || 'radius').trim();
         const responderInviteToken =
             typeof body.responderInviteToken === 'string' ? body.responderInviteToken.trim() : '';
 
@@ -111,6 +112,7 @@ export async function POST(req: NextRequest) {
             role: finalRole,
             accountStatus,
             requestedLicense,
+            requestedLicenseType,
             isSafe,
             country: country || '',
             state: state || '',

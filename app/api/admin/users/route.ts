@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
             }
             const total = await User.countDocuments(leaderQuery);
             const users = await User.find(leaderQuery)
-                .select('_id name email responderFunction responderVertical accountStatus city state role requestedLicense licenseId createdBy createdAt')
+                .select('_id name email responderFunction responderVertical accountStatus city state role requestedLicense requestedLicenseType licenseId createdBy createdAt')
                 .sort({ createdAt: -1 })
                 .skip(skip)
                 .limit(limit);
@@ -103,7 +103,7 @@ export async function GET(req: NextRequest) {
 
         const total = await User.countDocuments(query);
         const users = await User.find(query)
-            .select('_id name email responderFunction responderVertical accountStatus city state role requestedLicense licenseId createdBy createdAt')
+            .select('_id name email responderFunction responderVertical accountStatus city state role requestedLicense requestedLicenseType licenseId createdBy createdAt')
             .sort({ createdAt: -1 })
             .skip(skip)
             .limit(limit);

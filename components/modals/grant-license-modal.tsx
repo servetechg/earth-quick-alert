@@ -48,6 +48,7 @@ interface GrantLicenseModalProps {
     state?: string;
     country?: string;
     zipcode?: string;
+    requestedLicenseType?: string;
   } | null;
   isOpen: boolean;
   onClose: () => void;
@@ -71,7 +72,6 @@ export function GrantLicenseModal({ user, isOpen, onClose, onSuccess }: GrantLic
   const [userSearch, setUserSearch] = useState('')
   const [isNewUser, setIsNewUser] = useState(false)
 
-  // Form State
   const [formData, setFormData] = useState({
     organizationName: '',
     billingContact: user?.name || '',
@@ -87,6 +87,7 @@ export function GrantLicenseModal({ user, isOpen, onClose, onSuccess }: GrantLic
     countryCode: '',
     userId: user?._id || '',
     organizationalAddress: '',
+    coverageType: user?.requestedLicenseType || 'radius',
   })
 
   const {
@@ -123,6 +124,7 @@ export function GrantLicenseModal({ user, isOpen, onClose, onSuccess }: GrantLic
         country: user.country || '',
         zipcode: user.zipcode || '',
         billingAddress: fullAddress || prev.billingAddress,
+        coverageType: user.requestedLicenseType || 'radius',
       }))
 
       if (fullAddress) {
@@ -376,26 +378,72 @@ export function GrantLicenseModal({ user, isOpen, onClose, onSuccess }: GrantLic
                   )}
                 </div>
 
+                <div className="space-y-3 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                  <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Coverage Scope Option</Label>
+                  <div className="flex gap-3">
+                    <Button
+                      type="button"
+                      variant={formData.coverageType === 'state' ? 'default' : 'outline'}
+                      onClick={() => setFormData(prev => ({ ...prev, coverageType: 'state' }))}
+                      className={cn(
+                        "flex-1 h-11 text-xs font-black uppercase tracking-widest rounded-xl transition-all shadow-sm",
+                        formData.coverageType === 'state'
+                          ? "bg-[#33375D] text-white hover:bg-[#2B2F50]"
+                          : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                      )}
+                    >
+                      Complete State
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={formData.coverageType === 'radius' ? 'default' : 'outline'}
+                      onClick={() => setFormData(prev => ({ ...prev, coverageType: 'radius' }))}
+                      className={cn(
+                        "flex-1 h-11 text-xs font-black uppercase tracking-widest rounded-xl transition-all shadow-sm",
+                        formData.coverageType === 'radius'
+                          ? "bg-[#33375D] text-white hover:bg-[#2B2F50]"
+                          : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                      )}
+                    >
+                      Limited Radius
+                    </Button>
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
                   <div className="space-y-6">
                     <div className="flex justify-between items-center gap-2">
                       <Label className="text-sm font-medium text-slate-700">Coverage Radius</Label>
-                      <span className="text-sm font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-full shrink-0 flex items-center gap-1.5">
-                        {coverageLoading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                        {hasStateCoverage && maxRadiusMile != null
-                          ? `${formData.radiusMile} / ${maxRadiusMile} Mi`
-                          : `${formData.radiusMile} Mi`}
+                      <span className="text-sm font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-full shrink-0 flex items-center gap-1.5 animate-in fade-in duration-300">
+                        {formData.coverageType === 'state' ? (
+                          'Entire State'
+                        ) : (
+                          <>
+                            {coverageLoading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                            {hasStateCoverage && maxRadiusMile != null
+                              ? `${formData.radiusMile} / ${maxRadiusMile} Mi`
+                              : `${formData.radiusMile} Mi`}
+                          </>
+                        )}
                       </span>
                     </div>
-                    {!hasStateCoverage && !coverageLoading && (
-                      <p className="text-xs text-slate-500">
-                        Pick a primary address from Google suggestions (not just typed text) to load the state max radius.
+                    {formData.coverageType === 'state' ? (
+                      <p className="text-xs text-slate-500 font-medium bg-blue-50/20 text-blue-800 p-4 rounded-2xl border border-blue-100/50 leading-relaxed animate-in slide-in-from-top-2 duration-300">
+                        Coverage encompasses the entire state of <strong>{formData.state || 'selected state'}</strong>. Coordinate-based radius restrictions are disabled.
                       </p>
-                    )}
-                    {hasStateCoverage && maxRadiusMile != null && formData.state && (
-                      <p className="text-xs text-slate-500">
-                        Max for {formData.state}: {maxRadiusMile} mi
-                      </p>
+                    ) : (
+                      <>
+                        {!hasStateCoverage && !coverageLoading && (
+                          <p className="text-xs text-slate-500">
+                            Pick a primary address from Google suggestions (not just typed text) to load the state max radius.
+                          </p>
+                        )}
+                        {hasStateCoverage && maxRadiusMile != null && formData.state && (
+                          <p className="text-xs text-slate-500">
+                            Max for {formData.state}: {maxRadiusMile} mi
+                          </p>
+                        )}
+                      </>
                     )}
                     <input
                       type="range"
@@ -403,7 +451,7 @@ export function GrantLicenseModal({ user, isOpen, onClose, onSuccess }: GrantLic
                       max={maxRadiusMile ?? LICENSE_COVERAGE_MIN_MILE}
                       step={LICENSE_COVERAGE_STEP_MILE}
                       value={formData.radiusMile}
-                      disabled={!hasStateCoverage || maxRadiusMile == null || coverageLoading}
+                      disabled={formData.coverageType === 'state' || !hasStateCoverage || maxRadiusMile == null || coverageLoading}
                       onChange={(e) =>
                         setFormData((prev) => ({
                           ...prev,
@@ -414,7 +462,7 @@ export function GrantLicenseModal({ user, isOpen, onClose, onSuccess }: GrantLic
                     />
                     <div className="flex justify-between text-[10px] text-slate-400 font-medium uppercase tracking-widest">
                       <span>{LICENSE_COVERAGE_MIN_MILE} Mi</span>
-                      {hasStateCoverage && maxRadiusMile != null ? (
+                      {formData.coverageType !== 'state' && hasStateCoverage && maxRadiusMile != null ? (
                         <>
                           <span>{midpointRadiusLabel(LICENSE_COVERAGE_MIN_MILE, maxRadiusMile)} Mi</span>
                           <span>{maxRadiusMile} Mi</span>
@@ -426,11 +474,11 @@ export function GrantLicenseModal({ user, isOpen, onClose, onSuccess }: GrantLic
                   </div>
 
                   {isLoaded && (
-                    <div className="h-40 rounded-2xl overflow-hidden border border-slate-200 shadow-sm">
+                    <div className="h-40 rounded-2xl overflow-hidden border border-slate-200 shadow-sm relative">
                       <GoogleMap
                         mapContainerStyle={{ width: '100%', height: '100%' }}
                         center={mapCenter}
-                        zoom={mapZoomForRadiusMiles(formData.radiusMile)}
+                        zoom={formData.coverageType === 'state' ? 6 : mapZoomForRadiusMiles(formData.radiusMile)}
                         options={{
                           disableDefaultUI: true,
                           zoomControl: false,
@@ -440,17 +488,19 @@ export function GrantLicenseModal({ user, isOpen, onClose, onSuccess }: GrantLic
                         }}
                       >
                         <Marker position={mapCenter} />
-                        <Circle
-                          center={mapCenter}
-                          radius={formData.radiusMile * 1609.34}
-                          options={{
-                            fillOpacity: 0.1,
-                            strokeOpacity: 0.4,
-                            fillColor: '#3b82f6',
-                            strokeColor: '#3b82f6',
-                            strokeWeight: 1
-                          }}
-                        />
+                        {formData.coverageType !== 'state' && (
+                          <Circle
+                            center={mapCenter}
+                            radius={formData.radiusMile * 1609.34}
+                            options={{
+                              fillOpacity: 0.1,
+                              strokeOpacity: 0.4,
+                              fillColor: '#3b82f6',
+                              strokeColor: '#3b82f6',
+                              strokeWeight: 1
+                            }}
+                          />
+                        )}
                       </GoogleMap>
                     </div>
                   )}
