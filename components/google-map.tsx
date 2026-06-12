@@ -10,6 +10,8 @@ import {
     coverageCirclePath,
     type LatLngPoint,
 } from '@/lib/geo/license-coverage-radius'
+import type { UnifiedEventHeatPoint } from '@/lib/geo/unified-event-heatmap'
+import { IncidentDetailDialog } from '@/components/incident/incident-detail-dialog'
 
 type DeckHeatPoint = { position: [number, number]; weight: number }
 
@@ -95,6 +97,10 @@ interface GoogleMapProps {
     polylines?: MapPolylineSpec[]
     /** Concentric disaster impact circles (Zone A / B / C). */
     disasterZoneCircles?: MapDisasterZoneCircleSpec[]
+    /** Incident metadata for heatmap clicks (no pin markers). */
+    heatIncidents?: UnifiedEventHeatPoint[]
+    /** When true, clicking the heat layer opens incident details instead of showing pins. */
+    heatClickOnly?: boolean
 }
 
 const containerStyle = {
@@ -141,6 +147,36 @@ function coverageToMapBounds(coverage: CoverageCircleSpec): MapStateBounds {
     return geoBoundsToMapStateBounds(box)
 }
 
+function distanceKm(aLat: number, aLng: number, bLat: number, bLng: number): number {
+    const R = 6371
+    const dLat = ((bLat - aLat) * Math.PI) / 180
+    const dLng = ((bLng - aLng) * Math.PI) / 180
+    const x =
+        Math.sin(dLat / 2) ** 2 +
+        Math.cos((aLat * Math.PI) / 180) *
+            Math.cos((bLat * Math.PI) / 180) *
+            Math.sin(dLng / 2) ** 2
+    return R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x))
+}
+
+function findNearestHeatIncident(
+    lat: number,
+    lng: number,
+    incidents: UnifiedEventHeatPoint[],
+    maxKm = 40,
+): UnifiedEventHeatPoint | null {
+    let best: UnifiedEventHeatPoint | null = null
+    let bestDist = Infinity
+    for (const inc of incidents) {
+        const d = distanceKm(lat, lng, inc.lat, inc.lng)
+        if (d < bestDist) {
+            bestDist = d
+            best = inc
+        }
+    }
+    return best && bestDist <= maxKm ? best : null
+}
+
 function viewportExceedsStateBounds(map: google.maps.Map, bounds: MapStateBounds): boolean {
     const viewport = map.getBounds()
     if (!viewport) return false
@@ -167,6 +203,8 @@ export function GoogleMap({
     lockToCoverage = false,
     polylines = [],
     disasterZoneCircles = [],
+    heatIncidents = [],
+    heatClickOnly = false,
 }: GoogleMapProps) {
     const { isLoaded } = useJsApiLoader({
         id: GOOGLE_MAPS_LOADER_ID,
@@ -180,6 +218,8 @@ export function GoogleMap({
     }, [center])
 
     const [selectedMarker, setSelectedMarker] = useState<MapMarker | null>(null)
+    const [selectedHeatIncident, setSelectedHeatIncident] = useState<UnifiedEventHeatPoint | null>(null)
+    const [incidentDialogOpen, setIncidentDialogOpen] = useState(false)
     const [map, setMap] = React.useState<google.maps.Map | null>(null)
     const deckOverlayRef = useRef<GoogleMapsOverlay | null>(null)
     const stateBoundsFittedRef = useRef(false)
@@ -446,6 +486,23 @@ export function GoogleMap({
         }
     }, [markers, selectedMarker])
 
+    const handleMapClick = useCallback(
+        (e: google.maps.MapMouseEvent) => {
+            if (!heatClickOnly || !showHeatmap || !heatIncidents.length) return
+            const lat = e.latLng?.lat()
+            const lng = e.latLng?.lng()
+            if (lat == null || lng == null) return
+            const hit = findNearestHeatIncident(lat, lng, heatIncidents)
+            if (hit) {
+                setSelectedMarker(null)
+                setSelectedHeatIncident(hit)
+            } else {
+                setSelectedHeatIncident(null)
+            }
+        },
+        [heatClickOnly, showHeatmap, heatIncidents],
+    )
+
     React.useEffect(() => {
         if (!map) return
 
@@ -507,6 +564,7 @@ export function GoogleMap({
                 zoom={stateBounds || coverageMapBounds ? undefined : zoom}
                 onLoad={onLoad}
                 onUnmount={onUnmount}
+                onClick={handleMapClick}
                 options={{
                     disableDefaultUI: false,
                     zoomControl: true,
@@ -599,7 +657,10 @@ export function GoogleMap({
                         <Marker
                             position={marker.position}
                             title={marker.title}
-                            onClick={() => setSelectedMarker(marker)}
+                            onClick={() => {
+                                setSelectedHeatIncident(null)
+                                setSelectedMarker(marker)
+                            }}
                             icon={
                                 marker.type === 'user' ? (
                                     marker.isSafe ? {
@@ -648,7 +709,10 @@ export function GoogleMap({
                             <Circle
                                 center={marker.position}
                                 radius={marker.radius}
-                                onClick={() => setSelectedMarker(marker)}
+                                onClick={() => {
+                                setSelectedHeatIncident(null)
+                                setSelectedMarker(marker)
+                            }}
                                 options={{
                                     strokeColor: marker.type === 'earthquake' ? '#FF8C00' : '#4169E1',
                                     strokeOpacity: 0.8,
@@ -660,6 +724,40 @@ export function GoogleMap({
                         )}
                     </React.Fragment>
                 ))}
+
+                {selectedHeatIncident && (
+                    <InfoWindow
+                        position={{ lat: selectedHeatIncident.lat, lng: selectedHeatIncident.lng }}
+                        onCloseClick={() => setSelectedHeatIncident(null)}
+                    >
+                        <div className="p-2 min-w-[200px] max-w-[300px] bg-white text-slate-900 rounded-lg">
+                            <h3 className="font-extrabold text-sm mb-1 uppercase tracking-tight flex items-center gap-2">
+                                ⚠️ Incident
+                            </h3>
+                            <div className="font-bold text-lg mb-1">{selectedHeatIncident.name}</div>
+                            {selectedHeatIncident.severity && (
+                                <div className="text-[10px] font-black uppercase mb-1 inline-block px-2 py-0.5 rounded bg-amber-100 text-amber-800">
+                                    {selectedHeatIncident.severity}
+                                </div>
+                            )}
+                            {selectedHeatIncident.location && (
+                                <p className="text-xs text-slate-700 mb-2 leading-relaxed">
+                                    {selectedHeatIncident.location}
+                                </p>
+                            )}
+                            <p className="text-[10px] text-slate-500 mb-2">
+                                {selectedHeatIncident.category || selectedHeatIncident.source || 'Active alert'}
+                            </p>
+                            <button
+                                type="button"
+                                onClick={() => setIncidentDialogOpen(true)}
+                                className="mt-1 inline-flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wide text-[#33375D] hover:underline"
+                            >
+                                View AI Report →
+                            </button>
+                        </div>
+                    </InfoWindow>
+                )}
 
                 {selectedMarker && (
                     <InfoWindow
@@ -710,13 +808,14 @@ export function GoogleMap({
                                 </p>
                             )}
 
-                            {selectedMarker.riskReportHref && (
-                                <a
-                                    href={selectedMarker.riskReportHref}
+                            {selectedMarker.incidentId && (
+                                <button
+                                    type="button"
+                                    onClick={() => setIncidentDialogOpen(true)}
                                     className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wide text-[#33375D] hover:underline"
                                 >
-                                    View AI Risk Report →
-                                </a>
+                                    View AI Report →
+                                </button>
                             )}
 
                             {selectedMarker.alerts && selectedMarker.alerts.length > 0 && (
@@ -736,6 +835,25 @@ export function GoogleMap({
                     </InfoWindow>
                 )}
             </GoogleMapComponent>
+
+            <IncidentDetailDialog
+                open={incidentDialogOpen}
+                onOpenChange={setIncidentDialogOpen}
+                eventIds={
+                    selectedHeatIncident
+                        ? [selectedHeatIncident.id]
+                        : selectedMarker?.incidentId
+                          ? [selectedMarker.incidentId]
+                          : []
+                }
+                bulletText={
+                    selectedHeatIncident
+                        ? `${selectedHeatIncident.name} — ${selectedHeatIncident.severity} severity${selectedHeatIncident.location ? ` · ${selectedHeatIncident.location}` : ''}`
+                        : selectedMarker?.title
+                          ? `${selectedMarker.title}${selectedMarker.description ? ` — ${selectedMarker.description}` : ''}`
+                          : ''
+                }
+            />
         </div>
     )
 }

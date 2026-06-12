@@ -16,6 +16,7 @@ import {
   HospitalCapacityCard,
   PowerOutageSummaryCard,
   ResourceDeploymentCard,
+  DashboardSnapshotExport,
 } from '@/components/admin-dashboard'
 import { useUser } from '@/lib/store/user-store'
 import type { RiskReport } from '@/lib/types/risk-assessment'
@@ -182,6 +183,20 @@ export default function Dashboard() {
 
   return (
     <AdminPageShell className="bg-slate-100/50" innerClassName="space-y-4">
+      <div className="flex justify-end dashboard-export-ignore">
+        <DashboardSnapshotExport
+          snapshotTitle="Sub-Admin Situational Dashboard"
+          summaryLine={
+            incidentLive?.description
+              ? incidentLive.description
+              : gisFocusState
+                ? `Coverage: ${gisFocusState}`
+                : undefined
+          }
+        />
+      </div>
+
+      <div id="dashboard-export-root" className="space-y-4">
       <div className="flex flex-col xl:flex-row gap-4 items-stretch">
         {/* Main left section */}
         <div className="flex-1 min-w-0 flex flex-col gap-4">
@@ -225,6 +240,7 @@ export default function Dashboard() {
         <HospitalCapacityCard />
         <PowerOutageSummaryCard />
         <ResourceDeploymentCard />
+      </div>
       </div>
     </AdminPageShell>
   )

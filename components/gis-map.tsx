@@ -934,8 +934,8 @@ export function GISMap({
     const activeTabMarkers = markers
     const enabledLayerMarkers: any[] = []
 
-    // 1. Incidents (always on super-admin unified feed)
-    if (incidentsVisible) {
+    // Unified heat feed: incidents show on heatmap only (click for details), not as blue pins.
+    if (incidentsVisible && unifiedIncidents.length === 0) {
       enabledLayerMarkers.push(...situationalMarkers)
     }
 
@@ -982,6 +982,8 @@ export function GISMap({
     markerInCoverage,
     showCriticalInfraLayers,
     criticalInfraMarkers,
+    unifiedIncidents,
+    incidentsVisible,
   ])
 
   const disasterZonesVisible = useMemo(() => {
@@ -1082,6 +1084,8 @@ export function GISMap({
           lockToCoverage={lockToCoverageCircle}
           polylines={mapPolylines}
           disasterZoneCircles={disasterZoneCircles}
+          heatIncidents={usesUnifiedHeat ? unifiedIncidents : undefined}
+          heatClickOnly={usesUnifiedHeat}
         />
 
         {(isSearchingInfra || isLoadingCriticalInfra) && (
