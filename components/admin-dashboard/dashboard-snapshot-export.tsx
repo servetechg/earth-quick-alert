@@ -21,6 +21,39 @@ type DashboardSnapshotExportProps = {
   summaryLine?: string
 }
 
+const EXPORT_MIN_WIDTH_PX = 1600
+const EXPORT_PADDING_PX = 32
+
+function prepareCloneForCapture(clonedRoot: HTMLElement, captureWidth: number) {
+  clonedRoot.style.width = `${captureWidth}px`
+  clonedRoot.style.maxWidth = 'none'
+  clonedRoot.style.minWidth = `${captureWidth}px`
+  clonedRoot.style.overflow = 'visible'
+  clonedRoot.style.padding = `${EXPORT_PADDING_PX}px`
+  clonedRoot.style.boxSizing = 'border-box'
+  clonedRoot.style.backgroundColor = '#f1f5f9'
+
+  clonedRoot.querySelectorAll<HTMLElement>('*').forEach((el) => {
+    const cls = el.className
+    if (typeof cls === 'string') {
+      if (cls.includes('overflow-hidden') || cls.includes('overflow-x-hidden')) {
+        el.style.overflow = 'visible'
+      }
+      if (cls.includes('min-w-0')) {
+        el.style.minWidth = 'auto'
+      }
+      if (cls.includes('max-w-[')) {
+        el.style.maxWidth = 'none'
+      }
+    }
+  })
+
+  // Ensure multi-column dashboard layout renders at full width in the clone
+  clonedRoot.querySelectorAll<HTMLElement>('.flex, .grid').forEach((el) => {
+    el.style.maxWidth = 'none'
+  })
+}
+
 export function DashboardSnapshotExport({
   exportRootId = 'dashboard-export-root',
   snapshotTitle = 'Situational Dashboard Snapshot',
@@ -41,16 +74,56 @@ export function DashboardSnapshotExport({
 
     setCapturing(true)
     setStatus(null)
+
+    const scrollEl = document.documentElement
+    const prevScrollTop = scrollEl.scrollTop
+    const prevRootWidth = root.style.width
+    const prevRootMaxWidth = root.style.maxWidth
+    const prevRootOverflow = root.style.overflow
+
+    scrollEl.scrollTop = 0
+    root.scrollIntoView({ block: 'start' })
+
+    const captureWidth = Math.max(
+      root.scrollWidth,
+      root.offsetWidth,
+      root.getBoundingClientRect().width,
+      EXPORT_MIN_WIDTH_PX,
+    )
+    const captureHeight = Math.max(root.scrollHeight, root.offsetHeight)
+
+    root.style.width = `${captureWidth}px`
+    root.style.maxWidth = 'none'
+    root.style.overflow = 'visible'
+
+    // Let layout reflow at the export width before capture
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+    await new Promise<void>((resolve) => setTimeout(resolve, 120))
+
     try {
+      const scale = Math.min(Math.max(window.devicePixelRatio || 1, 2), 3)
+
       const canvas = await html2canvas(root, {
         useCORS: true,
         allowTaint: true,
-        scale: Math.min(window.devicePixelRatio || 1, 2),
-        backgroundColor: '#f8fafc',
+        scale,
+        backgroundColor: '#f1f5f9',
         logging: false,
+        width: captureWidth + EXPORT_PADDING_PX * 2,
+        height: Math.max(root.scrollHeight, captureHeight) + EXPORT_PADDING_PX * 2,
+        windowWidth: captureWidth + EXPORT_PADDING_PX * 2,
+        windowHeight: Math.max(root.scrollHeight, captureHeight) + EXPORT_PADDING_PX * 2,
+        x: 0,
+        y: 0,
+        scrollX: 0,
+        scrollY: 0,
         ignoreElements: (el) => el.classList?.contains('dashboard-export-ignore') ?? false,
+        onclone: (_doc, clonedRoot) => {
+          prepareCloneForCapture(clonedRoot as HTMLElement, captureWidth)
+        },
       })
-      const dataUrl = canvas.toDataURL('image/png')
+
+      const dataUrl = canvas.toDataURL('image/png', 1.0)
       const base64 = dataUrl.replace(/^data:image\/png;base64,/, '')
       return base64
     } catch (e) {
@@ -58,6 +131,10 @@ export function DashboardSnapshotExport({
       setStatus({ type: 'err', message: msg })
       return null
     } finally {
+      root.style.width = prevRootWidth
+      root.style.maxWidth = prevRootMaxWidth
+      root.style.overflow = prevRootOverflow
+      scrollEl.scrollTop = prevScrollTop
       setCapturing(false)
     }
   }

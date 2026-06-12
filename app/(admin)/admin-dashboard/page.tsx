@@ -196,7 +196,7 @@ export default function Dashboard() {
         />
       </div>
 
-      <div id="dashboard-export-root" className="space-y-4">
+      <div id="dashboard-export-root" className="space-y-4 w-full">
       <div className="flex flex-col xl:flex-row gap-4 items-stretch">
         {/* Main left section */}
         <div className="flex-1 min-w-0 flex flex-col gap-4">

@@ -14,6 +14,8 @@ import {
     fetchSubAdminLeaderMarkers,
 } from '@/lib/services/situational-map-markers';
 import { resolveSubAdminJurisdiction } from '@/lib/sub-admin/jurisdiction';
+import { ensureArkansasPresentationLicense } from '@/lib/demo/ensure-presentation-license';
+import { DEMO_PRESENTATION_EMAIL } from '@/lib/demo/constants';
 import { resolveDemoSessionContext, getDemoSituationalMapPayload } from '@/lib/demo/provider';
 
 function mapCitizensToClient(
@@ -131,6 +133,10 @@ export async function GET(req: Request) {
         } | null = null;
 
         if (role === 'sub-admin') {
+            const email = String(session.user.email ?? '').trim().toLowerCase();
+            if (email === DEMO_PRESENTATION_EMAIL) {
+                await ensureArkansasPresentationLicense(userId);
+            }
             const jurisdiction = await resolveSubAdminJurisdiction(userId);
             if (jurisdiction) {
                 coverage = {
