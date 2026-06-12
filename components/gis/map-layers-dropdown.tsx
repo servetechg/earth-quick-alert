@@ -10,11 +10,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
-import {
-  TOP_LEVEL_MAP_LAYERS,
-  INFRASTRUCTURE_SUB_LAYERS,
-  DISASTER_ZONE_LAYER,
-} from '@/lib/gis/map-layer-config'
+import { TOP_LEVEL_MAP_LAYERS, DISASTER_ZONE_LAYER } from '@/lib/gis/map-layer-config'
 import { CRITICAL_INFRASTRUCTURE_SECTORS } from '@/lib/gis/critical-infrastructure-sectors'
 
 interface MapLayersDropdownProps {
@@ -129,29 +125,6 @@ export function MapLayersDropdown({
           ))}
         </div>
 
-        <div className="mt-3 pt-2 border-t border-slate-100">
-          <div className="flex items-center gap-1.5 px-1 pb-2">
-            <Building2 className="w-3.5 h-3.5 text-slate-400" />
-            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-              Infrastructure
-            </span>
-          </div>
-          <div className="space-y-0.5 pl-1">
-            {INFRASTRUCTURE_SUB_LAYERS.map((sub) => (
-              <LayerRow
-                key={sub.id}
-                id={sub.id}
-                label={sub.label}
-                color={sub.color}
-                Icon={sub.Icon}
-                checked={!!layers[sub.id]}
-                onToggle={() => toggle(sub.id)}
-                compact
-              />
-            ))}
-          </div>
-        </div>
-
         {showCriticalInfra && (
           <div className="mt-3 pt-2 border-t border-slate-100">
             <div className="flex items-center gap-1.5 px-1 pb-2">
@@ -160,7 +133,7 @@ export function MapLayersDropdown({
                 Critical Infrastructure (16)
               </span>
             </div>
-            <div className="space-y-0.5 pl-1 max-h-[220px] overflow-y-auto">
+            <div className="space-y-0.5 pl-1">
               {CRITICAL_INFRASTRUCTURE_SECTORS.map((sector) => (
                 <LayerRow
                   key={sector.id}

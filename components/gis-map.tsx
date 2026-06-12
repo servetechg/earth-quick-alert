@@ -40,12 +40,11 @@ import { Switch } from '@/components/ui/switch'
 
 import { MapLayersDropdown } from '@/components/gis/map-layers-dropdown'
 import {
-  INFRASTRUCTURE_SUB_LAYERS,
+  GOOGLE_PLACE_MAP_LAYERS,
   buildDefaultMapLayerState,
 } from '@/lib/gis/map-layer-config'
 import { CRITICAL_INFRASTRUCTURE_SECTORS } from '@/lib/gis/critical-infrastructure-sectors'
 import {
-  boundsFromPath,
   disasterZonesToMapCircles,
   zoneLabelPosition,
 } from '@/lib/demo/disaster-zones-lrk'
@@ -55,6 +54,21 @@ type GisMapTab = 'Citizens' | 'Responders' | 'Leaders'
 
 const ALL_GIS_TABS: GisMapTab[] = ['Citizens', 'Responders', 'Leaders']
 const SUB_ADMIN_GIS_TABS: GisMapTab[] = ['Citizens', 'Responders']
+
+function isHelpCitizenMarker(m: { isSafe?: boolean; status?: string }) {
+  if (m.isSafe === false) return true
+  const s = (m.status ?? '').toLowerCase()
+  return s === 'help' || s === 'needs_assistance' || s === 'danger'
+}
+
+function markerNearPoint(
+  position: { lat: number; lng: number },
+  lat: number,
+  lng: number,
+  maxMiles = 22,
+) {
+  return calculateDistance(position.lat, position.lng, lat, lng) <= maxMiles
+}
 
 interface GISMapProps {
   selectedLocation?: string
@@ -108,6 +122,7 @@ export function GISMap({
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number }>({ lat: 37.0902, lng: -95.7129 }) // Center of USA
   const [mapZoom, setMapZoom] = useState(4)
   const [activeTab, setActiveTab] = useState<GisMapTab>('Citizens')
+  const [selectedDemoHeat, setSelectedDemoHeat] = useState<UnifiedEventHeatPoint | null>(null)
   const [showHeatmap, setShowHeatmap] = useState(true)
   const [unifiedIncidents, setUnifiedIncidents] = useState<UnifiedEventHeatPoint[]>([])
   const [incidentHeatCount, setIncidentHeatCount] = useState(0)
@@ -154,32 +169,19 @@ export function GISMap({
     return true
   }, [showLayersPanel, coverageCircle, coverageMeta])
 
-  const tornadoCorridorBounds = useMemo((): MapStateBounds | null => {
-    if (tornadoPathPoints.length < 2) return null
-    return boundsFromPath(tornadoPathPoints, 0.1)
-  }, [tornadoPathPoints])
-
-  const isTornadoDemoView = scenarioDemo || (demoModeActive && tornadoPathPoints.length >= 2)
-
   const mapStateBounds = useMemo((): MapStateBounds | null => {
     if (lockToCoverageCircle) return null
-    if (isTornadoDemoView && tornadoCorridorBounds) return tornadoCorridorBounds
-    if (demoModeActive && unifiedMapFeed && !isTornadoDemoView) {
+    // State-scoped dashboards: pan/zoom limit is the full state (e.g. Arkansas), not tornado corridor
+    if (stateBoundsRestriction) return stateBoundsRestriction
+    if (demoModeActive && unifiedMapFeed) {
       const ar = getUsStateBbox('AR')
       if (ar) {
         const [west, south, east, north] = ar
         return { west, south, east, north }
       }
     }
-    return stateBoundsRestriction
-  }, [
-    lockToCoverageCircle,
-    isTornadoDemoView,
-    tornadoCorridorBounds,
-    demoModeActive,
-    unifiedMapFeed,
-    stateBoundsRestriction,
-  ])
+    return null
+  }, [lockToCoverageCircle, demoModeActive, unifiedMapFeed, stateBoundsRestriction])
 
   useEffect(() => {
     if (!unifiedMapFeed && !stateScoped) return
@@ -222,6 +224,21 @@ export function GISMap({
       setActiveTab(tabs[0])
     }
   }, [tabs, activeTab])
+
+  const isDemoSimulation = scenarioDemo || demoModeActive
+
+  useEffect(() => {
+    setSelectedDemoHeat(null)
+  }, [activeTab])
+
+  const handleHeatIncidentSelect = useCallback(
+    (incident: UnifiedEventHeatPoint) => {
+      if (isDemoSimulation && activeTab === 'Citizens') {
+        setSelectedDemoHeat(incident)
+      }
+    },
+    [isDemoSimulation, activeTab],
+  )
 
   useEffect(() => {
     let cancelled = false
@@ -288,7 +305,7 @@ export function GISMap({
               id: r.id,
               position: { lat: r.lat, lng: r.lng },
               title: r.title,
-              type: 'incident',
+              type: 'responder',
               status: r.status,
               location: r.location,
               description: r.description,
@@ -334,40 +351,42 @@ export function GISMap({
           setSubAdmins(mapLeaders(data.leaders))
         }
 
-        if (
-          showLayersPanel &&
-          data.coverage?.center &&
-          data.coverage?.radiusMeters
-        ) {
+        if (showLayersPanel && data.coverage?.center) {
           const mile = data.coverage.radiusMile
           const isDemoStateWide = data.demo === true && data.coverage?.stateWide === true
-          setCoverageCircle({
-            center: data.coverage.center,
-            radiusMeters: data.coverage.radiusMeters,
-            label: isDemoStateWide
-              ? `Arkansas demo coverage`
-              : typeof mile === 'number'
-                ? `License coverage · ${mile} mi`
-                : 'License coverage',
-          })
+          const isStateCoverage =
+            data.coverage.coverageType === 'state' || isDemoStateWide
           setCoverageMeta({
-            coverageType:
-              data.coverage.coverageType === 'state' || isDemoStateWide ? 'state' : 'radius',
+            coverageType: isStateCoverage ? 'state' : 'radius',
             stateWide: isDemoStateWide,
             radiusMile: typeof mile === 'number' ? mile : undefined,
           })
+          if (isStateCoverage) {
+            setCoverageCircle(null)
+          } else if (data.coverage?.radiusMeters) {
+            setCoverageCircle({
+              center: data.coverage.center,
+              radiusMeters: data.coverage.radiusMeters,
+              label:
+                typeof mile === 'number'
+                  ? `License coverage · ${mile} mi`
+                  : 'License coverage',
+            })
+          } else {
+            setCoverageCircle(null)
+          }
           if (
             Number.isFinite(data.coverage.center.lat) &&
             Number.isFinite(data.coverage.center.lng) &&
             !data.tornadoPath?.coordinates?.length
           ) {
-            setMapCenter(data.coverage.center)
-            if (
-              data.coverage.coverageType !== 'state' &&
-              !isDemoStateWide &&
-              typeof mile === 'number'
-            ) {
-              setMapZoom(mapZoomForRadiusMiles(mile))
+            if (isStateCoverage && focusState) {
+              /* state fitBounds handled by GoogleMap stateBounds */
+            } else if (!isStateCoverage) {
+              setMapCenter(data.coverage.center)
+              if (typeof mile === 'number') {
+                setMapZoom(mapZoomForRadiusMiles(mile))
+              }
             }
           }
         } else {
@@ -652,7 +671,7 @@ export function GISMap({
       searchCenters.push(mapCenter)
     }
 
-    const enabledGoogleTypes = INFRASTRUCTURE_SUB_LAYERS.filter(
+    const enabledGoogleTypes = GOOGLE_PLACE_MAP_LAYERS.filter(
       (layer) => mapLayers[layer.id]
     )
 
@@ -753,8 +772,6 @@ export function GISMap({
     }
   }, [
     mapLayers.fire_station,
-    mapLayers.pharmacy,
-    mapLayers.hospital,
     mapLayers.police,
     impactedUsers,
     coverageCircle,
@@ -819,14 +836,29 @@ export function GISMap({
     let currentFiltered: any[] = []
 
     switch (activeTab) {
-      case 'Citizens': currentFiltered = impactedUsers; break;
-      case 'Responders': currentFiltered = responders; break;
-      case 'Leaders': currentFiltered = subAdmins; break;
-      default: currentFiltered = [];
+      case 'Citizens':
+        currentFiltered = impactedUsers
+        if (isDemoSimulation) {
+          currentFiltered = currentFiltered.filter(isHelpCitizenMarker)
+          if (selectedDemoHeat) {
+            currentFiltered = currentFiltered.filter((m) =>
+              markerNearPoint(m.position, selectedDemoHeat.lat, selectedDemoHeat.lng, 30),
+            )
+          }
+        }
+        break
+      case 'Responders':
+        currentFiltered = responders
+        break
+      case 'Leaders':
+        currentFiltered = subAdmins
+        break
+      default:
+        currentFiltered = []
     }
 
-    // Apply location filtering
-    if (selectedLocation !== 'All') {
+    // Sub-admin dashboards pass the admin name as selectedLocation — skip for demo markers
+    if (selectedLocation !== 'All' && !isDemoSimulation) {
       currentFiltered = currentFiltered.filter(m =>
         m.subAdminName === selectedLocation ||
         m.location === selectedLocation ||
@@ -840,7 +872,17 @@ export function GISMap({
     }
 
     return currentFiltered
-  }, [activeTab, impactedUsers, responders, subAdmins, selectedLocation, lockToCoverageCircle, markerInCoverage])
+  }, [
+    activeTab,
+    impactedUsers,
+    responders,
+    subAdmins,
+    selectedLocation,
+    lockToCoverageCircle,
+    markerInCoverage,
+    isDemoSimulation,
+    selectedDemoHeat,
+  ])
 
   /** Operational dashboards always show incidents/heatmap; Filter checkbox is optional elsewhere. */
   const incidentsVisible = unifiedMapFeed || stateScoped || mapLayers.incidents
@@ -863,7 +905,7 @@ export function GISMap({
         }))
     }
 
-    const enabledInfraMarkers = INFRASTRUCTURE_SUB_LAYERS.flatMap((layer) => {
+    const enabledInfraMarkers = GOOGLE_PLACE_MAP_LAYERS.flatMap((layer) => {
       if (mapLayers[layer.id]) {
         return Array.from(infraCacheRef.current.values())
           .filter((m: any) => m.placeType === layer.placeType)
@@ -940,7 +982,7 @@ export function GISMap({
     }
 
     // 2. Google Places sub-layers
-    INFRASTRUCTURE_SUB_LAYERS.forEach((layer) => {
+    GOOGLE_PLACE_MAP_LAYERS.forEach((layer) => {
       if (mapLayers[layer.id]) {
         const markersForLayer = Array.from(infraCacheRef.current.values())
           .filter((m: any) => m.placeType === layer.placeType)
@@ -1038,7 +1080,15 @@ export function GISMap({
             onShowHeatmapChange={setShowHeatmap}
             displayHeatCount={displayHeatCount}
             situationalLoading={situationalLoading}
-            coverageLabel={showLayersPanel ? coverageCircle?.label : undefined}
+            coverageLabel={
+              showLayersPanel
+                ? coverageMeta?.coverageType === 'state'
+                  ? focusState
+                    ? `${focusState} statewide`
+                    : 'Statewide coverage'
+                  : coverageCircle?.label
+                : undefined
+            }
             usesUnifiedHeat={usesUnifiedHeat}
           />
         </div>
@@ -1086,6 +1136,7 @@ export function GISMap({
           disasterZoneCircles={disasterZoneCircles}
           heatIncidents={usesUnifiedHeat ? unifiedIncidents : undefined}
           heatClickOnly={usesUnifiedHeat}
+          onHeatIncidentSelect={isDemoSimulation ? handleHeatIncidentSelect : undefined}
         />
 
         {(isSearchingInfra || isLoadingCriticalInfra) && (

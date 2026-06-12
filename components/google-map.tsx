@@ -13,6 +13,20 @@ import {
 import type { UnifiedEventHeatPoint } from '@/lib/geo/unified-event-heatmap'
 import { IncidentDetailDialog } from '@/components/incident/incident-detail-dialog'
 
+function formatMarkerStatus(status?: string, isSafe?: boolean): string {
+    if (status === 'help' || status === 'needs_assistance') return 'Help'
+    if (status === 'safe') return 'Safe'
+    if (isSafe === false) return 'Help'
+    if (isSafe === true) return 'Safe'
+    return status ?? 'Unknown'
+}
+
+function isHelpStatus(status?: string, isSafe?: boolean): boolean {
+    if (isSafe === false) return true
+    const s = (status ?? '').toLowerCase()
+    return s === 'help' || s === 'needs_assistance' || s === 'danger'
+}
+
 type DeckHeatPoint = { position: [number, number]; weight: number }
 
 /** Matches prior Google HeatmapLayer gradient (blue → yellow → orange → red). */
@@ -29,7 +43,7 @@ interface MapMarker {
     id: string
     position: { lat: number; lng: number }
     title: string
-    type: 'user' | 'hazard' | 'earthquake' | 'weather' | 'admin' | 'incident' | 'condition' | 'infrastructure'
+    type: 'user' | 'hazard' | 'earthquake' | 'weather' | 'admin' | 'incident' | 'condition' | 'infrastructure' | 'responder'
     isSafe?: boolean
     mag?: number
     description?: string
@@ -101,6 +115,8 @@ interface GoogleMapProps {
     heatIncidents?: UnifiedEventHeatPoint[]
     /** When true, clicking the heat layer opens incident details instead of showing pins. */
     heatClickOnly?: boolean
+    /** Fired when user clicks a heatmap incident (demo tab workflows). */
+    onHeatIncidentSelect?: (incident: UnifiedEventHeatPoint) => void
 }
 
 const containerStyle = {
@@ -205,6 +221,7 @@ export function GoogleMap({
     disasterZoneCircles = [],
     heatIncidents = [],
     heatClickOnly = false,
+    onHeatIncidentSelect,
 }: GoogleMapProps) {
     const { isLoaded } = useJsApiLoader({
         id: GOOGLE_MAPS_LOADER_ID,
@@ -271,9 +288,11 @@ export function GoogleMap({
         const tighten = (attempt: number) => {
             const z = targetMap.getZoom() ?? 6
             if (!viewportExceedsStateBounds(targetMap, bounds) || attempt >= 5) {
-                stateMinZoomRef.current = z
-                lastZoomRef.current = z
-                targetMap.setOptions({ minZoom: z })
+                const fitZoom = z
+                // Stop zoom-out once the full state is visible — no further zoom-out past this level
+                stateMinZoomRef.current = fitZoom
+                lastZoomRef.current = targetMap.getZoom() ?? fitZoom
+                targetMap.setOptions({ minZoom: fitZoom })
                 return
             }
             targetMap.setZoom(z + 1)
@@ -300,11 +319,31 @@ export function GoogleMap({
         [],
     )
 
-    const fitStateView = useCallback(
-        (targetMap: google.maps.Map, bounds: MapStateBounds) => {
-            fitBoundedView(targetMap, bounds, applyStateMinZoom)
+    const establishStateZoomLimit = useCallback(
+        (targetMap: google.maps.Map, bounds: MapStateBounds, preserveView = false) => {
+            if (!preserveView) {
+                fitBoundedView(targetMap, bounds, applyStateMinZoom)
+                return
+            }
+            const prevZoom = targetMap.getZoom()
+            const prevCenter = targetMap.getCenter()
+            fitBoundedView(targetMap, bounds, (m) => {
+                applyStateMinZoom(m, bounds)
+                if (prevCenter && prevZoom != null) {
+                    m.setZoom(prevZoom)
+                    m.setCenter(prevCenter)
+                    lastZoomRef.current = prevZoom
+                }
+            })
         },
         [applyStateMinZoom, fitBoundedView],
+    )
+
+    const fitStateView = useCallback(
+        (targetMap: google.maps.Map, bounds: MapStateBounds) => {
+            establishStateZoomLimit(targetMap, bounds, false)
+        },
+        [establishStateZoomLimit],
     )
 
     const applyCoverageMinZoom = useCallback((targetMap: google.maps.Map, bounds: MapStateBounds) => {
@@ -350,7 +389,8 @@ export function GoogleMap({
             })
 
             if (!stateBoundsFittedRef.current) {
-                fitStateView(map, stateBounds)
+                // Keep current demo/regional zoom; only compute the full-state zoom-out floor
+                establishStateZoomLimit(map, stateBounds, true)
                 stateBoundsFittedRef.current = true
             }
 
@@ -372,16 +412,9 @@ export function GoogleMap({
 
                 const zoomedOut = prev != null && current < prev
                 const belowMin = minZoom != null && current < minZoom
-                const viewportTooWide = viewportExceedsStateBounds(map, stateBounds)
 
-                if (zoomedOut && (belowMin || viewportTooWide)) {
-                    if (minZoom != null) {
-                        map.setZoom(minZoom)
-                    } else {
-                        resetToStateView()
-                    }
-                } else if (viewportTooWide) {
-                    resetToStateView()
+                if (zoomedOut && belowMin) {
+                    map.setZoom(minZoom!)
                 }
 
                 lastZoomRef.current = map.getZoom() ?? current
@@ -395,7 +428,7 @@ export function GoogleMap({
                 google.maps.event.removeListener(dragEndListener)
             }
         }
-    }, [map, stateBounds, fitStateView, coverageMapBounds])
+    }, [map, stateBounds, fitStateView, establishStateZoomLimit, coverageMapBounds])
 
     // Lock sub-admin license radius: fit full circle and restrict pan/zoom to its bbox
     React.useEffect(() => {
@@ -496,11 +529,12 @@ export function GoogleMap({
             if (hit) {
                 setSelectedMarker(null)
                 setSelectedHeatIncident(hit)
+                onHeatIncidentSelect?.(hit)
             } else {
                 setSelectedHeatIncident(null)
             }
         },
-        [heatClickOnly, showHeatmap, heatIncidents],
+        [heatClickOnly, showHeatmap, heatIncidents, onHeatIncidentSelect],
     )
 
     React.useEffect(() => {
@@ -679,6 +713,9 @@ export function GoogleMap({
                                 } : marker.type === 'admin' ? {
                                     url: 'https://maps.google.com/mapfiles/ms/icons/yellow-dot.png',
                                     scaledSize: new google.maps.Size(42, 42)
+                                } : marker.type === 'responder' ? {
+                                    url: 'https://maps.google.com/mapfiles/ms/icons/orange-dot.png',
+                                    scaledSize: new google.maps.Size(36, 36)
                                 } : (marker.type === 'incident' || marker.type === 'infrastructure') ? (
                                     marker.icon === 'hospital' ? makeGlyphMarker('#EF4444', '+', 34) :
                                         marker.icon === 'pharmacy' ? makeGlyphMarker('#10B981', '\u213E', 32) : {
@@ -767,6 +804,7 @@ export function GoogleMap({
                         <div className="p-2 min-w-[200px] max-w-[300px] bg-white text-slate-900 rounded-lg">
                             <h3 className="font-extrabold text-sm mb-1 uppercase tracking-tight flex items-center gap-2">
                                 {selectedMarker.type === 'user' ? '👤 Citizen' :
+                                    selectedMarker.type === 'responder' ? '🚒 Responder' :
                                     selectedMarker.type === 'earthquake' ? '🌋 Earthquake' :
                                         selectedMarker.type === 'weather' ? '🌦️ Weather Alert' :
                                             selectedMarker.type === 'incident' ? '⚠️ Incident' :
@@ -775,10 +813,10 @@ export function GoogleMap({
                             </h3>
                             <div className="font-bold text-lg mb-1">{selectedMarker.title}</div>
 
-                            {selectedMarker.status && (
-                                <div className={`text-[10px] font-black uppercase mb-1 inline-block px-2 py-0.5 rounded ${selectedMarker.isSafe === false || selectedMarker.status === 'Danger' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
+                            {(selectedMarker.status || selectedMarker.isSafe != null) && (
+                                <div className={`text-[10px] font-black uppercase mb-1 inline-block px-2 py-0.5 rounded ${selectedMarker.isSafe === false || isHelpStatus(selectedMarker.status, selectedMarker.isSafe) ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
                                     }`}>
-                                    Status: {selectedMarker.status}
+                                    Status: {formatMarkerStatus(selectedMarker.status, selectedMarker.isSafe)}
                                 </div>
                             )}
 

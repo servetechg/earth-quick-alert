@@ -159,7 +159,7 @@ export default function SuperAdminDashboard() {
           />
         </div>
 
-        <div id="dashboard-export-root" className="space-y-8">
+        <div id="dashboard-export-root" className="space-y-8 w-full">
         {/* Title Section */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-white p-8 rounded-[32px] border border-slate-100 shadow-sm relative overflow-hidden">
           <div className="absolute top-0 right-0 w-64 h-64 bg-red-500/5 rounded-full -mr-32 -mt-32 blur-3xl" />

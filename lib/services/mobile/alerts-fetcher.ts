@@ -1,52 +1,15 @@
 import connectDB from '@/lib/mongodb';
 import CommunityAlert from '@/models/CommunityAlert';
-import WeatherAlertRecord from '@/models/WeatherAlertRecord';
-import WeatherAlertTypeConfig from '@/models/WeatherAlertTypeConfig';
-import { alertProcessor } from '@/lib/services/alert-processor';
 import { Alert, AlertSource, AlertSeverity } from '@/lib/types/api-alerts';
-import {
-    geocodeLocation,
-    locationMatchesAlertAreas,
-} from '@/lib/services/location-matching';
 import { buildUserZones, type UserZone } from '@/lib/services/mobile/zone-utils';
 import type { UserProfilePayload } from '@/lib/types/mobile/auth';
 import type { MobileAlertSeverity, MobileWeatherAlert } from '@/lib/types/mobile/alerts';
+import {
+    fetchUnifiedEventsForMobileUser,
+    unifiedSourceDisplay,
+} from '@/lib/services/mobile/unified-event-mobile-alerts';
 
-type WeatherAlertDoc = {
-    alertId: string;
-    source: string;
-    event?: string;
-    severity: string;
-    title: string;
-    description: string;
-    timestamp: Date;
-    expiresAt?: Date;
-    coordinates?: { lat: number; lon: number };
-    affectedAreas?: string[];
-    areaDesc?: string;
-    zones?: string[];
-};
-
-function unique<T>(values: T[]): T[] {
-    return Array.from(new Set(values));
-}
-
-function toRadians(value: number): number {
-    return value * (Math.PI / 180);
-}
-
-function distanceKm(aLat: number, aLon: number, bLat: number, bLon: number): number {
-    const earthRadiusKm = 6371;
-    const dLat = toRadians(bLat - aLat);
-    const dLon = toRadians(bLon - aLon);
-    const sinLat = Math.sin(dLat / 2);
-    const sinLon = Math.sin(dLon / 2);
-    const value =
-        sinLat * sinLat +
-        Math.cos(toRadians(aLat)) * Math.cos(toRadians(bLat)) * sinLon * sinLon;
-    const c = 2 * Math.atan2(Math.sqrt(value), Math.sqrt(1 - value));
-    return earthRadiusKm * c;
-}
+type UnifiedMobileAlert = Alert & { unifiedSource?: string };
 
 function toMobileSeverity(value: string): MobileAlertSeverity {
     const n = (value || '').toLowerCase();
@@ -63,18 +26,30 @@ function severityRank(s: MobileAlertSeverity): number {
     return 1;
 }
 
-function sourceLabel(source: AlertSource): string {
+function legacySourceLabel(source: AlertSource): string {
     if (source === AlertSource.WEATHER_API) return 'NWPS';
     if (source === AlertSource.EARTHQUAKE_API) return 'USGS';
     if (source === AlertSource.ADMIN_MANUAL) return 'COMMUNITY';
     return 'ALERT';
 }
 
+function resolveDisplaySource(alert: Alert): string {
+    const unified = alert as UnifiedMobileAlert;
+    if (unified.unifiedSource) return unifiedSourceDisplay(unified.unifiedSource);
+    return legacySourceLabel(alert.source);
+}
+
 function expiresLabel(expiresAt?: string): string {
-    if (!expiresAt) return 'EXPIRES: SEE GAUGE / NWPS';
+    if (!expiresAt) return 'EXPIRES: SEE ALERT DETAILS';
     const exp = new Date(expiresAt);
-    if (Number.isNaN(exp.getTime())) return 'EXPIRES: SEE GAUGE / NWPS';
-    return `EXPIRES: ${exp.toISOString().slice(0, 16).replace('T', ' ')} UTC`;
+    if (Number.isNaN(exp.getTime())) return `EXPIRES: ${expiresAt}`;
+    return `EXPIRES: ${exp.toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+    })}`;
 }
 
 function pickLocation(alert: Alert, zones: UserZone[]): string {
@@ -92,114 +67,11 @@ export async function fetchMobileAlertsForUser(
     await connectDB();
 
     const zones = buildUserZones(profile);
-    const zoneStrings = zones.map((z) => z.locationString);
-    if (zoneStrings.length === 0) return [];
+    if (zones.length === 0) return [];
 
-    const geocodedLocations: { lat: number; lon: number; name: string }[] = [];
-    for (const zone of zones) {
-        const geocoded = await geocodeLocation(zone.locationString);
-        if (geocoded) geocodedLocations.push(geocoded);
-    }
+    const unifiedAlerts = await fetchUnifiedEventsForMobileUser(profile);
 
     const now = new Date();
-    const alertConfig: { events?: { name: string; enabled?: boolean; invalid?: boolean }[] } | null =
-        (await WeatherAlertTypeConfig.findOne().lean()) as typeof alertConfig;
-    const enabledEvents = new Set<string>(
-        (alertConfig?.events || [])
-            .filter((entry) => entry.enabled && !entry.invalid)
-            .map((entry) => entry.name),
-    );
-    const hasConfig = Array.isArray(alertConfig?.events) && alertConfig.events.length > 0;
-
-    const storedWeatherAlerts = (await WeatherAlertRecord.find({
-        source: AlertSource.WEATHER_API,
-        $or: [
-            { expiresAt: { $exists: false } },
-            { expiresAt: null },
-            { expiresAt: { $gt: now } },
-        ],
-    })
-        .sort({ timestamp: -1 })
-        .lean()) as unknown as WeatherAlertDoc[];
-
-    const mergedWeatherMap = new Map<string, Alert>();
-    const coordinateLocations = geocodedLocations.map((v) => ({
-        lat: v.lat,
-        lon: v.lon,
-        name: v.name,
-    }));
-
-    for (const record of storedWeatherAlerts) {
-        if (hasConfig && record.event && !enabledEvents.has(record.event)) continue;
-
-        const matchedAreas = zoneStrings.filter((location) =>
-            locationMatchesAlertAreas(
-                location,
-                record.affectedAreas || [],
-                record.areaDesc,
-                record.zones || [],
-            ),
-        );
-
-        if (matchedAreas.length === 0 && record.coordinates && coordinateLocations.length > 0) {
-            const nearby = coordinateLocations
-                .filter(
-                    (coords) =>
-                        distanceKm(
-                            coords.lat,
-                            coords.lon,
-                            record.coordinates!.lat,
-                            record.coordinates!.lon,
-                        ) <= 80,
-                )
-                .map((coords) => coords.name);
-            matchedAreas.push(...nearby);
-        }
-
-        if (matchedAreas.length === 0) continue;
-
-        const existing = mergedWeatherMap.get(record.alertId);
-        mergedWeatherMap.set(record.alertId, {
-            id: record.alertId,
-            source: AlertSource.WEATHER_API,
-            severity: record.severity as AlertSeverity,
-            title: record.title,
-            description: record.description,
-            timestamp: new Date(record.timestamp).toISOString(),
-            expiresAt: record.expiresAt ? new Date(record.expiresAt).toISOString() : undefined,
-            affectedAreas: unique([...(existing?.affectedAreas || []), ...matchedAreas]),
-            areaDesc: record.areaDesc,
-            zones: record.zones || [],
-            event: record.event,
-        } as Alert);
-    }
-
-    const earthquakeAlerts: Alert[] = [];
-    for (const location of geocodedLocations) {
-        try {
-            const fetched = await alertProcessor.fetchAllAlerts(
-                { lat: location.lat, lon: location.lon },
-                [AlertSource.EARTHQUAKE_API],
-            );
-            for (const alert of fetched) {
-                const existing = earthquakeAlerts.find((item) => item.id === alert.id);
-                if (!existing) {
-                    earthquakeAlerts.push({
-                        ...alert,
-                        affectedAreas: unique([...(alert.affectedAreas || []), location.name]),
-                    });
-                } else {
-                    existing.affectedAreas = unique([
-                        ...(existing.affectedAreas || []),
-                        location.name,
-                    ]);
-                }
-            }
-        } catch (error) {
-            console.error(`Mobile alerts: earthquake fetch for ${location.name}:`, error);
-        }
-    }
-
     const communityRaw = await CommunityAlert.find({
         $or: [
             { expiresAt: { $exists: false } },
@@ -211,7 +83,7 @@ export async function fetchMobileAlertsForUser(
         .lean();
 
     const userIdLower = userId.toLowerCase();
-    const scopedZones = zoneStrings.map((z) => z.toLowerCase().trim()).filter(Boolean);
+    const scopedZones = zones.map((z) => z.locationString.toLowerCase().trim()).filter(Boolean);
 
     const communityAlerts: Alert[] = communityRaw
         .filter((alert: Record<string, unknown>) => {
@@ -246,11 +118,7 @@ export async function fetchMobileAlertsForUser(
             affectedAreas: (alert.affectedAreas as string[]) || [],
         })) as Alert[];
 
-    const allAlerts: Alert[] = [
-        ...Array.from(mergedWeatherMap.values()),
-        ...earthquakeAlerts,
-        ...communityAlerts,
-    ];
+    const allAlerts: Alert[] = [...unifiedAlerts, ...communityAlerts];
 
     allAlerts.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
     return allAlerts;
@@ -269,7 +137,7 @@ export function alertToMobileItem(
         severity,
         title: alert.title,
         location: pickLocation(alert, zones),
-        source: sourceLabel(alert.source),
+        source: resolveDisplaySource(alert),
         issuedAt,
         expiresAt,
         expiresLabel: expiresLabel(expiresAt),
