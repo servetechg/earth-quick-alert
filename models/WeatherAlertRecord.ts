@@ -1,7 +1,7 @@
 import mongoose, { Schema, model, models } from 'mongoose';
 
 const WeatherAlertRecordSchema = new Schema({
-    alertId: { type: String, required: true, index: true },
+    alertId: { type: String, required: true },
     source: { type: String, required: true },
     event: { type: String },
     severity: { type: String },

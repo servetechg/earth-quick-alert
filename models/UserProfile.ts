@@ -17,6 +17,17 @@ const LodgingSectionSchema = new Schema(
     { _id: false },
 );
 
+const ProfileDocumentSchema = new Schema(
+    {
+        url: { type: String, required: true },
+        fileName: { type: String, required: true },
+        mimeType: { type: String, default: '' },
+        publicId: { type: String, default: '' },
+        resourceType: { type: String, enum: ['image', 'raw'], default: 'raw' },
+    },
+    { _id: false },
+);
+
 const AlertLocationSchema = new Schema(
     {
         id: { type: String, required: true },
@@ -59,6 +70,10 @@ const UserProfileSchema = new Schema(
         transport: { type: RequirementSectionSchema, required: true },
         lodging: { type: LodgingSectionSchema, required: true },
         alertLocations: { type: [AlertLocationSchema], default: [] },
+        isPrimaryAddress: { type: Boolean },
+        allowResidenceInspection: { type: Boolean },
+        proofOfOwnership: { type: ProfileDocumentSchema, default: null },
+        proofOfResidency: { type: ProfileDocumentSchema, default: null },
         weatherPreferences: { type: [WeatherPreferenceSchema], default: [] },
     },
     { timestamps: true },
@@ -90,5 +105,21 @@ export type UserProfileLean = {
         state: string;
         zipCode?: string;
     }[];
+    isPrimaryAddress?: boolean;
+    allowResidenceInspection?: boolean;
+    proofOfOwnership?: {
+        url: string;
+        fileName: string;
+        mimeType?: string;
+        publicId?: string;
+        resourceType?: 'image' | 'raw';
+    } | null;
+    proofOfResidency?: {
+        url: string;
+        fileName: string;
+        mimeType?: string;
+        publicId?: string;
+        resourceType?: 'image' | 'raw';
+    } | null;
     weatherPreferences?: { id: string; enabled: boolean }[];
 };

@@ -1,3 +1,5 @@
+import type { ProfileDocumentRef } from '@/lib/types/mobile/profile-document';
+
 /** Ready2Go mobile API — shared response shapes */
 
 export type ApiUser = {
@@ -10,6 +12,8 @@ export type ApiUser = {
     profilePic?: string;
     emailVerified: boolean;
     profileComplete: boolean;
+    /** ISO timestamp — used for incomplete-profile reminder timing */
+    createdAt?: string;
 };
 
 export type AlertLocationPayload = {
@@ -63,6 +67,10 @@ export type UserProfilePayload = {
     transport: ProfileRequirementSection;
     lodging: ProfileLodgingSection;
     alertLocations?: AlertLocationPayload[];
+    isPrimaryAddress?: boolean;
+    allowResidenceInspection?: boolean;
+    proofOfOwnership?: ProfileDocumentRef | null;
+    proofOfResidency?: ProfileDocumentRef | null;
 };
 
 export const OTP_PURPOSES = ['EMAIL_VERIFICATION', 'PASSWORD_RESET'] as const;

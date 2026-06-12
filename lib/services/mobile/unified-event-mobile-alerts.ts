@@ -1,8 +1,14 @@
+import { pointInUsStateBBox } from '@/lib/constants/us-state-bounding-boxes';
 import { getCurrentEvents, type UnifiedEventDoc } from '@/lib/services/unified-event-repo';
-import { alertRowMatchesAiAlignedStateScope } from '@/lib/utils/alert-location-state-match';
+import { buildUserZones } from '@/lib/services/mobile/zone-utils';
 import { unifiedSourceToLegacy } from '@/lib/unified-event/legacy-source';
-import { Alert, AlertSeverity, AlertSource } from '@/lib/types/api-alerts';
+import {
+    alertRowMatchesAiAlignedStateScope,
+    locationStringsMatchState,
+} from '@/lib/utils/alert-location-state-match';
+import { normalizeStateToUsps } from '@/lib/utils/us-state-usps';
 import type { UserProfilePayload } from '@/lib/types/mobile/auth';
+import { Alert, AlertSeverity, AlertSource } from '@/lib/types/api-alerts';
 import {
     resolveUnifiedEventExpiresIso,
     resolveUnifiedEventIssuedIso,
@@ -21,10 +27,10 @@ const SOURCE_LABELS: Record<string, string> = {
     seed: 'READY2GO',
 };
 
-function collectUserStates(profile: UserProfilePayload | null): string[] {
+function statesFromProfile(profile: UserProfilePayload | null): string[] {
     const states = new Set<string>();
-    const home = profile?.address?.state?.trim();
-    if (home) states.add(home);
+    const addrState = profile?.address?.state?.trim();
+    if (addrState) states.add(addrState);
     for (const loc of profile?.alertLocations ?? []) {
         if (loc.state?.trim()) states.add(loc.state.trim());
     }
@@ -45,19 +51,37 @@ function sourceLabel(source: string): string {
     return SOURCE_LABELS[legacy] ?? legacy.toUpperCase();
 }
 
-function eventMatchesUser(doc: UnifiedEventDoc, states: string[]): boolean {
-    if (states.length === 0) return false;
+function unifiedEventMatchesUser(
+    doc: UnifiedEventDoc,
+    zoneStrings: string[],
+    states: string[],
+): boolean {
+    const legacySource = unifiedSourceToLegacy(doc.source);
     const row = {
-        source: doc.source,
-        location: doc.location,
-        description: doc.description,
-        name: doc.name,
-        instructions: doc.instructions,
+        source: legacySource,
+        location: doc.location ?? '',
+        description: doc.description ?? '',
+        name: doc.name ?? '',
+        instructions: doc.instructions ?? [],
     };
-    return states.some((state) => alertRowMatchesAiAlignedStateScope(row, state));
+
+    for (const state of states) {
+        if (!locationStringsMatchState(zoneStrings, state)) continue;
+        if (alertRowMatchesAiAlignedStateScope(row, state)) return true;
+    }
+
+    if (doc.lat != null && doc.lng != null && Number.isFinite(doc.lat) && Number.isFinite(doc.lng)) {
+        for (const state of states) {
+            const usps = normalizeStateToUsps(state);
+            if (!usps) continue;
+            if (pointInUsStateBBox(doc.lng, doc.lat, usps)) return true;
+        }
+    }
+
+    return false;
 }
 
-type UnifiedMobileAlert = Alert & { unifiedSource: string };
+type UnifiedMobileAlert = Alert & { unifiedSource: string; sourceDisplay?: string };
 
 function unifiedDocToAlert(doc: UnifiedEventDoc): UnifiedMobileAlert {
     const issuedIso = resolveUnifiedEventIssuedIso(doc);
@@ -75,21 +99,26 @@ function unifiedDocToAlert(doc: UnifiedEventDoc): UnifiedMobileAlert {
         affectedAreas: doc.location ? [doc.location] : [],
         areaDesc: doc.location,
         event: doc.name,
+        sourceDisplay: sourceLabel(doc.source),
     };
 }
 
 /**
  * Mobile alerts from UnifiedEvent (same source as admin Alerts & Communication).
- * Matches user home + alert-location states via AI-aligned scope rules.
+ * Matches user zones + states via AI-aligned scope rules and coordinate bbox fallback.
  */
 export async function fetchUnifiedEventsForMobileUser(
     profile: UserProfilePayload | null,
-): Promise<Alert[]> {
-    const states = collectUserStates(profile);
+): Promise<UnifiedMobileAlert[]> {
+    const zones = buildUserZones(profile);
+    const zoneStrings = zones.map((z) => z.locationString);
+    if (zoneStrings.length === 0) return [];
+
+    const states = statesFromProfile(profile);
     if (states.length === 0) return [];
 
     const docs = await getCurrentEvents();
-    const matched = docs.filter((doc) => eventMatchesUser(doc, states));
+    const matched = docs.filter((doc) => unifiedEventMatchesUser(doc, zoneStrings, states));
 
     matched.sort(
         (a, b) =>
