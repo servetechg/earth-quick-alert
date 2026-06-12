@@ -125,6 +125,7 @@ export async function GET(req: Request) {
             center: { lat: number; lng: number };
             radiusMile: number;
             radiusMeters: number;
+            coverageType: 'state' | 'radius';
             state?: string;
             stateCode?: string;
         } | null = null;
@@ -136,6 +137,7 @@ export async function GET(req: Request) {
                     center: jurisdiction.center,
                     radiusMile: jurisdiction.radiusMile,
                     radiusMeters: jurisdiction.radiusMile * 1609.34,
+                    coverageType: jurisdiction.coverageType,
                     state: jurisdiction.stateRaw,
                     stateCode: jurisdiction.stateCode ?? undefined,
                 };

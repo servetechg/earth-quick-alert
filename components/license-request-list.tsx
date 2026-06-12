@@ -25,6 +25,7 @@ interface IUser {
     requestedOrgName?: string;
     city?: string;
     country?: string;
+    requestedLicenseType?: string;
 }
 
 export function LicenseRequestList() {

@@ -1,6 +1,7 @@
 import connectDB from '@/lib/mongodb';
 import User from '@/models/User';
 import UserProfile from '@/models/UserProfile';
+import { pointInUsStateBBox } from '@/lib/constants/us-state-bounding-boxes';
 import {
     geocodeLocation,
     locationMatchesAlertAreas,
@@ -173,6 +174,10 @@ function userLatLngRoughlyInJurisdictionBBox(
 ): boolean {
     if (lat == null || lng == null || !Number.isFinite(lat) || !Number.isFinite(lng)) {
         return false;
+    }
+    if (jurisdiction.coverageType === 'state') {
+        if (!jurisdiction.stateCode) return false;
+        return pointInUsStateBBox(lng, lat, jurisdiction.stateCode);
     }
     const { minLat, maxLat, minLng, maxLng } = jurisdictionLatLngBBox(jurisdiction);
     return lat >= minLat && lat <= maxLat && lng >= minLng && lng <= maxLng;
