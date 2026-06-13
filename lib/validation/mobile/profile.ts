@@ -135,7 +135,7 @@ export const profileCompleteSchema = z.object({
         transport: requirementSectionSchema(TRANSPORT_OPTIONS, 'transport'),
         lodging: lodgingSchema,
         /** Optional — step 2 onboarding; omit or `[]` if user skipped */
-        alertLocations: z.array(alertLocationOnboardingSchema).max(5).optional(),
+        alertLocations: z.array(alertLocationOnboardingSchema).optional(),
         isPrimaryAddress: z.boolean().optional(),
         allowResidenceInspection: z.boolean().optional(),
         proofOfOwnership: profileDocumentRefSchema.nullable().optional(),
