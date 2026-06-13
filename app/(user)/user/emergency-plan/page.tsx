@@ -205,7 +205,7 @@ export default function EmergencyPlanPage() {
 
               <Card
                 onClick={() => setIsContactModalOpen(true)}
-                className="group p-4 flex items-center gap-4 border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50/50 hover:bg-slate-50 hover:border-slate-300 transition-all duration-300 cursor-pointer min-h-[80px]"
+                className="group p-4 flex items-center gap-4 border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50 hover:bg-slate-100 hover:border-slate-300 transition-all duration-300 cursor-pointer min-h-[80px]"
               >
                 <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center shadow-sm border border-slate-100 group-hover:bg-slate-900 transition-colors shrink-0">
                   <Plus className="w-5 h-5 text-slate-400 group-hover:text-white" />

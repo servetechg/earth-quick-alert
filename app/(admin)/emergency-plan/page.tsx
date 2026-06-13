@@ -1132,12 +1132,12 @@ export default function EmergencyPlanPage() {
                         </DialogDescription>
                     </DialogHeader>
 
-                    <div className="py-2 space-y-4">
+                    <div className="py-2 space-y-4 min-w-100">
                         <button
                             type="button"
                             onClick={handlePickFile}
                             disabled={uploading}
-                            className="group w-full flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/60 px-6 py-8 text-slate-500 transition hover:border-[#33375D]/40 hover:bg-slate-50 disabled:opacity-60"
+                            className="group w-full flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 px-6 py-8 text-slate-500 transition hover:border-[#33375D]/40 hover:bg-slate-100 disabled:opacity-60"
                         >
                             <span className="w-11 h-11 rounded-xl bg-white border border-slate-200 inline-flex items-center justify-center text-[#33375D] shadow-sm group-hover:shadow-md transition">
                                 <Upload size={18} />
