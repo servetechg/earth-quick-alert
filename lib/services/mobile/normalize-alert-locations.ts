@@ -1,7 +1,8 @@
 import { randomUUID } from 'crypto';
 import type { AlertLocationPayload } from '@/lib/types/mobile/auth';
 
-const MAX_ALERT_LOCATIONS = 5;
+const UUID_RE =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 /** US ZIP optional for alert-only locations (city/state/label). */
 export function normalizeOptionalZip(zip?: string | null): string {
@@ -16,23 +17,23 @@ export function normalizeUsState(state: string): string {
     return s;
 }
 
+function resolveLocationId(id?: string | null): string {
+    const trimmed = String(id ?? '').trim();
+    if (UUID_RE.test(trimmed)) return trimmed;
+    return randomUUID();
+}
+
 /**
- * On onboarding complete / PUT: replace client ids (`loc-123…`) with server UUIDs.
- * Primary home address is stored separately — do not merge into alertLocations.
+ * On onboarding complete / PUT: assign server UUIDs for new client ids (`loc-123…`).
+ * Preserve existing server UUIDs so edits update the same row.
  */
 export function normalizeAlertLocationsForSave(
     input: AlertLocationPayload[] | undefined | null,
 ): AlertLocationPayload[] {
     if (!input?.length) return [];
 
-    if (input.length > MAX_ALERT_LOCATIONS) {
-        const err = new Error('LOCATION_LIMIT_EXCEEDED');
-        (err as Error & { code: string }).code = 'LOCATION_LIMIT_EXCEEDED';
-        throw err;
-    }
-
     return input.map((loc) => ({
-        id: randomUUID(),
+        id: resolveLocationId(loc.id),
         label: String(loc.label ?? '').trim(),
         city: String(loc.city ?? '').trim(),
         state: normalizeUsState(String(loc.state ?? '')),
