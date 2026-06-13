@@ -24,7 +24,5 @@ export const alertLocationSchema = z.object({
 export const alertLocationOnboardingSchema = alertLocationSchema;
 
 export const putAlertLocationsSchema = z.object({
-    alertLocations: z
-        .array(alertLocationSchema)
-        .max(5, 'Maximum 5 alert locations allowed'),
+    alertLocations: z.array(alertLocationSchema),
 });

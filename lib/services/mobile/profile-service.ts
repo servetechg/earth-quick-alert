@@ -7,8 +7,6 @@ import { toApiUser } from '@/lib/auth/mobile/user-mapper';
 import { saveUserProfile, loadUserProfile, reloadApiUser } from '@/lib/services/mobile/auth-service';
 import { formatProfileAddress } from '@/lib/services/mobile/zone-utils';
 
-const MAX_ALERT_LOCATIONS = 5;
-
 export async function patchMobileUserAccount(
     userId: string,
     patch: { firstName?: string; lastName?: string; email?: string; phone?: string },
@@ -97,12 +95,6 @@ export async function replaceAlertLocations(
     userId: string,
     locations: AlertLocationPayload[],
 ): Promise<AlertLocationPayload[]> {
-    if (locations.length > MAX_ALERT_LOCATIONS) {
-        const err = new Error('LOCATION_LIMIT_EXCEEDED');
-        (err as Error & { code: string }).code = 'LOCATION_LIMIT_EXCEEDED';
-        throw err;
-    }
-
     await connectDB();
     const user = await User.findById(userId).lean();
     if (!user?.profileComplete) {

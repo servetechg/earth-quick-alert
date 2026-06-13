@@ -31,11 +31,6 @@ export async function PUT(req: NextRequest) {
                     code: 'PROFILE_INCOMPLETE',
                 });
             }
-            if (code === 'LOCATION_LIMIT_EXCEEDED') {
-                return apiError('Maximum 5 alert locations allowed', 400, {
-                    code: 'LOCATION_LIMIT_EXCEEDED',
-                });
-            }
             throw e;
         }
     } catch (e) {
