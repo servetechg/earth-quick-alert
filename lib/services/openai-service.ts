@@ -105,9 +105,9 @@ export interface ContinuityAuditInput {
         response: number;
     };
     integrity: {
-        compliant: number;
-        underReview: number;
-        nonCompliant: number;
+        inSync: number;
+        reviewing: number;
+        deviation: number;
         unanalyzed: number;
     };
     plans: Array<{
@@ -1093,11 +1093,12 @@ Rules:
 
     private derivePosture(input: ContinuityAuditInput): ContinuityAuditSummary['posture'] {
         if (!input.totals.plans) return 'At Risk';
-        const { nonCompliant, underReview } = input.integrity;
+        const deviations = input.integrity.deviation;
+        const reviewing = input.integrity.reviewing;
         const analyzed = input.totals.analyzed;
         const avg = input.averageScore;
-        if (nonCompliant > 0 || avg < 55 || analyzed === 0) return 'At Risk';
-        if (underReview > 0 || avg < 75) return 'Steady';
+        if (deviations > 0 || avg < 55 || analyzed === 0) return 'At Risk';
+        if (reviewing > 0 || avg < 75) return 'Steady';
         return 'Resilient';
     }
 

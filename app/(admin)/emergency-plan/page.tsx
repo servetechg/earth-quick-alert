@@ -39,16 +39,7 @@ import {
     CheckCircle,
     Sparkles,
     Download,
-    Info,
 } from 'lucide-react'
-import {
-    Tooltip,
-    TooltipContent,
-    TooltipProvider,
-    TooltipTrigger,
-} from '@/components/ui/tooltip'
-import { INTEGRITY_TOOLTIPS } from '@/lib/constants/integrity-tooltips'
-import { integrityPresentation } from '@/lib/constants/integrity-status'
 import { AdminPageShell } from '@/components/admin-page-shell'
 import { AdminPageHeader } from '@/components/admin-page-header'
 import { AdminPageLoader } from '@/components/admin-page-loader'
@@ -149,25 +140,20 @@ function resolveFileHref(fileUrl: string): string {
     return trimmed
 }
 
-function FieldTooltip({ label, text }: { label: string; text: string }) {
-    return (
-        <TooltipProvider delayDuration={200}>
-            <Tooltip>
-                <TooltipTrigger asChild>
-                    <button
-                        type="button"
-                        className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-slate-400 hover:text-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#33375D]/30"
-                        aria-label={`About ${label}`}
-                    >
-                        <Info className="h-3.5 w-3.5" />
-                    </button>
-                </TooltipTrigger>
-                <TooltipContent side="top" className="max-w-xs text-left leading-snug">
-                    {text}
-                </TooltipContent>
-            </Tooltip>
-        </TooltipProvider>
-    )
+/** Maps OpenAI integrity status + score to the dashboard bar (score = fill width %). */
+function integrityPresentation(status: string | undefined, score: number | undefined) {
+    const s = status || 'Reviewing'
+    const pct = Math.min(100, Math.max(0, typeof score === 'number' && !Number.isNaN(score) ? score : 0))
+    let labelColor = 'text-blue-500'
+    let barColor = 'bg-blue-500'
+    if (s === 'In Sync') {
+        labelColor = 'text-emerald-500'
+        barColor = 'bg-emerald-500'
+    } else if (s === 'Deviation Found') {
+        labelColor = 'text-red-500'
+        barColor = 'bg-red-500'
+    }
+    return { labelColor, barColor, pct }
 }
 
 function normalizeAttachment(att: EmergencyAttachment): EmergencyAttachment {
@@ -221,9 +207,8 @@ export default function EmergencyPlanPage() {
         posture: 'Resilient' | 'Steady' | 'At Risk'
         averageScore: number
         totals: { plans: number; attachments: number; analyzed: number }
-        integrity: { compliant: number; underReview: number; nonCompliant: number; unanalyzed: number }
+        integrity: { inSync: number; reviewing: number; deviation: number; unanalyzed: number }
         generatedAt: string
-        degraded?: boolean
     }
     const [auditSummary, setAuditSummary] = useState<AuditSummary | null>(null)
     const [auditLoading, setAuditLoading] = useState(false)
@@ -284,7 +269,7 @@ export default function EmergencyPlanPage() {
         }
     }
 
-    const generateAuditSummary = async () => {
+    const refreshAuditSummary = async () => {
         setAuditLoading(true)
         try {
             const res = await fetch('/api/admin/continuity-plans/audit-summary', {
@@ -292,16 +277,9 @@ export default function EmergencyPlanPage() {
                 cache: 'no-store',
             })
             const body = await res.json().catch(() => ({}))
-            if (!res.ok || !body.success) {
-                throw new Error(body.error || 'Failed to generate audit summary')
-            }
-            if (body.data) {
-                setAuditSummary(body.data as AuditSummary)
-                toast.success('Continuity audit summary generated')
-            }
+            if (res.ok && body.success && body.data) setAuditSummary(body.data as AuditSummary)
         } catch (err) {
-            console.error('Audit summary generate failed:', err)
-            toast.error(err instanceof Error ? err.message : 'Failed to generate audit summary')
+            console.error('Audit summary refresh failed:', err)
         } finally {
             setAuditLoading(false)
         }
@@ -421,6 +399,7 @@ export default function EmergencyPlanPage() {
                 setSelectedUploadFiles([])
                 setUploadOpen(false)
                 await fetchPlans()
+                refreshAuditSummary()
             }
         } finally {
             setUploading(false)
@@ -474,6 +453,7 @@ export default function EmergencyPlanPage() {
             toast.success('Plan updated')
             setEditOpen(false)
             await fetchPlans()
+            refreshAuditSummary()
         } catch (e: unknown) {
             toast.error(e instanceof Error ? e.message : 'Could not save plan')
         } finally {
@@ -495,14 +475,10 @@ export default function EmergencyPlanPage() {
             })
             const body = await res.json().catch(() => ({}))
             if (!res.ok) throw new Error(body.error || 'Delete failed')
-            if (body.aiCleanupOk === false) {
-                toast.warning('Attachment removed; AI vector cleanup will retry on next analysis.')
-            } else {
-                toast.success('Attachment purged')
-            }
-            setAuditSummary(null)
+            toast.success('Attachment purged')
             setDeleteTarget(null)
             await fetchPlans()
+            refreshAuditSummary()
         } catch (e: unknown) {
             toast.error(e instanceof Error ? e.message : 'Delete failed')
         } finally {
@@ -623,10 +599,7 @@ export default function EmergencyPlanPage() {
                                     Last Updated
                                 </th>
                                 <th className="px-6 py-4 text-center text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                                    <span className="inline-flex items-center justify-center gap-1.5">
-                                        AI Integrity
-                                        <FieldTooltip label="AI Integrity" text={INTEGRITY_TOOLTIPS.score} />
-                                    </span>
+                                    AI Integrity
                                 </th>
                                 <th className="px-6 py-4 text-right text-[10px] font-black text-slate-500 uppercase tracking-widest">
                                     Actions
@@ -693,37 +666,40 @@ export default function EmergencyPlanPage() {
                                                 {auditLabel}
                                             </td>
                                             <td className="px-6 py-5 text-center min-w-[200px]">
-                                                <div className="flex flex-col items-center gap-1 max-w-[240px] mx-auto">
+                                                <div
+                                                    className="flex flex-col items-center gap-1 max-w-[240px] mx-auto"
+                                                    title={
+                                                        doc.aiIntegritySummary ||
+                                                        (!doc.aiIntegrityAnalyzedAt && !doc.aiIntegrityStatus
+                                                            ? 'AI integrity runs when you upload. Re-upload this file to score it.'
+                                                            : 'OpenAI COOP integrity — PDF, DOCX, CSV, XLSX.')
+                                                    }
+                                                >
                                                     {!doc.aiIntegrityAnalyzedAt && !doc.aiIntegrityStatus ? (
-                                                        <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-[0.2em] text-slate-400">
+                                                        <span className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400">
                                                             Not analyzed
-                                                            <FieldTooltip label="Not analyzed" text={INTEGRITY_TOOLTIPS.notAnalyzed} />
                                                         </span>
                                                     ) : (
                                                         <>
                                                             <span
                                                                 className={cn(
-                                                                    'inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-[0.2em]',
-                                                                    integ.labelColor,
+                                                                    'text-[9px] font-black uppercase tracking-[0.2em]',
+                                                                    integ.labelColor
                                                                 )}
                                                             >
-                                                                {integ.label}
-                                                                <FieldTooltip label="Status" text={INTEGRITY_TOOLTIPS.status} />
+                                                                {doc.aiIntegrityStatus || 'Reviewing'}
                                                             </span>
-                                                            <div className="flex w-32 items-center gap-1">
-                                                                <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
-                                                                    <div
-                                                                        className={cn(
-                                                                            'h-full transition-all duration-700',
-                                                                            integ.barColor,
-                                                                        )}
-                                                                        style={{ width: `${integ.pct}%` }}
-                                                                    />
-                                                                </div>
-                                                                <FieldTooltip label="Score" text={INTEGRITY_TOOLTIPS.score} />
+                                                            <div className="w-32 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                                                <div
+                                                                    className={cn(
+                                                                        'h-full transition-all duration-700',
+                                                                        integ.barColor
+                                                                    )}
+                                                                    style={{ width: `${integ.pct}%` }}
+                                                                />
                                                             </div>
                                                             {doc.aiIntegritySummary ? (
-                                                                <p className="mt-1 line-clamp-4 whitespace-pre-line text-[10px] font-medium leading-snug text-slate-500">
+                                                                <p className="text-[10px] font-medium text-slate-500 leading-snug line-clamp-2 mt-1">
                                                                     {doc.aiIntegritySummary}
                                                                 </p>
                                                             ) : null}
@@ -792,54 +768,27 @@ export default function EmergencyPlanPage() {
                 <div className="w-16 h-16 bg-[#33375D] rounded-2xl flex items-center justify-center text-white shadow-lg shadow-[#33375D]/20 shrink-0 relative z-10">
                     <Sparkles size={28} />
                 </div>
-                <div className="relative z-10 flex-1 min-w-0 space-y-3">
+                <div className="relative z-10 space-y-3 flex-1 min-w-0">
                     <div className="flex flex-wrap items-center gap-3">
-                        <h4 className="text-xl font-black uppercase tracking-tight text-slate-900">
-                            AI-Driven Continuity Audit
-                        </h4>
-                        <FieldTooltip label="Continuity audit" text={INTEGRITY_TOOLTIPS.audit.summary} />
+                        <h4 className="text-xl font-black text-slate-900 uppercase tracking-tight">AI-Driven Continuity Audit</h4>
                         {auditSummary ? (
                             <span
                                 className={cn(
-                                    'flex h-6 items-center gap-1 rounded-full border px-2.5 text-[9px] font-black uppercase tracking-[0.2em]',
-                                    auditSummary.posture === 'Resilient' && 'border-emerald-100 bg-emerald-50 text-emerald-600',
-                                    auditSummary.posture === 'Steady' && 'border-blue-100 bg-blue-50 text-blue-600',
-                                    auditSummary.posture === 'At Risk' && 'border-amber-100 bg-amber-50 text-amber-600',
+                                    'h-6 px-2.5 rounded-full border text-[9px] font-black uppercase tracking-[0.2em] flex items-center',
+                                    auditSummary.posture === 'Resilient' && 'bg-emerald-50 border-emerald-100 text-emerald-600',
+                                    auditSummary.posture === 'Steady' && 'bg-blue-50 border-blue-100 text-blue-600',
+                                    auditSummary.posture === 'At Risk' && 'bg-amber-50 border-amber-100 text-amber-600',
                                 )}
                             >
                                 Posture · {auditSummary.posture}
-                                <FieldTooltip label="Posture" text={INTEGRITY_TOOLTIPS.audit.posture} />
                             </span>
                         ) : null}
                         {auditSummary && auditSummary.totals.plans > 0 ? (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-slate-500">
-                                Avg integrity · {auditSummary.averageScore} / 100 · {auditSummary.totals.attachments} file
-                                {auditSummary.totals.attachments === 1 ? '' : 's'} across {auditSummary.totals.plans} plan
-                                {auditSummary.totals.plans === 1 ? '' : 's'}
-                                <FieldTooltip label="Average score" text={INTEGRITY_TOOLTIPS.audit.averageScore} />
+                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                                Avg integrity · {auditSummary.averageScore} / 100 · {auditSummary.totals.attachments} file{auditSummary.totals.attachments === 1 ? '' : 's'} across {auditSummary.totals.plans} plan{auditSummary.totals.plans === 1 ? '' : 's'}
                             </span>
                         ) : null}
-                        <Button
-                            type="button"
-                            size="sm"
-                            disabled={auditLoading || planIdsSorted.length === 0}
-                            onClick={() => void generateAuditSummary()}
-                            className="ml-auto h-9 gap-2 rounded-lg bg-[#33375D] px-4 text-[10px] font-black uppercase tracking-widest text-white hover:bg-[#2B2F50]"
-                        >
-                            {auditLoading ? (
-                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            ) : (
-                                <Sparkles className="h-3.5 w-3.5" />
-                            )}
-                            Generate Audit Summary
-                        </Button>
                     </div>
-
-                    {auditSummary?.degraded ? (
-                        <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
-                            {INTEGRITY_TOOLTIPS.audit.degraded}
-                        </p>
-                    ) : null}
 
                     {auditLoading && !auditSummary ? (
                         <p className="text-sm font-medium text-slate-500 leading-relaxed max-w-5xl flex items-center gap-2">
@@ -847,7 +796,7 @@ export default function EmergencyPlanPage() {
                         </p>
                     ) : auditSummary ? (
                         <>
-                            <p className="whitespace-pre-line text-sm font-medium text-slate-600 leading-relaxed max-w-5xl">
+                            <p className="text-sm font-medium text-slate-600 leading-relaxed max-w-5xl">
                                 {auditSummary.summary}
                             </p>
                             {auditSummary.findings.length ? (
@@ -865,8 +814,8 @@ export default function EmergencyPlanPage() {
                             ) : null}
                         </>
                     ) : (
-                        <p className="max-w-5xl text-sm font-medium leading-relaxed text-slate-500">
-                            Upload continuity plans, then click Generate Audit Summary for an AI-written inventory health report.
+                        <p className="text-sm font-medium text-slate-500 leading-relaxed max-w-5xl">
+                            Add a continuity plan to generate an AI audit of your inventory.
                         </p>
                     )}
 
