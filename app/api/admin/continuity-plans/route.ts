@@ -1,10 +1,13 @@
 import { NextResponse } from 'next/server';
 import connectDB from '@/lib/mongodb';
 import ContinuityPlan from '@/models/ContinuityPlan';
-import ContinuityAuditReport from '@/models/ContinuityAuditReport';
 import { getSession } from '@/lib/auth';
 import { uploadEmergencyPlanBuffer } from '@/lib/emergency-plan-cloudinary';
 import { openaiService } from '@/lib/services/openai-service';
+import {
+    analyzeCoopAttachmentIntegrity,
+    persistCoopAttachmentIntegrity,
+} from '@/lib/services/continuity-integrity-service';
 import { extractTextFromBuffer, FAST_TEXT_CAP } from '@/lib/emergency-plan-ai-integrity';
 
 export const runtime = 'nodejs';
@@ -313,64 +316,79 @@ export async function POST(req: Request) {
         const resolvedOverview = metadata?.overview || `Imported ${ext.toUpperCase()} continuity artifact pending review.`;
 
         const ownerUserId = session.user.id;
-        const attachmentDoc = {
+        let plan = await ContinuityPlan.findOne({ ownerUserId, planId: resolvedPlanId });
+        const planExisted = Boolean(plan);
+        if (!plan) {
+            plan = new ContinuityPlan({
+                ownerUserId,
+                licenseId: session.user.licenseId ?? null,
+                planId: resolvedPlanId,
+                label: resolvedLabel,
+                overview: resolvedOverview,
+                category: resolvedCategory,
+                steps: [],
+                attachments: [],
+            });
+        }
+
+        plan.attachments.push({
             fileName: file.name,
             fileUrl: upload.secure_url,
             size: buffer.length,
             uploadedAt: new Date(),
             cloudinaryPublicId: upload.public_id,
             cloudinaryResourceType: upload.resource_type,
-        };
-
-        // Analysis is intentionally NOT run here — the upload returns immediately and the client
-        // kicks off POST /analyze per attachment (concurrently). See analyze/route.ts.
-        let plan = await ContinuityPlan.findOne({ ownerUserId, planId: resolvedPlanId });
-        let planExisted = Boolean(plan);
-
-        if (!plan) {
-            try {
-                plan = await ContinuityPlan.create({
-                    ownerUserId,
-                    licenseId: session.user.licenseId ?? null,
-                    planId: resolvedPlanId,
-                    label: resolvedLabel,
-                    overview: resolvedOverview,
-                    category: resolvedCategory,
-                    steps: [],
-                    attachments: [attachmentDoc],
-                });
-            } catch (err: unknown) {
-                // A concurrent upload created the same plan first — attach to it instead of failing.
-                const code =
-                    err && typeof err === 'object' && 'code' in err
-                        ? (err as { code?: number }).code
-                        : undefined;
-                if (code !== 11000) throw err;
-                plan = await ContinuityPlan.findOne({ ownerUserId, planId: resolvedPlanId });
-                if (!plan) throw err;
-                planExisted = true;
-                plan.attachments.push(attachmentDoc);
-                await plan.save();
-            }
-        } else {
-            plan.attachments.push(attachmentDoc);
-            await plan.save();
-        }
-
-        const attachmentId = plan.attachments[plan.attachments.length - 1]?._id;
-
-        // Inventory changed — drop the cached audit so it can't show stale totals after new uploads.
-        await ContinuityAuditReport.deleteOne({ ownerUserId }).catch((e) => {
-            console.warn('[continuity-upload] failed to clear cached audit report:', e);
         });
+
+        await plan.save();
+
+        let responsePlan = plan;
+        const lastAtt = plan.attachments[plan.attachments.length - 1];
+        const attachmentId = lastAtt?._id;
+
+        if (attachmentId) {
+            try {
+                const integrityResult = await analyzeCoopAttachmentIntegrity({
+                    ownerUserId: String(ownerUserId),
+                    plan: {
+                        planId: plan.planId,
+                        label: plan.label,
+                        overview: plan.overview || '',
+                        category: plan.category,
+                        steps: Array.isArray(plan.steps) ? plan.steps.map(String) : [],
+                    },
+                    attachment: {
+                        attachmentId: String(attachmentId),
+                        fileName: file.name,
+                        fileExtension: ext,
+                        fileMime: mime,
+                        fileSizeBytes: buffer.length,
+                        fileUrl: upload.secure_url,
+                        cloudinaryPublicId: upload.public_id,
+                        cloudinaryResourceType: upload.resource_type,
+                    },
+                    extractedText: extractedText || undefined,
+                    maxExcerptChars: FAST_TEXT_CAP,
+                });
+
+                await persistCoopAttachmentIntegrity(
+                    String(ownerUserId),
+                    resolvedPlanId,
+                    attachmentId,
+                    integrityResult,
+                );
+            } catch (aiErr) {
+                console.error('ContinuityPlan upload AI integrity:', aiErr);
+            }
+            responsePlan = (await ContinuityPlan.findOne({ ownerUserId, planId: resolvedPlanId })) ?? plan;
+        }
 
         return NextResponse.json({
             success: true,
             message: planExisted ? 'File attached to existing plan' : 'New plan created and file uploaded',
             attachedToExistingPlan: planExisted,
             planId: resolvedPlanId,
-            attachmentId: attachmentId ? String(attachmentId) : null,
-            data: plan,
+            data: responsePlan,
         });
     } catch (error) {
         console.error('ContinuityPlan POST error:', error);

@@ -24,6 +24,7 @@ export type PythonAnalyzeResponse = {
             quality?: number | null;
             duplication?: number | null;
         };
+        similarFiles?: Array<{ attachmentId?: string; similarity?: number }>;
         degraded?: boolean;
         cacheHit?: boolean;
     };
@@ -162,7 +163,6 @@ function mapPythonAnalyzeToResult(data: PythonAnalyzeResponse): CoopIntegrityAna
         summary: String(data.summary || INTEGRITY_FALLBACK.summary).slice(0, 2000),
         analyzedAt,
         degraded: Boolean(data.details?.degraded),
-        cacheHit: Boolean(data.details?.cacheHit),
         componentScores: data.details?.componentScores,
     };
 }
@@ -181,61 +181,50 @@ async function pollIntegrityAnalysisResult(
     const headers = buildBearerHeaders();
 
     while (Date.now() < deadlineMs) {
-        try {
-            const res = await fetch(pollUrl, {
-                method: 'GET',
-                headers,
-                // Per-poll cap: if a single /result request stalls (slow tunnel), abort just that
-                // attempt and retry on the next tick — never give up the whole wait.
-                signal: AbortSignal.timeout(20_000),
-            });
+        const res = await fetch(pollUrl, {
+            method: 'GET',
+            headers,
+            signal: AbortSignal.timeout(30_000),
+        });
 
-            if (res.status === 404) {
-                await sleep(POLL_INTERVAL_MS);
-                continue;
-            }
-
-            if (!res.ok) {
-                const errBody = await res.text().catch(() => '');
-                console.warn(
-                    `[continuity-integrity] poll HTTP ${res.status} for ${pollUrl}: ${errBody.slice(0, 200)}`,
-                );
-                await sleep(POLL_INTERVAL_MS);
-                continue;
-            }
-
-            const data = (await res.json()) as PythonAsyncAnalyzeResponse & PythonAnalyzeResponse;
-
-            if (data.state === 'processing') {
-                await sleep(POLL_INTERVAL_MS);
-                continue;
-            }
-
-            if (data.state === 'error') {
-                return fallbackResult(
-                    typeof data.detail === 'string' && data.detail.trim()
-                        ? data.detail.trim()
-                        : `Analysis job failed (attachmentId=${attachmentId})`,
-                );
-            }
-
-            if (data.state === 'done' && data.result) {
-                return mapPythonAnalyzeToResult(data.result);
-            }
-
-            if (typeof data.score === 'number' && data.summary) {
-                return mapPythonAnalyzeToResult(data);
-            }
-
+        if (res.status === 404) {
             await sleep(POLL_INTERVAL_MS);
-        } catch (pollErr) {
-            // A single slow/aborted/failed poll must NOT end the wait — log and keep polling
-            // every POLL_INTERVAL_MS until the overall deadline. (The job keeps running in Python.)
+            continue;
+        }
+
+        if (!res.ok) {
+            const errBody = await res.text().catch(() => '');
             console.warn(
-                `[continuity-integrity] poll attempt failed (will retry): ${pollErr instanceof Error ? pollErr.message : String(pollErr)}`,
+                `[continuity-integrity] poll HTTP ${res.status} for ${pollUrl}: ${errBody.slice(0, 200)}`,
             );
             await sleep(POLL_INTERVAL_MS);
+            continue;
         }
+
+        const data = (await res.json()) as PythonAsyncAnalyzeResponse & PythonAnalyzeResponse;
+
+        if (data.state === 'processing') {
+            await sleep(POLL_INTERVAL_MS);
+            continue;
+        }
+
+        if (data.state === 'error') {
+            return fallbackResult(
+                typeof data.detail === 'string' && data.detail.trim()
+                    ? data.detail.trim()
+                    : `Analysis job failed (attachmentId=${attachmentId})`,
+            );
+        }
+
+        if (data.state === 'done' && data.result) {
+            return mapPythonAnalyzeToResult(data.result);
+        }
+
+        if (typeof data.score === 'number' && data.summary) {
+            return mapPythonAnalyzeToResult(data);
+        }
+
+        await sleep(POLL_INTERVAL_MS);
     }
 
     return null;
@@ -247,7 +236,6 @@ export type CoopIntegrityAnalysisResult = {
     summary: string;
     analyzedAt: Date;
     degraded?: boolean;
-    cacheHit?: boolean;
     componentScores?: {
         content?: number | null;
         name?: number | null;
@@ -449,99 +437,37 @@ export function derivePostureFromInput(input: ContinuityAuditInput): ContinuityA
     return 'Resilient';
 }
 
-/**
- * Permanently purge documents from the AI service — clears the cache verdict, the per-attachment
- * audit entry, the analyze-job row, and the Weaviate vectors for each id (§4.4 / §9.3).
- * Also used by the re-analyze flow: purge (clears cache) then POST /analyze recomputes.
- */
-export async function deleteIntegrityAttachments(
+/** Clear Python cache so the next /analyze rebuilds vectors (§9.2). */
+export async function rescanIntegrityAttachments(
     ownerUserId: string,
     attachmentIds: string[],
-): Promise<{ deleted: number; notFound: number } | null> {
-    if (!attachmentIds.length) return { deleted: 0, notFound: 0 };
+    force = false,
+): Promise<{ scheduled: number; skipped: number; message: string } | null> {
+    if (!attachmentIds.length) return null;
 
     const baseUrl = getPythonIntegrityBaseUrl();
-    const rawBody = JSON.stringify({
-        tenantKey: buildPythonTenantKey(ownerUserId),
+    const payload = {
         attachmentIds,
-    });
+        tenantKey: buildPythonTenantKey(ownerUserId),
+        force,
+    };
+    const rawBody = JSON.stringify(payload);
 
     try {
         const headers = buildAuthHeaders(rawBody);
-        const res = await fetch(`${baseUrl}/v1/integrity/attachments`, {
-            method: 'DELETE',
+        const res = await fetch(`${baseUrl}/v1/integrity/rescan`, {
+            method: 'POST',
             headers,
             body: rawBody,
-            // Fail fast: delete should never hang the UI on an unreachable AI service.
-            signal: AbortSignal.timeout(15_000),
-        });
-        if (!res.ok) {
-            console.error('python-integrity delete HTTP error:', res.status, await res.text().catch(() => ''));
-            return null;
-        }
-        return (await res.json()) as { deleted: number; notFound: number };
-    } catch (err) {
-        console.error('python-integrity delete failed:', err);
-        return null;
-    }
-}
-
-export type SimilarFile = {
-    attachmentId: string;
-    fileName: string;
-    planId: string;
-    similarity: number;
-    exactDuplicate: boolean;
-};
-
-/**
- * Live duplicate / related files for one attachment across the whole tenant vault (§4.3).
- * GET has an empty body; when HMAC is configured the service signs over the raw body (""),
- * so we sign the empty string. Never throws — returns [] on any error.
- */
-export async function fetchSimilarFilesViaPython(
-    ownerUserId: string,
-    attachmentId: string,
-): Promise<SimilarFile[]> {
-    const baseUrl = getPythonIntegrityBaseUrl();
-    const tenantKey = buildPythonTenantKey(ownerUserId);
-    const url =
-        `${baseUrl}/v1/integrity/similar/${encodeURIComponent(attachmentId)}` +
-        `?tenantKey=${encodeURIComponent(tenantKey)}`;
-
-    try {
-        const headers = buildBearerHeaders();
-        const hmacSecret =
-            process.env.PYTHON_HMAC_SECRET?.trim() || process.env.HMAC_SECRET?.trim();
-        if (hmacSecret) {
-            headers['X-Ready2Go-Signature'] = createHmac('sha256', hmacSecret).update('').digest('hex');
-        }
-
-        const res = await fetch(url, {
-            method: 'GET',
-            headers,
             signal: AbortSignal.timeout(30_000),
         });
         if (!res.ok) {
-            console.warn('python-integrity similar HTTP error:', res.status);
-            return [];
+            console.error('python-integrity rescan HTTP error:', res.status, await res.text().catch(() => ''));
+            return null;
         }
-
-        const data = (await res.json()) as { similar?: Array<Partial<SimilarFile>> };
-        return Array.isArray(data?.similar)
-            ? data.similar.map((s) => ({
-                  attachmentId: String(s.attachmentId ?? ''),
-                  fileName: String(s.fileName ?? ''),
-                  planId: String(s.planId ?? ''),
-                  similarity:
-                      typeof s.similarity === 'number' && Number.isFinite(s.similarity)
-                          ? s.similarity
-                          : 0,
-                  exactDuplicate: Boolean(s.exactDuplicate),
-              }))
-            : [];
+        return (await res.json()) as { scheduled: number; skipped: number; message: string };
     } catch (err) {
-        console.error('python-integrity similar failed:', err);
-        return [];
+        console.error('python-integrity rescan failed:', err);
+        return null;
     }
 }

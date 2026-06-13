@@ -48,11 +48,7 @@ export async function buildContinuityAuditInput(ownerUserId: string): Promise<Co
     let totalAttachments = 0;
     let analyzed = 0;
 
-    // Only plans that actually hold files count toward the audit — empty shells (e.g. left over
-    // before cleanup) must never inflate "N files across M plans".
-    const nonEmptyPlans = plans.filter((p) => (p.attachments || []).length > 0);
-
-    const planSummaries: ContinuityAuditInput['plans'] = nonEmptyPlans.map((p) => {
+    const planSummaries: ContinuityAuditInput['plans'] = plans.map((p) => {
         const cat = resolveCategory(p.category, p.planId);
         const atts = p.attachments || [];
         counts[cat] += atts.length;
@@ -88,7 +84,7 @@ export async function buildContinuityAuditInput(ownerUserId: string): Promise<Co
 
     return {
         totals: {
-            plans: nonEmptyPlans.length,
+            plans: plans.length,
             attachments: totalAttachments,
             analyzed,
         },
