@@ -31,7 +31,7 @@ import {
 import { GoogleMap, type CoverageCircleSpec, type MapPolylineSpec, type MapStateBounds } from '@/components/google-map'
 import type { UnifiedEventHeatPoint } from '@/lib/geo/unified-event-heatmap'
 import { cn } from '@/lib/utils'
-import { getUsStateBbox } from '@/lib/constants/us-state-bounding-boxes'
+import { getUsStateBbox, pointInUsStateBBox } from '@/lib/constants/us-state-bounding-boxes'
 import { normalizeStateToUsps } from '@/lib/utils/us-state-usps'
 import { ShieldCheck, Truck, Siren, Building2, MapPin } from 'lucide-react'
 import { geocodeAddress, calculateDistance } from '@/lib/services/mock-map-service'
@@ -40,9 +40,12 @@ import { Switch } from '@/components/ui/switch'
 
 import { MapLayersDropdown } from '@/components/gis/map-layers-dropdown'
 import {
-  GOOGLE_PLACE_MAP_LAYERS,
+  GIS_FILTER_MAP_LAYERS,
   buildDefaultMapLayerState,
 } from '@/lib/gis/map-layer-config'
+import { gisFilterLayerByResultType, gisFilterLayerById } from '@/lib/gis/gis-filter-layers'
+import { rankPlacesForViewport } from '@/lib/gis/viewport-place-ranking'
+import type { InfrastructurePlaceResult } from '@/lib/gis/infrastructure-places-fetch'
 import { CRITICAL_INFRASTRUCTURE_SECTORS } from '@/lib/gis/critical-infrastructure-sectors'
 import {
   disasterZonesToMapCircles,
@@ -131,8 +134,12 @@ export function GISMap({
     coverageType: 'state' | 'radius'
     stateWide?: boolean
     radiusMile?: number
+    stateCode?: string
   } | null>(null)
-  const [mapPolylines, setMapPolylines] = useState<MapPolylineSpec[]>([])
+  const [mapViewportBounds, setMapViewportBounds] = useState<MapStateBounds | null>(null)
+  const [tornadoPolylines, setTornadoPolylines] = useState<MapPolylineSpec[]>([])
+  const [roadClosurePolylines, setRoadClosurePolylines] = useState<MapPolylineSpec[]>([])
+  const [isLoadingRoadClosures, setIsLoadingRoadClosures] = useState(false)
   const [situationalLoading, setSituationalLoading] = useState(false)
   const [mapLayers, setMapLayers] = useState<Record<string, boolean>>(() =>
     buildDefaultMapLayerState({
@@ -147,7 +154,7 @@ export function GISMap({
   const [isLoadingCriticalInfra, setIsLoadingCriticalInfra] = useState(false)
 
   const infraCacheRef = React.useRef<Map<string, any>>(new Map())
-  const fetchedKeysRef = React.useRef<Set<string>>(new Set())
+  const infraScopeKeyRef = React.useRef<string>('')
   const [cacheTrigger, setCacheTrigger] = useState(0)
   const heatSwitchId = useId()
 
@@ -207,8 +214,18 @@ export function GISMap({
 
   const markerInCoverage = useCallback(
     (position?: { lat: number; lng: number } | null) => {
-      if (!lockToCoverageCircle || !coverageCircle) return true
       if (!position) return false
+
+      const stateCode =
+        coverageMeta?.stateCode ||
+        (focusState ? normalizeStateToUsps(focusState) : null) ||
+        (scopeState ? normalizeStateToUsps(scopeState) : null)
+
+      if (coverageMeta?.coverageType === 'state' && stateCode) {
+        return pointInUsStateBBox(position.lng, position.lat, stateCode)
+      }
+
+      if (!lockToCoverageCircle || !coverageCircle) return true
       return pointInCoverageCircle(
         position.lat,
         position.lng,
@@ -216,7 +233,7 @@ export function GISMap({
         coverageCircle.radiusMeters,
       )
     },
-    [lockToCoverageCircle, coverageCircle],
+    [lockToCoverageCircle, coverageCircle, coverageMeta, focusState, scopeState],
   )
 
   useEffect(() => {
@@ -360,6 +377,12 @@ export function GISMap({
             coverageType: isStateCoverage ? 'state' : 'radius',
             stateWide: isDemoStateWide,
             radiusMile: typeof mile === 'number' ? mile : undefined,
+            stateCode:
+              typeof data.coverage.stateCode === 'string'
+                ? data.coverage.stateCode
+                : focusState
+                  ? normalizeStateToUsps(focusState) ?? undefined
+                  : undefined,
           })
           if (isStateCoverage) {
             setCoverageCircle(null)
@@ -400,7 +423,7 @@ export function GISMap({
         if (tornadoPath?.coordinates && tornadoPath.coordinates.length >= 2) {
           const path = tornadoPath.coordinates.map(([lng, lat]) => ({ lat, lng }))
           setTornadoPathPoints(path)
-          setMapPolylines([
+          setTornadoPolylines([
             {
               path,
               strokeColor: '#DC2626',
@@ -418,7 +441,7 @@ export function GISMap({
           setMapZoom(10)
         } else {
           setTornadoPathPoints([])
-          setMapPolylines([])
+          setTornadoPolylines([])
         }
       } catch (e) {
         console.error('Situational map feed:', e)
@@ -640,124 +663,137 @@ export function GISMap({
     }
   }, [selectedLocation, focusState, subAdmins, impactedUsers, mapStateBounds, lockToCoverageCircle, coverageCircle, coverageMeta])
 
-  // Google Places Infrastructure fetching and client-side caching
+  const enabledGisFilterLayerIds = useMemo(() => {
+    return GIS_FILTER_MAP_LAYERS.filter((layer) => mapLayers[layer.id]).map((layer) => layer.id)
+  }, [mapLayers])
+
+  const infraTypesKey = useMemo(
+    () => enabledGisFilterLayerIds.sort().join(','),
+    [enabledGisFilterLayerIds],
+  )
+
+  const continentalUsBounds = useMemo(
+    (): MapStateBounds => ({ west: -125, south: 24.5, east: -66.5, north: 49.5 }),
+    [],
+  )
+
+  const infraFetchBounds = useMemo((): MapStateBounds | null => {
+    if (mapViewportBounds) return mapViewportBounds
+    if (stateBoundsRestriction) return stateBoundsRestriction
+    if (mapStateBounds) return mapStateBounds
+    if (mapZoom <= 7) return continentalUsBounds
+    return null
+  }, [
+    mapViewportBounds,
+    stateBoundsRestriction,
+    mapStateBounds,
+    mapZoom,
+    continentalUsBounds,
+  ])
+
+  const infraFetchScopeKey = useMemo(() => {
+    if (infraFetchBounds) {
+      const b = infraFetchBounds
+      return `viewport:${b.west.toFixed(2)},${b.south.toFixed(2)},${b.east.toFixed(2)},${b.north.toFixed(2)}|${infraTypesKey}`
+    }
+    return `pending|${infraTypesKey}`
+  }, [infraTypesKey, infraFetchBounds])
+
+  const handleMapBoundsChange = useCallback((bounds: MapStateBounds) => {
+    setMapViewportBounds((prev) => {
+      if (!prev) return bounds
+      const delta =
+        Math.abs(prev.west - bounds.west) +
+        Math.abs(prev.east - bounds.east) +
+        Math.abs(prev.south - bounds.south) +
+        Math.abs(prev.north - bounds.north)
+      if (delta < 0.03) return prev
+      return bounds
+    })
+  }, [])
+
+  const infraTypesKeyRef = React.useRef<string>('')
+
+  // Google Places — grid search with backend cache; merge markers as the map moves
   useEffect(() => {
     let cancelled = false
 
-    // 1. Get unique search centers (unique user positions)
-    const searchCenters: { lat: number; lng: number }[] = []
-    for (const user of impactedUsers) {
-      if (!user.position || !markerInCoverage(user.position)) continue
-
-      const isIdentical = searchCenters.some((center) => {
-        const dist = calculateDistance(
-          user.position.lat,
-          user.position.lng,
-          center.lat,
-          center.lng
-        )
-        return dist < 0.5
-      })
-
-      if (!isIdentical) {
-        searchCenters.push(user.position)
-      }
-    }
-
-    // Fallbacks
-    if (searchCenters.length === 0 && coverageCircle?.center) {
-      searchCenters.push(coverageCircle.center)
-    } else if (searchCenters.length === 0 && mapCenter) {
-      searchCenters.push(mapCenter)
-    }
-
-    const enabledGoogleTypes = GOOGLE_PLACE_MAP_LAYERS.filter(
-      (layer) => mapLayers[layer.id]
-    )
-
-    if (enabledGoogleTypes.length === 0 || searchCenters.length === 0) {
+    if (enabledGisFilterLayerIds.length === 0 || !infraFetchBounds) {
       return
     }
 
-    async function fetchNearbyInfra() {
+    async function fetchScopedInfra() {
+      if (infraTypesKeyRef.current !== infraTypesKey) {
+        infraCacheRef.current.clear()
+        infraTypesKeyRef.current = infraTypesKey
+      }
+      infraScopeKeyRef.current = infraFetchScopeKey
+
       setIsSearchingInfra(true)
       try {
-        let cacheUpdated = false
+        const body: Record<string, unknown> = {
+          layers: enabledGisFilterLayerIds,
+          bounds: infraFetchBounds,
+        }
+        if (scopeState?.trim()) {
+          body.scopeState = scopeState.trim()
+        }
 
-        await Promise.all(
-          searchCenters.map(async (center) => {
-            await Promise.all(
-              enabledGoogleTypes.map(async (layer) => {
-                const cacheKey = `${center.lat.toFixed(4)}_${center.lng.toFixed(4)}_${layer.placeType}`
-                if (fetchedKeysRef.current.has(cacheKey)) {
-                  return // Already fetched for this center & type
-                }
+        const res = await fetch('/api/admin/infrastructure-places', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(body),
+        })
 
-                try {
-                  const res = await fetch(
-                    `/api/places?lat=${center.lat}&lng=${center.lng}&type=${layer.placeType}&radius=2000`
-                  )
-                  if (res.ok) {
-                    const data = await res.json()
-                    const results = data.results || []
+        if (!res.ok || cancelled) return
 
-                    if (cancelled) return
+        const data = await res.json()
+        const results = Array.isArray(data.results) ? data.results : []
 
-                    results.forEach((place: any) => {
-                      if (!infraCacheRef.current.has(place.place_id)) {
-                        const placePos = place.geometry.location
-                        
-                        // Map category and icon mapping
-                        const category =
-                          layer.placeType === 'hospital'
-                            ? '🏥 Hospital'
-                            : layer.placeType === 'pharmacy'
-                              ? '💊 Pharmacy'
-                              : layer.placeType === 'fire_station'
-                                ? '🔥 Emergency Service'
-                                : '👮 Police Station'
-
-                        const icon =
-                          layer.placeType === 'hospital'
-                            ? 'hospital'
-                            : layer.placeType === 'pharmacy'
-                              ? 'pharmacy'
-                              : layer.placeType === 'fire_station'
-                                ? 'fire'
-                                : 'police'
-
-                        infraCacheRef.current.set(place.place_id, {
-                          id: place.place_id,
-                          position: placePos,
-                          title: place.name,
-                          type: 'infrastructure',
-                          placeType: layer.placeType,
-                          category: category,
-                          status: `Verified ${layer.label}`,
-                          description: place.vicinity || 'Real-time infrastructure',
-                          color: layer.color,
-                          icon: icon,
-                          location: selectedLocation !== 'All' ? selectedLocation : 'USA',
-                        })
-                        cacheUpdated = true
-                      }
-                    })
-
-                    fetchedKeysRef.current.add(cacheKey)
-                  }
-                } catch (err) {
-                  console.warn(`Search failed for ${layer.placeType} at ${center.lat},${center.lng}`, err)
-                }
-              })
-            )
-          })
+        const fetchedResultTypes = new Set(
+          enabledGisFilterLayerIds
+            .map((id) => gisFilterLayerById(id)?.resultType)
+            .filter(Boolean) as string[],
         )
+        for (const [cacheId, cached] of infraCacheRef.current.entries()) {
+          if (fetchedResultTypes.has(cached.placeType)) {
+            infraCacheRef.current.delete(cacheId)
+          }
+        }
 
-        if (cacheUpdated && !cancelled) {
+        for (const place of results) {
+          const layerDef =
+            gisFilterLayerByResultType(place.placeType) ??
+            GIS_FILTER_MAP_LAYERS.find((l) => l.resultType === place.placeType)
+          if (!layerDef) continue
+
+          const placePos = { lat: place.lat, lng: place.lng }
+          if (!markerInCoverage(placePos)) continue
+
+          if (!infraCacheRef.current.has(place.place_id)) {
+            infraCacheRef.current.set(place.place_id, {
+              id: place.place_id,
+              position: placePos,
+              title: place.name,
+              type: 'infrastructure',
+              placeType: place.placeType,
+              category: layerDef.label,
+              status: `Verified ${layerDef.label}`,
+              location: place.vicinity || 'Address not available',
+              color: layerDef.color,
+              icon: layerDef.markerIcon ?? 'hospital',
+              rating: place.rating,
+              user_ratings_total: place.user_ratings_total,
+            })
+          }
+        }
+
+        if (!cancelled) {
           setCacheTrigger((prev) => prev + 1)
         }
       } catch (error) {
-        console.warn('Infra search error:', error)
+        console.warn('Scoped infra search error:', error)
       } finally {
         if (!cancelled) {
           setIsSearchingInfra(false)
@@ -765,20 +801,131 @@ export function GISMap({
       }
     }
 
-    void fetchNearbyInfra()
+    const timer = window.setTimeout(() => {
+      void fetchScopedInfra()
+    }, 500)
 
     return () => {
       cancelled = true
+      window.clearTimeout(timer)
     }
   }, [
-    mapLayers.fire_station,
-    mapLayers.police,
-    impactedUsers,
-    coverageCircle,
-    mapCenter,
+    enabledGisFilterLayerIds,
+    infraFetchScopeKey,
+    infraTypesKey,
     markerInCoverage,
-    selectedLocation,
+    infraFetchBounds,
   ])
+
+  useEffect(() => {
+    let cancelled = false
+
+    if (!mapLayers.roads) {
+      setRoadClosurePolylines([])
+      return
+    }
+
+    async function fetchRoadClosures() {
+      setIsLoadingRoadClosures(true)
+      try {
+        const body: Record<string, unknown> = {}
+        if (scopeState?.trim()) {
+          body.scopeState = scopeState.trim()
+        }
+        const bounds =
+          mapViewportBounds ?? stateBoundsRestriction ?? mapStateBounds ?? null
+        if (bounds) {
+          body.bounds = bounds
+        }
+
+        const res = await fetch('/api/admin/road-closures', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(body),
+        })
+
+        if (!res.ok || cancelled) return
+
+        const data = await res.json()
+        const closures = Array.isArray(data.closures) ? data.closures : []
+
+        const polylines: MapPolylineSpec[] = []
+        for (const raw of closures) {
+          const path = Array.isArray(raw.path)
+            ? raw.path.filter(
+                (p: { lat?: number; lng?: number }) =>
+                  Number.isFinite(p.lat) && Number.isFinite(p.lng),
+              )
+            : []
+          if (path.length < 2) continue
+
+          const status = String(raw.status ?? 'Unknown')
+          const strokeColor =
+            status === 'Closed'
+              ? '#DC2626'
+              : status === 'Restricted'
+                ? '#F59E0B'
+                : '#EAB308'
+
+          polylines.push({
+            id: `closure-shadow-${String(raw.id)}`,
+            path,
+            strokeColor: '#7F1D1D',
+            strokeWeight: 11,
+            strokeOpacity: 0.35,
+            kind: 'road_closure',
+          })
+          polylines.push({
+            id: String(raw.id),
+            path,
+            strokeColor,
+            strokeWeight: 7,
+            strokeOpacity: 0.92,
+            kind: 'road_closure',
+            label: String(raw.roadName ?? 'Road closure'),
+            closure: {
+              roadName: String(raw.roadName ?? 'Road closure'),
+              status,
+              reason: raw.reason ? String(raw.reason) : undefined,
+              startLocation: raw.startLocation ? String(raw.startLocation) : undefined,
+              endLocation: raw.endLocation ? String(raw.endLocation) : undefined,
+              updatedAt: raw.updatedAt ? String(raw.updatedAt) : undefined,
+              source: raw.source ? String(raw.source) : undefined,
+            },
+          })
+        }
+
+        if (!cancelled) {
+          setRoadClosurePolylines(polylines)
+        }
+      } catch (error) {
+        console.warn('Road closures fetch error:', error)
+        if (!cancelled) setRoadClosurePolylines([])
+      } finally {
+        if (!cancelled) setIsLoadingRoadClosures(false)
+      }
+    }
+
+    void fetchRoadClosures()
+    const interval = window.setInterval(fetchRoadClosures, 5 * 60 * 1000)
+
+    return () => {
+      cancelled = true
+      window.clearInterval(interval)
+    }
+  }, [
+    mapLayers.roads,
+    scopeState,
+    mapViewportBounds,
+    stateBoundsRestriction,
+    mapStateBounds,
+  ])
+
+  const combinedPolylines = useMemo(
+    () => [...tornadoPolylines, ...roadClosurePolylines],
+    [tornadoPolylines, roadClosurePolylines],
+  )
 
   const enabledCriticalSectors = useMemo(() => {
     if (!showCriticalInfraLayers) return [] as string[]
@@ -905,10 +1052,10 @@ export function GISMap({
         }))
     }
 
-    const enabledInfraMarkers = GOOGLE_PLACE_MAP_LAYERS.flatMap((layer) => {
+    const enabledInfraMarkers = GIS_FILTER_MAP_LAYERS.flatMap((layer) => {
       if (mapLayers[layer.id]) {
         return Array.from(infraCacheRef.current.values())
-          .filter((m: any) => m.placeType === layer.placeType)
+          .filter((m: any) => m.placeType === layer.resultType)
       }
       return []
     })
@@ -972,6 +1119,11 @@ export function GISMap({
       }))
   }, [incidentsVisible, unifiedIncidents, lockToCoverageCircle, coverageCircle])
 
+  const viewportRankBounds = useMemo(
+    (): MapStateBounds | null => mapViewportBounds ?? infraFetchBounds,
+    [mapViewportBounds, infraFetchBounds],
+  )
+
   const mapMarkers = useMemo(() => {
     const activeTabMarkers = markers
     const enabledLayerMarkers: any[] = []
@@ -981,14 +1133,35 @@ export function GISMap({
       enabledLayerMarkers.push(...situationalMarkers)
     }
 
-    // 2. Google Places sub-layers
-    GOOGLE_PLACE_MAP_LAYERS.forEach((layer) => {
-      if (mapLayers[layer.id]) {
-        const markersForLayer = Array.from(infraCacheRef.current.values())
-          .filter((m: any) => m.placeType === layer.placeType)
-          .filter((m: any) => markerInCoverage(m.position))
+    // 2. Google Places sub-layers — viewport-ranked like Google Maps
+    GIS_FILTER_MAP_LAYERS.forEach((layer) => {
+      if (!mapLayers[layer.id]) return
+
+      const markersForLayer = Array.from(infraCacheRef.current.values())
+        .filter((m: any) => m.placeType === layer.resultType)
+        .filter((m: any) => markerInCoverage(m.position))
+
+      if (markersForLayer.length === 0) return
+
+      if (!viewportRankBounds) {
         enabledLayerMarkers.push(...markersForLayer)
+        return
       }
+
+      const asPlaces: InfrastructurePlaceResult[] = markersForLayer.map((m: any) => ({
+        place_id: m.id,
+        name: m.title,
+        placeType: m.placeType,
+        lat: m.position.lat,
+        lng: m.position.lng,
+        vicinity: m.location,
+        rating: m.rating,
+        user_ratings_total: m.user_ratings_total,
+      }))
+      const rankedIds = new Set(
+        rankPlacesForViewport(asPlaces, viewportRankBounds).map((p) => p.place_id),
+      )
+      enabledLayerMarkers.push(...markersForLayer.filter((m: any) => rankedIds.has(m.id)))
     })
 
     // 3. CISA critical infrastructure (Dashboard A + B)
@@ -1026,6 +1199,7 @@ export function GISMap({
     criticalInfraMarkers,
     unifiedIncidents,
     incidentsVisible,
+    viewportRankBounds,
   ])
 
   const disasterZonesVisible = useMemo(() => {
@@ -1132,14 +1306,16 @@ export function GISMap({
           stateBounds={mapStateBounds}
           coverageCircle={showLayersPanel ? coverageCircle : null}
           lockToCoverage={lockToCoverageCircle}
-          polylines={mapPolylines}
+          polylines={combinedPolylines}
           disasterZoneCircles={disasterZoneCircles}
           heatIncidents={usesUnifiedHeat ? unifiedIncidents : undefined}
           heatClickOnly={usesUnifiedHeat}
           onHeatIncidentSelect={isDemoSimulation ? handleHeatIncidentSelect : undefined}
+          onBoundsChanged={showLayersPanel ? handleMapBoundsChange : undefined}
+          clusterInfrastructure={showLayersPanel}
         />
 
-        {(isSearchingInfra || isLoadingCriticalInfra) && (
+        {(isSearchingInfra || isLoadingCriticalInfra || isLoadingRoadClosures) && (
           <div className="absolute right-4 top-4 bg-white/90 backdrop-blur-md px-4 py-2 rounded-2xl shadow-2xl border border-slate-100 flex items-center gap-2 z-50 animate-in fade-in slide-in-from-top-2 duration-300">
             <Loader2 className="w-4 h-4 text-[#33375D] animate-spin" />
             <span className="text-[10px] font-black uppercase tracking-widest text-slate-600">Locating Facilities...</span>
