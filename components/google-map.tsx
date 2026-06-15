@@ -4,14 +4,15 @@ import React, { useMemo, useCallback, useState, useRef } from 'react'
 import { GoogleMap as GoogleMapComponent, useJsApiLoader, Marker, InfoWindow, Circle, Polyline } from '@react-google-maps/api'
 import { GoogleMapsOverlay } from '@deck.gl/google-maps'
 import { HeatmapLayer } from '@deck.gl/aggregation-layers'
-import { GOOGLE_MAPS_API_KEY, GOOGLE_MAPS_LIBRARIES, GOOGLE_MAPS_LOADER_ID } from '@/lib/constants/google-maps-config'
+import { GOOGLE_MAPS_API_KEY, GOOGLE_MAPS_LIBRARIES, GOOGLE_MAPS_LOADER_ID, isGoogleMapsConfigured } from '@/lib/constants/google-maps-config'
 import {
     coverageCircleLatLngBounds,
-    coverageCirclePath,
     type LatLngPoint,
 } from '@/lib/geo/license-coverage-radius'
 import type { UnifiedEventHeatPoint } from '@/lib/geo/unified-event-heatmap'
 import { IncidentDetailDialog } from '@/components/incident/incident-detail-dialog'
+import { GoogleMapsUnavailable } from '@/components/google-maps-unavailable'
+import { GoogleMapErrorBoundary } from '@/components/google-map-error-boundary'
 
 function formatMarkerStatus(status?: string, isSafe?: boolean): string {
     if (status === 'help' || status === 'needs_assistance') return 'Help'
@@ -207,7 +208,19 @@ function viewportExceedsStateBounds(map: google.maps.Map, bounds: MapStateBounds
     )
 }
 
-export function GoogleMap({
+export function GoogleMap(props: GoogleMapProps) {
+    return (
+        <GoogleMapErrorBoundary>
+            {!isGoogleMapsConfigured() ? (
+                <GoogleMapsUnavailable reason="missing-key" />
+            ) : (
+                <GoogleMapInner {...props} />
+            )}
+        </GoogleMapErrorBoundary>
+    )
+}
+
+function GoogleMapInner({
     address,
     markers = [],
     center,
@@ -223,11 +236,25 @@ export function GoogleMap({
     heatClickOnly = false,
     onHeatIncidentSelect,
 }: GoogleMapProps) {
-    const { isLoaded } = useJsApiLoader({
+    const { isLoaded, loadError } = useJsApiLoader({
         id: GOOGLE_MAPS_LOADER_ID,
         googleMapsApiKey: GOOGLE_MAPS_API_KEY,
         libraries: GOOGLE_MAPS_LIBRARIES
     })
+
+    const [authFailed, setAuthFailed] = useState(false)
+    const [heatmapFailed, setHeatmapFailed] = useState(false)
+
+    React.useEffect(() => {
+        type GmWindow = Window & { gm_authFailure?: () => void }
+        const win = window as GmWindow
+        const previous = win.gm_authFailure
+        win.gm_authFailure = () => setAuthFailed(true)
+        return () => {
+            if (previous) win.gm_authFailure = previous
+            else delete win.gm_authFailure
+        }
+    }, [])
 
     const mapCenter = useMemo(() => {
         if (center) return center
@@ -277,6 +304,29 @@ export function GoogleMap({
             ),
         [heatPoints],
     )
+
+    const validPolylines = useMemo(() => {
+        return polylines.flatMap((line, idx) => {
+            const path = line.path.filter(
+                (p) =>
+                    Number.isFinite(p.lat) &&
+                    Number.isFinite(p.lng) &&
+                    !Number.isNaN(p.lat) &&
+                    !Number.isNaN(p.lng),
+            )
+            if (path.length < 2) return []
+            const first = path[0]
+            const last = path[path.length - 1]
+            const key = `polyline-${line.label ?? idx}-${path.length}-${first.lat.toFixed(5)}-${first.lng.toFixed(5)}-${last.lat.toFixed(5)}-${last.lng.toFixed(5)}`
+            return [{ ...line, path, key }]
+        })
+    }, [polylines])
+
+    const showCoverageCircle =
+        coverageCircle != null &&
+        Number.isFinite(coverageCircle.center.lat) &&
+        Number.isFinite(coverageCircle.center.lng) &&
+        coverageCircle.radiusMeters > 0
 
     // Smooth pan when center changes (skip when locked to state or coverage — fitBounds owns the view)
     React.useEffect(() => {
@@ -538,45 +588,62 @@ export function GoogleMap({
     )
 
     React.useEffect(() => {
-        if (!map) return
+        if (!map || heatmapFailed) return
 
-        if (!deckOverlayRef.current) {
-            deckOverlayRef.current = new GoogleMapsOverlay({ interleaved: true })
-        }
-        const overlay = deckOverlayRef.current
+        try {
+            if (!deckOverlayRef.current) {
+                deckOverlayRef.current = new GoogleMapsOverlay({ interleaved: false })
+            }
+            const overlay = deckOverlayRef.current
 
-        if (!showHeatmap || validHeatPoints.length === 0) {
-            overlay.setProps({ layers: [] })
+            if (!showHeatmap || validHeatPoints.length === 0) {
+                overlay.setProps({ layers: [] })
+                overlay.setMap(map)
+                return
+            }
+
+            const data: DeckHeatPoint[] = validHeatPoints.map((p) => ({
+                position: [p.lng, p.lat],
+                weight: Math.max(0.1, Math.min(1.2, p.weight ?? 0.6)),
+            }))
+
+            overlay.setProps({
+                layers: [
+                    new HeatmapLayer<DeckHeatPoint>({
+                        id: 'incident-heatmap',
+                        data,
+                        pickable: false,
+                        getPosition: (d) => d.position,
+                        getWeight: (d) => d.weight,
+                        radiusPixels: 36,
+                        intensity: 1.2,
+                        threshold: 0.04,
+                        colorRange: HEATMAP_COLOR_RANGE,
+                    }),
+                ],
+            })
             overlay.setMap(map)
-            return
+        } catch (error) {
+            console.error('Incident heatmap unavailable:', error)
+            setHeatmapFailed(true)
         }
-
-        const data: DeckHeatPoint[] = validHeatPoints.map((p) => ({
-            position: [p.lng, p.lat],
-            weight: Math.max(0.1, Math.min(1.2, p.weight ?? 0.6)),
-        }))
-
-        overlay.setProps({
-            layers: [
-                new HeatmapLayer<DeckHeatPoint>({
-                    id: 'incident-heatmap',
-                    data,
-                    pickable: false,
-                    getPosition: (d) => d.position,
-                    getWeight: (d) => d.weight,
-                    radiusPixels: 36,
-                    intensity: 1.2,
-                    threshold: 0.04,
-                    colorRange: HEATMAP_COLOR_RANGE,
-                }),
-            ],
-        })
-        overlay.setMap(map)
 
         return () => {
-            overlay.setProps({ layers: [] })
+            try {
+                deckOverlayRef.current?.setProps({ layers: [] })
+            } catch {
+                /* ignore teardown errors */
+            }
         }
-    }, [map, showHeatmap, validHeatPoints])
+    }, [map, showHeatmap, validHeatPoints, heatmapFailed])
+
+    if (loadError || authFailed) {
+        return (
+            <GoogleMapsUnavailable
+                reason={authFailed ? 'invalid-key' : 'load-failed'}
+            />
+        )
+    }
 
     if (!isLoaded) return <div className="w-full h-full min-h-[400px] bg-slate-100 animate-pulse flex items-center justify-center rounded-xl border border-slate-200">
         <p className="text-slate-400 text-xs font-black uppercase tracking-widest">Initalizing Satellite Feed...</p>
@@ -609,25 +676,21 @@ export function GoogleMap({
                     fullscreenControl: true
                 }}
             >
-                {coverageCircle &&
-                    Number.isFinite(coverageCircle.center.lat) &&
-                    Number.isFinite(coverageCircle.center.lng) &&
-                    coverageCircle.radiusMeters > 0 && (
-                        <Polyline
-                            path={coverageCirclePath(
-                                coverageCircle.center,
-                                coverageCircle.radiusMeters,
-                            )}
-                            options={{
-                                strokeColor: '#33375D',
-                                strokeOpacity: 0.95,
-                                strokeWeight: 2,
-                                geodesic: true,
-                                clickable: false,
-                                zIndex: 2,
-                            }}
-                        />
-                    )}
+                {map && showCoverageCircle && (
+                    <Circle
+                        center={coverageCircle.center}
+                        radius={coverageCircle.radiusMeters}
+                        options={{
+                            fillColor: 'transparent',
+                            fillOpacity: 0,
+                            strokeColor: '#33375D',
+                            strokeOpacity: 0.95,
+                            strokeWeight: 2,
+                            clickable: false,
+                            zIndex: 2,
+                        }}
+                    />
+                )}
 
                 {disasterZoneCircles.map((zone) => (
                     <React.Fragment key={`dz-${zone.id}`}>
@@ -662,19 +725,11 @@ export function GoogleMap({
                     </React.Fragment>
                 ))}
 
-                {polylines.map((line, idx) => {
-                    const path = line.path.filter(
-                        (p) =>
-                            Number.isFinite(p.lat) &&
-                            Number.isFinite(p.lng) &&
-                            !Number.isNaN(p.lat) &&
-                            !Number.isNaN(p.lng),
-                    )
-                    if (path.length < 2) return null
-                    return (
+                {map &&
+                    validPolylines.map((line) => (
                         <Polyline
-                            key={`polyline-${idx}-${line.label ?? 'path'}`}
-                            path={path}
+                            key={line.key}
+                            path={line.path}
                             options={{
                                 strokeColor: line.strokeColor ?? '#DC2626',
                                 strokeOpacity: line.strokeOpacity ?? 0.9,
@@ -683,8 +738,7 @@ export function GoogleMap({
                                 zIndex: 2,
                             }}
                         />
-                    )
-                })}
+                    ))}
 
                 {validMarkers.map((marker) => (
                     <React.Fragment key={marker.id}>
