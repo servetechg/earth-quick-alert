@@ -7,6 +7,7 @@ import { HeatmapLayer } from '@deck.gl/aggregation-layers'
 import { GOOGLE_MAPS_API_KEY, GOOGLE_MAPS_LIBRARIES, GOOGLE_MAPS_LOADER_ID } from '@/lib/constants/google-maps-config'
 import {
     coverageCircleLatLngBounds,
+    coverageCirclePath,
     type LatLngPoint,
 } from '@/lib/geo/license-coverage-radius'
 import type { UnifiedEventHeatPoint } from '@/lib/geo/unified-event-heatmap'
@@ -276,29 +277,6 @@ export function GoogleMap({
             ),
         [heatPoints],
     )
-
-    const validPolylines = useMemo(() => {
-        return polylines.flatMap((line, idx) => {
-            const path = line.path.filter(
-                (p) =>
-                    Number.isFinite(p.lat) &&
-                    Number.isFinite(p.lng) &&
-                    !Number.isNaN(p.lat) &&
-                    !Number.isNaN(p.lng),
-            )
-            if (path.length < 2) return []
-            const first = path[0]
-            const last = path[path.length - 1]
-            const key = `polyline-${line.label ?? idx}-${path.length}-${first.lat.toFixed(5)}-${first.lng.toFixed(5)}-${last.lat.toFixed(5)}-${last.lng.toFixed(5)}`
-            return [{ ...line, path, key }]
-        })
-    }, [polylines])
-
-    const showCoverageCircle =
-        coverageCircle != null &&
-        Number.isFinite(coverageCircle.center.lat) &&
-        Number.isFinite(coverageCircle.center.lng) &&
-        coverageCircle.radiusMeters > 0
 
     // Smooth pan when center changes (skip when locked to state or coverage — fitBounds owns the view)
     React.useEffect(() => {
@@ -631,21 +609,25 @@ export function GoogleMap({
                     fullscreenControl: true
                 }}
             >
-                {map && showCoverageCircle && (
-                    <Circle
-                        center={coverageCircle.center}
-                        radius={coverageCircle.radiusMeters}
-                        options={{
-                            fillColor: 'transparent',
-                            fillOpacity: 0,
-                            strokeColor: '#33375D',
-                            strokeOpacity: 0.95,
-                            strokeWeight: 2,
-                            clickable: false,
-                            zIndex: 2,
-                        }}
-                    />
-                )}
+                {coverageCircle &&
+                    Number.isFinite(coverageCircle.center.lat) &&
+                    Number.isFinite(coverageCircle.center.lng) &&
+                    coverageCircle.radiusMeters > 0 && (
+                        <Polyline
+                            path={coverageCirclePath(
+                                coverageCircle.center,
+                                coverageCircle.radiusMeters,
+                            )}
+                            options={{
+                                strokeColor: '#33375D',
+                                strokeOpacity: 0.95,
+                                strokeWeight: 2,
+                                geodesic: true,
+                                clickable: false,
+                                zIndex: 2,
+                            }}
+                        />
+                    )}
 
                 {disasterZoneCircles.map((zone) => (
                     <React.Fragment key={`dz-${zone.id}`}>
@@ -680,11 +662,19 @@ export function GoogleMap({
                     </React.Fragment>
                 ))}
 
-                {map &&
-                    validPolylines.map((line) => (
+                {polylines.map((line, idx) => {
+                    const path = line.path.filter(
+                        (p) =>
+                            Number.isFinite(p.lat) &&
+                            Number.isFinite(p.lng) &&
+                            !Number.isNaN(p.lat) &&
+                            !Number.isNaN(p.lng),
+                    )
+                    if (path.length < 2) return null
+                    return (
                         <Polyline
-                            key={line.key}
-                            path={line.path}
+                            key={`polyline-${idx}-${line.label ?? 'path'}`}
+                            path={path}
                             options={{
                                 strokeColor: line.strokeColor ?? '#DC2626',
                                 strokeOpacity: line.strokeOpacity ?? 0.9,
@@ -693,7 +683,8 @@ export function GoogleMap({
                                 zIndex: 2,
                             }}
                         />
-                    ))}
+                    )
+                })}
 
                 {validMarkers.map((marker) => (
                     <React.Fragment key={marker.id}>
