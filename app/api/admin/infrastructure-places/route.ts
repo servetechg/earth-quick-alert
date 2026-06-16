@@ -12,6 +12,11 @@ import {
     resolveSubAdminJurisdiction,
     type SubAdminJurisdiction,
 } from '@/lib/sub-admin/jurisdiction';
+import {
+    clampBoundsToUsa,
+    filterLatLngInUsa,
+    isSuperAdminNationwideView,
+} from '@/lib/constants/usa-map-bounds';
 import { normalizeStateToUsps } from '@/lib/utils/us-state-usps';
 import { maybeDemoJurisdictionOverride } from '@/lib/demo/provider';
 import { resolveEnabledFilterLayers } from '@/lib/gis/gis-filter-layers';
@@ -42,20 +47,28 @@ function parseBounds(raw: unknown): MapBounds | null {
 function resolveSuperAdminScope(
     scopeState: string | undefined,
     bounds: MapBounds | null,
+    nationwideUsaOnly: boolean,
 ): InfrastructureSearchScope | null {
     if (!bounds) return null;
+
+    let effectiveBounds = bounds;
+    if (nationwideUsaOnly) {
+        const clipped = clampBoundsToUsa(bounds);
+        if (!clipped) return null;
+        effectiveBounds = clipped;
+    }
 
     if (scopeState) {
         const stateCode = normalizeStateToUsps(scopeState);
         if (stateCode) {
             const stateBounds = boundsFromStateCode(stateCode);
             if (stateBounds) {
-                const clipped = intersectBounds(bounds, stateBounds);
+                const clipped = intersectBounds(effectiveBounds, stateBounds);
                 if (clipped) return { mode: 'bounds', bounds: clipped };
             }
         }
     }
-    return { mode: 'bounds', bounds };
+    return { mode: 'bounds', bounds: effectiveBounds };
 }
 
 function resolveSubAdminScope(
@@ -127,21 +140,31 @@ export async function POST(req: Request) {
             } | null;
             licenseId = user?.licenseId ? String(user.licenseId) : null;
         } else {
-            scope = resolveSuperAdminScope(body.scopeState?.trim() || undefined, viewportBounds);
+            scope = resolveSuperAdminScope(
+                body.scopeState?.trim() || undefined,
+                viewportBounds,
+                isSuperAdminNationwideView(role, body.scopeState),
+            );
         }
 
         if (!scope) {
+            if (isSuperAdminNationwideView(role)) {
+                return NextResponse.json({ results: [], count: 0, source: 'google_places_and_deployments' });
+            }
             return NextResponse.json(
                 { error: 'Could not resolve search scope for license' },
                 { status: 400 },
             );
         }
 
-        const results: InfrastructurePlaceResult[] = await fetchAllFilterLayerPlaces(
+        const rawResults: InfrastructurePlaceResult[] = await fetchAllFilterLayerPlaces(
             scope,
             layers,
             { viewportBounds, licenseId, jurisdiction },
         );
+        const results = isSuperAdminNationwideView(role, body.scopeState)
+            ? filterLatLngInUsa(rawResults)
+            : rawResults;
 
         return NextResponse.json({
             results,

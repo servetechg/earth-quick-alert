@@ -33,6 +33,8 @@ import type { UnifiedEventHeatPoint } from '@/lib/geo/unified-event-heatmap'
 import { cn } from '@/lib/utils'
 import { getUsStateBbox, pointInUsStateBBox } from '@/lib/constants/us-state-bounding-boxes'
 import { normalizeStateToUsps } from '@/lib/utils/us-state-usps'
+import { intersectBounds } from '@/lib/gis/infrastructure-search-grid'
+import { CONUS_MAP_BOUNDS, clampBoundsToUsa, viewportCenterInUsa, pointInUsaBounds } from '@/lib/constants/usa-map-bounds'
 import { ShieldCheck, Truck, Siren, Building2, MapPin } from 'lucide-react'
 import { geocodeAddress, calculateDistance } from '@/lib/services/mock-map-service'
 import { mapZoomForRadiusMiles, pointInCoverageCircle } from '@/lib/geo/license-coverage-radius'
@@ -46,7 +48,7 @@ import {
 import { gisFilterLayerByResultType, gisFilterLayerById } from '@/lib/gis/gis-filter-layers'
 import { rankPlacesForViewport } from '@/lib/gis/viewport-place-ranking'
 import type { InfrastructurePlaceResult } from '@/lib/gis/infrastructure-places-fetch'
-import { CRITICAL_INFRASTRUCTURE_SECTORS } from '@/lib/gis/critical-infrastructure-sectors'
+import { CRITICAL_INFRASTRUCTURE_SECTORS, criticalSectorById } from '@/lib/gis/critical-infrastructure-sectors'
 import {
   disasterZonesToMapCircles,
   zoneLabelPosition,
@@ -139,6 +141,8 @@ export function GISMap({
   const [mapViewportBounds, setMapViewportBounds] = useState<MapStateBounds | null>(null)
   const [tornadoPolylines, setTornadoPolylines] = useState<MapPolylineSpec[]>([])
   const [roadClosurePolylines, setRoadClosurePolylines] = useState<MapPolylineSpec[]>([])
+  const [operationalAlertPolylines, setOperationalAlertPolylines] = useState<MapPolylineSpec[]>([])
+  const [operationalIncidentMarkers, setOperationalIncidentMarkers] = useState<any[]>([])
   const [isLoadingRoadClosures, setIsLoadingRoadClosures] = useState(false)
   const [situationalLoading, setSituationalLoading] = useState(false)
   const [mapLayers, setMapLayers] = useState<Record<string, boolean>>(() =>
@@ -168,6 +172,30 @@ export function GISMap({
     const [west, south, east, north] = bbox
     return { west, south, east, north }
   }, [focusState])
+
+  /** Super-admin nationwide (no state drill-down): USA-only data and map pan limit. */
+  const restrictToUsa = unifiedMapFeed && !stateScoped && !stateBoundsRestriction
+
+  const clampFetchBounds = useCallback(
+    (bounds: MapStateBounds | null): MapStateBounds | null => {
+      if (!bounds) return null
+      if (!restrictToUsa) return bounds
+      return clampBoundsToUsa(bounds)
+    },
+    [restrictToUsa],
+  )
+
+  /** GIS filter data only when the map center is inside the US. */
+  const viewportInUsa = useMemo(() => {
+    if (!restrictToUsa) return true
+    if (!mapViewportBounds) return true
+    return viewportCenterInUsa(mapViewportBounds)
+  }, [restrictToUsa, mapViewportBounds])
+
+  const inUsaView = useCallback(
+    (lat: number, lng: number) => !restrictToUsa || pointInUsaBounds(lat, lng),
+    [restrictToUsa],
+  )
 
   const lockToCoverageCircle = useMemo(() => {
     if (!showLayersPanel || !coverageCircle) return false
@@ -272,7 +300,17 @@ export function GISMap({
         const data = await res.json()
         if (cancelled) return
         setScenarioDemo(data.demo === true)
-        setUnifiedIncidents(Array.isArray(data.incidents) ? data.incidents : [])
+        const incidents = Array.isArray(data.incidents) ? data.incidents : []
+        setUnifiedIncidents(
+          restrictToUsa
+            ? incidents.filter(
+                (inc: { lat?: number; lng?: number }) =>
+                  Number.isFinite(inc.lat) &&
+                  Number.isFinite(inc.lng) &&
+                  pointInUsaBounds(inc.lat as number, inc.lng as number),
+              )
+            : incidents,
+        )
         setIncidentHeatCount(
           typeof data.alignedEventCount === 'number'
             ? data.alignedEventCount
@@ -283,74 +321,79 @@ export function GISMap({
                 : 0
         )
 
-        const mapCitizens = (rows: typeof data.citizens) =>
-          (rows ?? []).map(
-            (c: {
-              id: string
-              lat: number
-              lng: number
-              title: string
-              isSafe?: boolean
-              status?: string
-              location?: string
-              description?: string
-            }) => ({
-              id: c.id,
-              position: { lat: c.lat, lng: c.lng },
-              title: c.title,
-              type: 'user',
-              isSafe: c.isSafe,
-              status: c.status,
-              location: c.location,
-              description: c.description,
-            })
-          )
+        const usaOnly = <T extends { lat: number; lng: number }>(rows: T[] | undefined): T[] =>
+          restrictToUsa
+            ? (rows ?? []).filter((row) => pointInUsaBounds(row.lat, row.lng))
+            : (rows ?? [])
 
-        const mapResponders = (rows: typeof data.responders) =>
-          (rows ?? []).map(
-            (r: {
-              id: string
-              lat: number
-              lng: number
-              title: string
-              status?: string
-              location?: string
-              description?: string
-              color?: string
-              icon?: string
-            }) => ({
-              id: r.id,
-              position: { lat: r.lat, lng: r.lng },
-              title: r.title,
-              type: 'responder',
-              status: r.status,
-              location: r.location,
-              description: r.description,
-              color: r.color,
-              icon: r.icon,
-            })
-          )
+        const mapCitizens = (
+          rows: Array<{
+            id: string
+            lat: number
+            lng: number
+            title: string
+            isSafe?: boolean
+            status?: string
+            location?: string
+            description?: string
+          }> | undefined,
+        ) =>
+          usaOnly(rows).map((c) => ({
+            id: c.id,
+            position: { lat: c.lat, lng: c.lng },
+            title: c.title,
+            type: 'user',
+            isSafe: c.isSafe,
+            status: c.status,
+            location: c.location,
+            description: c.description,
+          }))
 
-        const mapLeaders = (rows: typeof data.leaders) =>
-          (rows ?? []).map(
-            (l: {
-              id: string
-              lat: number
-              lng: number
-              title: string
-              status?: string
-              location?: string
-              description?: string
-            }) => ({
-              id: l.id,
-              position: { lat: l.lat, lng: l.lng },
-              title: l.title,
-              type: 'admin',
-              status: l.status,
-              location: l.location,
-              description: l.description,
-            })
-          )
+        const mapResponders = (
+          rows: Array<{
+            id: string
+            lat: number
+            lng: number
+            title: string
+            status?: string
+            location?: string
+            description?: string
+            color?: string
+            icon?: string
+          }> | undefined,
+        ) =>
+          usaOnly(rows).map((r) => ({
+            id: r.id,
+            position: { lat: r.lat, lng: r.lng },
+            title: r.title,
+            type: 'responder',
+            status: r.status,
+            location: r.location,
+            description: r.description,
+            color: r.color,
+            icon: r.icon,
+          }))
+
+        const mapLeaders = (
+          rows: Array<{
+            id: string
+            lat: number
+            lng: number
+            title: string
+            status?: string
+            location?: string
+            description?: string
+          }> | undefined,
+        ) =>
+          usaOnly(rows).map((l) => ({
+            id: l.id,
+            position: { lat: l.lat, lng: l.lng },
+            title: l.title,
+            type: 'admin',
+            status: l.status,
+            location: l.location,
+            description: l.description,
+          }))
 
         if (stateScoped && Array.isArray(data.citizens)) {
           setImpactedUsers(mapCitizens(data.citizens))
@@ -459,7 +502,7 @@ export function GISMap({
       cancelled = true
       clearInterval(interval)
     }
-  }, [showLayersPanel, stateScoped, unifiedMapFeed, scopeState])
+  }, [showLayersPanel, stateScoped, unifiedMapFeed, scopeState, restrictToUsa, focusState])
 
   useEffect(() => {
     if (stateScoped || unifiedMapFeed) return
@@ -672,23 +715,24 @@ export function GISMap({
     [enabledGisFilterLayerIds],
   )
 
-  const continentalUsBounds = useMemo(
-    (): MapStateBounds => ({ west: -125, south: 24.5, east: -66.5, north: 49.5 }),
-    [],
-  )
-
   const infraFetchBounds = useMemo((): MapStateBounds | null => {
-    if (mapViewportBounds) return mapViewportBounds
-    if (stateBoundsRestriction) return stateBoundsRestriction
-    if (mapStateBounds) return mapStateBounds
-    if (mapZoom <= 7) return continentalUsBounds
-    return null
+    if (restrictToUsa && mapViewportBounds && !viewportCenterInUsa(mapViewportBounds)) {
+      return null
+    }
+    let bounds: MapStateBounds | null = null
+    if (mapViewportBounds) bounds = mapViewportBounds
+    else if (stateBoundsRestriction) bounds = stateBoundsRestriction
+    else if (mapStateBounds) bounds = mapStateBounds
+    else if (mapZoom <= 7) bounds = CONUS_MAP_BOUNDS
+    else return null
+    return clampFetchBounds(bounds)
   }, [
     mapViewportBounds,
     stateBoundsRestriction,
     mapStateBounds,
     mapZoom,
-    continentalUsBounds,
+    clampFetchBounds,
+    restrictToUsa,
   ])
 
   const infraFetchScopeKey = useMemo(() => {
@@ -718,7 +762,11 @@ export function GISMap({
   useEffect(() => {
     let cancelled = false
 
-    if (enabledGisFilterLayerIds.length === 0 || !infraFetchBounds) {
+    if (enabledGisFilterLayerIds.length === 0 || !infraFetchBounds || !viewportInUsa) {
+      if (!viewportInUsa && restrictToUsa) {
+        infraCacheRef.current.clear()
+        setCacheTrigger((t) => t + 1)
+      }
       return
     }
 
@@ -763,6 +811,13 @@ export function GISMap({
         }
 
         for (const place of results) {
+          if (
+            !Number.isFinite(place.lat) ||
+            !Number.isFinite(place.lng) ||
+            !inUsaView(place.lat, place.lng)
+          ) {
+            continue
+          }
           const layerDef =
             gisFilterLayerByResultType(place.placeType) ??
             GIS_FILTER_MAP_LAYERS.find((l) => l.resultType === place.placeType)
@@ -815,13 +870,16 @@ export function GISMap({
     infraTypesKey,
     markerInCoverage,
     infraFetchBounds,
+    inUsaView,
+    viewportInUsa,
+    restrictToUsa,
   ])
 
   useEffect(() => {
     let cancelled = false
 
-    if (!mapLayers.roads) {
-      setRoadClosurePolylines([])
+    if (!mapLayers.roads || !viewportInUsa) {
+      if (!viewportInUsa) setRoadClosurePolylines([])
       return
     }
 
@@ -832,8 +890,9 @@ export function GISMap({
         if (scopeState?.trim()) {
           body.scopeState = scopeState.trim()
         }
-        const bounds =
-          mapViewportBounds ?? stateBoundsRestriction ?? mapStateBounds ?? null
+        const bounds = clampFetchBounds(
+          mapViewportBounds ?? stateBoundsRestriction ?? mapStateBounds ?? null,
+        )
         if (bounds) {
           body.bounds = bounds
         }
@@ -859,6 +918,9 @@ export function GISMap({
               )
             : []
           if (path.length < 2) continue
+          if (restrictToUsa && !path.some((p: { lat?: number; lng?: number }) => inUsaView(p.lat as number, p.lng as number))) {
+            continue
+          }
 
           const status = String(raw.status ?? 'Unknown')
           const strokeColor =
@@ -920,11 +982,206 @@ export function GISMap({
     mapViewportBounds,
     stateBoundsRestriction,
     mapStateBounds,
+    clampFetchBounds,
+    restrictToUsa,
+    inUsaView,
+    viewportInUsa,
+  ])
+
+  const operationalAlertLayersKey = useMemo(() => {
+    const keys = ['weather', 'risk', 'flood'].filter((id) => mapLayers[id])
+    return keys.sort().join(',')
+  }, [mapLayers.weather, mapLayers.risk, mapLayers.flood])
+
+  const operationalIncidentLayersKey = useMemo(() => {
+    const keys = ['power', 'water'].filter((id) => mapLayers[id])
+    return keys.sort().join(',')
+  }, [mapLayers.power, mapLayers.water])
+
+  useEffect(() => {
+    let cancelled = false
+
+    if (!operationalAlertLayersKey || !viewportInUsa) {
+      if (!viewportInUsa) setOperationalAlertPolylines([])
+      return
+    }
+
+    async function fetchOperationalAlerts() {
+      try {
+        const categories = operationalAlertLayersKey.split(',')
+        const bounds = clampFetchBounds(
+          mapViewportBounds ??
+            stateBoundsRestriction ??
+            mapStateBounds ??
+            infraFetchBounds ??
+            null,
+        )
+        const polylines: MapPolylineSpec[] = []
+
+        for (const category of categories) {
+          const body: Record<string, unknown> = {
+            category,
+            format: 'features',
+          }
+          if (scopeState?.trim()) body.scopeState = scopeState.trim()
+          if (bounds) body.bounds = bounds
+
+          const res = await fetch('/api/map/alerts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(body),
+          })
+          if (!res.ok || cancelled) continue
+
+          const data = await res.json()
+          const alerts = Array.isArray(data.alerts) ? data.alerts : []
+          const strokeColor =
+            category === 'flood' ? '#A41E22' : category === 'risk' ? '#0EA5E9' : '#3B82F6'
+
+          for (const alert of alerts) {
+            const paths = Array.isArray(alert.paths) ? alert.paths : []
+            for (let idx = 0; idx < paths.length; idx += 1) {
+              const path = paths[idx].filter(
+                (p: { lat?: number; lng?: number }) =>
+                  Number.isFinite(p.lat) && Number.isFinite(p.lng),
+              )
+              if (path.length < 2) continue
+              if (
+                restrictToUsa &&
+                !path.some((p: { lat?: number; lng?: number }) =>
+                  inUsaView(p.lat as number, p.lng as number),
+                )
+              ) {
+                continue
+              }
+              polylines.push({
+                id: `alert-${String(alert.id)}-${idx}`,
+                path,
+                strokeColor,
+                strokeWeight: 4,
+                strokeOpacity: 0.75,
+                kind: 'route',
+                label: String(alert.headline ?? alert.event ?? 'Weather alert'),
+              })
+            }
+          }
+        }
+
+        if (!cancelled) setOperationalAlertPolylines(polylines)
+      } catch (error) {
+        console.warn('Operational alerts fetch error:', error)
+        if (!cancelled) setOperationalAlertPolylines([])
+      }
+    }
+
+    void fetchOperationalAlerts()
+    const interval = window.setInterval(fetchOperationalAlerts, 5 * 60 * 1000)
+    return () => {
+      cancelled = true
+      window.clearInterval(interval)
+    }
+  }, [
+    operationalAlertLayersKey,
+    scopeState,
+    mapViewportBounds,
+    stateBoundsRestriction,
+    mapStateBounds,
+    infraFetchBounds,
+    clampFetchBounds,
+    restrictToUsa,
+    inUsaView,
+    viewportInUsa,
+  ])
+
+  useEffect(() => {
+    let cancelled = false
+
+    if (!operationalIncidentLayersKey || !viewportInUsa) {
+      if (!viewportInUsa) setOperationalIncidentMarkers([])
+      return
+    }
+
+    async function fetchOperationalIncidents() {
+      try {
+        const filters = operationalIncidentLayersKey.split(',')
+        const bounds = clampFetchBounds(
+          mapViewportBounds ??
+            stateBoundsRestriction ??
+            mapStateBounds ??
+            infraFetchBounds ??
+            null,
+        )
+        const markers: any[] = []
+
+        for (const filter of filters) {
+          const body: Record<string, unknown> = {
+            filter,
+            format: 'markers',
+          }
+          if (bounds) body.bounds = bounds
+
+          const res = await fetch('/api/map/incidents', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(body),
+          })
+          if (!res.ok || cancelled) continue
+
+          const data = await res.json()
+          const incidents = Array.isArray(data.incidents) ? data.incidents : []
+          for (const inc of incidents) {
+            if (!Number.isFinite(inc.lat) || !Number.isFinite(inc.lng)) continue
+            const pos = { lat: inc.lat, lng: inc.lng }
+            if (!markerInCoverage(pos)) continue
+            if (!inUsaView(pos.lat, pos.lng)) continue
+            markers.push({
+              id: `ops-${filter}-${inc.id}`,
+              position: pos,
+              title: inc.title,
+              type: 'incident' as const,
+              category: filter === 'power' ? 'Power Outages' : 'Water Issues',
+              status: inc.status,
+              location: inc.location,
+              description: inc.description,
+              color: filter === 'power' ? '#EAB308' : '#0EA5E9',
+              icon: filter === 'power' ? 'generator' : 'water_crew',
+            })
+          }
+        }
+
+        if (!cancelled) setOperationalIncidentMarkers(markers)
+      } catch (error) {
+        console.warn('Operational incidents fetch error:', error)
+        if (!cancelled) setOperationalIncidentMarkers([])
+      }
+    }
+
+    void fetchOperationalIncidents()
+    const interval = window.setInterval(fetchOperationalIncidents, 2 * 60 * 1000)
+    return () => {
+      cancelled = true
+      window.clearInterval(interval)
+    }
+  }, [
+    operationalIncidentLayersKey,
+    mapViewportBounds,
+    stateBoundsRestriction,
+    mapStateBounds,
+    infraFetchBounds,
+    markerInCoverage,
+    clampFetchBounds,
+    inUsaView,
+    viewportInUsa,
   ])
 
   const combinedPolylines = useMemo(
-    () => [...tornadoPolylines, ...roadClosurePolylines],
-    [tornadoPolylines, roadClosurePolylines],
+    () =>
+      viewportInUsa
+        ? [...tornadoPolylines, ...roadClosurePolylines, ...operationalAlertPolylines]
+        : [...tornadoPolylines],
+    [tornadoPolylines, roadClosurePolylines, operationalAlertPolylines, viewportInUsa],
   )
 
   const enabledCriticalSectors = useMemo(() => {
@@ -932,52 +1189,138 @@ export function GISMap({
     return CRITICAL_INFRASTRUCTURE_SECTORS.filter((s) => mapLayers[s.id]).map((s) => s.id)
   }, [showCriticalInfraLayers, mapLayers])
 
+  /** Super-admin: viewport BBOX. Sub-admin radius license: lat/lng/radius circle. */
+  const ciFetchScope = useMemo(() => {
+    if (demoModeActive) {
+      return {
+        mode: 'radius' as const,
+        lat: 34.7465,
+        lng: -92.2896,
+        radius: 80_000,
+        key: 'demo-ar',
+      }
+    }
+
+    if (
+      lockToCoverageCircle &&
+      coverageCircle &&
+      coverageMeta?.coverageType === 'radius'
+    ) {
+      return {
+        mode: 'radius' as const,
+        lat: coverageCircle.center.lat,
+        lng: coverageCircle.center.lng,
+        radius: coverageCircle.radiusMeters,
+        key: `radius:${coverageCircle.center.lat.toFixed(3)},${coverageCircle.center.lng.toFixed(3)}:${Math.round(coverageCircle.radiusMeters)}`,
+      }
+    }
+
+    let bounds: MapStateBounds | null = mapViewportBounds
+    if (bounds && stateBoundsRestriction) {
+      bounds = intersectBounds(bounds, stateBoundsRestriction) ?? stateBoundsRestriction
+    } else if (!bounds) {
+      bounds = stateBoundsRestriction
+    }
+    if (restrictToUsa) {
+      if (mapViewportBounds && !viewportCenterInUsa(mapViewportBounds)) {
+        return null
+      }
+      if (bounds) {
+        bounds = clampBoundsToUsa(bounds)
+        if (!bounds) return null
+      } else {
+        bounds = CONUS_MAP_BOUNDS
+      }
+    }
+
+    if (!bounds) return null
+
+    return {
+      mode: 'bounds' as const,
+      bounds,
+      key: `bbox:${bounds.west.toFixed(1)},${bounds.south.toFixed(1)},${bounds.east.toFixed(1)},${bounds.north.toFixed(1)}`,
+    }
+  }, [
+    demoModeActive,
+    lockToCoverageCircle,
+    coverageCircle,
+    coverageMeta?.coverageType,
+    mapViewportBounds,
+    stateBoundsRestriction,
+    restrictToUsa,
+  ])
+
   useEffect(() => {
-    if (!showCriticalInfraLayers || enabledCriticalSectors.length === 0) {
+    if (!showCriticalInfraLayers || enabledCriticalSectors.length === 0 || !ciFetchScope) {
+      setCriticalInfraMarkers([])
+      return
+    }
+
+    if (!viewportInUsa) {
       setCriticalInfraMarkers([])
       return
     }
 
     let cancelled = false
-    setIsLoadingCriticalInfra(true)
+    const controller = new AbortController()
 
-    const center = demoModeActive
-      ? { lat: 34.7465, lng: -92.2896 }
-      : coverageCircle?.center ?? mapCenter
-
-    const qs = new URLSearchParams({
-      sectors: enabledCriticalSectors.join(','),
-      lat: String(center.lat),
-      lng: String(center.lng),
-      radius: demoModeActive ? '80000' : '35000',
-    })
-
-    fetch(`/api/admin/critical-infrastructure?${qs}`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (!cancelled && Array.isArray(data.markers)) {
-          setCriticalInfraMarkers(data.markers)
+    async function fetchCriticalInfra() {
+      setIsLoadingCriticalInfra(true)
+      try {
+        const body: Record<string, unknown> = {
+          sectors: enabledCriticalSectors,
         }
-      })
-      .catch(() => {
+
+        if (ciFetchScope!.mode === 'bounds') {
+          body.bounds = ciFetchScope!.bounds
+        } else {
+          body.lat = ciFetchScope!.lat
+          body.lng = ciFetchScope!.lng
+          body.radius = ciFetchScope!.radius
+        }
+
+        const res = await fetch('/api/admin/critical-infrastructure', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(body),
+          signal: controller.signal,
+        })
+
+        if (!res.ok || cancelled) return
+
+        const data = await res.json()
+        if (!cancelled && Array.isArray(data.markers)) {
+          const markers = restrictToUsa
+            ? data.markers.filter(
+                (m: { lat?: number; lng?: number }) =>
+                  Number.isFinite(m.lat) &&
+                  Number.isFinite(m.lng) &&
+                  inUsaView(m.lat as number, m.lng as number),
+              )
+            : data.markers
+          setCriticalInfraMarkers(markers)
+        }
+      } catch (error) {
+        if (cancelled || (error instanceof DOMException && error.name === 'AbortError')) {
+          return
+        }
         if (!cancelled) setCriticalInfraMarkers([])
-      })
-      .finally(() => {
+      } finally {
         if (!cancelled) setIsLoadingCriticalInfra(false)
-      })
+      }
+    }
+
+    const timer = window.setTimeout(() => {
+      void fetchCriticalInfra()
+    }, 800)
 
     return () => {
       cancelled = true
+      controller.abort()
+      window.clearTimeout(timer)
     }
-  }, [
-    showCriticalInfraLayers,
-    enabledCriticalSectors.join(','),
-    demoModeActive,
-    coverageCircle?.center.lat,
-    coverageCircle?.center.lng,
-    mapCenter.lat,
-    mapCenter.lng,
-  ])
+  }, [showCriticalInfraLayers, enabledCriticalSectors.join(','), ciFetchScope?.key, restrictToUsa, inUsaView, viewportInUsa])
 
   const markers = useMemo(() => {
     let currentFiltered: any[] = []
@@ -1018,6 +1361,16 @@ export function GISMap({
       currentFiltered = currentFiltered.filter((m) => markerInCoverage(m.position))
     }
 
+    if (restrictToUsa) {
+      currentFiltered = currentFiltered.filter(
+        (m) =>
+          m?.position &&
+          Number.isFinite(m.position.lat) &&
+          Number.isFinite(m.position.lng) &&
+          inUsaView(m.position.lat, m.position.lng),
+      )
+    }
+
     return currentFiltered
   }, [
     activeTab,
@@ -1030,6 +1383,8 @@ export function GISMap({
     isDemoSimulation,
     selectedDemoHeat,
     stateScoped,
+    restrictToUsa,
+    inUsaView,
   ])
 
   /** Operational dashboards always show incidents/heatmap; Filter checkbox is optional elsewhere. */
@@ -1037,8 +1392,10 @@ export function GISMap({
 
   const heatPoints = useMemo(() => {
     if (!showHeatmap || !incidentsVisible) return []
+    if (restrictToUsa && !viewportInUsa) return []
 
     const inCoverage = (lat: number, lng: number) => {
+      if (!inUsaView(lat, lng)) return false
       if (!lockToCoverageCircle || !coverageCircle) return true
       return pointInCoverageCircle(lat, lng, coverageCircle.center, coverageCircle.radiusMeters)
     }
@@ -1092,12 +1449,16 @@ export function GISMap({
     lockToCoverageCircle,
     coverageCircle,
     cacheTrigger,
+    inUsaView,
+    restrictToUsa,
+    viewportInUsa,
   ])
 
   const situationalMarkers = useMemo(() => {
     if (!incidentsVisible) return []
     return unifiedIncidents
       .filter((inc) => {
+        if (!inUsaView(inc.lat, inc.lng)) return false
         if (!lockToCoverageCircle || !coverageCircle) return true
         return pointInCoverageCircle(
           inc.lat,
@@ -1118,7 +1479,7 @@ export function GISMap({
         incidentId: inc.id,
         riskReportHref: `/ai-risk-assessment?incident=${encodeURIComponent(inc.id)}`,
       }))
-  }, [incidentsVisible, unifiedIncidents, lockToCoverageCircle, coverageCircle])
+  }, [incidentsVisible, unifiedIncidents, lockToCoverageCircle, coverageCircle, inUsaView])
 
   const viewportRankBounds = useMemo(
     (): MapStateBounds | null => mapViewportBounds ?? infraFetchBounds,
@@ -1128,18 +1489,21 @@ export function GISMap({
   const mapMarkers = useMemo(() => {
     const activeTabMarkers = markers
     const enabledLayerMarkers: any[] = []
+    const showFilterLayers = !restrictToUsa || viewportInUsa
 
     // Unified heat feed: incidents show on heatmap only (click for details), not as blue pins.
-    if (incidentsVisible && unifiedIncidents.length === 0) {
+    if (showFilterLayers && incidentsVisible && unifiedIncidents.length === 0) {
       enabledLayerMarkers.push(...situationalMarkers)
     }
 
     // 2. Google Places sub-layers — viewport-ranked like Google Maps
+    if (showFilterLayers) {
     GIS_FILTER_MAP_LAYERS.forEach((layer) => {
       if (!mapLayers[layer.id]) return
 
       const markersForLayer = Array.from(infraCacheRef.current.values())
         .filter((m: any) => m.placeType === layer.resultType)
+        .filter((m: any) => inUsaView(m.position.lat, m.position.lng))
         .filter((m: any) => markerInCoverage(m.position))
 
       if (markersForLayer.length === 0) return
@@ -1164,29 +1528,38 @@ export function GISMap({
       )
       enabledLayerMarkers.push(...markersForLayer.filter((m: any) => rankedIds.has(m.id)))
     })
+    }
 
     // 3. CISA critical infrastructure (Dashboard A + B)
-    if (showCriticalInfraLayers) {
+    if (showFilterLayers && showCriticalInfraLayers) {
       CRITICAL_INFRASTRUCTURE_SECTORS.forEach((sector) => {
         if (mapLayers[sector.id]) {
           const sectorMarkers = criticalInfraMarkers
             .filter((m) => m.sectorId === sector.id)
+            .filter((m) => inUsaView(m.lat, m.lng))
             .filter((m) => markerInCoverage({ lat: m.lat, lng: m.lng }))
-            .map((m) => ({
-              id: m.id,
-              position: { lat: m.lat, lng: m.lng },
-              title: m.title,
-              type: 'infrastructure' as const,
-              category: sector.label,
-              status: m.status,
-              location: m.location,
-              description: m.description,
-              color: sector.color,
-              icon: 'hospital',
-            }))
+            .map((m) => {
+              const sector = criticalSectorById(m.sectorId)
+              return {
+                id: m.id,
+                position: { lat: m.lat, lng: m.lng },
+                title: m.title,
+                type: 'infrastructure' as const,
+                category: sector?.label ?? m.sectorId,
+                status: m.status,
+                location: m.location,
+                description: m.description,
+                color: sector?.color ?? '#6366F1',
+                glyph: sector?.markerGlyph,
+              }
+            })
           enabledLayerMarkers.push(...sectorMarkers)
         }
       })
+    }
+
+    if (showFilterLayers && operationalIncidentMarkers.length > 0) {
+      enabledLayerMarkers.push(...operationalIncidentMarkers)
     }
 
     return [...activeTabMarkers, ...enabledLayerMarkers]
@@ -1201,6 +1574,10 @@ export function GISMap({
     unifiedIncidents,
     incidentsVisible,
     viewportRankBounds,
+    operationalIncidentMarkers,
+    restrictToUsa,
+    viewportInUsa,
+    inUsaView,
   ])
 
   const disasterZonesVisible = useMemo(() => {
@@ -1234,12 +1611,30 @@ export function GISMap({
     }))
   }, [disasterZonesVisible, tornadoPathPoints])
 
-  const displayHeatCount =
-    unifiedIncidents.length > 0
-      ? incidentsVisible
-        ? incidentHeatCount
-        : 0
-      : heatPoints.length
+  const heatIncidentsForMap = useMemo(() => {
+    if (unifiedIncidents.length === 0) return undefined
+    if (restrictToUsa && !viewportInUsa) return []
+    if (restrictToUsa) {
+      return unifiedIncidents.filter((inc) => pointInUsaBounds(inc.lat, inc.lng))
+    }
+    return unifiedIncidents
+  }, [unifiedIncidents, restrictToUsa, viewportInUsa])
+
+  const displayHeatCount = useMemo(() => {
+    if (restrictToUsa && !viewportInUsa) return 0
+    if (unifiedIncidents.length > 0) {
+      return incidentsVisible ? incidentHeatCount : 0
+    }
+    return heatPoints.length
+  }, [
+    restrictToUsa,
+    viewportInUsa,
+    unifiedIncidents.length,
+    incidentsVisible,
+    incidentHeatCount,
+    heatPoints.length,
+  ])
+
   const usesUnifiedHeat = unifiedIncidents.length > 0
 
   return (
@@ -1309,7 +1704,7 @@ export function GISMap({
           lockToCoverage={lockToCoverageCircle}
           polylines={combinedPolylines}
           disasterZoneCircles={disasterZoneCircles}
-          heatIncidents={usesUnifiedHeat ? unifiedIncidents : undefined}
+          heatIncidents={usesUnifiedHeat ? heatIncidentsForMap : undefined}
           heatClickOnly={usesUnifiedHeat}
           onHeatIncidentSelect={isDemoSimulation ? handleHeatIncidentSelect : undefined}
           onBoundsChanged={showLayersPanel ? handleMapBoundsChange : undefined}

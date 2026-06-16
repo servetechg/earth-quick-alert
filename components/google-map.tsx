@@ -54,6 +54,8 @@ interface MapMarker {
     timestamp?: string
     color?: string
     icon?: string
+    /** Single-letter glyph for critical-infrastructure pins */
+    glyph?: string
     category?: string
     location?: string
     /** Link to AI risk report for this incident (Dashboard A). */
@@ -238,6 +240,9 @@ function buildMarkerIcon(marker: MapMarker): google.maps.Icon | google.maps.Symb
         }
     }
     if (marker.type === 'incident' || marker.type === 'infrastructure') {
+        if (marker.glyph) {
+            return makeGlyphMarker(marker.color || '#6366F1', marker.glyph, 34)
+        }
         if (marker.icon === 'hospital') return makeGlyphMarker('#EF4444', 'H', 34)
         if (marker.icon === 'pharmacy') return makePharmacyPinIcon()
         if (marker.icon === 'fire') return makeEmergencyServicePinIcon()

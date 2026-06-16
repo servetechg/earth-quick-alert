@@ -43,10 +43,28 @@ export interface CriticalInfraSectorDef {
   shortLabel: string
   Icon: LucideIcon
   color: string
+  /** Single-letter map pin glyph (e.g. Chemical → C). */
+  markerGlyph: string
   /** Google Places type when live lookup is supported */
   googlePlaceType?: string
   /** Additional place types merged in nearby search */
   googlePlaceTypes?: string[]
+  /** Google Text Search when no place type exists (e.g. chemical plants). */
+  googleTextQueries?: string[]
+}
+
+export function sectorGooglePlaceTypes(sector: CriticalInfraSectorDef): string[] {
+  if (sector.googlePlaceTypes?.length) return sector.googlePlaceTypes
+  if (sector.googlePlaceType) return [sector.googlePlaceType]
+  return []
+}
+
+export function sectorGoogleTextQueries(sector: CriticalInfraSectorDef): string[] {
+  return sector.googleTextQueries?.filter(Boolean) ?? []
+}
+
+export function sectorHasGooglePlaces(sector: CriticalInfraSectorDef): boolean {
+  return sectorGooglePlaceTypes(sector).length > 0 || sectorGoogleTextQueries(sector).length > 0
 }
 
 export const CRITICAL_INFRASTRUCTURE_SECTORS: CriticalInfraSectorDef[] = [
@@ -56,6 +74,8 @@ export const CRITICAL_INFRASTRUCTURE_SECTORS: CriticalInfraSectorDef[] = [
     shortLabel: 'Chemical',
     Icon: FlaskConical,
     color: '#7C3AED',
+    markerGlyph: 'C',
+    googleTextQueries: ['chemical plant'],
   },
   {
     id: 'ci_commercial',
@@ -63,6 +83,7 @@ export const CRITICAL_INFRASTRUCTURE_SECTORS: CriticalInfraSectorDef[] = [
     shortLabel: 'Commercial',
     Icon: Building2,
     color: '#6366F1',
+    markerGlyph: 'M',
     googlePlaceTypes: ['shopping_mall', 'bank', 'airport'],
   },
   {
@@ -71,6 +92,7 @@ export const CRITICAL_INFRASTRUCTURE_SECTORS: CriticalInfraSectorDef[] = [
     shortLabel: 'Communications',
     Icon: Radio,
     color: '#0EA5E9',
+    markerGlyph: 'R',
   },
   {
     id: 'ci_manufacturing',
@@ -78,6 +100,7 @@ export const CRITICAL_INFRASTRUCTURE_SECTORS: CriticalInfraSectorDef[] = [
     shortLabel: 'Manufacturing',
     Icon: Factory,
     color: '#64748B',
+    markerGlyph: 'F',
   },
   {
     id: 'ci_dams',
@@ -85,6 +108,7 @@ export const CRITICAL_INFRASTRUCTURE_SECTORS: CriticalInfraSectorDef[] = [
     shortLabel: 'Dams',
     Icon: Droplets,
     color: '#0284C7',
+    markerGlyph: 'D',
   },
   {
     id: 'ci_defense',
@@ -92,6 +116,7 @@ export const CRITICAL_INFRASTRUCTURE_SECTORS: CriticalInfraSectorDef[] = [
     shortLabel: 'Defense',
     Icon: Shield,
     color: '#334155',
+    markerGlyph: 'S',
   },
   {
     id: 'ci_emergency_services',
@@ -99,6 +124,7 @@ export const CRITICAL_INFRASTRUCTURE_SECTORS: CriticalInfraSectorDef[] = [
     shortLabel: 'Emergency Svc',
     Icon: Siren,
     color: '#DC2626',
+    markerGlyph: 'E',
     googlePlaceTypes: ['fire_station', 'police'],
   },
   {
@@ -107,6 +133,7 @@ export const CRITICAL_INFRASTRUCTURE_SECTORS: CriticalInfraSectorDef[] = [
     shortLabel: 'Energy',
     Icon: Zap,
     color: '#EAB308',
+    markerGlyph: 'Z',
     googlePlaceType: 'gas_station',
   },
   {
@@ -115,6 +142,7 @@ export const CRITICAL_INFRASTRUCTURE_SECTORS: CriticalInfraSectorDef[] = [
     shortLabel: 'Financial',
     Icon: Landmark,
     color: '#059669',
+    markerGlyph: 'B',
     googlePlaceType: 'bank',
   },
   {
@@ -123,6 +151,7 @@ export const CRITICAL_INFRASTRUCTURE_SECTORS: CriticalInfraSectorDef[] = [
     shortLabel: 'Food & Ag',
     Icon: Wheat,
     color: '#84CC16',
+    markerGlyph: 'A',
     googlePlaceTypes: ['supermarket', 'grocery_or_supermarket'],
   },
   {
@@ -131,6 +160,7 @@ export const CRITICAL_INFRASTRUCTURE_SECTORS: CriticalInfraSectorDef[] = [
     shortLabel: 'Government',
     Icon: Building,
     color: '#1E3A8A',
+    markerGlyph: 'G',
     googlePlaceType: 'city_hall',
   },
   {
@@ -139,6 +169,7 @@ export const CRITICAL_INFRASTRUCTURE_SECTORS: CriticalInfraSectorDef[] = [
     shortLabel: 'Healthcare',
     Icon: HeartPulse,
     color: '#EF4444',
+    markerGlyph: 'H',
     googlePlaceTypes: ['hospital', 'pharmacy', 'doctor'],
   },
   {
@@ -147,6 +178,7 @@ export const CRITICAL_INFRASTRUCTURE_SECTORS: CriticalInfraSectorDef[] = [
     shortLabel: 'IT',
     Icon: Server,
     color: '#8B5CF6',
+    markerGlyph: 'I',
   },
   {
     id: 'ci_nuclear',
@@ -154,6 +186,7 @@ export const CRITICAL_INFRASTRUCTURE_SECTORS: CriticalInfraSectorDef[] = [
     shortLabel: 'Nuclear',
     Icon: Atom,
     color: '#F97316',
+    markerGlyph: 'N',
   },
   {
     id: 'ci_transportation',
@@ -161,7 +194,8 @@ export const CRITICAL_INFRASTRUCTURE_SECTORS: CriticalInfraSectorDef[] = [
     shortLabel: 'Transportation',
     Icon: Train,
     color: '#2563EB',
-    googlePlaceTypes: ['transit_station', 'bus_station', 'train_station'],
+    markerGlyph: 'T',
+    googlePlaceTypes: ['transit_station', 'bus_station', 'train_station', 'airport'],
   },
   {
     id: 'ci_water',
@@ -169,6 +203,7 @@ export const CRITICAL_INFRASTRUCTURE_SECTORS: CriticalInfraSectorDef[] = [
     shortLabel: 'Water',
     Icon: Waves,
     color: '#06B6D4',
+    markerGlyph: 'W',
   },
 ]
 
