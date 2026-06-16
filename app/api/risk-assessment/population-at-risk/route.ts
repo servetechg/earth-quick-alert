@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import dbConnect from '@/lib/mongodb';
-import { fetchPopulationAtRiskAlignedEventFeed } from '@/lib/services/alert-communication-aligned-feed';
+import { fetchAlignedUnifiedEventFeed, fetchPopulationAtRiskAlignedEventFeed } from '@/lib/services/alert-communication-aligned-feed';
 import { resolveRiskIngestScopeForSession } from '@/lib/risk-assessment/resolve-ingest-scope';
 import { listUsersInAlignedAlertAreas } from '@/lib/services/users-in-aligned-alert-areas';
 import {
@@ -12,6 +12,9 @@ import {
 import { resolveSubAdminJurisdiction } from '@/lib/sub-admin/jurisdiction';
 import { resolveDemoSessionContext } from '@/lib/demo/provider';
 import { DEMO_CITIZEN_MARKERS } from '@/lib/demo/data/little-rock-tornado-2023';
+import { buildDemoAnalyzeResponse } from '@/lib/demo/build-risk-responses';
+import { computeCensusExposureFromAlertRows } from '@/lib/services/alert-area-census-exposure';
+import type { RiskExposureSnapshot } from '@/lib/types/risk-assessment';
 
 const ALLOWED_ROLES = new Set([
     'admin',
@@ -25,7 +28,11 @@ const ALLOWED_ROLES = new Set([
 ]);
 
 export type PopulationAtRiskResponse = {
-    count: number;
+    /** U.S. Census ACS estimate for counties in active alert areas. */
+    census_population_estimate: number;
+    census_vintage_label?: string;
+    counties_resolved?: RiskExposureSnapshot['countiesResolved'];
+    ready2go_users_count: number;
     users: Array<{
         id: string;
         name: string;
@@ -54,7 +61,15 @@ export async function GET(req: Request) {
                 email: `citizen${i + 1}@demo.ready2go.app`,
                 address: c.location,
             }));
-            return NextResponse.json({ count: users.length, users } satisfies PopulationAtRiskResponse);
+            const demoAnalyze = buildDemoAnalyzeResponse();
+            const exposure = demoAnalyze.population_exposure;
+            return NextResponse.json({
+                census_population_estimate: exposure?.populationAffectedEstimate ?? 412_000,
+                census_vintage_label: exposure?.censusVintageLabel,
+                counties_resolved: exposure?.countiesResolved ?? [],
+                ready2go_users_count: users.length,
+                users,
+            } satisfies PopulationAtRiskResponse);
         }
 
         const url = new URL(req.url);
@@ -69,23 +84,46 @@ export async function GET(req: Request) {
         const cacheKey = buildPopulationAtRiskCacheKey(session.user.id as string, scope.stateCd);
         const cached = getPopulationAtRiskCache(cacheKey);
         if (cached) {
-            return NextResponse.json({ count: cached.length, users: cached } satisfies PopulationAtRiskResponse);
+            return NextResponse.json({
+                census_population_estimate: 0,
+                ready2go_users_count: cached.length,
+                users: cached,
+            } satisfies PopulationAtRiskResponse);
         }
-
-        const alignedCards = await fetchPopulationAtRiskAlignedEventFeed({
-            userId: session.user.id as string | undefined,
-            role,
-        });
 
         const jurisdiction =
             role === 'sub-admin'
                 ? await resolveSubAdminJurisdiction(session.user.id as string)
                 : null;
 
-        const users = await listUsersInAlignedAlertAreas(alignedCards, jurisdiction);
+        const scopeStateUsps = jurisdiction?.stateCode ?? (scope.stateCd !== 'us' ? scope.stateCd.toUpperCase() : null);
+
+        const censusRows = await fetchAlignedUnifiedEventFeed({
+            userId: session.user.id as string | undefined,
+            role,
+        });
+        const userRows = await fetchPopulationAtRiskAlignedEventFeed({
+            userId: session.user.id as string | undefined,
+            role,
+        });
+
+        const populationExposure = await computeCensusExposureFromAlertRows(censusRows, {
+            defaultStateUsps: scopeStateUsps,
+            scopeStateUsps,
+            dashboardStateCd: scope.stateCd,
+            jurisdiction,
+        });
+
+        const users = await listUsersInAlignedAlertAreas(userRows, jurisdiction);
         setPopulationAtRiskCache(cacheKey, users);
 
-        return NextResponse.json({ count: users.length, users } satisfies PopulationAtRiskResponse);
+        return NextResponse.json({
+            census_population_estimate: populationExposure?.populationAffectedEstimate ?? 0,
+            census_vintage_label: populationExposure?.censusVintageLabel,
+            counties_resolved: populationExposure?.countiesResolved ?? [],
+            ready2go_users_count: users.length,
+            users,
+        } satisfies PopulationAtRiskResponse);
     } catch (e: unknown) {
         console.error('risk-assessment/population-at-risk:', e);
         const message = e instanceof Error ? e.message : 'Unknown error';

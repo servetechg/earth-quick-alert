@@ -512,12 +512,17 @@ function withPopulationAtRiskUsers(
   return {
     ...summary,
     population_at_risk_users: users,
-    populations_at_risk: users.length,
+    ready2go_users_at_risk: users.length,
   };
 }
 
 function summaryMissingPopulationUsers(summary: RiskSummaryPayload): boolean {
-  return summary.populations_at_risk > 0 && !(summary.population_at_risk_users?.length);
+  const expected = summary.ready2go_users_at_risk ?? 0;
+  return expected > 0 && !(summary.population_at_risk_users?.length);
+}
+
+function ready2goUsersAtRisk(summary: RiskSummaryPayload): number {
+  return summary.ready2go_users_at_risk ?? summary.population_at_risk_users?.length ?? 0;
 }
 
 // ─── PopulationAtRiskDialog ───────────────────────────────────────────────────
@@ -526,36 +531,49 @@ function PopulationAtRiskDialog({
   open,
   onOpenChange,
   users: initialUsers,
-  expectedCount,
+  censusEstimate,
+  ready2goCount,
+  populationExposure,
   scopeQuery,
   onUsersLoaded,
 }: {
   open: boolean;
   onOpenChange: (b: boolean) => void;
   users: NonNullable<RiskSummaryPayload['population_at_risk_users']>;
-  expectedCount: number;
+  censusEstimate: number;
+  ready2goCount: number;
+  populationExposure: RiskSummaryPayload['population_exposure'];
   scopeQuery: string;
   onUsersLoaded?: (users: NonNullable<RiskSummaryPayload['population_at_risk_users']>) => void;
 }) {
   const [users, setUsers] = useState(initialUsers);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [exposure, setExposure] = useState(populationExposure);
+  const [censusTotal, setCensusTotal] = useState(censusEstimate);
 
   useEffect(() => {
     setUsers(initialUsers);
   }, [initialUsers]);
 
   useEffect(() => {
+    setExposure(populationExposure);
+    setCensusTotal(censusEstimate);
+  }, [populationExposure, censusEstimate]);
+
+  useEffect(() => {
     if (!open) return;
 
-    if (initialUsers.length > 0) {
+    if (initialUsers.length > 0 && populationExposure) {
       setUsers(initialUsers);
+      setExposure(populationExposure);
+      setCensusTotal(censusEstimate);
       setError(null);
       setLoading(false);
       return;
     }
 
-    if (expectedCount <= 0) {
+    if (ready2goCount <= 0 && censusEstimate <= 0) {
       setUsers([]);
       return;
     }
@@ -568,19 +586,38 @@ function PopulationAtRiskDialog({
       .then(async (res) => {
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
-          throw new Error(body.message ?? body.error ?? 'Failed to load users at risk');
+          throw new Error(body.message ?? body.error ?? 'Failed to load population at risk');
         }
-        return res.json() as Promise<{ users?: PopulationAtRiskUser[] }>;
+        return res.json() as Promise<{
+          users?: PopulationAtRiskUser[];
+          census_population_estimate?: number;
+          census_vintage_label?: string;
+          counties_resolved?: NonNullable<RiskSummaryPayload['population_exposure']>['countiesResolved'];
+        }>;
       })
       .then((data) => {
         if (cancelled) return;
         const loaded = Array.isArray(data.users) ? data.users : [];
         setUsers(loaded);
+        if (typeof data.census_population_estimate === 'number') {
+          setCensusTotal(data.census_population_estimate);
+        }
+        if (data.counties_resolved || data.census_vintage_label) {
+          setExposure((prev) => ({
+            populationAffectedEstimate: data.census_population_estimate ?? prev?.populationAffectedEstimate ?? 0,
+            censusVintageLabel: data.census_vintage_label ?? prev?.censusVintageLabel ?? '',
+            countiesResolved: data.counties_resolved ?? prev?.countiesResolved ?? [],
+            countyHintsApplied: prev?.countyHintsApplied ?? [],
+            countyMatchHints: prev?.countyMatchHints ?? [],
+            centroids: prev?.centroids ?? [],
+            dashboardStateCd: prev?.dashboardStateCd ?? 'us',
+          }));
+        }
         if (loaded.length > 0) onUsersLoaded?.(loaded);
       })
       .catch((e: unknown) => {
         if (!cancelled) {
-          setError(e instanceof Error ? e.message : 'Failed to load users at risk');
+          setError(e instanceof Error ? e.message : 'Failed to load population at risk');
         }
       })
       .finally(() => {
@@ -590,7 +627,9 @@ function PopulationAtRiskDialog({
     return () => {
       cancelled = true;
     };
-  }, [open, initialUsers, expectedCount, scopeQuery, onUsersLoaded]);
+  }, [open, initialUsers, ready2goCount, censusEstimate, populationExposure, scopeQuery, onUsersLoaded]);
+
+  const counties = exposure?.countiesResolved ?? [];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -601,7 +640,7 @@ function PopulationAtRiskDialog({
           </DialogTitle>
           <DialogDescription asChild>
             <p className="text-sm text-slate-500">
-              Ready2Go users in active alert areas ({expectedCount.toLocaleString()} total)
+              U.S. Census estimate for counties in active alert areas, plus Ready2Go registered users.
             </p>
           </DialogDescription>
         </DialogHeader>
@@ -609,7 +648,7 @@ function PopulationAtRiskDialog({
         {loading && (
           <div className="flex items-center justify-center gap-2 py-10 text-sm text-slate-500">
             <Loader2 className="h-4 w-4 animate-spin" />
-            Loading users…
+            Loading exposure details…
           </div>
         )}
 
@@ -619,25 +658,65 @@ function PopulationAtRiskDialog({
           </div>
         )}
 
-        {!loading && !error && users.length === 0 && (
-          <p className="py-8 text-center text-sm italic text-slate-400">
-            No Ready2Go users matched the current incident areas.
-          </p>
-        )}
-
-        {!loading && !error && users.length > 0 && (
-          <ul className="divide-y divide-slate-100 rounded-xl border border-slate-100 overflow-hidden">
-            {users.map((user) => (
-              <li key={user.id} className="bg-white px-4 py-3">
-                <p className="font-bold text-sm text-slate-800">{user.name}</p>
-                <p className="mt-0.5 text-xs text-slate-500">{user.email}</p>
-                <p className="mt-2 flex gap-1.5 text-xs leading-relaxed text-slate-600">
-                  <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" />
-                  <span>{user.address}</span>
+        {!loading && !error && (
+          <>
+            <section className="rounded-xl border border-slate-100 bg-slate-50/80 p-4">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                U.S. Census (ACS)
+              </p>
+              <p className="mt-1 text-2xl font-extrabold tabular-nums text-slate-800">
+                {censusTotal > 0 ? censusTotal.toLocaleString() : '—'}
+              </p>
+              <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                {exposure?.censusVintageLabel ??
+                  'County / parish population totals for jurisdictions named in current alerts.'}
+              </p>
+              {counties.length > 0 && (
+                <ul className="mt-3 divide-y divide-slate-200/80 rounded-lg border border-slate-100 bg-white overflow-hidden">
+                  {counties.map((row) => (
+                    <li
+                      key={`${row.stateAbbr}-${row.countyStem}`}
+                      className="flex items-center justify-between px-3 py-2 text-sm"
+                    >
+                      <span className="font-medium text-slate-700">{row.label}</span>
+                      <span className="tabular-nums font-bold text-slate-800">
+                        {row.population.toLocaleString()}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {counties.length === 0 && (exposure?.countyHintsApplied?.length ?? 0) > 0 && (
+                <p className="mt-2 text-xs text-slate-600">
+                  Counties in scope: {exposure!.countyHintsApplied!.join(', ')}
                 </p>
-              </li>
-            ))}
-          </ul>
+              )}
+            </section>
+
+            <section className="mt-4">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                Ready2Go users ({ready2goCount.toLocaleString()})
+              </p>
+              {users.length === 0 ? (
+                <p className="mt-2 py-4 text-center text-sm italic text-slate-400">
+                  No Ready2Go users matched the current incident areas.
+                </p>
+              ) : (
+                <ul className="mt-2 divide-y divide-slate-100 rounded-xl border border-slate-100 overflow-hidden">
+                  {users.map((user) => (
+                    <li key={user.id} className="bg-white px-4 py-3">
+                      <p className="font-bold text-sm text-slate-800">{user.name}</p>
+                      <p className="mt-0.5 text-xs text-slate-500">{user.email}</p>
+                      <p className="mt-2 flex gap-1.5 text-xs leading-relaxed text-slate-600">
+                        <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" />
+                        <span>{user.address}</span>
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          </>
         )}
       </DialogContent>
     </Dialog>
@@ -1694,13 +1773,13 @@ export default function RiskAssessment() {
               label="Population at Risk"
               icon={Users}
               headerAction={
-                hasReport && summary!.populations_at_risk > 0 ? (
+                hasReport && (summary!.populations_at_risk > 0 || ready2goUsersAtRisk(summary!) > 0) ? (
                   <button
                     type="button"
                     onClick={() => setPopAtRiskOpen(true)}
                     className="rounded-lg p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-[#33375D]"
-                    title="View users at risk"
-                    aria-label="View users at risk"
+                    title="View census exposure and Ready2Go users"
+                    aria-label="View census exposure and Ready2Go users"
                   >
                     <Eye className="h-4 w-4" />
                   </button>
@@ -1708,11 +1787,18 @@ export default function RiskAssessment() {
               }
             >
               <p className="text-3xl font-extrabold tabular-nums text-slate-800">
-                {summary!.populations_at_risk.toLocaleString()}
+                {summary!.populations_at_risk > 0
+                  ? summary!.populations_at_risk.toLocaleString()
+                  : '—'}
               </p>
               <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
-                Ready2Go users in active alert areas
+                U.S. Census estimate in active alert areas
               </p>
+              {ready2goUsersAtRisk(summary!) > 0 && (
+                <p className="mt-1 text-[11px] font-semibold text-[#33375D]">
+                  {ready2goUsersAtRisk(summary!).toLocaleString()} Ready2Go users
+                </p>
+              )}
             </KpiCard>
 
             <KpiCard label="Critical Infrastructure at Risk" icon={Building2}>
@@ -1803,7 +1889,9 @@ export default function RiskAssessment() {
         open={popAtRiskOpen}
         onOpenChange={setPopAtRiskOpen}
         users={summary?.population_at_risk_users ?? []}
-        expectedCount={summary?.populations_at_risk ?? 0}
+        censusEstimate={summary?.populations_at_risk ?? 0}
+        ready2goCount={summary ? ready2goUsersAtRisk(summary) : 0}
+        populationExposure={summary?.population_exposure}
         scopeQuery={scopeQuery}
         onUsersLoaded={handlePopulationUsersLoaded}
       />
