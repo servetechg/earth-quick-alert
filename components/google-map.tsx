@@ -118,6 +118,8 @@ interface GoogleMapProps {
     heatClickOnly?: boolean
     /** Fired when user clicks a heatmap incident (demo tab workflows). */
     onHeatIncidentSelect?: (incident: UnifiedEventHeatPoint) => void
+    /** When true with stateBounds, fit the full state on initial load (sub-admin dashboards). */
+    fitStateOnLoad?: boolean
 }
 
 const containerStyle = {
@@ -235,6 +237,7 @@ function GoogleMapInner({
     heatIncidents = [],
     heatClickOnly = false,
     onHeatIncidentSelect,
+    fitStateOnLoad = false,
 }: GoogleMapProps) {
     const { isLoaded, loadError } = useJsApiLoader({
         id: GOOGLE_MAPS_LOADER_ID,
@@ -372,7 +375,7 @@ function GoogleMapInner({
     const establishStateZoomLimit = useCallback(
         (targetMap: google.maps.Map, bounds: MapStateBounds, preserveView = false) => {
             if (!preserveView) {
-                fitBoundedView(targetMap, bounds, applyStateMinZoom)
+                fitBoundedView(targetMap, bounds, applyStateMinZoom, 24)
                 return
             }
             const prevZoom = targetMap.getZoom()
@@ -439,8 +442,7 @@ function GoogleMapInner({
             })
 
             if (!stateBoundsFittedRef.current) {
-                // Keep current demo/regional zoom; only compute the full-state zoom-out floor
-                establishStateZoomLimit(map, stateBounds, true)
+                establishStateZoomLimit(map, stateBounds, !fitStateOnLoad)
                 stateBoundsFittedRef.current = true
             }
 
@@ -478,7 +480,7 @@ function GoogleMapInner({
                 google.maps.event.removeListener(dragEndListener)
             }
         }
-    }, [map, stateBounds, fitStateView, establishStateZoomLimit, coverageMapBounds])
+    }, [map, stateBounds, fitStateView, establishStateZoomLimit, coverageMapBounds, fitStateOnLoad])
 
     // Lock sub-admin license radius: fit full circle and restrict pan/zoom to its bbox
     React.useEffect(() => {

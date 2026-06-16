@@ -132,6 +132,8 @@ export function GISMap({
     stateWide?: boolean
     radiusMile?: number
   } | null>(null)
+  /** Fallback when user profile `focusState` is not hydrated yet (from situational-map coverage). */
+  const [apiCoverageState, setApiCoverageState] = useState<string | null>(null)
   const [mapPolylines, setMapPolylines] = useState<MapPolylineSpec[]>([])
   const [situationalLoading, setSituationalLoading] = useState(false)
   const [mapLayers, setMapLayers] = useState<Record<string, boolean>>(() =>
@@ -151,8 +153,13 @@ export function GISMap({
   const [cacheTrigger, setCacheTrigger] = useState(0)
   const heatSwitchId = useId()
 
+  const effectiveFocusState = useMemo(() => {
+    const st = (focusState || apiCoverageState || '').trim()
+    return st || undefined
+  }, [focusState, apiCoverageState])
+
   const stateBoundsRestriction = useMemo((): MapStateBounds | null => {
-    const st = (focusState || '').trim()
+    const st = (effectiveFocusState || '').trim()
     if (!st) return null
     const usps = normalizeStateToUsps(st)
     if (!usps) return null
@@ -160,7 +167,7 @@ export function GISMap({
     if (!bbox) return null
     const [west, south, east, north] = bbox
     return { west, south, east, north }
-  }, [focusState])
+  }, [effectiveFocusState])
 
   const lockToCoverageCircle = useMemo(() => {
     if (!showLayersPanel || !coverageCircle) return false
@@ -173,7 +180,7 @@ export function GISMap({
     if (lockToCoverageCircle) return null
     // State-scoped dashboards: pan/zoom limit is the full state (e.g. Arkansas), not tornado corridor
     if (stateBoundsRestriction) return stateBoundsRestriction
-    if (demoModeActive && unifiedMapFeed) {
+    if (demoModeActive && (unifiedMapFeed || stateScoped)) {
       const ar = getUsStateBbox('AR')
       if (ar) {
         const [west, south, east, north] = ar
@@ -181,7 +188,7 @@ export function GISMap({
       }
     }
     return null
-  }, [lockToCoverageCircle, demoModeActive, unifiedMapFeed, stateBoundsRestriction])
+  }, [lockToCoverageCircle, demoModeActive, unifiedMapFeed, stateScoped, stateBoundsRestriction])
 
   useEffect(() => {
     if (!unifiedMapFeed && !stateScoped) return
@@ -351,11 +358,25 @@ export function GISMap({
           setSubAdmins(mapLeaders(data.leaders))
         }
 
-        if (showLayersPanel && data.coverage?.center) {
+        let coverageIsState = false
+
+        if ((showLayersPanel || stateScoped) && data.coverage?.center) {
           const mile = data.coverage.radiusMile
           const isDemoStateWide = data.demo === true && data.coverage?.stateWide === true
           const isStateCoverage =
             data.coverage.coverageType === 'state' || isDemoStateWide
+          coverageIsState = isStateCoverage
+          if (isStateCoverage) {
+            const coverageState =
+              typeof data.coverage.state === 'string'
+                ? data.coverage.state
+                : typeof data.coverage.stateCode === 'string'
+                  ? data.coverage.stateCode
+                  : null
+            if (coverageState?.trim()) {
+              setApiCoverageState(coverageState.trim())
+            }
+          }
           setCoverageMeta({
             coverageType: isStateCoverage ? 'state' : 'radius',
             stateWide: isDemoStateWide,
@@ -380,9 +401,7 @@ export function GISMap({
             Number.isFinite(data.coverage.center.lng) &&
             !data.tornadoPath?.coordinates?.length
           ) {
-            if (isStateCoverage && focusState) {
-              /* state fitBounds handled by GoogleMap stateBounds */
-            } else if (!isStateCoverage) {
+            if (!isStateCoverage) {
               setMapCenter(data.coverage.center)
               if (typeof mile === 'number') {
                 setMapZoom(mapZoomForRadiusMiles(mile))
@@ -392,6 +411,22 @@ export function GISMap({
         } else {
           setCoverageCircle(null)
           setCoverageMeta(null)
+          if (data.coverage) {
+            coverageIsState =
+              data.coverage.coverageType === 'state' ||
+              (data.demo === true && data.coverage?.stateWide === true)
+            if (coverageIsState) {
+              const coverageState =
+                typeof data.coverage.state === 'string'
+                  ? data.coverage.state
+                  : typeof data.coverage.stateCode === 'string'
+                    ? data.coverage.stateCode
+                    : null
+              if (coverageState?.trim()) {
+                setApiCoverageState(coverageState.trim())
+              }
+            }
+          }
         }
 
         const tornadoPath = data.tornadoPath as
@@ -409,13 +444,16 @@ export function GISMap({
               label: typeof data.scenarioTitle === 'string' ? data.scenarioTitle : 'Tornado path',
             },
           ])
-          const lats = path.map((p) => p.lat)
-          const lngs = path.map((p) => p.lng)
-          setMapCenter({
-            lat: (Math.min(...lats) + Math.max(...lats)) / 2,
-            lng: (Math.min(...lngs) + Math.max(...lngs)) / 2,
-          })
-          setMapZoom(10)
+          // State-scoped dashboards keep the full-state viewport; only draw the path overlay.
+          if (!stateScoped && !coverageIsState) {
+            const lats = path.map((p) => p.lat)
+            const lngs = path.map((p) => p.lng)
+            setMapCenter({
+              lat: (Math.min(...lats) + Math.max(...lats)) / 2,
+              lng: (Math.min(...lngs) + Math.max(...lngs)) / 2,
+            })
+            setMapZoom(10)
+          }
         } else {
           setTornadoPathPoints([])
           setMapPolylines([])
@@ -1130,6 +1168,7 @@ export function GISMap({
           heatPoints={heatPoints}
           showHeatmap={showHeatmap}
           stateBounds={mapStateBounds}
+          fitStateOnLoad={Boolean(mapStateBounds)}
           coverageCircle={showLayersPanel ? coverageCircle : null}
           lockToCoverage={lockToCoverageCircle}
           polylines={mapPolylines}
