@@ -4,12 +4,18 @@ import dbConnect from '@/lib/mongodb';
 import { runDashboardIngest } from '@/lib/services/risk-ingest-service';
 import { openaiService } from '@/lib/services/openai-service';
 import { listUsersInAlignedAlertAreas } from '@/lib/services/users-in-aligned-alert-areas';
+import { getOrRevalidate } from '@/lib/services/risk-report-cache';
 import {
     buildPopulationAtRiskCacheKey,
     setPopulationAtRiskCache,
 } from '@/lib/services/population-at-risk-cache';
 import { recordActivity, ACTIVITY_ACTIONS } from '@/lib/activity-log';
-import { fetchAlignedUnifiedEventFeed, fetchPopulationAtRiskAlignedEventFeed } from '@/lib/services/alert-communication-aligned-feed';
+import {
+    fetchAlignedUnifiedEventDocsForSession,
+    fetchAlignedUnifiedEventFeed,
+    fetchPopulationAtRiskAlignedEventFeed,
+} from '@/lib/services/alert-communication-aligned-feed';
+import { computeRiskSnapshot } from '@/lib/services/risk-current-snapshot';
 import { applyRiskReportToAlignedAlertFeed } from '@/lib/services/risk-report-alert-alignment';
 import { resolveRiskIngestScopeForSession } from '@/lib/risk-assessment/resolve-ingest-scope';
 import {
@@ -54,6 +60,9 @@ export async function POST(req: Request) {
             nationwide?: boolean;
             /** When true, append an activity-log row (use only for explicit “Generate report” from AI Risk Assessment). */
             recordActivity?: boolean;
+            skipHistorical?: boolean;
+            /** When true, bypass the server SWR cache and recompute the ingest + report now. */
+            forceRefresh?: boolean;
         } = {};
         try {
             body = await req.json();
@@ -71,13 +80,20 @@ export async function POST(req: Request) {
         const nwpsGaugeId =
             typeof body.nwpsGaugeId === 'string' && body.nwpsGaugeId.length > 0 ? body.nwpsGaugeId : 'SACC1';
         const usgsSite = typeof body.usgsSite === 'string' && body.usgsSite.length > 0 ? body.usgsSite : undefined;
+        const skipHistorical = body.skipHistorical === true;
 
-        const bundle = await runDashboardIngest({
-            stateCd,
-            nwpsGaugeId,
-            usgsSite,
-            nationwide: useNationwide,
-        });
+        const forceRefresh = body.forceRefresh === true;
+        const cacheKey = `analyze:${scope.nationwide ? 'us' : scope.stateCd}:${skipHistorical ? 'card' : 'full'}:v1`;
+        const { bundle, report: baseReport } = await getOrRevalidate(cacheKey, async () => {
+            const bundle = await runDashboardIngest({
+                stateCd,
+                nwpsGaugeId,
+                usgsSite,
+                nationwide: useNationwide,
+            });
+            const report = await openaiService.synthesizeDashboardRiskReport(bundle, { includeHistorical: !skipHistorical });
+            return { bundle, report };
+        }, { force: forceRefresh });
 
         const jurisdiction =
             role === 'sub-admin'
@@ -94,7 +110,24 @@ export async function POST(req: Request) {
             };
         }
 
-        let report = await openaiService.synthesizeDashboardRiskReport(bundle);
+        let report = baseReport;
+
+        // Align the two headline KPIs (overall risk level + AI confidence) with the dashboard
+        // card's `/summary` endpoint: compute them from the SAME aligned UnifiedEvent docs using
+        // the SAME computeRiskSnapshot() math, so both surfaces show identical, stable values.
+        // The live-feed/AI-grounded fields (findings, recommendations, narrative) are untouched.
+        const snapshotEvents = await fetchAlignedUnifiedEventDocsForSession({
+            userId: session.user.id as string | undefined,
+            role,
+        });
+        const snapshot = computeRiskSnapshot(snapshotEvents, {
+            aiAvailable: openaiService.isAvailable(),
+        });
+        report = {
+            ...report,
+            overall_risk_level: snapshot.overall_risk_level,
+            ai_confidence: snapshot.ai_confidence,
+        };
 
         const alignedAlerts = await fetchAlignedUnifiedEventFeed({
             userId: session.user.id as string | undefined,
