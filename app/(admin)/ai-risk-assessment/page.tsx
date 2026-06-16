@@ -1142,7 +1142,7 @@ function createRiskReportPdf(
 
   for (const bucket of severityBuckets) {
     for (const cat of bucket.categories) {
-      writeBullets(`${bucket.severity} — ${humanizeCategory(cat.category)}`, (cat.bullets ?? []).map((b) => normalizeAiBullet(b.text)));
+      writeBullets(`${bucket.severity} — ${humanizeCategory(cat.category)}`, (cat.bullets ?? []).map((b) => b.text));
     }
   }
 

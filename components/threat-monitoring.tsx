@@ -5,7 +5,6 @@ import { Card } from '@/components/ui/card'
 import { CheckCircle2, Loader2, AlertCircle, RefreshCw } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Skeleton } from '@/components/ui/skeleton'
-import type { RiskReport } from '@/lib/types/risk-assessment'
 import {
     THREAT_CARD_LAST_KEY,
     buildThreatCardCacheKey,
@@ -47,21 +46,12 @@ function overallLevelToRelevance(level: string): 'High' | 'Medium' | 'Low' {
     return 'Low'
 }
 
-function reportToPanelRow(report: RiskReport, locationLabel: string): ThreatPanelRow {
-    return {
-        relevance: overallLevelToRelevance(report.overall_risk_level),
-        severity: (report.overall_risk_level || 'NOMINAL').toUpperCase(),
-        affectedAreas: locationLabel,
-        confidence: typeof report.ai_confidence === 'number' ? report.ai_confidence : 0,
-    }
-}
-
 export function ThreatMonitoring({ locationName }: ThreatMonitoringProps) {
     // Restore the last saved card row for an instant, skeleton-free first paint.
     const [row, setRow] = useState<ThreatPanelRow | null>(() => loadCachedThreatRow(THREAT_CARD_LAST_KEY))
     const [loading, setLoading] = useState<boolean>(() => loadCachedThreatRow(THREAT_CARD_LAST_KEY) === null)
     const [error, setError] = useState<string | null>(null)
-    const [affectedAreaLabel, setAffectedAreaLabel] = useState('Regional scope')
+    const [affectedAreaLabel, setAffectedAreaLabel] = useState('United States')
     // When the displayed KPI data was computed (from /summary, refined by /analyze).
     const [updatedAt, setUpdatedAt] = useState<string | null>(null)
     // Manual "Refresh now" in progress (force re-pull). Separate from the first-paint skeleton.
@@ -133,11 +123,12 @@ export function ThreatMonitoring({ locationName }: ThreatMonitoringProps) {
                 // Continue to generic fallback.
             }
 
-            try {
-                if (!cancelled) setAffectedAreaLabel(label === 'USA' ? 'USA' : label !== 'Current Location' ? label : 'Regional scope')
-            } catch {
-                if (!cancelled) setAffectedAreaLabel('Regional scope')
-            }
+            // Final fallback. This card only renders on the nationwide super-admin/admin
+            // dashboard, so when no specific state/city resolves the actual scope is the whole
+            // country — never a vague "Regional scope".
+            const fallbackLabel =
+                label !== 'Current Location' && label !== 'USA' ? label : 'United States'
+            if (!cancelled) setAffectedAreaLabel(fallbackLabel)
         }
 
         resolveAffectedArea()
@@ -197,9 +188,11 @@ export function ThreatMonitoring({ locationName }: ThreatMonitoringProps) {
         return () => timers.forEach(clearTimeout)
     }, [row])
 
-    // One fetch cycle: Stage 1 (/summary, primary) then Stage 2 (/analyze, silent refine).
-    // opts.force = user-triggered "Refresh now" → bypass server caches (real live re-pull).
-    // opts.silent = background poll → no skeleton/spinner, never surfaces an error.
+    // Single fast fetch: deterministic KPIs from the DB-backed /summary endpoint. The card
+    // intentionally does NOT call the heavy /analyze (8 live feeds + AI) — its KPIs are aligned
+    // to /summary, so /analyze adds latency without changing what's shown. A timeout guards
+    // against a slow/unreachable server so the card never spins indefinitely.
+    // opts.force = "Refresh now" → bypass the server cache. opts.silent = background poll.
     const runAssessment = useCallback(
         async (opts?: { force?: boolean; silent?: boolean }) => {
             const force = opts?.force === true
@@ -208,77 +201,41 @@ export function ThreatMonitoring({ locationName }: ThreatMonitoringProps) {
             busyRef.current = true
 
             const hasRestored = hadCachedRowRef.current === true
-            let stageOneOk = false
             if (!silent) setError(null)
             if (force) setRefreshing(true)
             else if (!hasRestored && !silent) setLoading(true)
 
             const alive = () => mountedRef.current
+            const ctrl = new AbortController()
+            const timeout = setTimeout(() => ctrl.abort(), 15000)
 
             try {
-                // Stage 1 (fast, primary): deterministic KPIs from DB-backed summary.
-                try {
-                    const sumUrl = force
-                        ? '/api/risk-assessment/summary?refresh=1'
-                        : '/api/risk-assessment/summary'
-                    const sumRes = await fetch(sumUrl, { credentials: 'same-origin' }).catch(() => null)
-                    if (sumRes && sumRes.ok) {
-                        const sumJson = await sumRes.json().catch(() => ({}))
-                        if (alive() && sumJson) {
-                            setRow({
-                                relevance: overallLevelToRelevance(sumJson.overall_risk_level || 'NOMINAL'),
-                                severity: (sumJson.overall_risk_level || 'NOMINAL').toUpperCase(),
-                                affectedAreas: affectedAreaLabel,
-                                confidence: typeof sumJson.ai_confidence === 'number' ? sumJson.ai_confidence : 0,
-                            })
-                            setUpdatedAt(typeof sumJson.generated_at === 'string' ? sumJson.generated_at : new Date().toISOString())
-                            stageOneOk = true
+                const sumUrl = force
+                    ? '/api/risk-assessment/summary?refresh=1'
+                    : '/api/risk-assessment/summary'
+                const sumRes = await fetch(sumUrl, { credentials: 'same-origin', signal: ctrl.signal }).catch(() => null)
+                if (sumRes && sumRes.ok) {
+                    const sumJson = await sumRes.json().catch(() => ({}))
+                    if (alive() && sumJson) {
+                        const newRow: ThreatPanelRow = {
+                            relevance: overallLevelToRelevance(sumJson.overall_risk_level || 'NOMINAL'),
+                            severity: (sumJson.overall_risk_level || 'NOMINAL').toUpperCase(),
+                            affectedAreas: affectedAreaLabel,
+                            confidence: typeof sumJson.ai_confidence === 'number' ? sumJson.ai_confidence : 0,
                         }
+                        setRow(newRow)
+                        setUpdatedAt(typeof sumJson.generated_at === 'string' ? sumJson.generated_at : new Date().toISOString())
+                        // Cache immediately so the next visit paints instantly (no skeleton).
+                        saveCachedThreatRow(buildThreatCardCacheKey(affectedAreaLabel), newRow)
                     }
-                } catch (err) {
-                    console.error('Threat monitoring — summary:', err)
-                } finally {
-                    if (alive()) setLoading(false)
-                }
-
-                // Surface an error only when we have nothing at all to show (never on silent polls).
-                if (alive() && !hasRestored && !stageOneOk && !silent) {
+                } else if (alive() && !hasRestored && !silent) {
+                    // Nothing cached and the request failed/timed out — surface a soft message.
                     setError('Service temporarily unavailable')
-                    return
                 }
-
-                // Stage 2 (silent refine): the AI-grounded report. Only nudges KPI values if changed.
-                try {
-                    const response = await fetch('/api/risk-assessment/analyze', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        credentials: 'same-origin',
-                        /** Nationwide dashboard ingest; forceRefresh on a manual "Refresh now". */
-                        body: JSON.stringify({ skipHistorical: true, forceRefresh: force }),
-                    })
-                    if (!response.ok) return
-                    const json = await response.json().catch(() => ({}))
-                    if (!alive() || !json?.report) return
-
-                    const refined = reportToPanelRow(json.report as RiskReport, affectedAreaLabel)
-                    const refinedAt = (json.report as RiskReport)?.generated_at
-                    if (typeof refinedAt === 'string' && refinedAt) setUpdatedAt(refinedAt)
-                    setRow((prev) => {
-                        if (
-                            prev &&
-                            prev.relevance === refined.relevance &&
-                            prev.severity === refined.severity &&
-                            prev.confidence === refined.confidence
-                        ) {
-                            return prev
-                        }
-                        return { ...refined, affectedAreas: prev?.affectedAreas ?? refined.affectedAreas }
-                    })
-                    saveCachedThreatRow(buildThreatCardCacheKey(affectedAreaLabel), refined)
-                } catch (err) {
-                    console.error('Threat monitoring — analyze refine:', err)
-                }
+            } catch (err) {
+                console.error('Threat monitoring — summary:', err)
             } finally {
+                clearTimeout(timeout)
                 busyRef.current = false
                 if (alive()) {
                     setLoading(false)

@@ -1368,7 +1368,6 @@ EVENT REFERENCE TRACKING — REQUIRED:
 - "eventRefs" is an array of strings, length >= 1, containing every _ref the bullet covers.
 - Union of all "eventRefs" across all bullets MUST equal the full input set — no event may be silently dropped.
 - Do NOT invent _ref values. Only return strings that appeared in the input.
-- CRITICAL: The "_ref" values are internal IDs. They go ONLY in the "eventRefs" array. NEVER write them, or phrases like "Event references", into the bullet "text" — the "text" is shown to users and must read as a clean sentence with no ID strings.
 
 Return JSON: {"bullets": [{"text": "<sentence>", "eventRefs": ["<_ref>", ...]}, ...]}.`,
                 },

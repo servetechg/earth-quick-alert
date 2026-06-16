@@ -71,7 +71,9 @@ export function clearCachedAiRiskReport(cacheKey: string): void {
 
 // v2: KPIs now sourced from computeRiskSnapshot on both /summary and /analyze (aligned formulas);
 // bump invalidates rows cached under the old, divergent /analyze values.
-const THREAT_CARD_VERSION = 2;
+// v3: affected-area fallback now defaults to "United States" (never "Regional scope");
+// bump discards rows cached with the old vague label.
+const THREAT_CARD_VERSION = 3;
 
 export type ThreatCardRow = {
   relevance: 'High' | 'Medium' | 'Low';

@@ -36,38 +36,14 @@ export function dropAbsenceSentences(text: string): string {
 }
 
 /**
- * Strip internal event-reference IDs the model sometimes echoes into prose
- * (e.g. `Event references: ["6a2f3133fdc9c682c7879e5d", ...]`). These are
- * MongoDB ObjectIds meant only for the structured `eventRefs` field — never
- * shown to users.
- */
-export function stripEventRefArtifacts(text: string): string {
-  if (!text) return ''
-  return text
-    // "Event reference(s): [ ... ]" — label plus its bracketed array
-    .replace(/\s*\bevent\s+references?\b\s*:?\s*\[[^\]]*\]/gi, '')
-    // bare array of 24-char hex ObjectIds left anywhere in the sentence
-    .replace(/\[\s*["']?[0-9a-f]{24}["']?(?:\s*,\s*["']?[0-9a-f]{24}["']?)*\s*\]/gi, '')
-    // dangling "Event references:" label with no array after it
-    .replace(/\s*\bevent\s+references?\b\s*:?/gi, '')
-    // tidy whitespace / trailing punctuation left behind by the removals
-    .replace(/\s{2,}/g, ' ')
-    .replace(/\s+([.;,])/g, '$1')
-    .replace(/[\s.;,]+$/g, '')
-    .trim()
-}
-
-/**
  * Coerce AI JSON fields to display-safe strings.
  * OpenAI occasionally returns structured objects instead of prose bullets.
  */
 export function normalizeAiBullet(item: unknown): string {
-  let out = ''
-  if (typeof item === 'string') {
-    out = item.trim()
-  } else if (typeof item === 'number' || typeof item === 'boolean') {
-    out = String(item)
-  } else if (item && typeof item === 'object') {
+  if (typeof item === 'string') return item.trim()
+  if (typeof item === 'number' || typeof item === 'boolean') return String(item)
+
+  if (item && typeof item === 'object') {
     const o = item as Record<string, unknown>
     const name = pickField(o, ['name', 'title', 'event', 'type'])
     const location = pickField(o, ['location', 'primaryLocation', 'area', 'county'])
@@ -75,20 +51,14 @@ export function normalizeAiBullet(item: unknown): string {
     const severity = pickField(o, ['severity', 'level'])
     const description = pickField(o, ['description', 'summary', 'text', 'bullet'])
 
-    if (description && !name && !location) {
-      out = description
-    } else {
-      const parts = [name, location, time, severity].filter(Boolean)
-      if (parts.length) out = parts.join(' — ')
-    }
+    if (description && !name && !location) return description
+
+    const parts = [name, location, time, severity].filter(Boolean)
+    if (parts.length) return parts.join(' — ')
   }
 
-  if (!out) {
-    const fallback = String(item ?? '').trim()
-    out = fallback === '[object Object]' ? '' : fallback
-  }
-
-  return stripEventRefArtifacts(out)
+  const fallback = String(item ?? '').trim()
+  return fallback === '[object Object]' ? '' : fallback
 }
 
 export function normalizeAiBulletList(items: unknown, max = 20): string[] {
