@@ -24,7 +24,7 @@ export function buildDemoRiskSnapshot(): RiskSnapshot {
     return {
         ...snapshot,
         overall_risk_level: 'SEVERE',
-        populations_at_risk: 1_284,
+        populations_at_risk: 412_000,
         ai_confidence: 92,
         sources_count: alertCount,
     };
@@ -39,8 +39,8 @@ export function buildDemoRiskReport(): RiskReport {
         generated_at: new Date().toISOString(),
         overall_risk_level: 'SEVERE',
         ai_confidence: 92,
-        populations_at_risk: 1_284,
-        ready2go_users_reachable: 1284,
+        populations_at_risk: 412_000,
+        ready2go_users_reachable: DEMO_CITIZEN_MARKERS.length,
         domain_severities: {
             meteorological: 'SEVERE',
             hydrological: 'ELEVATED',
@@ -145,6 +145,7 @@ export function buildDemoAnalyzeResponse() {
 
     return {
         report,
+        population_exposure: bundle.riskExposure ?? null,
         ingest: {
             successfulSources: bundle.successfulSources,
             totalSignals: bundle.totalSignals,
@@ -153,7 +154,7 @@ export function buildDemoAnalyzeResponse() {
             ingestScope: 'state' as const,
             nwpsGaugeId: bundle.nwpsGaugeId,
             populationsAtRiskAcsEstimate: 412_000,
-            reachableReady2GoUsers: 1284,
+            reachableReady2GoUsers: DEMO_CITIZEN_MARKERS.length,
             riskExposureVintage: bundle.riskExposure?.censusVintageLabel ?? null,
             aligned_event_count: aligned.length,
             aligned_alert_count: aligned.length,
@@ -171,12 +172,14 @@ export function buildDemoAnalyzeResponse() {
 export function buildDemoSummaryResponse() {
     const snapshot = buildDemoRiskSnapshot();
     const report = buildDemoRiskReport();
+    const analyze = buildDemoAnalyzeResponse();
     const populationAtRiskUsers = DEMO_CITIZEN_MARKERS.map((c, i) => ({
         id: c.id,
         name: c.title,
         email: `citizen${i + 1}@demo.ready2go.app`,
         address: c.location,
     }));
+    const censusEstimate = analyze.ingest.populationsAtRiskAcsEstimate ?? 412_000;
     const { severity_buckets, ...rest } = snapshot;
     return {
         ...rest,
@@ -184,7 +187,9 @@ export function buildDemoSummaryResponse() {
         major_incidents: report.major_incidents,
         minor_incidents: report.minor_incidents,
         incident_distribution: report.incident_distribution,
-        populations_at_risk: populationAtRiskUsers.length,
+        populations_at_risk: censusEstimate,
+        ready2go_users_at_risk: populationAtRiskUsers.length,
+        population_exposure: analyze.population_exposure ?? null,
         population_at_risk_users: populationAtRiskUsers,
         ai_available: true,
         demo: true,
