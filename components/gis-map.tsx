@@ -1004,8 +1004,8 @@ export function GISMap({
         currentFiltered = []
     }
 
-    // Sub-admin dashboards pass the admin name as selectedLocation — skip for demo markers
-    if (selectedLocation !== 'All' && !isDemoSimulation) {
+    // Sub-admin: citizens/responders already scoped by situational-map API (radius/state).
+    if (selectedLocation !== 'All' && !isDemoSimulation && !stateScoped) {
       currentFiltered = currentFiltered.filter(m =>
         m.subAdminName === selectedLocation ||
         m.location === selectedLocation ||
@@ -1029,6 +1029,7 @@ export function GISMap({
     markerInCoverage,
     isDemoSimulation,
     selectedDemoHeat,
+    stateScoped,
   ])
 
   /** Operational dashboards always show incidents/heatmap; Filter checkbox is optional elsewhere. */
@@ -1304,7 +1305,7 @@ export function GISMap({
           heatPoints={heatPoints}
           showHeatmap={showHeatmap}
           stateBounds={mapStateBounds}
-          coverageCircle={showLayersPanel ? coverageCircle : null}
+          coverageCircle={showLayersPanel && coverageMeta?.coverageType !== 'state' ? coverageCircle : null}
           lockToCoverage={lockToCoverageCircle}
           polylines={combinedPolylines}
           disasterZoneCircles={disasterZoneCircles}
