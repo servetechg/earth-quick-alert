@@ -51,6 +51,7 @@ export function buildDemoRiskReport(): RiskReport {
             `SPC High Risk (5/5) outlook; Tornado Watch → Garland funnel (1:18 PM) → Pulaski Warning (2:03 PM) → Martindale touchdown (2:18 PM CDT).`,
             `Tornado emergencies for Cammack Village and Sherwood/Jacksonville; NWS LZK take-cover with Memphis warning handoff.`,
             `${t.impacts.structuresDamagedOrDestroyed.toLocaleString()} structures damaged/destroyed (588 major damage in Breckenridge segment); mass-casualty declared — 54 injuries.`,
+            `WARNING: Responders must remain alert to impending tornado threads and secondary convective lines. Active warning warnings require immediate shelter-in-place protocols.`,
         ],
         hydrological_findings: [
             'Localized flash flooding possible in debris-clogged drainage basins post-storm.',
@@ -71,16 +72,22 @@ export function buildDemoRiskReport(): RiskReport {
                 step: 2,
             },
             {
+                priority: 'IMMEDIATE',
+                action: 'WARNING: Coordinate real-time radar monitoring to warn field responders of impending tornado threads and secondary storm lines in the track corridor.',
+                deployable: false,
+                step: 3,
+            },
+            {
                 priority: 'URGENT',
                 action: 'Email situational risk PDF to Arkansas sub-admins and responders via operational mail queue.',
                 deployable: true,
-                step: 3,
+                step: 4,
             },
             {
                 priority: 'STANDARD',
                 action: 'Open Virtual EOC bridge and track hospital capacity surge (54 injuries reported).',
                 deployable: false,
-                step: 4,
+                step: 5,
             },
         ],
         incident_distribution: snapshot.incident_distribution,
