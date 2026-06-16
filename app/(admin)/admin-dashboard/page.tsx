@@ -219,7 +219,6 @@ export default function Dashboard() {
           <GISMap
             title="Live Situational Map"
             showLayersPanel
-            showCriticalInfraLayers
             showDisasterZones
             stateScoped
             visibleTabs={['Citizens', 'Responders']}

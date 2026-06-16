@@ -1,10 +1,10 @@
 import User from '@/models/User';
 import Responder from '@/models/Responder';
-import { getSubAdminUserFilter } from '@/lib/admin-filters';
 import { geocodeLocation } from '@/lib/services/location-matching';
 import { normalizeStateToUsps } from '@/lib/utils/us-state-usps';
 import {
     coordinatesInJurisdiction,
+    jurisdictionLatLngBBox,
     resolveSubAdminJurisdiction,
     type SubAdminJurisdiction,
 } from '@/lib/sub-admin/jurisdiction';
@@ -23,7 +23,117 @@ export type GisMapMarkerDto = {
     icon?: string;
 };
 
-const CITIZEN_ROLES = ['user', 'manager', 'eoc-manager', 'admin'] as const;
+const CITIZEN_ROLES = ['user'] as const;
+
+function buildScopedCitizenQuery(
+    subAdminUserId: string,
+    jurisdiction: SubAdminJurisdiction,
+    licenseId: unknown,
+    stateRaw: string,
+): Record<string, unknown> {
+    const scopeOr: Record<string, unknown>[] = [{ createdBy: subAdminUserId }];
+    if (licenseId) scopeOr.push({ licenseId });
+
+    if (stateRaw) {
+        const escaped = stateRaw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        scopeOr.push({ state: new RegExp(escaped, 'i') });
+        const usps = normalizeStateToUsps(stateRaw);
+        if (usps) scopeOr.push({ state: new RegExp(usps, 'i') });
+    }
+
+    const base: Record<string, unknown> = {
+        role: { $in: [...CITIZEN_ROLES] },
+        accountStatus: 'approved',
+        $or: scopeOr,
+    };
+
+    if (jurisdiction.coverageType === 'radius') {
+        const bbox = jurisdictionLatLngBBox(jurisdiction);
+        return {
+            $and: [
+                base,
+                {
+                    $or: [
+                        {
+                            lat: { $gte: bbox.minLat, $lte: bbox.maxLat },
+                            lng: { $gte: bbox.minLng, $lte: bbox.maxLng },
+                        },
+                        { lat: { $exists: false } },
+                        { lng: { $exists: false } },
+                        { lat: null },
+                        { lng: null },
+                    ],
+                },
+            ],
+        };
+    }
+
+    return base;
+}
+
+export async function fetchScopedCitizenMarkers(subAdminUserId: string): Promise<GisMapMarkerDto[]> {
+    const jurisdiction = await resolveSubAdminJurisdiction(subAdminUserId);
+    if (!jurisdiction) return [];
+
+    const subAdmin = await User.findById(subAdminUserId).select('state licenseId').lean();
+    if (!subAdmin) return [];
+
+    const stateRaw = typeof subAdmin.state === 'string' ? subAdmin.state.trim() : '';
+    const licenseId = subAdmin.licenseId;
+
+    const query = buildScopedCitizenQuery(
+        subAdminUserId,
+        jurisdiction,
+        licenseId,
+        stateRaw,
+    );
+
+    const users = await User.find(query)
+        .select('name location city state zipcode isSafe lat lng')
+        .limit(500)
+        .lean();
+
+    const markers: GisMapMarkerDto[] = [];
+    const seen = new Set<string>();
+    let geocodeBudget = 60;
+
+    for (const u of users) {
+        const id = String(u._id);
+        if (seen.has(id)) continue;
+
+        const locationStr =
+            (typeof u.location === 'string' && u.location.trim()) ||
+            [u.city, u.state, u.zipcode].filter(Boolean).join(', ');
+
+        let coords: { lat: number; lng: number } | null = null;
+        if (typeof u.lat === 'number' && typeof u.lng === 'number') {
+            coords = { lat: u.lat, lng: u.lng };
+        } else if (geocodeBudget > 0) {
+            coords = await resolveCoords(null, null, locationStr);
+            if (coords) geocodeBudget -= 1;
+        }
+        if (!coords) continue;
+        if (!coordinatesInJurisdiction(coords.lat, coords.lng, jurisdiction)) continue;
+
+        seen.add(id);
+        const isSafe = u.isSafe !== false;
+        markers.push({
+            id,
+            lat: coords.lat,
+            lng: coords.lng,
+            title: String(u.name || 'Citizen'),
+            type: 'user',
+            isSafe,
+            status: isSafe ? 'Safe' : 'At Risk',
+            location: locationStr,
+            description: isSafe
+                ? `Citizen · ${locationStr || 'Unknown'}`
+                : `At risk · ${locationStr || 'Unknown'}`,
+        });
+    }
+
+    return markers;
+}
 
 function responderVisuals(unitType: string) {
     const t = unitType.toLowerCase();
@@ -48,57 +158,6 @@ async function resolveCoords(
     return { lat: geo.lat, lng: geo.lon };
 }
 
-export async function fetchScopedCitizenMarkers(subAdminUserId: string): Promise<GisMapMarkerDto[]> {
-    const jurisdiction = await resolveSubAdminJurisdiction(subAdminUserId);
-    const subAdmin = await User.findById(subAdminUserId).select('state city name').lean();
-    if (!subAdmin) return [];
-
-    const userFilter = await getSubAdminUserFilter(subAdminUserId);
-    const baseQuery = { role: { $in: [...CITIZEN_ROLES] } };
-    const query = userFilter ? { $and: [baseQuery, userFilter] } : baseQuery;
-
-    const users = await User.find(query)
-        .select('name location city state zipcode isSafe accountStatus')
-        .limit(200)
-        .lean();
-
-    const markers: GisMapMarkerDto[] = [];
-    let geocodeBudget = 40;
-
-    for (const u of users) {
-        const locationStr =
-            (typeof u.location === 'string' && u.location.trim()) ||
-            [u.city, u.state, u.zipcode].filter(Boolean).join(', ');
-
-        let coords: { lat: number; lng: number } | null = null;
-        if (geocodeBudget > 0) {
-            coords = await resolveCoords(null, null, locationStr);
-            if (coords) geocodeBudget -= 1;
-        }
-        if (!coords) continue;
-        if (jurisdiction && !coordinatesInJurisdiction(coords.lat, coords.lng, jurisdiction)) {
-            continue;
-        }
-
-        const isSafe = u.isSafe !== false;
-        markers.push({
-            id: String(u._id),
-            lat: coords.lat,
-            lng: coords.lng,
-            title: String(u.name || 'Citizen'),
-            type: 'user',
-            isSafe,
-            status: isSafe ? 'Safe' : 'At Risk',
-            location: locationStr,
-            description: isSafe
-                ? `Citizen · ${locationStr || 'Unknown'}`
-                : `At risk · ${locationStr || 'Unknown'}`,
-        });
-    }
-
-    return markers;
-}
-
 export async function fetchScopedResponderMarkers(subAdminUserId: string): Promise<GisMapMarkerDto[]> {
     const jurisdiction = await resolveSubAdminJurisdiction(subAdminUserId);
     const subAdmin = await User.findById(subAdminUserId)
@@ -121,7 +180,7 @@ export async function fetchScopedResponderMarkers(subAdminUserId: string): Promi
     if (scopeOr.length > 0) andParts.push({ $or: scopeOr });
 
     const responderUsers = await User.find({ $and: andParts })
-        .select('name location city state responderVertical responderFunction')
+        .select('name location city state lat lng responderVertical responderFunction')
         .limit(100)
         .lean();
 
@@ -192,7 +251,17 @@ export async function fetchScopedResponderMarkers(subAdminUserId: string): Promi
         const locationStr =
             (typeof u.location === 'string' && u.location.trim()) ||
             [u.city, u.state].filter(Boolean).join(', ');
-        await pushMarker(String(u._id), String(u.name || 'Responder'), unitType, 'Active', locationStr, null, jurisdiction);
+        await pushMarker(
+            String(u._id),
+            String(u.name || 'Responder'),
+            unitType,
+            'Active',
+            locationStr,
+            typeof u.lat === 'number' && typeof u.lng === 'number'
+                ? { lat: u.lat, lng: u.lng }
+                : null,
+            jurisdiction,
+        );
     }
 
     for (const r of legacyResponders) {
