@@ -82,6 +82,10 @@ export async function POST(req: NextRequest) {
                     requestedLicenseType: 'state',
                     licenseId: null,
                 });
+            } else if (!String(existingUser.state ?? '').trim()) {
+                existingUser.state = 'Arkansas';
+                existingUser.requestedLicenseType = existingUser.requestedLicenseType || 'state';
+                await existingUser.save();
             }
             await ensureArkansasPresentationLicense(existingUser._id.toString());
         }
