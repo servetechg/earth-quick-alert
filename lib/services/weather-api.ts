@@ -44,7 +44,7 @@ export class WeatherAPIService {
      */
     async fetchFullWeatherData(lat: number, lon: number): Promise<WeatherData> {
         try {
-            const url = `${this.baseURL}?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m,visibility&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=auto&forecast_days=7`;
+            const url = `${this.baseURL}?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m,visibility&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=auto&forecast_days=7`;
 
             const response = await fetch(url);
             if (!response.ok) throw new Error(`Weather API error: ${response.status}`);

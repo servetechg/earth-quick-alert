@@ -20,6 +20,7 @@ import {
     buildDemoSummaryResponse,
 } from '@/lib/demo/build-risk-responses';
 import { DEMO_SCENARIO_ID, DEMO_SCENARIO_TITLE } from '@/lib/demo/constants';
+import { buildDemoAfterActionReview } from '@/lib/demo/build-aar-response';
 
 export type DemoSessionContext = {
     active: true;
@@ -131,4 +132,5 @@ export {
     buildDemoIncidentDetails,
     buildDemoSeveritySummaries,
     buildDemoSummaryResponse,
+    buildDemoAfterActionReview,
 };

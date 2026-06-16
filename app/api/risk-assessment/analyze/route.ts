@@ -17,6 +17,7 @@ import {
     resolveSubAdminJurisdiction,
 } from '@/lib/sub-admin/jurisdiction';
 import { resolveDemoSessionContext, buildDemoAnalyzeResponse } from '@/lib/demo/provider';
+import { computeCensusExposureFromAlertRows } from '@/lib/services/alert-area-census-exposure';
 
 /** Roles allowed to run Dashboard A fusion (aligned with admin operational tooling). */
 const ALLOWED_ROLES = new Set([
@@ -114,9 +115,23 @@ export async function POST(req: Request) {
         );
         const usersAtRisk = usersAtRiskList.length;
 
+        const scopeStateUsps =
+            jurisdiction?.stateCode ??
+            (stateCd !== 'us' ? stateCd.toUpperCase() : null);
+        const alertExposure = await computeCensusExposureFromAlertRows(alignedAlerts, {
+            defaultStateUsps: scopeStateUsps,
+            scopeStateUsps,
+            dashboardStateCd: stateCd,
+            jurisdiction,
+        });
+        const censusAtRisk =
+            alertExposure && alertExposure.populationAffectedEstimate > 0
+                ? alertExposure.populationAffectedEstimate
+                : bundle.riskExposure?.populationAffectedEstimate ?? 0;
+
         report = {
             ...report,
-            populations_at_risk: usersAtRisk,
+            populations_at_risk: censusAtRisk,
             ready2go_users_reachable: usersAtRisk,
         };
 
@@ -145,7 +160,8 @@ export async function POST(req: Request) {
                 ingestScope: bundle.ingestScope ?? 'nationwide',
                 nwpsGaugeId: bundle.nwpsGaugeId,
                 usgsSite: bundle.usgsSite,
-                populationsAtRiskAcsEstimate: bundle.riskExposure?.populationAffectedEstimate ?? null,
+                populationsAtRiskAcsEstimate: censusAtRisk,
+                alertAreaPopulationExposure: alertExposure,
                 reachableReady2GoUsers: usersAtRisk,
                 riskExposureVintage: bundle.riskExposure?.censusVintageLabel ?? null,
                 /** Same live UnifiedEvent rows as Alerts & Communication after refresh + role filter. */

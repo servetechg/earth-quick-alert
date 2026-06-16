@@ -4,9 +4,14 @@ import { join } from 'path';
 import connectDB from '@/lib/mongodb';
 import mongoose from 'mongoose';
 import ContinuityPlan from '@/models/ContinuityPlan';
+import ContinuityAuditReport from '@/models/ContinuityAuditReport';
 import { getSession } from '@/lib/auth';
 import { destroyEmergencyPlanAsset } from '@/lib/emergency-plan-cloudinary';
 import type { EmergencyPlanCloudinaryResource } from '@/lib/emergency-plan-cloudinary';
+import {
+    rescanIntegrityAttachments,
+    usePythonIntegrityBackend,
+} from '@/lib/services/python-integrity-client';
 
 export const runtime = 'nodejs';
 
@@ -71,6 +76,17 @@ export async function DELETE(req: Request) {
             return NextResponse.json({ success: false, error: 'Attachment not found on plan' }, { status: 404 });
         }
 
+        let aiCleanupOk = true;
+        if (usePythonIntegrityBackend()) {
+            const rescan = await rescanIntegrityAttachments(String(ownerUserId), [attachmentId], true);
+            if (!rescan) {
+                aiCleanupOk = false;
+                console.warn(
+                    `[continuity-delete] Python rescan failed for attachmentId=${attachmentId} — continuing with vault delete`,
+                );
+            }
+        }
+
         if (att.cloudinaryPublicId && att.cloudinaryResourceType) {
             try {
                 await destroyEmergencyPlanAsset(
@@ -97,8 +113,17 @@ export async function DELETE(req: Request) {
 
         await ContinuityPlan.updateOne({ ownerUserId, planId }, { $pull: { attachments: { _id: subdocId } } });
 
+        await ContinuityAuditReport.deleteOne({ ownerUserId }).catch((e) => {
+            console.warn('[continuity-delete] failed to clear cached audit report:', e);
+        });
+
         const updated = await ContinuityPlan.findOne({ ownerUserId, planId });
-        return NextResponse.json({ success: true, message: 'Attachment deleted', data: updated });
+        return NextResponse.json({
+            success: true,
+            message: 'Attachment deleted',
+            aiCleanupOk,
+            data: updated,
+        });
     } catch (error) {
         console.error('ContinuityPlan attachment DELETE error:', error);
         return NextResponse.json({ success: false, error: 'Internal Server Error' }, { status: 500 });

@@ -185,6 +185,7 @@ export default function Dashboard() {
     <AdminPageShell className="bg-slate-100/50" innerClassName="space-y-4">
       <div className="flex justify-end dashboard-export-ignore">
         <DashboardSnapshotExport
+          subAdminRecipientPicker
           snapshotTitle="Sub-Admin Situational Dashboard"
           summaryLine={
             incidentLive?.description

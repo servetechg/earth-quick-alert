@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import html2canvas from 'html2canvas-pro'
 import { Camera, Loader2, Mail, Download } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -14,11 +14,21 @@ import {
 } from '@/components/ui/dialog'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
+import { Checkbox } from '@/components/ui/checkbox'
+
+type SnapshotResponderRecipient = {
+  id: string
+  name: string
+  email: string
+  unitType: string
+}
 
 type DashboardSnapshotExportProps = {
   exportRootId?: string
   snapshotTitle?: string
   summaryLine?: string
+  /** Sub-admin: pick specific responders or send to all scoped responders. */
+  subAdminRecipientPicker?: boolean
 }
 
 const EXPORT_MIN_WIDTH_PX = 1600
@@ -48,7 +58,6 @@ function prepareCloneForCapture(clonedRoot: HTMLElement, captureWidth: number) {
     }
   })
 
-  // Ensure multi-column dashboard layout renders at full width in the clone
   clonedRoot.querySelectorAll<HTMLElement>('.flex, .grid').forEach((el) => {
     el.style.maxWidth = 'none'
   })
@@ -58,12 +67,62 @@ export function DashboardSnapshotExport({
   exportRootId = 'dashboard-export-root',
   snapshotTitle = 'Situational Dashboard Snapshot',
   summaryLine,
+  subAdminRecipientPicker = false,
 }: DashboardSnapshotExportProps) {
   const [open, setOpen] = useState(false)
   const [extraEmails, setExtraEmails] = useState('')
   const [capturing, setCapturing] = useState(false)
   const [sending, setSending] = useState(false)
   const [status, setStatus] = useState<{ type: 'ok' | 'err'; message: string } | null>(null)
+
+  const [responders, setResponders] = useState<SnapshotResponderRecipient[]>([])
+  const [loadingRecipients, setLoadingRecipients] = useState(false)
+  const [sendToAllResponders, setSendToAllResponders] = useState(true)
+  const [selectedResponderIds, setSelectedResponderIds] = useState<Set<string>>(new Set())
+
+  const loadRecipients = useCallback(async () => {
+    if (!subAdminRecipientPicker) return
+    setLoadingRecipients(true)
+    try {
+      const res = await fetch('/api/admin/dashboard-snapshot/recipients')
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        throw new Error(data.error ?? 'Failed to load responders')
+      }
+      const list = Array.isArray(data.responders) ? data.responders : []
+      setResponders(list)
+      setSelectedResponderIds(new Set(list.map((r: SnapshotResponderRecipient) => r.id)))
+    } catch (e) {
+      setResponders([])
+      setStatus({
+        type: 'err',
+        message: e instanceof Error ? e.message : 'Could not load responders',
+      })
+    } finally {
+      setLoadingRecipients(false)
+    }
+  }, [subAdminRecipientPicker])
+
+  useEffect(() => {
+    if (open && subAdminRecipientPicker) {
+      void loadRecipients()
+    }
+  }, [open, subAdminRecipientPicker, loadRecipients])
+
+  const resetDialogState = () => {
+    setExtraEmails('')
+    setStatus(null)
+    setSendToAllResponders(true)
+  }
+
+  const toggleResponder = (id: string, checked: boolean) => {
+    setSelectedResponderIds((prev) => {
+      const next = new Set(prev)
+      if (checked) next.add(id)
+      else next.delete(id)
+      return next
+    })
+  }
 
   const captureSnapshot = async (): Promise<string | null> => {
     const root = document.getElementById(exportRootId)
@@ -96,7 +155,6 @@ export function DashboardSnapshotExport({
     root.style.maxWidth = 'none'
     root.style.overflow = 'visible'
 
-    // Let layout reflow at the export width before capture
     await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
     await new Promise<void>((resolve) => setTimeout(resolve, 120))
 
@@ -124,8 +182,7 @@ export function DashboardSnapshotExport({
       })
 
       const dataUrl = canvas.toDataURL('image/png', 1.0)
-      const base64 = dataUrl.replace(/^data:image\/png;base64,/, '')
-      return base64
+      return dataUrl.replace(/^data:image\/png;base64,/, '')
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Failed to capture dashboard'
       setStatus({ type: 'err', message: msg })
@@ -150,22 +207,36 @@ export function DashboardSnapshotExport({
   }
 
   const handleEmail = async () => {
+    if (subAdminRecipientPicker && !sendToAllResponders && selectedResponderIds.size === 0) {
+      setStatus({ type: 'err', message: 'Select at least one responder or choose Send to all.' })
+      return
+    }
+
     const base64 = await captureSnapshot()
     if (!base64) return
 
     setSending(true)
     setStatus(null)
     try {
+      const payload: Record<string, unknown> = {
+        imageBase64: base64,
+        snapshotTitle,
+        summaryLine,
+        extraEmails,
+        filename: `Ready2Go-Dashboard-${new Date().toISOString().slice(0, 10)}.png`,
+      }
+
+      if (subAdminRecipientPicker) {
+        payload.sendToAllResponders = sendToAllResponders
+        if (!sendToAllResponders) {
+          payload.responderIds = Array.from(selectedResponderIds)
+        }
+      }
+
       const res = await fetch('/api/admin/dashboard-snapshot/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          imageBase64: base64,
-          snapshotTitle,
-          summaryLine,
-          extraEmails,
-          filename: `Ready2Go-Dashboard-${new Date().toISOString().slice(0, 10)}.png`,
-        }),
+        body: JSON.stringify(payload),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
@@ -184,6 +255,12 @@ export function DashboardSnapshotExport({
   }
 
   const busy = capturing || sending
+  const emailDisabled =
+    busy ||
+    (subAdminRecipientPicker &&
+      !sendToAllResponders &&
+      selectedResponderIds.size === 0 &&
+      !loadingRecipients)
 
   return (
     <>
@@ -193,7 +270,7 @@ export function DashboardSnapshotExport({
         size="sm"
         className="dashboard-export-ignore gap-2 font-bold text-xs uppercase tracking-wide border-slate-200"
         onClick={() => {
-          setStatus(null)
+          resetDialogState()
           setOpen(true)
         }}
       >
@@ -202,21 +279,116 @@ export function DashboardSnapshotExport({
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Camera className="h-4 w-4 text-[#33375D]" />
               Dashboard Snapshot
             </DialogTitle>
             <DialogDescription>
-              Capture the current dashboard view and email it to approved responders. You can add
-              extra recipients below (comma or newline separated).
+              {subAdminRecipientPicker
+                ? 'Capture the dashboard and email it to your responders. Choose all responders or select specific people.'
+                : 'Capture the current dashboard view and email it to approved responders. You can add extra recipients below.'}
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-3">
+          <div className="space-y-4">
+            {subAdminRecipientPicker ? (
+              <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50/80 p-3">
+                <Label className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                  Responders
+                </Label>
+
+                {loadingRecipients ? (
+                  <div className="flex items-center gap-2 text-sm text-slate-500 py-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Loading responders…
+                  </div>
+                ) : responders.length === 0 ? (
+                  <p className="text-sm text-slate-500">
+                    No approved responders with email were found for your license area.
+                  </p>
+                ) : (
+                  <>
+                    <label className="flex items-start gap-3 cursor-pointer">
+                      <Checkbox
+                        checked={sendToAllResponders}
+                        onCheckedChange={(v) => setSendToAllResponders(v === true)}
+                        className="mt-0.5"
+                      />
+                      <span className="text-sm leading-snug">
+                        <span className="font-semibold text-slate-800">
+                          Send to all responders
+                        </span>
+                        <span className="block text-xs text-slate-500 mt-0.5">
+                          {responders.length} approved responder
+                          {responders.length === 1 ? '' : 's'} in your area
+                        </span>
+                      </span>
+                    </label>
+
+                    {!sendToAllResponders ? (
+                      <div className="space-y-2 pt-1 border-t border-slate-200">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                            Select recipients
+                          </p>
+                          <div className="flex gap-2 text-[10px] font-bold uppercase">
+                            <button
+                              type="button"
+                              className="text-[#33375D] hover:underline"
+                              onClick={() =>
+                                setSelectedResponderIds(new Set(responders.map((r) => r.id)))
+                              }
+                            >
+                              All
+                            </button>
+                            <button
+                              type="button"
+                              className="text-slate-400 hover:underline"
+                              onClick={() => setSelectedResponderIds(new Set())}
+                            >
+                              Clear
+                            </button>
+                          </div>
+                        </div>
+                        <ul className="max-h-40 overflow-y-auto space-y-2 pr-1">
+                          {responders.map((r) => (
+                            <li key={r.id}>
+                              <label className="flex items-start gap-2.5 cursor-pointer rounded-md px-1 py-0.5 hover:bg-white/80">
+                                <Checkbox
+                                  checked={selectedResponderIds.has(r.id)}
+                                  onCheckedChange={(v) => toggleResponder(r.id, v === true)}
+                                  className="mt-0.5"
+                                />
+                                <span className="min-w-0 text-sm leading-snug">
+                                  <span className="font-medium text-slate-800 block truncate">
+                                    {r.name}
+                                  </span>
+                                  <span className="text-xs text-slate-500 block truncate">
+                                    {r.unitType} · {r.email}
+                                  </span>
+                                </span>
+                              </label>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+                  </>
+                )}
+              </div>
+            ) : (
+              <p className="text-[10px] text-slate-400 -mt-1">
+                Approved responders are included automatically.
+              </p>
+            )}
+
             <div>
-              <Label htmlFor="snapshot-extra-emails" className="text-xs font-bold uppercase tracking-wide text-slate-500">
+              <Label
+                htmlFor="snapshot-extra-emails"
+                className="text-xs font-bold uppercase tracking-wide text-slate-500"
+              >
                 Additional recipients (optional)
               </Label>
               <Textarea
@@ -227,9 +399,6 @@ export function DashboardSnapshotExport({
                 rows={3}
                 className="mt-1.5 text-sm"
               />
-              <p className="mt-1 text-[10px] text-slate-400">
-                Approved responders are always included automatically.
-              </p>
             </div>
 
             {status && (
@@ -253,16 +422,24 @@ export function DashboardSnapshotExport({
               onClick={() => void handleDownload()}
               className="gap-2"
             >
-              {capturing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+              {capturing ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4" />
+              )}
               Download PNG
             </Button>
             <Button
               type="button"
-              disabled={busy}
+              disabled={emailDisabled}
               onClick={() => void handleEmail()}
               className="gap-2 bg-[#33375D] hover:bg-[#2B2F50]"
             >
-              {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
+              {sending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Mail className="h-4 w-4" />
+              )}
               Email to Responders
             </Button>
           </DialogFooter>

@@ -17,6 +17,7 @@ import {
 } from '@/lib/services/population-at-risk-cache';
 import { resolveSubAdminJurisdiction } from '@/lib/sub-admin/jurisdiction';
 import { resolveDemoSessionContext, buildDemoSummaryResponse } from '@/lib/demo/provider';
+import { computeCensusExposureFromAlertRows } from '@/lib/services/alert-area-census-exposure';
 
 const ALLOWED_ROLES = new Set([
     'admin', 'super-admin', 'sub-admin', 'eoc-manager',
@@ -53,14 +54,18 @@ export async function GET(req: Request) {
             { nationwide: bodyNationwide, stateCd: bodyStateCd },
         );
 
-        const cacheKey = `${session.user.id}:${scope.stateCd}:aligned-v5-pop-state`;
+        const cacheKey = `${session.user.id}:${scope.stateCd}:aligned-v9-census-parse`;
         const cached = cache.get(cacheKey);
         if (cached && cached.expiresAt > Date.now()) {
             const data = cached.data as Record<string, unknown>;
             const count = typeof data.populations_at_risk === 'number' ? data.populations_at_risk : 0;
             const users = data.population_at_risk_users;
+            const ready2go = typeof data.ready2go_users_at_risk === 'number' ? data.ready2go_users_at_risk : 0;
             const hasUserList = Array.isArray(users) && users.length > 0;
-            if (count === 0 || hasUserList) {
+            if (count === 0 && ready2go === 0) {
+                return NextResponse.json(cached.data);
+            }
+            if (ready2go === 0 || hasUserList) {
                 return NextResponse.json(cached.data);
             }
         }
@@ -101,6 +106,16 @@ export async function GET(req: Request) {
             populationAtRiskUsers,
         );
 
+        const scopeStateUsps =
+            jurisdiction?.stateCode ??
+            (scope.stateCd !== 'us' ? scope.stateCd.toUpperCase() : null);
+        const populationExposure = await computeCensusExposureFromAlertRows(alignedCards, {
+            defaultStateUsps: scopeStateUsps,
+            scopeStateUsps,
+            dashboardStateCd: scope.stateCd,
+            jurisdiction,
+        });
+
         // Strip raw event arrays from the response (only needed server-side)
         const { severity_buckets, ...rest } = snapshot;
         const response = {
@@ -109,7 +124,9 @@ export async function GET(req: Request) {
             major_incidents: aligned.major_incidents,
             minor_incidents: aligned.minor_incidents,
             incident_distribution: aligned.incident_distribution,
-            populations_at_risk: populationAtRiskUsers.length,
+            populations_at_risk: populationExposure?.populationAffectedEstimate ?? 0,
+            ready2go_users_at_risk: populationAtRiskUsers.length,
+            population_exposure: populationExposure,
             population_at_risk_users: populationAtRiskUsers,
             ai_available: aiAvailable,
             severity_buckets: severity_buckets.map((b) => ({
