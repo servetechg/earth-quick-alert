@@ -86,7 +86,12 @@ export interface RiskSummaryPayload {
   active_severities: string[];
   ai_confidence: number;
   ai_confidence_breakdown?: ConfidenceFactor[];
+  /** U.S. Census ACS estimate for people in counties / parishes named in active alert areas. */
   populations_at_risk: number;
+  /** Ready2Go app users whose location matches active alert areas (subset of Census total). */
+  ready2go_users_at_risk?: number;
+  /** County-level ACS breakdown backing `populations_at_risk`. */
+  population_exposure?: RiskExposureSnapshot | null;
   /** Ready2Go users in active alert areas — included with summary so the detail dialog opens instantly. */
   population_at_risk_users?: Array<{
     id: string;
