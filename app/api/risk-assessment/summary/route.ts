@@ -70,9 +70,10 @@ export async function GET(req: Request) {
             const aligned = applyRiskReportToAlignedAlertFeed(
                 {
                     ...snapshot,
-                    recommendations: [],
+                    recommendations: '',
+                    recommendations_list: [],
                     historical_analysis: {},
-                },
+                } as unknown as Parameters<typeof applyRiskReportToAlignedAlertFeed>[0],
                 alignedCards,
             );
 
