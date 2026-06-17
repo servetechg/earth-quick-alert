@@ -18,41 +18,32 @@ import {
     Zap,
     RotateCcw,
     Plus,
+    AlertTriangle,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { AdminPageShell } from '@/components/admin-page-shell'
 import { AdminPageHeader } from '@/components/admin-page-header'
 import { AdminPageLoader } from '@/components/admin-page-loader'
-
-// Dynamic Type for the Incident data
-type IncidentReviewDef = {
-    id?: string;
-    name: string;
-    type: string;
-    duration: string;
-    insights: number;
-    events: any[];
-    aiInsights: any[];
-}
+import type { AfterActionReviewData } from '@/lib/types/after-action-review'
 
 export default function AfterActionReviewPage() {
-    const [incidentData, setIncidentData] = useState<IncidentReviewDef | null>(null)
+    const [reviewData, setReviewData] = useState<AfterActionReviewData | null>(null)
     const [isLoading, setIsLoading] = useState(true)
     const [isExporting, setIsExporting] = useState(false)
 
     useEffect(() => {
         async function fetchReviewData() {
             try {
-                const res = await fetch('/api/admin/after-action-review')
+                const res = await fetch('/api/admin/after-action-review', { cache: 'no-store' })
                 if (res.ok) {
                     const data = await res.json()
                     if (data.success && data.data) {
-                        setIncidentData(data.data)
+                        setReviewData(data.data)
                     }
                 }
             } catch (err) {
-                console.error("Failed to fetch AAR data:", err)
+                console.error('Failed to fetch AAR data:', err)
             } finally {
                 setIsLoading(false)
             }
@@ -64,38 +55,66 @@ export default function AfterActionReviewPage() {
         return <AdminPageLoader />
     }
 
-    const displayData = incidentData || {
-        name: 'Incident OMEGA-74',
-        type: 'Flash Flood Event',
-        duration: '06h 45m',
-        insights: 14,
-        events: [
-            { id: 1, time: '12:45 PM', type: 'Critical', color: 'red', title: 'Flash Flood Warning Issued', description: 'NWS triggered automated siren protocol for Sector 4 and surrounding plains.' },
-            { id: 2, time: '01:12 PM', type: 'Action', color: 'blue', title: 'EOC Activation Level 2', description: 'Administrative protocols engaged. AI Incident Commander initialized with surface map data.' },
-            { id: 3, time: '01:30 PM', type: 'Report', color: 'green', title: 'Citizen Report Verified', description: 'Visual confirmation of bridge collapse at 40.71°N 74.00°W. Rerouting emergency units.' },
-        ],
-        aiInsights: [
-            { category: 'Summary', description: 'Rapid response protocols prevented structural failure in the eastern dam. Coordination via AI-enabled GIS mapping improved response time by 22%.' },
-        ]
+    if (!reviewData) {
+        return (
+            <AdminPageShell>
+                <AdminPageHeader
+                    title="After-Action Review"
+                    description="No resolved incident is available for review in your jurisdiction."
+                />
+                <Card className="p-10 flex flex-col items-center justify-center gap-4 text-center border border-slate-200 rounded-2xl">
+                    <AlertTriangle className="w-10 h-10 text-slate-300" />
+                    <p className="text-sm font-bold text-slate-600">
+                        After-action data appears once an incident is resolved or a demo simulation is active.
+                    </p>
+                    <p className="text-xs text-slate-400 max-w-md">
+                        For the Arkansas tornado presentation, enable Demo Simulation from the admin bar while signed in as
+                        arkansas@admin.com.
+                    </p>
+                </Card>
+            </AdminPageShell>
+        )
     }
 
     const kpiCards = [
-        { label: 'Tactical Name', value: displayData.name, sub: 'Identity Marker', icon: Target, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100' },
-        { label: 'Event Classification', value: displayData.type, sub: 'Impact Category', icon: Layers, color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-100' },
-        { label: 'Deployment Duration', value: displayData.duration, sub: 'Mission Window', icon: Activity, color: 'text-purple-600', bg: 'bg-purple-50', border: 'border-purple-100' },
-        { label: 'AI Intel Count', value: displayData.insights, sub: 'Automated Insights', icon: Sparkles, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100' },
-    ]
-
-    const performanceIndicators = [
-        { label: 'Resource Deployment', val: '92%', status: 'optimal' },
-        { label: 'Citizen Information Latency', val: '< 2.4s', status: 'optimal' },
-        { label: 'Data Synchronization', val: '99.9%', status: 'nominal' },
-    ]
-
-    const strategicEnhancements = [
-        'Integrate Multi-Spectral Satellite Feed earlier in Type 4 events.',
-        'Optimize secondary siren protocols in Sector 4 low-lands.',
-        'Upgrade GIS impact layers for better flood prediction.',
+        {
+            label: 'Tactical Name',
+            value: reviewData.name,
+            sub: reviewData.demo ? 'Demo Scenario' : 'Identity Marker',
+            icon: Target,
+            color: 'text-blue-600',
+            bg: 'bg-blue-50',
+            border: 'border-blue-100',
+        },
+        {
+            label: 'Event Classification',
+            value: reviewData.type,
+            sub: 'Impact Category',
+            icon: Layers,
+            color: 'text-orange-600',
+            bg: 'bg-orange-50',
+            border: 'border-orange-100',
+        },
+        {
+            label: 'Deployment Duration',
+            value: reviewData.durationDetail ?? reviewData.duration,
+            sub: reviewData.metadata?.durationMinutes
+                ? `${reviewData.metadata.durationMinutes} min on ground`
+                : 'Mission Window',
+            icon: Activity,
+            color: 'text-purple-600',
+            bg: 'bg-purple-50',
+            border: 'border-purple-100',
+        },
+        {
+            label: 'AI Intel Count',
+            value: String(reviewData.insights),
+            sub: 'Automated Insights',
+            icon: Sparkles,
+            color: 'text-emerald-600',
+            bg: 'bg-emerald-50',
+            border: 'border-emerald-100',
+        },
     ]
 
     const downloadReportPdf = () => {
@@ -140,7 +159,6 @@ export default function AfterActionReviewPage() {
                 })
             }
 
-            // Header
             doc.setFillColor(35, 56, 102)
             doc.rect(0, 0, pageW, 72, 'F')
             doc.setFont('helvetica', 'bold')
@@ -154,44 +172,16 @@ export default function AfterActionReviewPage() {
             y = 98
 
             writeTitle('KPI Dashboard Snapshot')
-            const gap = 10
-            const kpiCardW = (contentW - gap) / 2
-            const kpiCardH = 78
-            for (let i = 0; i < kpiCards.length; i += 2) {
-                ensure(kpiCardH + 8)
-                const rowItems = [kpiCards[i], kpiCards[i + 1]].filter(Boolean)
-                rowItems.forEach((kpi, col) => {
-                    const x = margin + col * (kpiCardW + gap)
-                    doc.setFillColor(247, 249, 255)
-                    doc.setDrawColor(224, 230, 242)
-                    doc.roundedRect(x, y - 12, kpiCardW, kpiCardH, 8, 8, 'FD')
-                    doc.setFont('helvetica', 'bold')
-                    doc.setFontSize(8.5)
-                    doc.setTextColor(90, 100, 120)
-                    doc.text(String(kpi.label).toUpperCase(), x + 10, y + 2)
-                    doc.setFontSize(14)
-                    doc.setTextColor(30, 35, 52)
-                    const valueText = String(kpi.value)
-                    const wrappedValue = doc.splitTextToSize(valueText, kpiCardW - 20)
-                    doc.text(wrappedValue[0] || valueText, x + 10, y + 24)
-                    doc.setFont('helvetica', 'normal')
-                    doc.setFontSize(8)
-                    doc.setTextColor(110, 120, 140)
-                    doc.text(String(kpi.sub).toUpperCase(), x + 10, y + 46)
-                })
-                y += kpiCardH + 10
-            }
-            writeWrapped(
-                `Strategic tactical analysis of ${displayData.name}. Modern failure analysis and operational intelligence.`,
-            )
+            kpiCards.forEach((kpi) => {
+                writeWrapped(`${kpi.label}: ${kpi.value} (${kpi.sub})`)
+            })
             y += 8
 
             writeTitle('Mission Chronology')
-            displayData.events.forEach((event: any, idx: number) => {
+            reviewData.events.forEach((event, idx) => {
                 ensure(30)
                 doc.setFont('helvetica', 'bold')
                 doc.setFontSize(10)
-                doc.setTextColor(35, 56, 102)
                 doc.text(`${idx + 1}. ${event.time} · ${event.type}`, margin, y)
                 y += 13
                 writeWrapped(event.title, 11)
@@ -200,29 +190,23 @@ export default function AfterActionReviewPage() {
             })
 
             writeTitle('Intelligence Analysis')
-            if (displayData.aiInsights?.length) {
-                displayData.aiInsights.forEach((insight: any, idx: number) => {
-                    ensure(22)
-                    doc.setFont('helvetica', 'bold')
-                    doc.setFontSize(10.5)
-                    doc.setTextColor(35, 56, 102)
-                    doc.text(`${idx + 1}. ${insight.category || 'Insight'}`, margin, y)
-                    y += 12
-                    writeWrapped(insight.description || 'No details available.', 10, 12)
-                    y += 4
-                })
-            } else {
-                writeWrapped('No AI insights found for this incident.')
-            }
+            reviewData.aiInsights.forEach((insight, idx) => {
+                ensure(22)
+                doc.setFont('helvetica', 'bold')
+                doc.text(`${idx + 1}. ${insight.category || 'Insight'}`, margin, y)
+                y += 12
+                writeWrapped(insight.description || 'No details available.', 10, 12)
+                y += 4
+            })
 
             writeTitle('Performance Indicators')
-            performanceIndicators.forEach((metric) =>
+            reviewData.performanceIndicators.forEach((metric) =>
                 writeWrapped(`• ${metric.label}: ${metric.val} (${metric.status})`),
             )
             y += 6
 
             writeTitle('Strategic Enhancements')
-            strategicEnhancements.forEach((item) => writeWrapped(`• ${item}`))
+            reviewData.strategicEnhancements.forEach((item) => writeWrapped(`• ${item}`))
 
             const pageCount = doc.getNumberOfPages()
             for (let i = 1; i <= pageCount; i++) {
@@ -248,16 +232,19 @@ export default function AfterActionReviewPage() {
         }
     }
 
+    const summaryInsight =
+        reviewData.aiInsights.find((i) => i.category === 'Summary') ?? reviewData.aiInsights[0]
+
     return (
         <AdminPageShell>
             <AdminPageHeader
                 title="After-Action Review"
-                description={`Strategic tactical analysis of ${displayData.name}. Modern failure analysis and operational intelligence.`}
+                description={`Strategic tactical analysis of ${reviewData.name}. ${reviewData.demo ? 'Arkansas EF-3 tornado presentation scenario.' : 'Operational intelligence from resolved incident data.'}`}
                 actions={
                     <>
                         <div className="hidden md:flex items-center gap-2 h-12 px-4 rounded-xl bg-slate-50 border border-slate-200">
                             <span className="inline-flex items-center gap-1.5 rounded-full bg-[#33375D] px-3 py-1 text-[9px] font-black uppercase tracking-widest text-white">
-                                Official Record
+                                {reviewData.demo ? 'Demo Record' : 'Official Record'}
                             </span>
                             <span className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 uppercase tracking-widest">
                                 <Clock size={12} /> {new Date().toLocaleDateString()}
@@ -281,7 +268,16 @@ export default function AfterActionReviewPage() {
                 }
             />
 
-            {/* KPI Dashboard */}
+            {reviewData.metadata?.efRating != null && (
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest -mt-2 mb-2 px-1">
+                    EF-{reviewData.metadata.efRating} · {reviewData.metadata.peakWindMph} mph peak ·{' '}
+                    {reviewData.metadata.pathLengthMiles} mi track ·{' '}
+                    {reviewData.metadata.structuresAffected?.toLocaleString()} structures ·{' '}
+                    {reviewData.metadata.injuriesDirect} injuries ·{' '}
+                    {(reviewData.metadata.counties ?? []).join(' & ')} counties
+                </p>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {kpiCards.map((kpi, i) => (
                     <Card
@@ -312,7 +308,6 @@ export default function AfterActionReviewPage() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                {/* Timeline */}
                 <div className="lg:col-span-12 space-y-4">
                     <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 px-1">
                         <div>
@@ -320,7 +315,7 @@ export default function AfterActionReviewPage() {
                                 Mission Chronology
                             </h2>
                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
-                                High-fidelity event serialization
+                                {reviewData.events.length} events from NWS products, EOC actions, citizens, and responders
                             </p>
                         </div>
                         <div className="flex flex-wrap items-center gap-4 text-[9px] font-bold text-slate-500 uppercase tracking-widest">
@@ -340,9 +335,8 @@ export default function AfterActionReviewPage() {
                         <div className="absolute left-[42px] lg:left-[46.5px] top-10 bottom-10 w-px bg-gradient-to-b from-[#33375D]/30 via-slate-200 to-transparent" />
 
                         <div className="space-y-10">
-                            {displayData.events.map((event: any, i: number) => (
-                                <div key={i} className="relative pl-12 lg:pl-14 group">
-                                    {/* Connector Dot */}
+                            {reviewData.events.map((event, i) => (
+                                <div key={event.id ?? i} className="relative pl-12 lg:pl-14 group">
                                     <div
                                         className={cn(
                                             'absolute left-0 top-1.5 w-3 h-3 rounded-full ring-4 ring-white z-10 transition-transform scale-150',
@@ -350,7 +344,9 @@ export default function AfterActionReviewPage() {
                                                 ? 'bg-red-500 shadow-[0_0_0_4px_rgba(239,68,68,0.15)]'
                                                 : event.color === 'blue'
                                                     ? 'bg-blue-500 shadow-[0_0_0_4px_rgba(59,130,246,0.15)]'
-                                                    : 'bg-emerald-500 shadow-[0_0_0_4px_rgba(16,185,129,0.15)]',
+                                                    : event.color === 'purple'
+                                                        ? 'bg-violet-500 shadow-[0_0_0_4px_rgba(139,92,246,0.15)]'
+                                                        : 'bg-emerald-500 shadow-[0_0_0_4px_rgba(16,185,129,0.15)]',
                                         )}
                                     />
 
@@ -367,7 +363,9 @@ export default function AfterActionReviewPage() {
                                                             ? 'bg-red-50 text-red-600 border-red-100'
                                                             : event.color === 'blue'
                                                                 ? 'bg-blue-50 text-blue-600 border-blue-100'
-                                                                : 'bg-emerald-50 text-emerald-600 border-emerald-100',
+                                                                : event.color === 'purple'
+                                                                    ? 'bg-violet-50 text-violet-600 border-violet-100'
+                                                                    : 'bg-emerald-50 text-emerald-600 border-emerald-100',
                                                     )}
                                                 >
                                                     {event.type}
@@ -396,7 +394,6 @@ export default function AfterActionReviewPage() {
                     </Card>
                 </div>
 
-                {/* Intelligence Analysis */}
                 <div className="lg:col-span-12 space-y-4">
                     <div className="px-1">
                         <h2 className="text-xl font-black text-slate-900 uppercase tracking-tight">
@@ -407,7 +404,6 @@ export default function AfterActionReviewPage() {
                         </p>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        {/* Operational Summary */}
                         <Card className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-sm hover:shadow-md transition-all group">
                             <div className="pointer-events-none absolute right-5 top-5 opacity-[0.06] transition-transform group-hover:scale-110">
                                 <FileText size={80} className="text-[#33375D]" />
@@ -425,13 +421,15 @@ export default function AfterActionReviewPage() {
                                     </p>
                                 </div>
                                 <p className="text-sm font-medium leading-relaxed text-slate-600">
-                                    {displayData.aiInsights[0]?.description}
+                                    {summaryInsight?.description}
                                 </p>
                                 <div className="flex items-center justify-between border-t border-slate-100 pt-4">
                                     <div className="flex items-center gap-2">
                                         <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                                         <span className="text-[9px] font-bold uppercase tracking-widest text-slate-500">
-                                            Confidence: 99.4%
+                                            {reviewData.demo && reviewData.metadata?.historicalMatchConfidence
+                                                ? `Historical match: ${Math.round(reviewData.metadata.historicalMatchConfidence * 100)}%`
+                                                : 'AI-assisted synthesis'}
                                         </span>
                                     </div>
                                     <CheckCircle size={14} className="shrink-0 text-emerald-500" aria-hidden />
@@ -439,7 +437,6 @@ export default function AfterActionReviewPage() {
                             </div>
                         </Card>
 
-                        {/* Performance Indicators */}
                         <Card className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-sm hover:shadow-md transition-all group">
                             <div className="pointer-events-none absolute right-5 top-5 opacity-[0.06] transition-transform group-hover:rotate-6">
                                 <Zap size={80} className="text-emerald-600" />
@@ -453,11 +450,11 @@ export default function AfterActionReviewPage() {
                                         Performance Indicators
                                     </h3>
                                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
-                                        Real-Time Telemetry
+                                        Scenario Telemetry
                                     </p>
                                 </div>
                                 <div className="space-y-4 pt-1">
-                                    {performanceIndicators.map((met, i) => (
+                                    {reviewData.performanceIndicators.map((met, i) => (
                                         <div key={i} className="flex flex-col gap-2">
                                             <div className="flex items-center justify-between gap-3 text-[10px] font-bold uppercase tracking-widest text-slate-500">
                                                 <span className="min-w-0 truncate">{met.label}</span>
@@ -466,7 +463,10 @@ export default function AfterActionReviewPage() {
                                                 </span>
                                             </div>
                                             <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
-                                                <div className="h-full w-[90%] bg-emerald-500" />
+                                                <div
+                                                    className="h-full bg-emerald-500 transition-all"
+                                                    style={{ width: `${met.percent}%` }}
+                                                />
                                             </div>
                                         </div>
                                     ))}
@@ -474,7 +474,6 @@ export default function AfterActionReviewPage() {
                             </div>
                         </Card>
 
-                        {/* Strategic Enhancements */}
                         <Card className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-sm hover:shadow-md transition-all group">
                             <div className="pointer-events-none absolute right-5 top-5 opacity-[0.06] transition-transform group-hover:-rotate-6">
                                 <RotateCcw size={80} className="text-orange-600" />
@@ -492,7 +491,7 @@ export default function AfterActionReviewPage() {
                                     </p>
                                 </div>
                                 <ul className="space-y-3">
-                                    {strategicEnhancements.map((imp, i) => (
+                                    {reviewData.strategicEnhancements.map((imp, i) => (
                                         <li key={i} className="flex gap-3">
                                             <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-orange-100 bg-orange-50">
                                                 <Plus size={12} className="text-orange-600" />

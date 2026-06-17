@@ -1,10 +1,33 @@
 'use client'
 
-import React, { useMemo, useCallback, useState, useRef } from 'react'
+import React, { useMemo, useCallback, useState, useRef, useEffect } from 'react'
 import { GoogleMap as GoogleMapComponent, useJsApiLoader, Marker, InfoWindow, Circle, Polyline } from '@react-google-maps/api'
+import { MarkerClusterer, SuperClusterAlgorithm } from '@googlemaps/markerclusterer'
 import { GoogleMapsOverlay } from '@deck.gl/google-maps'
 import { HeatmapLayer } from '@deck.gl/aggregation-layers'
-import { GOOGLE_MAPS_API_KEY, GOOGLE_MAPS_LIBRARIES, GOOGLE_MAPS_LOADER_ID } from '@/lib/constants/google-maps-config'
+import { GOOGLE_MAPS_API_KEY, GOOGLE_MAPS_LIBRARIES, GOOGLE_MAPS_LOADER_ID, isGoogleMapsConfigured } from '@/lib/constants/google-maps-config'
+import {
+    coverageCircleLatLngBounds,
+    type LatLngPoint,
+} from '@/lib/geo/license-coverage-radius'
+import type { UnifiedEventHeatPoint } from '@/lib/geo/unified-event-heatmap'
+import { IncidentDetailDialog } from '@/components/incident/incident-detail-dialog'
+import { GoogleMapsUnavailable } from '@/components/google-maps-unavailable'
+import { GoogleMapErrorBoundary } from '@/components/google-map-error-boundary'
+
+function formatMarkerStatus(status?: string, isSafe?: boolean): string {
+    if (status === 'help' || status === 'needs_assistance') return 'Help'
+    if (status === 'safe') return 'Safe'
+    if (isSafe === false) return 'Help'
+    if (isSafe === true) return 'Safe'
+    return status ?? 'Unknown'
+}
+
+function isHelpStatus(status?: string, isSafe?: boolean): boolean {
+    if (isSafe === false) return true
+    const s = (status ?? '').toLowerCase()
+    return s === 'help' || s === 'needs_assistance' || s === 'danger'
+}
 
 type DeckHeatPoint = { position: [number, number]; weight: number }
 
@@ -22,7 +45,7 @@ interface MapMarker {
     id: string
     position: { lat: number; lng: number }
     title: string
-    type: 'user' | 'hazard' | 'earthquake' | 'weather' | 'admin' | 'incident' | 'condition' | 'infrastructure'
+    type: 'user' | 'hazard' | 'earthquake' | 'weather' | 'admin' | 'incident' | 'condition' | 'infrastructure' | 'responder'
     isSafe?: boolean
     mag?: number
     description?: string
@@ -32,8 +55,26 @@ interface MapMarker {
     timestamp?: string
     color?: string
     icon?: string
+    /** Single-letter glyph for critical-infrastructure pins */
+    glyph?: string
     category?: string
     location?: string
+    /** Link to AI risk report for this incident (Dashboard A). */
+    riskReportHref?: string
+    incidentId?: string
+}
+
+export interface MapDisasterZoneCircleSpec {
+    id: string
+    center: { lat: number; lng: number }
+    radiusMeters: number
+    fillColor?: string
+    fillOpacity?: number
+    strokeColor?: string
+    strokeWeight?: number
+    label: string
+    /** Map position for the zone label marker */
+    labelPosition: { lat: number; lng: number }
 }
 
 export interface MapStateBounds {
@@ -49,12 +90,25 @@ export interface CoverageCircleSpec {
     label?: string
 }
 
+export interface RoadClosureDetail {
+    roadName: string
+    status: string
+    reason?: string
+    startLocation?: string
+    endLocation?: string
+    updatedAt?: string
+    source?: string
+}
+
 export interface MapPolylineSpec {
+    id?: string
     path: { lat: number; lng: number }[]
     strokeColor?: string
     strokeWeight?: number
     strokeOpacity?: number
     label?: string
+    kind?: 'road_closure' | 'route'
+    closure?: RoadClosureDetail
 }
 
 interface GoogleMapProps {
@@ -68,8 +122,24 @@ interface GoogleMapProps {
     stateBounds?: MapStateBounds | null
     /** Sub-admin license service area (miles stored server-side; pass meters here). */
     coverageCircle?: CoverageCircleSpec | null
+    /** Fit and restrict pan/zoom to the license radius (sub-admin radius licenses). */
+    lockToCoverage?: boolean
     /** Optional polylines (e.g. tornado survey path in demo mode). */
     polylines?: MapPolylineSpec[]
+    /** Concentric disaster impact circles (Zone A / B / C). */
+    disasterZoneCircles?: MapDisasterZoneCircleSpec[]
+    /** Incident metadata for heatmap clicks (no pin markers). */
+    heatIncidents?: UnifiedEventHeatPoint[]
+    /** When true, clicking the heat layer opens incident details instead of showing pins. */
+    heatClickOnly?: boolean
+    /** Fired when user clicks a heatmap incident (demo tab workflows). */
+    onHeatIncidentSelect?: (incident: UnifiedEventHeatPoint) => void
+    /** Debounced viewport bounds for nationwide infrastructure loading. */
+    onBoundsChanged?: (bounds: MapStateBounds) => void
+    /** Cluster infrastructure markers for large datasets. */
+    clusterInfrastructure?: boolean
+    /** When true with stateBounds, fit the full state on initial load (sub-admin dashboards). */
+    fitStateOnLoad?: boolean
 }
 
 const containerStyle = {
@@ -95,11 +165,184 @@ const makeGlyphMarker = (bg: string, glyph: string, size: number) => {
     }
 }
 
+const makePharmacyPinIcon = () => ({
+    url: '/icons/pharmacy-marker.svg',
+    scaledSize: new google.maps.Size(32, 42),
+    anchor: new google.maps.Point(16, 42),
+})
+
+const makeEmergencyServicePinIcon = () => ({
+    url: '/icons/emergency-service-marker.svg',
+    scaledSize: new google.maps.Size(32, 42),
+    anchor: new google.maps.Point(16, 42),
+})
+
+/** Above this zoom, infrastructure markers render individually (Google Maps–style). */
+const INFRA_CLUSTER_MAX_ZOOM = 10
+
+/** Cluster radius in pixels — tighter groups at low zoom, expands as user zooms in. */
+const INFRA_CLUSTER_RADIUS_PX = 58
+
+/** Soft cluster blob without numeric labels. */
+function createCountlessClusterRenderer() {
+    return {
+        render({ position }: { position: google.maps.LatLng }) {
+            const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240">
+  <circle cx="120" cy="120" r="62" fill="#33375D" opacity="0.14"/>
+  <circle cx="120" cy="120" r="44" fill="#33375D" opacity="0.24"/>
+  <circle cx="120" cy="120" r="28" fill="#33375D" opacity="0.36"/>
+</svg>`
+            return new google.maps.Marker({
+                position,
+                icon: {
+                    url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`,
+                    scaledSize: new google.maps.Size(42, 42),
+                    anchor: new google.maps.Point(21, 21),
+                },
+                clickable: true,
+                zIndex: Number(google.maps.Marker.MAX_ZINDEX) + 1,
+            })
+        },
+    }
+}
+
+function buildMarkerIcon(marker: MapMarker): google.maps.Icon | google.maps.Symbol | undefined {
+    if (marker.type === 'user') {
+        return marker.isSafe
+            ? {
+                  url: 'https://maps.google.com/mapfiles/ms/icons/green-dot.png',
+                  scaledSize: new google.maps.Size(32, 32),
+              }
+            : {
+                  url: 'https://maps.google.com/mapfiles/ms/icons/red-dot.png',
+                  scaledSize: new google.maps.Size(32, 32),
+              }
+    }
+    if (marker.type === 'earthquake') {
+        return {
+            url: 'https://maps.google.com/mapfiles/ms/icons/orange-dot.png',
+            scaledSize: new google.maps.Size(40, 40),
+        }
+    }
+    if (marker.type === 'weather') {
+        return {
+            url: 'https://maps.google.com/mapfiles/ms/icons/blue-dot.png',
+            scaledSize: new google.maps.Size(32, 32),
+        }
+    }
+    if (marker.type === 'admin') {
+        return {
+            url: 'https://maps.google.com/mapfiles/ms/icons/yellow-dot.png',
+            scaledSize: new google.maps.Size(42, 42),
+        }
+    }
+    if (marker.type === 'responder') {
+        return {
+            url: 'https://maps.google.com/mapfiles/ms/icons/orange-dot.png',
+            scaledSize: new google.maps.Size(36, 36),
+        }
+    }
+    if (marker.type === 'incident' || marker.type === 'infrastructure') {
+        if (marker.glyph) {
+            return makeGlyphMarker(marker.color || '#6366F1', marker.glyph, 34)
+        }
+        if (marker.icon === 'hospital') return makeGlyphMarker('#EF4444', 'H', 34)
+        if (marker.icon === 'pharmacy') return makePharmacyPinIcon()
+        if (marker.icon === 'fire') return makeEmergencyServicePinIcon()
+        if (marker.icon === 'shelter') return makeGlyphMarker('#16A34A', 'S', 34)
+        if (marker.icon === 'fuel') {
+            return {
+                url: 'https://maps.google.com/mapfiles/ms/icons/gas.png',
+                scaledSize: new google.maps.Size(32, 32),
+            }
+        }
+        if (marker.icon === 'generator') return makeGlyphMarker('#E5A436', 'G', 32)
+        if (marker.icon === 'meals') return makeGlyphMarker('#D74C30', 'M', 32)
+        if (marker.icon === 'power_crew') return makeGlyphMarker('#A99423', 'P', 32)
+        if (marker.icon === 'water_crew') return makeGlyphMarker('#4674C6', 'W', 32)
+        if (marker.icon === 'volunteers') return makeGlyphMarker('#5C7E2D', 'V', 32)
+        return {
+            url:
+                marker.color === '#10B981'
+                    ? 'https://maps.google.com/mapfiles/ms/icons/green-dot.png'
+                    : marker.color === '#3B82F6'
+                      ? 'https://maps.google.com/mapfiles/ms/icons/blue-dot.png'
+                      : marker.color === '#F59E0B'
+                        ? 'https://maps.google.com/mapfiles/ms/icons/orange-dot.png'
+                        : marker.color === '#06B6D4'
+                          ? 'https://maps.google.com/mapfiles/ms/icons/ltblue-dot.png'
+                          : marker.color === '#6366F1'
+                            ? 'https://maps.google.com/mapfiles/ms/icons/purple-dot.png'
+                            : marker.color === '#EC4899'
+                              ? 'https://maps.google.com/mapfiles/ms/icons/pink-dot.png'
+                              : marker.icon === 'police'
+                                  ? 'https://maps.google.com/mapfiles/ms/icons/police.png'
+                                  : 'https://maps.google.com/mapfiles/ms/icons/red-dot.png',
+            scaledSize: new google.maps.Size(32, 32),
+        }
+    }
+    if (marker.type === 'condition') {
+        return {
+            path: google.maps.SymbolPath.CIRCLE,
+            fillColor: marker.color || '#4169E1',
+            fillOpacity: 0.8,
+            scale: 8,
+            strokeColor: 'white',
+            strokeWeight: 2,
+        }
+    }
+    return undefined
+}
+
 function toLatLngBounds(bounds: MapStateBounds) {
     return new google.maps.LatLngBounds(
         { lat: bounds.south, lng: bounds.west },
         { lat: bounds.north, lng: bounds.east },
     )
+}
+
+function geoBoundsToMapStateBounds(bounds: { northeast: LatLngPoint; southwest: LatLngPoint }): MapStateBounds {
+    return {
+        west: bounds.southwest.lng,
+        south: bounds.southwest.lat,
+        east: bounds.northeast.lng,
+        north: bounds.northeast.lat,
+    }
+}
+
+function coverageToMapBounds(coverage: CoverageCircleSpec): MapStateBounds {
+    const box = coverageCircleLatLngBounds(coverage.center, coverage.radiusMeters)
+    return geoBoundsToMapStateBounds(box)
+}
+
+function distanceKm(aLat: number, aLng: number, bLat: number, bLng: number): number {
+    const R = 6371
+    const dLat = ((bLat - aLat) * Math.PI) / 180
+    const dLng = ((bLng - aLng) * Math.PI) / 180
+    const x =
+        Math.sin(dLat / 2) ** 2 +
+        Math.cos((aLat * Math.PI) / 180) *
+            Math.cos((bLat * Math.PI) / 180) *
+            Math.sin(dLng / 2) ** 2
+    return R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x))
+}
+
+function findNearestHeatIncident(
+    lat: number,
+    lng: number,
+    incidents: UnifiedEventHeatPoint[],
+    maxKm = 40,
+): UnifiedEventHeatPoint | null {
+    let best: UnifiedEventHeatPoint | null = null
+    let bestDist = Infinity
+    for (const inc of incidents) {
+        const d = distanceKm(lat, lng, inc.lat, inc.lng)
+        if (d < bestDist) {
+            bestDist = d
+            best = inc
+        }
+    }
+    return best && bestDist <= maxKm ? best : null
 }
 
 function viewportExceedsStateBounds(map: google.maps.Map, bounds: MapStateBounds): boolean {
@@ -116,7 +359,19 @@ function viewportExceedsStateBounds(map: google.maps.Map, bounds: MapStateBounds
     )
 }
 
-export function GoogleMap({
+export function GoogleMap(props: GoogleMapProps) {
+    return (
+        <GoogleMapErrorBoundary>
+            {!isGoogleMapsConfigured() ? (
+                <GoogleMapsUnavailable reason="missing-key" />
+            ) : (
+                <GoogleMapInner {...props} />
+            )}
+        </GoogleMapErrorBoundary>
+    )
+}
+
+function GoogleMapInner({
     address,
     markers = [],
     center,
@@ -125,13 +380,35 @@ export function GoogleMap({
     showHeatmap = false,
     stateBounds = null,
     coverageCircle = null,
+    lockToCoverage = false,
     polylines = [],
+    disasterZoneCircles = [],
+    heatIncidents = [],
+    heatClickOnly = false,
+    onHeatIncidentSelect,
+    onBoundsChanged,
+    clusterInfrastructure = false,
+    fitStateOnLoad = false,
 }: GoogleMapProps) {
-    const { isLoaded } = useJsApiLoader({
+    const { isLoaded, loadError } = useJsApiLoader({
         id: GOOGLE_MAPS_LOADER_ID,
         googleMapsApiKey: GOOGLE_MAPS_API_KEY,
         libraries: GOOGLE_MAPS_LIBRARIES
     })
+
+    const [authFailed, setAuthFailed] = useState(false)
+    const [heatmapFailed, setHeatmapFailed] = useState(false)
+
+    React.useEffect(() => {
+        type GmWindow = Window & { gm_authFailure?: () => void }
+        const win = window as GmWindow
+        const previous = win.gm_authFailure
+        win.gm_authFailure = () => setAuthFailed(true)
+        return () => {
+            if (previous) win.gm_authFailure = previous
+            else delete win.gm_authFailure
+        }
+    }, [])
 
     const mapCenter = useMemo(() => {
         if (center) return center
@@ -139,15 +416,135 @@ export function GoogleMap({
     }, [center])
 
     const [selectedMarker, setSelectedMarker] = useState<MapMarker | null>(null)
+    const [selectedRoadClosure, setSelectedRoadClosure] = useState<MapPolylineSpec | null>(null)
+    const [selectedHeatIncident, setSelectedHeatIncident] = useState<UnifiedEventHeatPoint | null>(null)
+    const [incidentDialogOpen, setIncidentDialogOpen] = useState(false)
     const [map, setMap] = React.useState<google.maps.Map | null>(null)
     const deckOverlayRef = useRef<GoogleMapsOverlay | null>(null)
     const stateBoundsFittedRef = useRef(false)
+    const coverageBoundsFittedRef = useRef(false)
     const stateMinZoomRef = useRef<number | null>(null)
+    const coverageMinZoomRef = useRef<number | null>(null)
     const lastZoomRef = useRef<number | null>(null)
+
+    const coverageMapBounds = useMemo((): MapStateBounds | null => {
+        if (!lockToCoverage || !coverageCircle) return null
+        if (
+            !Number.isFinite(coverageCircle.center.lat) ||
+            !Number.isFinite(coverageCircle.center.lng) ||
+            !(coverageCircle.radiusMeters > 0)
+        ) {
+            return null
+        }
+        return coverageToMapBounds(coverageCircle)
+    }, [lockToCoverage, coverageCircle])
 
     const onLoad = useCallback(function callback(map: google.maps.Map) {
         setMap(map)
     }, [])
+
+    useEffect(() => {
+        if (!map || !onBoundsChanged) return
+
+        const emitBounds = () => {
+            const bounds = map.getBounds()
+            if (!bounds) return
+            const ne = bounds.getNorthEast()
+            const sw = bounds.getSouthWest()
+            onBoundsChanged({
+                west: sw.lng(),
+                south: sw.lat(),
+                east: ne.lng(),
+                north: ne.lat(),
+            })
+        }
+
+        emitBounds()
+        const listener = map.addListener('idle', emitBounds)
+        return () => {
+            google.maps.event.removeListener(listener)
+        }
+    }, [map, onBoundsChanged])
+
+    const validMarkers = useMemo(
+        () =>
+            markers.filter(
+                (marker) =>
+                    marker.position &&
+                    typeof marker.position.lat === 'number' &&
+                    typeof marker.position.lng === 'number' &&
+                    !isNaN(marker.position.lat) &&
+                    !isNaN(marker.position.lng),
+            ),
+        [markers],
+    )
+
+    const renderedMarkers = useMemo(() => {
+        if (!clusterInfrastructure) return validMarkers
+        return validMarkers.filter((m) => m.type !== 'infrastructure')
+    }, [validMarkers, clusterInfrastructure])
+
+    const infrastructureMarkers = useMemo(() => {
+        if (!clusterInfrastructure) return []
+        return validMarkers.filter((m) => m.type === 'infrastructure')
+    }, [validMarkers, clusterInfrastructure])
+
+    const clustererRef = useRef<MarkerClusterer | null>(null)
+    const clusterMarkersRef = useRef<google.maps.Marker[]>([])
+
+    useEffect(() => {
+        if (!map || !clusterInfrastructure) return
+
+        clustererRef.current?.clearMarkers()
+        clusterMarkersRef.current.forEach((m) => m.setMap(null))
+        clusterMarkersRef.current = []
+
+        const gMarkers = infrastructureMarkers.map((marker) => {
+            const gMarker = new google.maps.Marker({
+                position: marker.position,
+                title: marker.title,
+                icon: buildMarkerIcon(marker),
+            })
+            gMarker.addListener('click', () => {
+                setSelectedHeatIncident(null)
+                setSelectedMarker(marker)
+            })
+            return gMarker
+        })
+
+        clusterMarkersRef.current = gMarkers
+        clustererRef.current = new MarkerClusterer({
+            map,
+            markers: gMarkers,
+            algorithm: new SuperClusterAlgorithm({
+                maxZoom: INFRA_CLUSTER_MAX_ZOOM,
+                radius: INFRA_CLUSTER_RADIUS_PX,
+                minPoints: 3,
+            }),
+            renderer: createCountlessClusterRenderer(),
+            onClusterClick: (_event, cluster, clusterMap) => {
+                const bounds = new google.maps.LatLngBounds()
+                for (const m of cluster.markers) {
+                    const pos =
+                        typeof (m as google.maps.Marker).getPosition === 'function'
+                            ? (m as google.maps.Marker).getPosition()
+                            : (m as { position?: google.maps.LatLng }).position
+                    if (pos) bounds.extend(pos)
+                }
+                if (!bounds.isEmpty()) {
+                    clusterMap.fitBounds(bounds, 56)
+                }
+            },
+        })
+
+        return () => {
+            clustererRef.current?.clearMarkers()
+            clustererRef.current = null
+            clusterMarkersRef.current.forEach((m) => m.setMap(null))
+            clusterMarkersRef.current = []
+        }
+    }, [map, clusterInfrastructure, infrastructureMarkers])
+
 
     const onUnmount = useCallback(function callback() {
         if (deckOverlayRef.current) {
@@ -166,17 +563,102 @@ export function GoogleMap({
         [heatPoints],
     )
 
-    // Smooth pan when center changes (skip when locked to state — fitBounds owns the view)
+    const validPolylines = useMemo(() => {
+        return polylines.flatMap((line, idx) => {
+            const path = line.path.filter(
+                (p) =>
+                    Number.isFinite(p.lat) &&
+                    Number.isFinite(p.lng) &&
+                    !Number.isNaN(p.lat) &&
+                    !Number.isNaN(p.lng),
+            )
+            if (path.length < 2) return []
+            const first = path[0]
+            const last = path[path.length - 1]
+            const key = `polyline-${line.label ?? idx}-${path.length}-${first.lat.toFixed(5)}-${first.lng.toFixed(5)}-${last.lat.toFixed(5)}-${last.lng.toFixed(5)}`
+            return [{ ...line, path, key }]
+        })
+    }, [polylines])
+
+    const showCoverageCircle =
+        coverageCircle != null &&
+        Number.isFinite(coverageCircle.center.lat) &&
+        Number.isFinite(coverageCircle.center.lng) &&
+        coverageCircle.radiusMeters > 0
+
+    // Smooth pan when center changes (skip when locked to state or coverage — fitBounds owns the view)
     React.useEffect(() => {
-        if (!map || !center || stateBounds) return
+        if (!map || !center || stateBounds || coverageMapBounds) return
         map.panTo(center)
-    }, [map, center, stateBounds])
+    }, [map, center, stateBounds, coverageMapBounds])
 
     const applyStateMinZoom = useCallback((targetMap: google.maps.Map, bounds: MapStateBounds) => {
         const tighten = (attempt: number) => {
             const z = targetMap.getZoom() ?? 6
             if (!viewportExceedsStateBounds(targetMap, bounds) || attempt >= 5) {
-                stateMinZoomRef.current = z
+                const fitZoom = z
+                // Stop zoom-out once the full state is visible — no further zoom-out past this level
+                stateMinZoomRef.current = fitZoom
+                lastZoomRef.current = targetMap.getZoom() ?? fitZoom
+                targetMap.setOptions({ minZoom: fitZoom })
+                return
+            }
+            targetMap.setZoom(z + 1)
+            google.maps.event.addListenerOnce(targetMap, 'idle', () => tighten(attempt + 1))
+        }
+        tighten(0)
+    }, [])
+
+    const fitBoundedView = useCallback(
+        (
+            targetMap: google.maps.Map,
+            bounds: MapStateBounds,
+            onIdle: (targetMap: google.maps.Map, bounds: MapStateBounds) => void,
+            padding = 8,
+        ) => {
+            const latLngBounds = toLatLngBounds(bounds)
+            const { west, south, east, north } = bounds
+            targetMap.setCenter({ lat: (south + north) / 2, lng: (west + east) / 2 })
+            targetMap.fitBounds(latLngBounds, padding)
+            google.maps.event.addListenerOnce(targetMap, 'idle', () => {
+                onIdle(targetMap, bounds)
+            })
+        },
+        [],
+    )
+
+    const establishStateZoomLimit = useCallback(
+        (targetMap: google.maps.Map, bounds: MapStateBounds, preserveView = false) => {
+            if (!preserveView) {
+                fitBoundedView(targetMap, bounds, applyStateMinZoom, 24)
+                return
+            }
+            const prevZoom = targetMap.getZoom()
+            const prevCenter = targetMap.getCenter()
+            fitBoundedView(targetMap, bounds, (m) => {
+                applyStateMinZoom(m, bounds)
+                if (prevCenter && prevZoom != null) {
+                    m.setZoom(prevZoom)
+                    m.setCenter(prevCenter)
+                    lastZoomRef.current = prevZoom
+                }
+            })
+        },
+        [applyStateMinZoom, fitBoundedView],
+    )
+
+    const fitStateView = useCallback(
+        (targetMap: google.maps.Map, bounds: MapStateBounds) => {
+            establishStateZoomLimit(targetMap, bounds, false)
+        },
+        [establishStateZoomLimit],
+    )
+
+    const applyCoverageMinZoom = useCallback((targetMap: google.maps.Map, bounds: MapStateBounds) => {
+        const tighten = (attempt: number) => {
+            const z = targetMap.getZoom() ?? 8
+            if (!viewportExceedsStateBounds(targetMap, bounds) || attempt >= 5) {
+                coverageMinZoomRef.current = z
                 lastZoomRef.current = z
                 targetMap.setOptions({ minZoom: z })
                 return
@@ -187,17 +669,11 @@ export function GoogleMap({
         tighten(0)
     }, [])
 
-    const fitStateView = useCallback(
+    const fitCoverageView = useCallback(
         (targetMap: google.maps.Map, bounds: MapStateBounds) => {
-            const latLngBounds = toLatLngBounds(bounds)
-            const { west, south, east, north } = bounds
-            targetMap.setCenter({ lat: (south + north) / 2, lng: (west + east) / 2 })
-            targetMap.fitBounds(latLngBounds, 8)
-            google.maps.event.addListenerOnce(targetMap, 'idle', () => {
-                applyStateMinZoom(targetMap, bounds)
-            })
+            fitBoundedView(targetMap, bounds, applyCoverageMinZoom, 24)
         },
-        [applyStateMinZoom],
+        [applyCoverageMinZoom, fitBoundedView],
     )
 
     // Apply state boundary restriction; warn only on zoom-out past full-state view
@@ -207,12 +683,70 @@ export function GoogleMap({
         if (!stateBounds) {
             stateBoundsFittedRef.current = false
             stateMinZoomRef.current = null
-            lastZoomRef.current = null
-            map.setOptions({ restriction: null, minZoom: undefined })
+            if (!coverageMapBounds) {
+                lastZoomRef.current = null
+                map.setOptions({ restriction: null, minZoom: undefined })
+            }
+        } else {
+            const latLngBounds = toLatLngBounds(stateBounds)
+            map.setOptions({
+                restriction: {
+                    latLngBounds,
+                    strictBounds: true,
+                },
+            })
+
+            if (!stateBoundsFittedRef.current) {
+                establishStateZoomLimit(map, stateBounds, !fitStateOnLoad)
+                stateBoundsFittedRef.current = true
+            }
+
+            const resetToStateView = () => {
+                fitStateView(map, stateBounds)
+            }
+
+            const onDragEnd = () => {
+                if (viewportExceedsStateBounds(map, stateBounds)) {
+                    resetToStateView()
+                }
+            }
+
+            const onZoomChanged = () => {
+                const current = map.getZoom()
+                if (current == null) return
+                const minZoom = stateMinZoomRef.current
+                const prev = lastZoomRef.current
+
+                const zoomedOut = prev != null && current < prev
+                const belowMin = minZoom != null && current < minZoom
+
+                if (zoomedOut && belowMin) {
+                    map.setZoom(minZoom!)
+                }
+
+                lastZoomRef.current = map.getZoom() ?? current
+            }
+
+            const zoomListener = map.addListener('zoom_changed', onZoomChanged)
+            const dragEndListener = map.addListener('dragend', onDragEnd)
+
+            return () => {
+                google.maps.event.removeListener(zoomListener)
+                google.maps.event.removeListener(dragEndListener)
+            }
+        }
+    }, [map, stateBounds, fitStateView, establishStateZoomLimit, coverageMapBounds, fitStateOnLoad])
+
+    // Lock sub-admin license radius: fit full circle and restrict pan/zoom to its bbox
+    React.useEffect(() => {
+        if (!map || !coverageMapBounds) {
+            coverageBoundsFittedRef.current = false
+            coverageMinZoomRef.current = null
             return
         }
 
-        const latLngBounds = toLatLngBounds(stateBounds)
+        const bounds = coverageMapBounds
+        const latLngBounds = toLatLngBounds(bounds)
         map.setOptions({
             restriction: {
                 latLngBounds,
@@ -220,39 +754,39 @@ export function GoogleMap({
             },
         })
 
-        if (!stateBoundsFittedRef.current) {
-            fitStateView(map, stateBounds)
-            stateBoundsFittedRef.current = true
+        if (!coverageBoundsFittedRef.current) {
+            fitCoverageView(map, bounds)
+            coverageBoundsFittedRef.current = true
         }
 
-        const resetToStateView = () => {
-            fitStateView(map, stateBounds)
+        const resetToCoverageView = () => {
+            fitCoverageView(map, bounds)
         }
 
         const onDragEnd = () => {
-            if (viewportExceedsStateBounds(map, stateBounds)) {
-                resetToStateView()
+            if (viewportExceedsStateBounds(map, bounds)) {
+                resetToCoverageView()
             }
         }
 
         const onZoomChanged = () => {
             const current = map.getZoom()
             if (current == null) return
-            const minZoom = stateMinZoomRef.current
+            const minZoom = coverageMinZoomRef.current
             const prev = lastZoomRef.current
 
             const zoomedOut = prev != null && current < prev
             const belowMin = minZoom != null && current < minZoom
-            const viewportTooWide = viewportExceedsStateBounds(map, stateBounds)
+            const viewportTooWide = viewportExceedsStateBounds(map, bounds)
 
             if (zoomedOut && (belowMin || viewportTooWide)) {
                 if (minZoom != null) {
                     map.setZoom(minZoom)
                 } else {
-                    resetToStateView()
+                    resetToCoverageView()
                 }
             } else if (viewportTooWide) {
-                resetToStateView()
+                resetToCoverageView()
             }
 
             lastZoomRef.current = map.getZoom() ?? current
@@ -265,13 +799,25 @@ export function GoogleMap({
             google.maps.event.removeListener(zoomListener)
             google.maps.event.removeListener(dragEndListener)
         }
-    }, [map, stateBounds, fitStateView])
+    }, [map, coverageMapBounds, fitCoverageView])
 
     React.useEffect(() => {
         stateBoundsFittedRef.current = false
         stateMinZoomRef.current = null
-        lastZoomRef.current = null
-    }, [stateBounds?.west, stateBounds?.south, stateBounds?.east, stateBounds?.north])
+        if (!coverageMapBounds) {
+            lastZoomRef.current = null
+        }
+    }, [stateBounds?.west, stateBounds?.south, stateBounds?.east, stateBounds?.north, coverageMapBounds])
+
+    React.useEffect(() => {
+        coverageBoundsFittedRef.current = false
+        coverageMinZoomRef.current = null
+    }, [
+        lockToCoverage,
+        coverageCircle?.center.lat,
+        coverageCircle?.center.lng,
+        coverageCircle?.radiusMeters,
+    ])
 
     // Clear selected marker if it's no longer in the markers list (e.g. when switching tabs)
     React.useEffect(() => {
@@ -280,67 +826,95 @@ export function GoogleMap({
         }
     }, [markers, selectedMarker])
 
+    const handleMapClick = useCallback(
+        (e: google.maps.MapMouseEvent) => {
+            if (!heatClickOnly || !showHeatmap || !heatIncidents.length) return
+            const lat = e.latLng?.lat()
+            const lng = e.latLng?.lng()
+            if (lat == null || lng == null) return
+            const hit = findNearestHeatIncident(lat, lng, heatIncidents)
+            if (hit) {
+                setSelectedMarker(null)
+                setSelectedHeatIncident(hit)
+                onHeatIncidentSelect?.(hit)
+            } else {
+                setSelectedHeatIncident(null)
+            }
+        },
+        [heatClickOnly, showHeatmap, heatIncidents, onHeatIncidentSelect],
+    )
+
     React.useEffect(() => {
-        if (!map) return
+        if (!map || heatmapFailed) return
 
-        if (!deckOverlayRef.current) {
-            deckOverlayRef.current = new GoogleMapsOverlay({ interleaved: true })
-        }
-        const overlay = deckOverlayRef.current
+        try {
+            if (!deckOverlayRef.current) {
+                deckOverlayRef.current = new GoogleMapsOverlay({ interleaved: false })
+            }
+            const overlay = deckOverlayRef.current
 
-        if (!showHeatmap || validHeatPoints.length === 0) {
-            overlay.setProps({ layers: [] })
+            if (!showHeatmap || validHeatPoints.length === 0) {
+                overlay.setProps({ layers: [] })
+                overlay.setMap(map)
+                return
+            }
+
+            const data: DeckHeatPoint[] = validHeatPoints.map((p) => ({
+                position: [p.lng, p.lat],
+                weight: Math.max(0.1, Math.min(1.2, p.weight ?? 0.6)),
+            }))
+
+            overlay.setProps({
+                layers: [
+                    new HeatmapLayer<DeckHeatPoint>({
+                        id: 'incident-heatmap',
+                        data,
+                        pickable: false,
+                        getPosition: (d) => d.position,
+                        getWeight: (d) => d.weight,
+                        radiusPixels: 36,
+                        intensity: 1.2,
+                        threshold: 0.04,
+                        colorRange: HEATMAP_COLOR_RANGE,
+                    }),
+                ],
+            })
             overlay.setMap(map)
-            return
+        } catch (error) {
+            console.error('Incident heatmap unavailable:', error)
+            setHeatmapFailed(true)
         }
-
-        const data: DeckHeatPoint[] = validHeatPoints.map((p) => ({
-            position: [p.lng, p.lat],
-            weight: Math.max(0.1, Math.min(1.2, p.weight ?? 0.6)),
-        }))
-
-        overlay.setProps({
-            layers: [
-                new HeatmapLayer<DeckHeatPoint>({
-                    id: 'incident-heatmap',
-                    data,
-                    pickable: false,
-                    getPosition: (d) => d.position,
-                    getWeight: (d) => d.weight,
-                    radiusPixels: 36,
-                    intensity: 1.2,
-                    threshold: 0.04,
-                    colorRange: HEATMAP_COLOR_RANGE,
-                }),
-            ],
-        })
-        overlay.setMap(map)
 
         return () => {
-            overlay.setProps({ layers: [] })
+            try {
+                deckOverlayRef.current?.setProps({ layers: [] })
+            } catch {
+                /* ignore teardown errors */
+            }
         }
-    }, [map, showHeatmap, validHeatPoints])
+    }, [map, showHeatmap, validHeatPoints, heatmapFailed])
+
+    if (loadError || authFailed) {
+        return (
+            <GoogleMapsUnavailable
+                reason={authFailed ? 'invalid-key' : 'load-failed'}
+            />
+        )
+    }
 
     if (!isLoaded) return <div className="w-full h-full min-h-[400px] bg-slate-100 animate-pulse flex items-center justify-center rounded-xl border border-slate-200">
         <p className="text-slate-400 text-xs font-black uppercase tracking-widest">Initalizing Satellite Feed...</p>
     </div>
-
-    const validMarkers = markers.filter(marker =>
-        marker.position &&
-        typeof marker.position.lat === 'number' &&
-        typeof marker.position.lng === 'number' &&
-        !isNaN(marker.position.lat) &&
-        !isNaN(marker.position.lng)
-    );
 
     return (
         <div className="w-full h-full min-h-[400px] rounded-xl overflow-hidden shadow-inner border border-slate-200 relative">
             <GoogleMapComponent
                 mapContainerStyle={containerStyle}
                 center={mapCenter}
-                zoom={stateBounds ? undefined : zoom}
+                zoom={stateBounds || coverageMapBounds ? undefined : zoom}
                 onLoad={onLoad}
                 onUnmount={onUnmount}
+                onClick={handleMapClick}
                 options={{
                     disableDefaultUI: false,
                     zoomControl: true,
@@ -351,96 +925,147 @@ export function GoogleMap({
                     fullscreenControl: true
                 }}
             >
-                {coverageCircle &&
-                    Number.isFinite(coverageCircle.center.lat) &&
-                    Number.isFinite(coverageCircle.center.lng) &&
-                    coverageCircle.radiusMeters > 0 && (
+                {map && showCoverageCircle && (
+                    <Circle
+                        center={coverageCircle.center}
+                        radius={coverageCircle.radiusMeters}
+                        options={{
+                            fillColor: 'transparent',
+                            fillOpacity: 0,
+                            strokeColor: '#33375D',
+                            strokeOpacity: 0.95,
+                            strokeWeight: 2,
+                            clickable: false,
+                            zIndex: 2,
+                        }}
+                    />
+                )}
+
+                {disasterZoneCircles.map((zone) => (
+                    <React.Fragment key={`dz-${zone.id}`}>
                         <Circle
-                            center={coverageCircle.center}
-                            radius={coverageCircle.radiusMeters}
+                            center={zone.center}
+                            radius={zone.radiusMeters}
                             options={{
-                                strokeColor: '#33375D',
-                                strokeOpacity: 0.85,
-                                strokeWeight: 2,
-                                fillColor: '#33375D',
-                                fillOpacity: 0.06,
+                                fillColor: zone.fillColor ?? '#DC2626',
+                                fillOpacity: zone.fillOpacity ?? 0.2,
+                                strokeColor: zone.strokeColor ?? '#991B1B',
+                                strokeWeight: zone.strokeWeight ?? 2,
+                                strokeOpacity: 0.95,
                                 clickable: false,
-                                zIndex: 1,
+                                zIndex: zone.id === 'zone_a' ? 5 : zone.id === 'zone_b' ? 4 : 3,
                             }}
                         />
-                    )}
+                        <Marker
+                            position={zone.labelPosition}
+                            clickable={false}
+                            icon={{
+                                path: google.maps.SymbolPath.CIRCLE,
+                                scale: 0,
+                            }}
+                            label={{
+                                text: zone.label,
+                                color: '#3A3D41',
+                                fontSize: '13px',
+                                fontWeight: 'bold',
+                            }}
+                            zIndex={10}
+                        />
+                    </React.Fragment>
+                ))}
 
-                {polylines.map((line, idx) => {
-                    const path = line.path.filter(
-                        (p) =>
-                            Number.isFinite(p.lat) &&
-                            Number.isFinite(p.lng) &&
-                            !Number.isNaN(p.lat) &&
-                            !Number.isNaN(p.lng),
-                    )
-                    if (path.length < 2) return null
-                    return (
+                {map &&
+                    validPolylines.map((line) => (
                         <Polyline
-                            key={`polyline-${idx}-${line.label ?? 'path'}`}
-                            path={path}
+                            key={line.key}
+                            path={line.path}
+                            onClick={() => {
+                                if (line.closure) {
+                                    setSelectedHeatIncident(null)
+                                    setSelectedMarker(null)
+                                    setSelectedRoadClosure(line)
+                                }
+                            }}
                             options={{
                                 strokeColor: line.strokeColor ?? '#DC2626',
                                 strokeOpacity: line.strokeOpacity ?? 0.9,
-                                strokeWeight: line.strokeWeight ?? 4,
+                                strokeWeight: line.strokeWeight ?? (line.kind === 'road_closure' ? 7 : 4),
                                 geodesic: true,
-                                zIndex: 2,
+                                zIndex: line.kind === 'road_closure' ? 3 : 2,
+                                clickable: Boolean(line.closure),
                             }}
                         />
-                    )
-                })}
+                    ))}
 
-                {validMarkers.map((marker) => (
+                {selectedRoadClosure?.closure && selectedRoadClosure.path.length >= 2 && (
+                    <InfoWindow
+                        position={
+                            selectedRoadClosure.path[
+                                Math.floor(selectedRoadClosure.path.length / 2)
+                            ]
+                        }
+                        onCloseClick={() => setSelectedRoadClosure(null)}
+                    >
+                        <div className="max-w-[280px] p-1">
+                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">
+                                Road Closure
+                            </p>
+                            <div className="font-bold text-base mb-2 text-slate-900">
+                                {selectedRoadClosure.closure.roadName}
+                            </div>
+                            <div
+                                className={`text-[10px] font-black uppercase mb-2 inline-block px-2 py-0.5 rounded ${
+                                    selectedRoadClosure.closure.status === 'Closed'
+                                        ? 'bg-red-100 text-red-700'
+                                        : selectedRoadClosure.closure.status === 'Restricted'
+                                          ? 'bg-amber-100 text-amber-800'
+                                          : 'bg-yellow-100 text-yellow-800'
+                                }`}
+                            >
+                                Status: {selectedRoadClosure.closure.status}
+                            </div>
+                            {selectedRoadClosure.closure.reason && (
+                                <p className="text-xs text-slate-600 mb-2 leading-relaxed">
+                                    {selectedRoadClosure.closure.reason}
+                                </p>
+                            )}
+                            {selectedRoadClosure.closure.startLocation && (
+                                <p className="text-xs text-slate-700 mb-1">
+                                    <span className="font-semibold">Start:</span>{' '}
+                                    {selectedRoadClosure.closure.startLocation}
+                                </p>
+                            )}
+                            {selectedRoadClosure.closure.endLocation && (
+                                <p className="text-xs text-slate-700 mb-1">
+                                    <span className="font-semibold">End:</span>{' '}
+                                    {selectedRoadClosure.closure.endLocation}
+                                </p>
+                            )}
+                            {selectedRoadClosure.closure.updatedAt && (
+                                <p className="text-[10px] text-slate-400 font-medium mt-2">
+                                    Updated:{' '}
+                                    {new Date(selectedRoadClosure.closure.updatedAt).toLocaleString()}
+                                </p>
+                            )}
+                            {selectedRoadClosure.closure.source && (
+                                <p className="text-[10px] text-slate-400 font-medium">
+                                    Source: {selectedRoadClosure.closure.source}
+                                </p>
+                            )}
+                        </div>
+                    </InfoWindow>
+                )}
+
+                {renderedMarkers.map((marker) => (
                     <React.Fragment key={marker.id}>
                         <Marker
                             position={marker.position}
                             title={marker.title}
-                            onClick={() => setSelectedMarker(marker)}
-                            icon={
-                                marker.type === 'user' ? (
-                                    marker.isSafe ? {
-                                        url: 'https://maps.google.com/mapfiles/ms/icons/green-dot.png',
-                                        scaledSize: new google.maps.Size(32, 32)
-                                    } : {
-                                        url: 'https://maps.google.com/mapfiles/ms/icons/red-dot.png',
-                                        scaledSize: new google.maps.Size(32, 32)
-                                    }
-                                ) : marker.type === 'earthquake' ? {
-                                    url: 'https://maps.google.com/mapfiles/ms/icons/orange-dot.png',
-                                    scaledSize: new google.maps.Size(40, 40)
-                                } : marker.type === 'weather' ? {
-                                    url: 'https://maps.google.com/mapfiles/ms/icons/blue-dot.png',
-                                    scaledSize: new google.maps.Size(32, 32)
-                                } : marker.type === 'admin' ? {
-                                    url: 'https://maps.google.com/mapfiles/ms/icons/yellow-dot.png',
-                                    scaledSize: new google.maps.Size(42, 42)
-                                } : (marker.type === 'incident' || marker.type === 'infrastructure') ? (
-                                    marker.icon === 'hospital' ? makeGlyphMarker('#EF4444', '+', 34) :
-                                        marker.icon === 'pharmacy' ? makeGlyphMarker('#10B981', '\u213E', 32) : {
-                                            url: marker.color === '#10B981' ? 'https://maps.google.com/mapfiles/ms/icons/green-dot.png' :
-                                                marker.color === '#3B82F6' ? 'https://maps.google.com/mapfiles/ms/icons/blue-dot.png' :
-                                                    marker.color === '#F59E0B' ? 'https://maps.google.com/mapfiles/ms/icons/orange-dot.png' :
-                                                        marker.color === '#06B6D4' ? 'https://maps.google.com/mapfiles/ms/icons/ltblue-dot.png' :
-                                                            marker.color === '#6366F1' ? 'https://maps.google.com/mapfiles/ms/icons/purple-dot.png' :
-                                                                marker.color === '#EC4899' ? 'https://maps.google.com/mapfiles/ms/icons/pink-dot.png' :
-                                                                    marker.icon === 'fire' ? 'https://maps.google.com/mapfiles/ms/icons/firedept.png' :
-                                                                        marker.icon === 'police' ? 'https://maps.google.com/mapfiles/ms/icons/police.png' :
-                                                                            'https://maps.google.com/mapfiles/ms/icons/red-dot.png',
-                                            scaledSize: new google.maps.Size(32, 32)
-                                        }
-                                ) : marker.type === 'condition' ? {
-                                    path: google.maps.SymbolPath.CIRCLE,
-                                    fillColor: marker.color || '#4169E1',
-                                    fillOpacity: 0.8,
-                                    scale: 8,
-                                    strokeColor: 'white',
-                                    strokeWeight: 2,
-                                } : undefined
-                            }
+                            onClick={() => {
+                                setSelectedHeatIncident(null)
+                                setSelectedMarker(marker)
+                            }}
+                            icon={buildMarkerIcon(marker)}
                         />
 
                         {/* Area Highlighting for Hazards */}
@@ -448,7 +1073,10 @@ export function GoogleMap({
                             <Circle
                                 center={marker.position}
                                 radius={marker.radius}
-                                onClick={() => setSelectedMarker(marker)}
+                                onClick={() => {
+                                setSelectedHeatIncident(null)
+                                setSelectedMarker(marker)
+                            }}
                                 options={{
                                     strokeColor: marker.type === 'earthquake' ? '#FF8C00' : '#4169E1',
                                     strokeOpacity: 0.8,
@@ -461,6 +1089,40 @@ export function GoogleMap({
                     </React.Fragment>
                 ))}
 
+                {selectedHeatIncident && (
+                    <InfoWindow
+                        position={{ lat: selectedHeatIncident.lat, lng: selectedHeatIncident.lng }}
+                        onCloseClick={() => setSelectedHeatIncident(null)}
+                    >
+                        <div className="p-2 min-w-[200px] max-w-[300px] bg-white text-slate-900 rounded-lg">
+                            <h3 className="font-extrabold text-sm mb-1 uppercase tracking-tight flex items-center gap-2">
+                                ⚠️ Incident
+                            </h3>
+                            <div className="font-bold text-lg mb-1">{selectedHeatIncident.name}</div>
+                            {selectedHeatIncident.severity && (
+                                <div className="text-[10px] font-black uppercase mb-1 inline-block px-2 py-0.5 rounded bg-amber-100 text-amber-800">
+                                    {selectedHeatIncident.severity}
+                                </div>
+                            )}
+                            {selectedHeatIncident.location && (
+                                <p className="text-xs text-slate-700 mb-2 leading-relaxed">
+                                    {selectedHeatIncident.location}
+                                </p>
+                            )}
+                            <p className="text-[10px] text-slate-500 mb-2">
+                                {selectedHeatIncident.category || selectedHeatIncident.source || 'Active alert'}
+                            </p>
+                            <button
+                                type="button"
+                                onClick={() => setIncidentDialogOpen(true)}
+                                className="mt-1 inline-flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wide text-[#33375D] hover:underline"
+                            >
+                                View AI Report →
+                            </button>
+                        </div>
+                    </InfoWindow>
+                )}
+
                 {selectedMarker && (
                     <InfoWindow
                         position={selectedMarker.position}
@@ -469,6 +1131,7 @@ export function GoogleMap({
                         <div className="p-2 min-w-[200px] max-w-[300px] bg-white text-slate-900 rounded-lg">
                             <h3 className="font-extrabold text-sm mb-1 uppercase tracking-tight flex items-center gap-2">
                                 {selectedMarker.type === 'user' ? '👤 Citizen' :
+                                    selectedMarker.type === 'responder' ? '🚒 Responder' :
                                     selectedMarker.type === 'earthquake' ? '🌋 Earthquake' :
                                         selectedMarker.type === 'weather' ? '🌦️ Weather Alert' :
                                             selectedMarker.type === 'incident' ? '⚠️ Incident' :
@@ -477,10 +1140,10 @@ export function GoogleMap({
                             </h3>
                             <div className="font-bold text-lg mb-1">{selectedMarker.title}</div>
 
-                            {selectedMarker.status && (
-                                <div className={`text-[10px] font-black uppercase mb-1 inline-block px-2 py-0.5 rounded ${selectedMarker.isSafe === false || selectedMarker.status === 'Danger' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
+                            {(selectedMarker.status || selectedMarker.isSafe != null) && (
+                                <div className={`text-[10px] font-black uppercase mb-1 inline-block px-2 py-0.5 rounded ${selectedMarker.isSafe === false || isHelpStatus(selectedMarker.status, selectedMarker.isSafe) ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
                                     }`}>
-                                    Status: {selectedMarker.status}
+                                    Status: {formatMarkerStatus(selectedMarker.status, selectedMarker.isSafe)}
                                 </div>
                             )}
 
@@ -510,6 +1173,16 @@ export function GoogleMap({
                                 </p>
                             )}
 
+                            {selectedMarker.incidentId && (
+                                <button
+                                    type="button"
+                                    onClick={() => setIncidentDialogOpen(true)}
+                                    className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wide text-[#33375D] hover:underline"
+                                >
+                                    View AI Report →
+                                </button>
+                            )}
+
                             {selectedMarker.alerts && selectedMarker.alerts.length > 0 && (
                                 <div className="mt-2 pt-2 border-t border-slate-100">
                                     <p className="text-[10px] font-black text-slate-400 uppercase mb-1">Active Alerts</p>
@@ -527,6 +1200,25 @@ export function GoogleMap({
                     </InfoWindow>
                 )}
             </GoogleMapComponent>
+
+            <IncidentDetailDialog
+                open={incidentDialogOpen}
+                onOpenChange={setIncidentDialogOpen}
+                eventIds={
+                    selectedHeatIncident
+                        ? [selectedHeatIncident.id]
+                        : selectedMarker?.incidentId
+                          ? [selectedMarker.incidentId]
+                          : []
+                }
+                bulletText={
+                    selectedHeatIncident
+                        ? `${selectedHeatIncident.name} — ${selectedHeatIncident.severity} severity${selectedHeatIncident.location ? ` · ${selectedHeatIncident.location}` : ''}`
+                        : selectedMarker?.title
+                          ? `${selectedMarker.title}${selectedMarker.description ? ` — ${selectedMarker.description}` : ''}`
+                          : ''
+                }
+            />
         </div>
     )
 }

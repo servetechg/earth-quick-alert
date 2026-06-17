@@ -170,3 +170,50 @@ export function mapZoomForRadiusMiles(miles: number): number {
     if (miles <= 350) return 6;
     return 5;
 }
+
+/** Axis-aligned bounding box for a geodesic circle (map fitBounds / restriction). */
+export function coverageCircleLatLngBounds(
+    center: LatLngPoint,
+    radiusMeters: number,
+): GeoBounds {
+    const latDelta = radiusMeters / 111_320;
+    const lngDelta =
+        radiusMeters /
+        (111_320 * Math.max(0.2, Math.abs(Math.cos((center.lat * Math.PI) / 180))));
+    return {
+        northeast: { lat: center.lat + latDelta, lng: center.lng + lngDelta },
+        southwest: { lat: center.lat - latDelta, lng: center.lng - lngDelta },
+    };
+}
+
+export function pointInCoverageCircle(
+    lat: number,
+    lng: number,
+    center: LatLngPoint,
+    radiusMeters: number,
+): boolean {
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return false;
+    const radiusMile = radiusMeters / 1609.34;
+    return calculateDistance(lat, lng, center.lat, center.lng) <= radiusMile;
+}
+
+/** Approximate circle ring for map polygon holes (counter-clockwise when outer is clockwise). */
+export function coverageCirclePath(
+    center: LatLngPoint,
+    radiusMeters: number,
+    points = 72,
+): LatLngPoint[] {
+    const latDelta = radiusMeters / 111_320;
+    const lngDelta =
+        radiusMeters /
+        (111_320 * Math.max(0.2, Math.abs(Math.cos((center.lat * Math.PI) / 180))));
+    const path: LatLngPoint[] = [];
+    for (let i = 0; i <= points; i++) {
+        const theta = (i / points) * 2 * Math.PI;
+        path.push({
+            lat: center.lat + latDelta * Math.sin(theta),
+            lng: center.lng + lngDelta * Math.cos(theta),
+        });
+    }
+    return path;
+}

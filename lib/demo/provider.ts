@@ -20,6 +20,7 @@ import {
     buildDemoSummaryResponse,
 } from '@/lib/demo/build-risk-responses';
 import { DEMO_SCENARIO_ID, DEMO_SCENARIO_TITLE } from '@/lib/demo/constants';
+import { buildDemoAfterActionReview } from '@/lib/demo/build-aar-response';
 
 export type DemoSessionContext = {
     active: true;
@@ -61,6 +62,7 @@ export function buildArkansasStateWideJurisdiction(): SubAdminJurisdiction {
         center: { lat: centerLat, lng: centerLng },
         radiusMile: Math.max(radiusMile, 200),
         radiusKm: Math.max(radiusMile, 200) * 1.60934,
+        coverageType: 'state',
     };
 }
 
@@ -92,6 +94,7 @@ export function getDemoSituationalMapPayload() {
             center: jurisdiction.center,
             radiusMile: jurisdiction.radiusMile,
             radiusMeters: jurisdiction.radiusMile * 1609.34,
+            coverageType: 'state' as const,
             state: jurisdiction.stateRaw,
             stateCode: jurisdiction.stateCode ?? 'AR',
             stateWide: true,
@@ -102,9 +105,9 @@ export function getDemoSituationalMapPayload() {
             lng: c.lng,
             title: c.title,
             isSafe: c.isSafe,
-            status: c.isSafe ? 'safe' : 'needs_assistance',
+            status: c.status ?? (c.isSafe ? 'safe' : 'help'),
             location: c.location,
-            description: 'Demo scenario citizen marker',
+            description: c.description,
         })),
         responders: DEMO_RESPONDER_MARKERS.map((r) => ({
             id: r.id,
@@ -113,7 +116,7 @@ export function getDemoSituationalMapPayload() {
             title: r.title,
             status: r.status,
             location: r.location,
-            description: 'Demo scenario responder deployment',
+            description: r.description,
             color: '#33375D',
             icon: 'responder',
         })),
@@ -129,4 +132,5 @@ export {
     buildDemoIncidentDetails,
     buildDemoSeveritySummaries,
     buildDemoSummaryResponse,
+    buildDemoAfterActionReview,
 };

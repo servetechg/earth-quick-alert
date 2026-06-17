@@ -5,6 +5,10 @@ import type { SeverityBucket, BulletWithRefs } from '@/lib/types/risk-assessment
 import { groupRelatedEvents, toEventGroupSummary } from '@/lib/services/event-grouping';
 import type { IncidentDetailResponse } from '@/app/api/risk-assessment/incident-details/route';
 import {
+    DEMO_CRITICAL_INFRA_MARKERS,
+    buildCriticalInfraAtRiskSummary,
+} from '@/lib/demo/critical-infrastructure-markers';
+import {
     DEMO_CITIZEN_MARKERS,
     DEMO_HISTORICAL_ANALYSIS,
     DEMO_PATH_SEGMENTS,
@@ -20,7 +24,7 @@ export function buildDemoRiskSnapshot(): RiskSnapshot {
     return {
         ...snapshot,
         overall_risk_level: 'SEVERE',
-        populations_at_risk: 1_284,
+        populations_at_risk: 412_000,
         ai_confidence: 92,
         sources_count: alertCount,
     };
@@ -35,8 +39,8 @@ export function buildDemoRiskReport(): RiskReport {
         generated_at: new Date().toISOString(),
         overall_risk_level: 'SEVERE',
         ai_confidence: 92,
-        populations_at_risk: 1_284,
-        ready2go_users_reachable: 1284,
+        populations_at_risk: 412_000,
+        ready2go_users_reachable: DEMO_CITIZEN_MARKERS.length,
         domain_severities: {
             meteorological: 'SEVERE',
             hydrological: 'ELEVATED',
@@ -47,6 +51,7 @@ export function buildDemoRiskReport(): RiskReport {
             `SPC High Risk (5/5) outlook; Tornado Watch → Garland funnel (1:18 PM) → Pulaski Warning (2:03 PM) → Martindale touchdown (2:18 PM CDT).`,
             `Tornado emergencies for Cammack Village and Sherwood/Jacksonville; NWS LZK take-cover with Memphis warning handoff.`,
             `${t.impacts.structuresDamagedOrDestroyed.toLocaleString()} structures damaged/destroyed (588 major damage in Breckenridge segment); mass-casualty declared — 54 injuries.`,
+            `WARNING: Responders must remain alert to impending tornado threads and secondary convective lines. Active warning warnings require immediate shelter-in-place protocols.`,
         ],
         hydrological_findings: [
             'Localized flash flooding possible in debris-clogged drainage basins post-storm.',
@@ -67,16 +72,22 @@ export function buildDemoRiskReport(): RiskReport {
                 step: 2,
             },
             {
+                priority: 'IMMEDIATE',
+                action: 'WARNING: Coordinate real-time radar monitoring to warn field responders of impending tornado threads and secondary storm lines in the track corridor.',
+                deployable: false,
+                step: 3,
+            },
+            {
                 priority: 'URGENT',
                 action: 'Email situational risk PDF to Arkansas sub-admins and responders via operational mail queue.',
                 deployable: true,
-                step: 3,
+                step: 4,
             },
             {
                 priority: 'STANDARD',
                 action: 'Open Virtual EOC bridge and track hospital capacity surge (54 injuries reported).',
                 deployable: false,
-                step: 4,
+                step: 5,
             },
         ],
         incident_distribution: snapshot.incident_distribution,
@@ -141,6 +152,7 @@ export function buildDemoAnalyzeResponse() {
 
     return {
         report,
+        population_exposure: bundle.riskExposure ?? null,
         ingest: {
             successfulSources: bundle.successfulSources,
             totalSignals: bundle.totalSignals,
@@ -149,7 +161,7 @@ export function buildDemoAnalyzeResponse() {
             ingestScope: 'state' as const,
             nwpsGaugeId: bundle.nwpsGaugeId,
             populationsAtRiskAcsEstimate: 412_000,
-            reachableReady2GoUsers: 1284,
+            reachableReady2GoUsers: DEMO_CITIZEN_MARKERS.length,
             riskExposureVintage: bundle.riskExposure?.censusVintageLabel ?? null,
             aligned_event_count: aligned.length,
             aligned_alert_count: aligned.length,
@@ -167,12 +179,14 @@ export function buildDemoAnalyzeResponse() {
 export function buildDemoSummaryResponse() {
     const snapshot = buildDemoRiskSnapshot();
     const report = buildDemoRiskReport();
+    const analyze = buildDemoAnalyzeResponse();
     const populationAtRiskUsers = DEMO_CITIZEN_MARKERS.map((c, i) => ({
         id: c.id,
         name: c.title,
         email: `citizen${i + 1}@demo.ready2go.app`,
         address: c.location,
     }));
+    const censusEstimate = analyze.ingest.populationsAtRiskAcsEstimate ?? 412_000;
     const { severity_buckets, ...rest } = snapshot;
     return {
         ...rest,
@@ -180,12 +194,22 @@ export function buildDemoSummaryResponse() {
         major_incidents: report.major_incidents,
         minor_incidents: report.minor_incidents,
         incident_distribution: report.incident_distribution,
-        populations_at_risk: populationAtRiskUsers.length,
+        populations_at_risk: censusEstimate,
+        ready2go_users_at_risk: populationAtRiskUsers.length,
+        population_exposure: analyze.population_exposure ?? null,
         population_at_risk_users: populationAtRiskUsers,
         ai_available: true,
         demo: true,
         scenarioId: DEMO_SCENARIO_ID,
         scenarioTitle: DEMO_SCENARIO_TITLE,
+        critical_infrastructure_at_risk: buildCriticalInfraAtRiskSummary(DEMO_CRITICAL_INFRA_MARKERS).map(
+            (row) => ({
+                sectorId: row.sectorId,
+                label: row.label,
+                facilitiesAtRisk: row.facilitiesAtRisk,
+                riskLevel: row.riskLevel,
+            }),
+        ),
         severity_buckets: severity_buckets.map((b) => ({
             severity: b.severity,
             categories: b.categories.map((c) => ({

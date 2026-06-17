@@ -14,7 +14,13 @@ import {
     fetchSubAdminLeaderMarkers,
 } from '@/lib/services/situational-map-markers';
 import { resolveSubAdminJurisdiction } from '@/lib/sub-admin/jurisdiction';
+import { ensureArkansasPresentationLicense } from '@/lib/demo/ensure-presentation-license';
+import { DEMO_PRESENTATION_EMAIL } from '@/lib/demo/constants';
 import { resolveDemoSessionContext, getDemoSituationalMapPayload } from '@/lib/demo/provider';
+import {
+    filterLatLngInUsa,
+    isSuperAdminNationwideView,
+} from '@/lib/constants/usa-map-bounds';
 
 function mapCitizensToClient(
     rows: Awaited<ReturnType<typeof fetchNationwideCitizenMarkers>>
@@ -97,11 +103,16 @@ export async function GET(req: Request) {
 
         const rows = await fetchAlignedUnifiedEventFeed({ userId, role });
         const stats = alignedIncidentStatsFromCards(rows as Record<string, unknown>[]);
-        const incidents = await resolveHeatPointsFromAlignedRows(rows as Record<string, unknown>[]);
+        let incidents = await resolveHeatPointsFromAlignedRows(rows as Record<string, unknown>[]);
 
         let citizens: ReturnType<typeof mapCitizensToClient> = [];
         let responders: ReturnType<typeof mapRespondersToClient> = [];
         let leaders: ReturnType<typeof mapLeadersToClient> = [];
+
+        const usaOnlyNationwide = isSuperAdminNationwideView(role, scopeState);
+        if (usaOnlyNationwide) {
+            incidents = filterLatLngInUsa(incidents);
+        }
 
         if (role === 'sub-admin') {
             const [citizenRows, responderRows] = await Promise.all([
@@ -116,26 +127,42 @@ export async function GET(req: Request) {
                 fetchNationwideResponderMarkers({ stateRaw: scopeState }),
                 fetchSubAdminLeaderMarkers({ stateRaw: scopeState }),
             ]);
-            citizens = mapCitizensToClient(citizenRows);
-            responders = mapRespondersToClient(responderRows);
-            leaders = mapLeadersToClient(leaderRows);
+            citizens = mapCitizensToClient(
+                usaOnlyNationwide
+                    ? filterLatLngInUsa(citizenRows)
+                    : citizenRows,
+            );
+            responders = mapRespondersToClient(
+                usaOnlyNationwide
+                    ? filterLatLngInUsa(responderRows)
+                    : responderRows,
+            );
+            leaders = mapLeadersToClient(
+                usaOnlyNationwide ? filterLatLngInUsa(leaderRows) : leaderRows,
+            );
         }
 
         let coverage: {
             center: { lat: number; lng: number };
             radiusMile: number;
             radiusMeters: number;
+            coverageType: 'state' | 'radius';
             state?: string;
             stateCode?: string;
         } | null = null;
 
         if (role === 'sub-admin') {
+            const email = String(session.user.email ?? '').trim().toLowerCase();
+            if (email === DEMO_PRESENTATION_EMAIL) {
+                await ensureArkansasPresentationLicense(userId);
+            }
             const jurisdiction = await resolveSubAdminJurisdiction(userId);
             if (jurisdiction) {
                 coverage = {
                     center: jurisdiction.center,
                     radiusMile: jurisdiction.radiusMile,
                     radiusMeters: jurisdiction.radiusMile * 1609.34,
+                    coverageType: jurisdiction.coverageType,
                     state: jurisdiction.stateRaw,
                     stateCode: jurisdiction.stateCode ?? undefined,
                 };

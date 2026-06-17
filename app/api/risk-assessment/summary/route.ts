@@ -18,6 +18,7 @@ import {
 import { resolveSubAdminJurisdiction } from '@/lib/sub-admin/jurisdiction';
 import { resolveDemoSessionContext, buildDemoSummaryResponse } from '@/lib/demo/provider';
 import { getOrRevalidate } from '@/lib/services/risk-report-cache';
+import { computeCensusExposureFromAlertRows } from '@/lib/services/alert-area-census-exposure';
 
 const ALLOWED_ROLES = new Set([
     'admin', 'super-admin', 'sub-admin', 'eoc-manager',
@@ -52,7 +53,7 @@ export async function GET(req: Request) {
             { nationwide: bodyNationwide, stateCd: bodyStateCd },
         );
 
-        const cacheKey = `${session.user.id}:${scope.stateCd}:aligned-v5-pop-state`;
+        const cacheKey = `${session.user.id}:${scope.stateCd}:aligned-v9-census-parse`;
 
         const response = await getOrRevalidate(cacheKey, async () => {
             const events = await fetchAlignedUnifiedEventDocsForSession({
@@ -91,6 +92,16 @@ export async function GET(req: Request) {
                 populationAtRiskUsers,
             );
 
+            const scopeStateUsps =
+                jurisdiction?.stateCode ??
+                (scope.stateCd !== 'us' ? scope.stateCd.toUpperCase() : null);
+            const populationExposure = await computeCensusExposureFromAlertRows(alignedCards, {
+                defaultStateUsps: scopeStateUsps,
+                scopeStateUsps,
+                dashboardStateCd: scope.stateCd,
+                jurisdiction,
+            });
+
             // Strip raw event arrays from the response (only needed server-side)
             const { severity_buckets, ...rest } = snapshot;
             const response = {
@@ -99,7 +110,9 @@ export async function GET(req: Request) {
                 major_incidents: aligned.major_incidents,
                 minor_incidents: aligned.minor_incidents,
                 incident_distribution: aligned.incident_distribution,
-                populations_at_risk: populationAtRiskUsers.length,
+                populations_at_risk: populationExposure?.populationAffectedEstimate ?? 0,
+                ready2go_users_at_risk: populationAtRiskUsers.length,
+                population_exposure: populationExposure,
                 population_at_risk_users: populationAtRiskUsers,
                 ai_available: aiAvailable,
                 severity_buckets: severity_buckets.map((b) => ({

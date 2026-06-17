@@ -1,11 +1,12 @@
 import License from '@/models/License';
 import User from '@/models/User';
-import { getUsStateBbox } from '@/lib/constants/us-state-bounding-boxes';
+import { getUsStateBbox, pointInUsStateBBox } from '@/lib/constants/us-state-bounding-boxes';
 import { calculateDistance } from '@/lib/services/mock-map-service';
 import { geocodeLocation } from '@/lib/services/location-matching';
-import { normalizeStateToUsps } from '@/lib/utils/us-state-usps';
+import { normalizeStateToUsps, textMentionsUsState } from '@/lib/utils/us-state-usps';
 import { parseLocations } from '@/lib/utils/alert-communication-hydrate';
-import { maybeDemoJurisdictionOverride } from '@/lib/demo/provider';
+import { maybeDemoJurisdictionOverride, buildArkansasStateWideJurisdiction } from '@/lib/demo/provider';
+import { DEMO_PRESENTATION_EMAIL } from '@/lib/demo/constants';
 
 export type SubAdminJurisdiction = {
     stateRaw: string;
@@ -13,6 +14,7 @@ export type SubAdminJurisdiction = {
     center: { lat: number; lng: number };
     radiusMile: number;
     radiusKm: number;
+    coverageType: 'state' | 'radius';
 };
 
 const DEFAULT_RADIUS_MILE = 5;
@@ -34,18 +36,25 @@ const geocodeCache = new Map<
 async function resolveSubAdminJurisdictionUncached(
     userId: string
 ): Promise<SubAdminJurisdiction | null> {
-    const u = await User.findById(userId)
-        .select('role state country city licenseId')
-        .lean();
+    const u = (await User.findById(userId)
+        .select('role state country city licenseId requestedLicenseType email')
+        .lean()) as any;
     if (!u || String(u.role) !== 'sub-admin') return null;
+
+    const email = String(u.email ?? '').trim().toLowerCase();
+    if (email === DEMO_PRESENTATION_EMAIL) {
+        return buildArkansasStateWideJurisdiction();
+    }
 
     const stateRaw = typeof u.state === 'string' ? u.state.trim() : '';
     if (!stateRaw) return null;
 
     const stateCode = normalizeStateToUsps(stateRaw);
     const license = u.licenseId
-        ? await License.findById(u.licenseId).select('radiusMile billingAddress').lean()
+        ? ((await License.findById(u.licenseId).select('radiusMile billingAddress coverageType').lean()) as any)
         : null;
+
+    const coverageType = (license?.coverageType || u.requestedLicenseType || 'radius') as 'state' | 'radius';
 
     const radiusMile =
         typeof license?.radiusMile === 'number' && license.radiusMile > 0
@@ -84,6 +93,7 @@ async function resolveSubAdminJurisdictionUncached(
         center,
         radiusMile,
         radiusKm: radiusMile * MILE_TO_KM,
+        coverageType,
     };
 }
 
@@ -135,6 +145,11 @@ export function coordinatesInJurisdiction(
     jurisdiction: SubAdminJurisdiction
 ): boolean {
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) return false;
+
+    if (jurisdiction.coverageType === 'state') {
+        if (!jurisdiction.stateCode) return false;
+        return pointInUsStateBBox(lng, lat, jurisdiction.stateCode);
+    }
 
     const distMile = calculateDistance(
         lat,
@@ -236,6 +251,12 @@ export function alertRowMatchesSubAdminJurisdictionSync(
     row: AlertRowForJurisdiction,
     jurisdiction: SubAdminJurisdiction
 ): boolean {
+    if (jurisdiction.coverageType === 'state') {
+        if (!jurisdiction.stateCode) return false;
+        const coords = extractAlertRowCoordinates(row);
+        if (!coords) return false;
+        return pointInUsStateBBox(coords.lng, coords.lat, jurisdiction.stateCode);
+    }
     const coords = extractAlertRowCoordinates(row);
     if (!coords) return false;
     return coordinatesInJurisdiction(coords.lat, coords.lng, jurisdiction);
@@ -250,6 +271,36 @@ export async function alertRowMatchesSubAdminJurisdiction(
     jurisdiction: SubAdminJurisdiction,
     geocodeBudget?: { remaining: number }
 ): Promise<boolean> {
+    if (jurisdiction.coverageType === 'state') {
+        if (!jurisdiction.stateCode) return false;
+
+        const coords = extractAlertRowCoordinates(row);
+        if (coords && pointInUsStateBBox(coords.lng, coords.lat, jurisdiction.stateCode)) {
+            return true;
+        }
+
+        const locationText = [
+            row.location,
+            row.name,
+            row.description,
+            ...(row.locations || [])
+        ].filter(Boolean).join(' ');
+
+        if (textMentionsUsState(locationText, jurisdiction.stateCode)) {
+            return true;
+        }
+
+        const queries = locationQueriesFromRow(row);
+        for (const query of queries) {
+            const geo = await geocodeLocationCached(query, geocodeBudget);
+            if (geo && pointInUsStateBBox(geo.lng, geo.lat, jurisdiction.stateCode)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     const coords = extractAlertRowCoordinates(row);
     if (coords && coordinatesInJurisdiction(coords.lat, coords.lng, jurisdiction)) {
         return true;

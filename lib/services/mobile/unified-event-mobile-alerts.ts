@@ -9,6 +9,23 @@ import {
 import { normalizeStateToUsps } from '@/lib/utils/us-state-usps';
 import type { UserProfilePayload } from '@/lib/types/mobile/auth';
 import { Alert, AlertSeverity, AlertSource } from '@/lib/types/api-alerts';
+import {
+    resolveUnifiedEventExpiresIso,
+    resolveUnifiedEventIssuedIso,
+} from '@/lib/services/mobile/unified-event-timestamps';
+
+const SOURCE_LABELS: Record<string, string> = {
+    nws: 'NWS',
+    usgs: 'USGS',
+    nwps: 'NWPS',
+    fema: 'FEMA',
+    firms: 'FIRMS',
+    inciweb: 'INCIWEB',
+    earthquake: 'USGS',
+    noaa_ncei: 'NOAA',
+    manual: 'READY2GO',
+    seed: 'READY2GO',
+};
 
 function statesFromProfile(profile: UserProfilePayload | null): string[] {
     const states = new Set<string>();
@@ -20,20 +37,18 @@ function statesFromProfile(profile: UserProfilePayload | null): string[] {
     return [...states];
 }
 
-function legacySeverityToAlertSeverity(value: string): AlertSeverity {
-    const n = (value || '').toLowerCase();
-    if (n === 'extreme') return AlertSeverity.EXTREME;
-    if (n === 'high') return AlertSeverity.HIGH;
-    if (n === 'moderate') return AlertSeverity.MODERATE;
-    if (n === 'low') return AlertSeverity.LOW;
+function toAlertSeverity(severity: string): AlertSeverity {
+    const s = String(severity ?? '').toLowerCase();
+    if (s === 'extreme') return AlertSeverity.EXTREME;
+    if (s === 'high') return AlertSeverity.HIGH;
+    if (s === 'moderate') return AlertSeverity.MODERATE;
+    if (s === 'low') return AlertSeverity.LOW;
     return AlertSeverity.MODERATE;
 }
 
-function legacySourceToAlertSource(legacy: string): AlertSource {
-    const s = legacy.toLowerCase();
-    if (s === 'usgs' || s === 'earthquake' || s === 'nwps') return AlertSource.WEATHER_API;
-    if (s === 'nws' || s === 'fema' || s === 'firms' || s === 'inciweb') return AlertSource.WEATHER_API;
-    return AlertSource.WEATHER_API;
+function sourceLabel(source: string): string {
+    const legacy = unifiedSourceToLegacy(source);
+    return SOURCE_LABELS[legacy] ?? legacy.toUpperCase();
 }
 
 function unifiedEventMatchesUser(
@@ -66,32 +81,35 @@ function unifiedEventMatchesUser(
     return false;
 }
 
-function unifiedEventToAlert(doc: UnifiedEventDoc): Alert & { sourceDisplay: string } {
-    const legacy = unifiedSourceToLegacy(doc.source);
-    const issuedAt = doc.issuedAt || doc.createdAt || new Date().toISOString();
-    const expiresAt = doc.expiresAt || undefined;
+type UnifiedMobileAlert = Alert & { unifiedSource: string; sourceDisplay?: string };
+
+function unifiedDocToAlert(doc: UnifiedEventDoc): UnifiedMobileAlert {
+    const issuedIso = resolveUnifiedEventIssuedIso(doc);
+    const expiresIso = resolveUnifiedEventExpiresIso(doc);
 
     return {
-        id: doc.externalId || String(doc._id),
-        source: legacySourceToAlertSource(legacy),
-        severity: legacySeverityToAlertSeverity(doc.severity),
+        id: doc.externalId || doc._id,
+        source: AlertSource.WEATHER_API,
+        unifiedSource: doc.source,
+        severity: toAlertSeverity(doc.severity),
         title: doc.name,
-        description: doc.description || '',
-        timestamp: issuedAt,
-        expiresAt: expiresAt && expiresAt !== 'null' ? expiresAt : undefined,
+        description: doc.description ?? '',
+        timestamp: issuedIso,
+        expiresAt: expiresIso,
         affectedAreas: doc.location ? [doc.location] : [],
         areaDesc: doc.location,
-        sourceDisplay: legacy.toUpperCase(),
+        event: doc.name,
+        sourceDisplay: sourceLabel(doc.source),
     };
 }
 
 /**
- * Current unified events scoped to the user's profile address + alert location states,
- * using the same AI-aligned state matching as Alerts & Communication / Risk Assessment.
+ * Mobile alerts from UnifiedEvent (same source as admin Alerts & Communication).
+ * Matches user zones + states via AI-aligned scope rules and coordinate bbox fallback.
  */
 export async function fetchUnifiedEventsForMobileUser(
     profile: UserProfilePayload | null,
-): Promise<(Alert & { sourceDisplay?: string })[]> {
+): Promise<UnifiedMobileAlert[]> {
     const zones = buildUserZones(profile);
     const zoneStrings = zones.map((z) => z.locationString);
     if (zoneStrings.length === 0) return [];
@@ -99,8 +117,18 @@ export async function fetchUnifiedEventsForMobileUser(
     const states = statesFromProfile(profile);
     if (states.length === 0) return [];
 
-    const events = await getCurrentEvents();
-    const matched = events.filter((doc) => unifiedEventMatchesUser(doc, zoneStrings, states));
+    const docs = await getCurrentEvents();
+    const matched = docs.filter((doc) => unifiedEventMatchesUser(doc, zoneStrings, states));
 
-    return matched.map(unifiedEventToAlert);
+    matched.sort(
+        (a, b) =>
+            new Date(resolveUnifiedEventIssuedIso(b)).getTime() -
+            new Date(resolveUnifiedEventIssuedIso(a)).getTime(),
+    );
+
+    return matched.map(unifiedDocToAlert);
+}
+
+export function unifiedSourceDisplay(source: string): string {
+    return sourceLabel(source);
 }

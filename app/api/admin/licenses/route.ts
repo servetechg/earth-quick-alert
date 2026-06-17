@@ -57,7 +57,8 @@ export async function POST(req: NextRequest) {
             radiusMile,
             stateCode,
             countryCode,
-            isNewUser
+            isNewUser,
+            coverageType
         } = await req.json();
 
         if (!organizationName || (!userId && !isNewUser)) {
@@ -140,7 +141,8 @@ export async function POST(req: NextRequest) {
             billingAddress,
             billingEmail,
             phoneNumber,
-            radiusMile: requestedRadius
+            radiusMile: coverageType === 'state' ? 0 : requestedRadius,
+            coverageType: coverageType || 'radius'
         });
 
         // 3. Update the sub-admin to point to this new license
