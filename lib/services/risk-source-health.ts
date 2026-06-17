@@ -18,6 +18,10 @@ export interface SourceHealth {
   ok: boolean;
 }
 
+/** Single source of truth for Live-Input row keys — kept in sync with probeSourceHealth(). */
+export const LIVE_INPUT_KEYS = ['nws', 'hydro', 'eq', 'firms', 'fema'] as const;
+export type LiveInputKey = (typeof LIVE_INPUT_KEYS)[number];
+
 async function fetchWithTimeout(
   url: string,
   init: RequestInit & { timeoutMs?: number } = {},
@@ -100,10 +104,10 @@ async function probeFema(): Promise<boolean> {
 /** Probe every Live-Input feed in parallel. Never rejects. */
 export async function probeSourceHealth(): Promise<SourceHealth[]> {
   return Promise.all([
-    probe('nws', probeNws),
-    probe('hydro', probeHydro),
-    probe('eq', probeEarthquake),
-    probe('firms', probeFirms),
-    probe('fema', probeFema),
+    probe(LIVE_INPUT_KEYS[0], probeNws),
+    probe(LIVE_INPUT_KEYS[1], probeHydro),
+    probe(LIVE_INPUT_KEYS[2], probeEarthquake),
+    probe(LIVE_INPUT_KEYS[3], probeFirms),
+    probe(LIVE_INPUT_KEYS[4], probeFema),
   ]);
 }

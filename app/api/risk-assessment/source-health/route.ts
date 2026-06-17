@@ -1,16 +1,13 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { getOrRevalidate } from '@/lib/services/risk-report-cache';
-import { probeSourceHealth, type SourceHealth } from '@/lib/services/risk-source-health';
+import { probeSourceHealth, LIVE_INPUT_KEYS, type SourceHealth } from '@/lib/services/risk-source-health';
 import { resolveDemoSessionContext } from '@/lib/demo/provider';
 
 const ALLOWED_ROLES = new Set([
     'admin', 'super-admin', 'sub-admin', 'eoc-manager',
     'eoc-observer', 'manager', 'responder', 'observer',
 ]);
-
-/** Live Inputs row keys — kept in sync with probeSourceHealth(). */
-const ALL_KEYS = ['nws', 'hydro', 'eq', 'firms', 'fema'] as const;
 
 export async function GET() {
     try {
@@ -25,7 +22,7 @@ export async function GET() {
             session.user.email as string,
         );
         if (demoCtx) {
-            const sources: SourceHealth[] = ALL_KEYS.map((key) => ({ key, ok: true }));
+            const sources: SourceHealth[] = LIVE_INPUT_KEYS.map((key) => ({ key, ok: true }));
             return NextResponse.json({ sources });
         }
 
