@@ -11,6 +11,7 @@ import {
     loadCachedThreatRow,
     saveCachedThreatRow,
 } from '@/lib/risk-assessment/client-report-cache'
+import { LIVE_INPUT_KEYS } from '@/lib/services/risk-source-health'
 
 /** UI row derived from the same `RiskReport` as AI Risk Assessment (`/api/risk-assessment/analyze`). */
 interface ThreatPanelRow {
@@ -60,6 +61,8 @@ export function ThreatMonitoring({ locationName }: ThreatMonitoringProps) {
     const [, setNowTick] = useState(0)
     const busyRef = useRef(false)
     const mountedRef = useRef(true)
+    const retryRef = useRef(0)
+    const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
     // Live-Input reachability: undefined = probing, true/false = result per source key.
     const [sourceHealth, setSourceHealth] = useState<Record<string, boolean>>({})
@@ -199,6 +202,13 @@ export function ThreatMonitoring({ locationName }: ThreatMonitoringProps) {
             const silent = opts?.silent === true
             if (busyRef.current) return // don't stack overlapping runs (poll vs manual)
             busyRef.current = true
+            if (force) {
+                retryRef.current = 0 // manual refresh resets the backoff counter
+                if (retryTimerRef.current !== null) {
+                    clearTimeout(retryTimerRef.current)
+                    retryTimerRef.current = null
+                }
+            }
 
             const hasRestored = hadCachedRowRef.current === true
             if (!silent) setError(null)
@@ -223,14 +233,28 @@ export function ThreatMonitoring({ locationName }: ThreatMonitoringProps) {
                             affectedAreas: affectedAreaLabel,
                             confidence: typeof sumJson.ai_confidence === 'number' ? sumJson.ai_confidence : 0,
                         }
+                        retryRef.current = 0 // reset retry counter on success
                         setRow(newRow)
                         setUpdatedAt(typeof sumJson.generated_at === 'string' ? sumJson.generated_at : new Date().toISOString())
                         // Cache immediately so the next visit paints instantly (no skeleton).
                         saveCachedThreatRow(buildThreatCardCacheKey(affectedAreaLabel), newRow)
                     }
-                } else if (alive() && !hasRestored && !silent) {
-                    // Nothing cached and the request failed/timed out — surface a soft message.
-                    setError('Service temporarily unavailable')
+                } else {
+                    // Request failed (refused, timed out, or 5xx). Retry up to 3 times with
+                    // exponential back-off (2 s → 4 s → 8 s) before showing the error.
+                    const MAX_RETRIES = 3
+                    const RETRY_DELAYS = [2000, 4000, 8000]
+                    if (alive() && retryRef.current < MAX_RETRIES) {
+                        const delay = RETRY_DELAYS[retryRef.current] ?? 8000
+                        retryRef.current += 1
+                        retryTimerRef.current = setTimeout(() => {
+                            busyRef.current = false // allow the retry run
+                            void runAssessment({ silent: true })
+                        }, delay)
+                    } else if (alive() && !hasRestored && !silent) {
+                        // Retries exhausted and nothing cached — surface the error.
+                        setError('Service temporarily unavailable')
+                    }
                 }
             } catch (err) {
                 console.error('Threat monitoring — summary:', err)
@@ -268,16 +292,18 @@ export function ThreatMonitoring({ locationName }: ThreatMonitoringProps) {
         mountedRef.current = true
         return () => {
             mountedRef.current = false
+            if (retryTimerRef.current !== null) clearTimeout(retryTimerRef.current)
         }
     }, [])
 
-    const liveInputs: { key: string; label: string }[] = [
-        { key: 'nws', label: 'NWS flood & hydro alerts' },
-        { key: 'hydro', label: 'NOAA NWPS gauges · USGS hydrology' },
-        { key: 'eq', label: 'USGS earthquake feed' },
-        { key: 'firms', label: 'NASA FIRMS thermal activity' },
-        { key: 'fema', label: 'FEMA OpenFEMA declarations' },
-    ]
+    const LIVE_INPUT_LABELS: Record<string, string> = {
+        nws: 'NWS flood & hydro alerts',
+        hydro: 'NOAA NWPS gauges · USGS hydrology',
+        eq: 'USGS earthquake feed',
+        firms: 'NASA FIRMS thermal activity',
+        fema: 'FEMA OpenFEMA declarations',
+    }
+    const liveInputs = LIVE_INPUT_KEYS.map((key) => ({ key, label: LIVE_INPUT_LABELS[key] ?? key }))
 
     return (
         <Card className="bg-white border-slate-200 rounded-3xl p-8 shadow-sm space-y-8 min-h-[600px] flex flex-col">
