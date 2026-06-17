@@ -106,11 +106,20 @@ export interface RiskSummaryPayload {
   critical_infrastructure_at_risk?: CriticalInfraAtRiskRow[];
 }
 
+export interface CriticalInfraFacilityAtRisk {
+  id: string;
+  name: string;
+  address: string;
+  riskLevel?: 'LOW' | 'MODERATE' | 'HIGH' | 'CRITICAL';
+}
+
 export interface CriticalInfraAtRiskRow {
   sectorId: string;
   label: string;
   facilitiesAtRisk: number;
   riskLevel: 'LOW' | 'MODERATE' | 'HIGH' | 'CRITICAL';
+  /** Named facilities near active alert / incident areas (hospitals, pharmacies, etc.). */
+  facilities?: CriticalInfraFacilityAtRisk[];
 }
 
 /** Payload returned by POST /api/risk-assessment/historical/[category] */

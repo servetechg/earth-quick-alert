@@ -208,6 +208,7 @@ export function buildDemoSummaryResponse() {
                 label: row.label,
                 facilitiesAtRisk: row.facilitiesAtRisk,
                 riskLevel: row.riskLevel,
+                facilities: row.facilities,
             }),
         ),
         severity_buckets: severity_buckets.map((b) => ({

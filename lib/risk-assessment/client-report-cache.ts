@@ -4,7 +4,7 @@ import type {
   SeverityBucket,
 } from '@/lib/types/risk-assessment';
 
-const CACHE_VERSION = 6;
+const CACHE_VERSION = 8;
 const MAX_AGE_MS = 12 * 60 * 60 * 1000; // 12 hours
 
 export type CachedAiRiskReport = {
