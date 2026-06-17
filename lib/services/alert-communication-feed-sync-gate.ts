@@ -46,7 +46,8 @@ export async function syncAlertCommunicationFeedsGate(): Promise<void> {
             );
         }
     } else {
-        await Promise.all([syncNwsAlertsIfStale(), syncAllSourcesIfStale()]);
+        void Promise.all([syncNwsAlertsIfStale(), syncAllSourcesIfStale()])
+            .catch((e) => console.error('[feed-sync-gate:stale]', e));
     }
 
     void syncHistoricalUnifiedEventsIfStale();

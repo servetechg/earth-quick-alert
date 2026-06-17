@@ -8,13 +8,12 @@ import { getActiveRespondersForCategory } from '@/lib/services/risk-responder-da
 import { openaiService } from '@/lib/services/openai-service';
 import type { HistoricalTabPayload } from '@/lib/types/risk-assessment';
 import { normalizeUnifiedEventCategory } from '@/lib/unified-event/category-infer';
+import { getOrRevalidate } from '@/lib/services/risk-report-cache';
 
 const ALLOWED_ROLES = new Set([
     'admin', 'super-admin', 'sub-admin', 'eoc-manager',
     'eoc-observer', 'manager', 'responder', 'observer',
 ]);
-
-const cache = new Map<string, { data: HistoricalTabPayload; expiresAt: number }>();
 
 export async function POST(
     req: Request,
@@ -36,8 +35,9 @@ export async function POST(
 
         const category = normalizeUnifiedEventCategory(categoryParam);
 
-        let body: { stateCd?: string; nationwide?: boolean } = {};
+        let body: { stateCd?: string; nationwide?: boolean; forceRefresh?: boolean } = {};
         try { body = await req.json(); } catch { /* empty body */ }
+        const forceRefresh = body.forceRefresh === true;
 
         const scope = await resolveRiskIngestScopeForSession(
             role,
@@ -46,10 +46,6 @@ export async function POST(
         );
 
         const cacheKey = `hist:${session.user.id}:${scope.stateCd}:${category}:aligned-v3`;
-        const cached = cache.get(cacheKey);
-        if (cached && cached.expiresAt > Date.now()) {
-            return NextResponse.json(cached.data);
-        }
 
         // Same aligned feed as Alerts & Communication, scoped to this category
         const allCurrent = await fetchAlignedUnifiedEventDocsForSession({
@@ -64,51 +60,53 @@ export async function POST(
             return NextResponse.json({ error: 'No active events for this category' }, { status: 404 });
         }
 
-        const seedEvent = pickSeedEvent(currentEvents);
+        const payload = await getOrRevalidate(cacheKey, async () => {
+            const seedEvent = pickSeedEvent(currentEvents);
 
-        // Find similar past events + active responders in parallel
-        const [similarPast, activeResponders] = await Promise.all([
-            findSimilarPastEvents(seedEvent, 3),
-            getActiveRespondersForCategory(category),
-        ]);
-        const hasSimilarPast = similarPast.length > 0;
-        const match_confidence = computeMatchConfidence(seedEvent, similarPast);
+            // Find similar past events + active responders in parallel
+            const [similarPast, activeResponders] = await Promise.all([
+                findSimilarPastEvents(seedEvent, 3),
+                getActiveRespondersForCategory(category),
+            ]);
+            const hasSimilarPast = similarPast.length > 0;
+            const match_confidence = computeMatchConfidence(seedEvent, similarPast);
 
-        // Run Call A (past summary) and Call B (current summary + responder data) in parallel
-        const [pastResult, currentResult] = await Promise.all([
-            openaiService.generateHistoricalPastSummary({ category, similarPastEvents: similarPast, currentSeed: seedEvent }),
-            openaiService.generateHistoricalCurrentSummary({ category, currentEvents, activeResponders }),
-        ]);
+            // Run Call A (past summary) and Call B (current summary + responder data) in parallel
+            const [pastResult, currentResult] = await Promise.all([
+                openaiService.generateHistoricalPastSummary({ category, similarPastEvents: similarPast, currentSeed: seedEvent }),
+                openaiService.generateHistoricalCurrentSummary({ category, currentEvents, activeResponders }),
+            ]);
 
-        // Call C (future measures) depends on A + B
-        const futureResult = await openaiService.generateHistoricalFutureMeasures({
-            category,
-            pastSummary: pastResult,
-            currentSummary: currentResult,
-        });
+            // Call C (future measures) depends on A + B
+            const futureResult = await openaiService.generateHistoricalFutureMeasures({
+                category,
+                pastSummary: pastResult,
+                currentSummary: currentResult,
+            });
 
-        // Call D (per-category strategic plan) depends on C
-        const categoryRecommendations = await openaiService.generateCategoryStrategicPlan({
-            category,
-            futureMeasures: futureResult.future_measures ?? [],
-        });
+            // Call D (per-category strategic plan) depends on C
+            const categoryRecommendations = await openaiService.generateCategoryStrategicPlan({
+                category,
+                futureMeasures: futureResult.future_measures ?? [],
+            });
 
-        const payload: HistoricalTabPayload = {
-            category,
-            hasSimilarPast,
-            historical_analysis: {
-                matched_event: hasSimilarPast ? pastResult.matched_event : undefined,
-                similarity_summary: hasSimilarPast ? pastResult.similarity_summary : undefined,
-                past_damages: hasSimilarPast ? pastResult.past_damages : undefined,
-                past_procedures: hasSimilarPast ? pastResult.past_procedures : undefined,
-                current_procedures: currentResult.current_procedures,
-                future_measures: futureResult.future_measures,
-                match_confidence,
-            },
-            recommendations_list: categoryRecommendations,
-        };
+            const payload: HistoricalTabPayload = {
+                category,
+                hasSimilarPast,
+                historical_analysis: {
+                    matched_event: hasSimilarPast ? pastResult.matched_event : undefined,
+                    similarity_summary: hasSimilarPast ? pastResult.similarity_summary : undefined,
+                    past_damages: hasSimilarPast ? pastResult.past_damages : undefined,
+                    past_procedures: hasSimilarPast ? pastResult.past_procedures : undefined,
+                    current_procedures: currentResult.current_procedures,
+                    future_measures: futureResult.future_measures,
+                    match_confidence,
+                },
+                recommendations_list: categoryRecommendations,
+            };
+            return payload;
+        }, { force: forceRefresh });
 
-        cache.set(cacheKey, { data: payload, expiresAt: Date.now() + 60_000 });
         return NextResponse.json(payload);
     } catch (e: any) {
         console.error(`risk-assessment/historical/${categoryParam}:`, e);

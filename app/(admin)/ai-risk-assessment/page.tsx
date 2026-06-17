@@ -1821,13 +1821,13 @@ export default function RiskAssessment() {
     });
   }, [reportCacheKey, summary, severityBuckets, tabDataMap]);
 
-  const fetchHistoricalCategory = useCallback(async (category: string) => {
+  const fetchHistoricalCategory = useCallback(async (category: string, opts?: { force?: boolean }) => {
     setLoadingCategories((prev) => new Set(prev).add(category));
     try {
       const res = await fetch(`/api/risk-assessment/historical/${category}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(scopeBody),
+        body: JSON.stringify({ ...scopeBody, forceRefresh: opts?.force === true }),
       });
       if (!res.ok) throw new Error(`Historical fetch failed for ${category}`);
       const data: HistoricalTabPayload = await res.json();
@@ -1849,10 +1849,12 @@ export default function RiskAssessment() {
     setLoadingCategories(new Set());
 
     try {
-      // Stage 1: summary (deterministic, fast)
+      // Stage 1: summary (deterministic, fast). Explicit Generate always forces fresh data,
+      // bypassing the server SWR cache so the user sees a genuine re-pull, not a cached snapshot.
       const qs = new URLSearchParams();
       if (scopeBody.stateCd) qs.set("stateCd", scopeBody.stateCd as string);
       if (scopeBody.nationwide === false) qs.set("nationwide", "false");
+      qs.set("refresh", "1");
       const summaryRes = await fetch(`/api/risk-assessment/summary?${qs}`);
       if (!summaryRes.ok) throw new Error("Summary request failed");
       let summaryData: RiskSummaryPayload = await summaryRes.json();
@@ -1871,14 +1873,14 @@ export default function RiskAssessment() {
         return;
       }
 
-      // Stages 2 + 3 in parallel: severity summaries + historical tabs
+      // Stages 2 + 3 in parallel: severity summaries + historical tabs (all forced fresh)
       const [sevRes] = await Promise.all([
         fetch("/api/risk-assessment/severity-summaries", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(scopeBody),
+          body: JSON.stringify({ ...scopeBody, forceRefresh: true }),
         }),
-        ...activeCategories.map((cat) => fetchHistoricalCategory(cat)),
+        ...activeCategories.map((cat) => fetchHistoricalCategory(cat, { force: true })),
       ]);
 
       if (sevRes.ok) {
@@ -1934,6 +1936,11 @@ export default function RiskAssessment() {
             <p className="max-w-3xl text-sm leading-relaxed text-slate-500">
               Dynamic multi-hazard intelligence synthesized from live active events — severity analysis, historical context, and strategic action plan.
             </p>
+            {hasReport && summary?.generated_at && (
+              <p className="mt-2 text-xs font-semibold text-slate-400">
+                Updated {new Date(summary.generated_at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
+              </p>
+            )}
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <Button onClick={generate} disabled={isGenerating}

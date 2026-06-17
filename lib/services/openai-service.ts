@@ -613,7 +613,11 @@ export class OpenAIService {
         return { ...r, alerts_count, major_incidents, minor_incidents };
     }
 
-    async synthesizeDashboardRiskReport(bundle: DashboardIngestBundle): Promise<RiskReport> {
+    async synthesizeDashboardRiskReport(
+        bundle: DashboardIngestBundle,
+        opts: { includeHistorical?: boolean } = {},
+    ): Promise<RiskReport> {
+        const includeHistorical = opts.includeHistorical !== false;
         const fallbackHeuristic = this.alignAlertsToDistribution(this.heuristicDashboardRiskReport(bundle), bundle);
         const fallbackKpis = applyDynamicExecutiveKpis(bundle, fallbackHeuristic);
         // Live-data-only historical scaffold — never the static copyFor* playbook prose.
@@ -670,6 +674,7 @@ ${PLAIN_ENGLISH_STYLE_RULES}${stateOnly}`,
             ...withKpis,
             ...buildLiveHistoricalContext(bundle, withKpis),
         };
+        if (!includeHistorical) return withHistory;
         const aiHistory = await this.generateHistoricalContext(bundle, withHistory);
         return { ...withHistory, ...aiHistory };
     }

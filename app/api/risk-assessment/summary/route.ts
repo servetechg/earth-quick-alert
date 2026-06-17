@@ -17,15 +17,13 @@ import {
 } from '@/lib/services/population-at-risk-cache';
 import { resolveSubAdminJurisdiction } from '@/lib/sub-admin/jurisdiction';
 import { resolveDemoSessionContext, buildDemoSummaryResponse } from '@/lib/demo/provider';
+import { getOrRevalidate } from '@/lib/services/risk-report-cache';
 import { computeCensusExposureFromAlertRows } from '@/lib/services/alert-area-census-exposure';
 
 const ALLOWED_ROLES = new Set([
     'admin', 'super-admin', 'sub-admin', 'eoc-manager',
     'eoc-observer', 'manager', 'responder', 'observer',
 ]);
-
-/** In-process cache: keyed by `userId:stateCd`, 60-second TTL */
-const cache = new Map<string, { data: unknown; expiresAt: number }>();
 
 export async function GET(req: Request) {
     try {
@@ -47,6 +45,7 @@ export async function GET(req: Request) {
         const url = new URL(req.url);
         const bodyStateCd = url.searchParams.get('stateCd') ?? undefined;
         const bodyNationwide = url.searchParams.get('nationwide') !== 'false';
+        const forceRefresh = url.searchParams.get('refresh') === '1';
 
         const scope = await resolveRiskIngestScopeForSession(
             role,
@@ -55,90 +54,78 @@ export async function GET(req: Request) {
         );
 
         const cacheKey = `${session.user.id}:${scope.stateCd}:aligned-v9-census-parse`;
-        const cached = cache.get(cacheKey);
-        if (cached && cached.expiresAt > Date.now()) {
-            const data = cached.data as Record<string, unknown>;
-            const count = typeof data.populations_at_risk === 'number' ? data.populations_at_risk : 0;
-            const users = data.population_at_risk_users;
-            const ready2go = typeof data.ready2go_users_at_risk === 'number' ? data.ready2go_users_at_risk : 0;
-            const hasUserList = Array.isArray(users) && users.length > 0;
-            if (count === 0 && ready2go === 0) {
-                return NextResponse.json(cached.data);
-            }
-            if (ready2go === 0 || hasUserList) {
-                return NextResponse.json(cached.data);
-            }
-        }
 
-        const events = await fetchAlignedUnifiedEventDocsForSession({
-            userId: session.user.id as string | undefined,
-            role,
-        });
-        const alignedCards = await fetchAlignedUnifiedEventFeed({
-            userId: session.user.id as string | undefined,
-            role,
-        });
-        const aiAvailable = openaiService.isAvailable();
-        const snapshot = computeRiskSnapshot(events, { aiAvailable });
-        const aligned = applyRiskReportToAlignedAlertFeed(
-            {
-                ...snapshot,
-                recommendations: [],
-                historical_analysis: {},
-            },
-            alignedCards,
-        );
+        const response = await getOrRevalidate(cacheKey, async () => {
+            const events = await fetchAlignedUnifiedEventDocsForSession({
+                userId: session.user.id as string | undefined,
+                role,
+            });
+            const alignedCards = await fetchAlignedUnifiedEventFeed({
+                userId: session.user.id as string | undefined,
+                role,
+            });
+            const aiAvailable = openaiService.isAvailable();
+            const snapshot = computeRiskSnapshot(events, { aiAvailable });
+            const aligned = applyRiskReportToAlignedAlertFeed(
+                {
+                    ...snapshot,
+                    recommendations: [],
+                    historical_analysis: {},
+                },
+                alignedCards,
+            );
 
-        const jurisdiction =
-            role === 'sub-admin'
-                ? await resolveSubAdminJurisdiction(session.user.id as string)
-                : null;
-        const populationAtRiskRows = await fetchPopulationAtRiskAlignedEventFeed({
-            userId: session.user.id as string | undefined,
-            role,
-        });
-        const populationAtRiskUsers = await listUsersInAlignedAlertAreas(
-            populationAtRiskRows,
-            jurisdiction,
-        );
-        setPopulationAtRiskCache(
-            buildPopulationAtRiskCacheKey(session.user.id as string, scope.stateCd),
-            populationAtRiskUsers,
-        );
+            const jurisdiction =
+                role === 'sub-admin'
+                    ? await resolveSubAdminJurisdiction(session.user.id as string)
+                    : null;
+            const populationAtRiskRows = await fetchPopulationAtRiskAlignedEventFeed({
+                userId: session.user.id as string | undefined,
+                role,
+            });
+            const populationAtRiskUsers = await listUsersInAlignedAlertAreas(
+                populationAtRiskRows,
+                jurisdiction,
+            );
+            setPopulationAtRiskCache(
+                buildPopulationAtRiskCacheKey(session.user.id as string, scope.stateCd),
+                populationAtRiskUsers,
+            );
 
-        const scopeStateUsps =
-            jurisdiction?.stateCode ??
-            (scope.stateCd !== 'us' ? scope.stateCd.toUpperCase() : null);
-        const populationExposure = await computeCensusExposureFromAlertRows(alignedCards, {
-            defaultStateUsps: scopeStateUsps,
-            scopeStateUsps,
-            dashboardStateCd: scope.stateCd,
-            jurisdiction,
-        });
+            const scopeStateUsps =
+                jurisdiction?.stateCode ??
+                (scope.stateCd !== 'us' ? scope.stateCd.toUpperCase() : null);
+            const populationExposure = await computeCensusExposureFromAlertRows(alignedCards, {
+                defaultStateUsps: scopeStateUsps,
+                scopeStateUsps,
+                dashboardStateCd: scope.stateCd,
+                jurisdiction,
+            });
 
-        // Strip raw event arrays from the response (only needed server-side)
-        const { severity_buckets, ...rest } = snapshot;
-        const response = {
-            ...rest,
-            alerts_count: aligned.alerts_count,
-            major_incidents: aligned.major_incidents,
-            minor_incidents: aligned.minor_incidents,
-            incident_distribution: aligned.incident_distribution,
-            populations_at_risk: populationExposure?.populationAffectedEstimate ?? 0,
-            ready2go_users_at_risk: populationAtRiskUsers.length,
-            population_exposure: populationExposure,
-            population_at_risk_users: populationAtRiskUsers,
-            ai_available: aiAvailable,
-            severity_buckets: severity_buckets.map((b) => ({
-                severity: b.severity,
-                categories: b.categories.map((c) => ({
-                    category: c.category,
-                    eventCount: c.events.length,
+            // Strip raw event arrays from the response (only needed server-side)
+            const { severity_buckets, ...rest } = snapshot;
+            const response = {
+                ...rest,
+                alerts_count: aligned.alerts_count,
+                major_incidents: aligned.major_incidents,
+                minor_incidents: aligned.minor_incidents,
+                incident_distribution: aligned.incident_distribution,
+                populations_at_risk: populationExposure?.populationAffectedEstimate ?? 0,
+                ready2go_users_at_risk: populationAtRiskUsers.length,
+                population_exposure: populationExposure,
+                population_at_risk_users: populationAtRiskUsers,
+                ai_available: aiAvailable,
+                severity_buckets: severity_buckets.map((b) => ({
+                    severity: b.severity,
+                    categories: b.categories.map((c) => ({
+                        category: c.category,
+                        eventCount: c.events.length,
+                    })),
                 })),
-            })),
-        };
+            };
+            return response;
+        }, { force: forceRefresh });
 
-        cache.set(cacheKey, { data: response, expiresAt: Date.now() + 60_000 });
         return NextResponse.json(response);
     } catch (e: any) {
         console.error('risk-assessment/summary:', e);
