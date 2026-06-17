@@ -10,7 +10,11 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
-import { TOP_LEVEL_MAP_LAYERS, DISASTER_ZONE_LAYER } from '@/lib/gis/map-layer-config'
+import {
+  GIS_FILTER_MAP_LAYERS,
+  TOP_LEVEL_MAP_LAYERS,
+  DISASTER_ZONE_LAYER,
+} from '@/lib/gis/map-layer-config'
 import { CRITICAL_INFRASTRUCTURE_SECTORS } from '@/lib/gis/critical-infrastructure-sectors'
 
 interface MapLayersDropdownProps {
@@ -18,6 +22,8 @@ interface MapLayersDropdownProps {
   onChange: (updater: (prev: Record<string, boolean>) => Record<string, boolean>) => void
   showCriticalInfra?: boolean
   showDisasterZones?: boolean
+  /** Arkansas demo — show infrastructure filters only (hide live operational feeds). */
+  demoPresentation?: boolean
 }
 
 function LayerRow({
@@ -69,6 +75,7 @@ export function MapLayersDropdown({
   onChange,
   showCriticalInfra = false,
   showDisasterZones = false,
+  demoPresentation = false,
 }: MapLayersDropdownProps) {
   const enabledCount = useMemo(() => {
     return Object.entries(layers).filter(([, v]) => v).length
@@ -78,9 +85,11 @@ export function MapLayersDropdown({
     onChange((prev) => ({ ...prev, [id]: !prev[id] }))
   }
 
-  const topLayers = showDisasterZones
-    ? [...TOP_LEVEL_MAP_LAYERS, DISASTER_ZONE_LAYER]
-    : TOP_LEVEL_MAP_LAYERS
+  const topLayers = demoPresentation
+    ? GIS_FILTER_MAP_LAYERS
+    : showDisasterZones
+      ? [...TOP_LEVEL_MAP_LAYERS, DISASTER_ZONE_LAYER]
+      : TOP_LEVEL_MAP_LAYERS
 
   return (
     <DropdownMenu modal={false}>
@@ -108,22 +117,53 @@ export function MapLayersDropdown({
         className="w-72 max-h-[min(70vh,520px)] overflow-y-auto p-3 rounded-2xl border-slate-200 shadow-xl"
       >
         <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1 pb-2 mb-1 border-b border-slate-100">
-          Map Layers
+          {demoPresentation ? 'Infrastructure & Resources' : 'Map Layers'}
         </p>
 
-        <div className="space-y-0.5">
-          {topLayers.map((layer) => (
+        {!demoPresentation && (
+          <div className="space-y-0.5">
+            {topLayers.map((layer) => (
+              <LayerRow
+                key={layer.id}
+                id={layer.id}
+                label={layer.label}
+                color={layer.color}
+                Icon={layer.Icon}
+                checked={!!layers[layer.id]}
+                onToggle={() => toggle(layer.id)}
+              />
+            ))}
+          </div>
+        )}
+
+        {demoPresentation && (
+          <div className="space-y-0.5">
+            {GIS_FILTER_MAP_LAYERS.map((layer) => (
+              <LayerRow
+                key={layer.id}
+                id={layer.id}
+                label={layer.label}
+                color={layer.color}
+                Icon={layer.Icon}
+                checked={!!layers[layer.id]}
+                onToggle={() => toggle(layer.id)}
+              />
+            ))}
+          </div>
+        )}
+
+        {demoPresentation && showDisasterZones && (
+          <div className="mt-3 pt-2 border-t border-slate-100">
             <LayerRow
-              key={layer.id}
-              id={layer.id}
-              label={layer.label}
-              color={layer.color}
-              Icon={layer.Icon}
-              checked={!!layers[layer.id]}
-              onToggle={() => toggle(layer.id)}
+              id={DISASTER_ZONE_LAYER.id}
+              label={DISASTER_ZONE_LAYER.label}
+              color={DISASTER_ZONE_LAYER.color}
+              Icon={DISASTER_ZONE_LAYER.Icon}
+              checked={!!layers[DISASTER_ZONE_LAYER.id]}
+              onToggle={() => toggle(DISASTER_ZONE_LAYER.id)}
             />
-          ))}
-        </div>
+          </div>
+        )}
 
         {showCriticalInfra && (
           <div className="mt-3 pt-2 border-t border-slate-100">

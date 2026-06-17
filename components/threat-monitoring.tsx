@@ -1,11 +1,16 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Card } from '@/components/ui/card'
-import { CheckCircle2, Loader2, AlertCircle } from 'lucide-react'
+import { CheckCircle2, Loader2, AlertCircle, RefreshCw } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Skeleton } from '@/components/ui/skeleton'
-import type { RiskReport } from '@/lib/types/risk-assessment'
+import {
+    THREAT_CARD_LAST_KEY,
+    buildThreatCardCacheKey,
+    loadCachedThreatRow,
+    saveCachedThreatRow,
+} from '@/lib/risk-assessment/client-report-cache'
 
 /** UI row derived from the same `RiskReport` as AI Risk Assessment (`/api/risk-assessment/analyze`). */
 interface ThreatPanelRow {
@@ -21,6 +26,19 @@ interface ThreatMonitoringProps {
     locationName?: string
 }
 
+/** Compact relative-ish timestamp for the "Updated …" hint. */
+function formatUpdatedAt(iso: string): string {
+    const d = new Date(iso)
+    if (Number.isNaN(d.getTime())) return ''
+    const diffMs = Date.now() - d.getTime()
+    const mins = Math.floor(diffMs / 60000)
+    if (mins < 1) return 'just now'
+    if (mins < 60) return `${mins}m ago`
+    const hrs = Math.floor(mins / 60)
+    if (hrs < 24) return `${hrs}h ago`
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+}
+
 function overallLevelToRelevance(level: string): 'High' | 'Medium' | 'Low' {
     const u = (level || '').toUpperCase()
     if (u === 'CRITICAL' || u === 'SEVERE' || u === 'HIGH') return 'High'
@@ -28,20 +46,31 @@ function overallLevelToRelevance(level: string): 'High' | 'Medium' | 'Low' {
     return 'Low'
 }
 
-function reportToPanelRow(report: RiskReport, locationLabel: string): ThreatPanelRow {
-    return {
-        relevance: overallLevelToRelevance(report.overall_risk_level),
-        severity: (report.overall_risk_level || 'NOMINAL').toUpperCase(),
-        affectedAreas: locationLabel,
-        confidence: typeof report.ai_confidence === 'number' ? report.ai_confidence : 0,
-    }
-}
-
 export function ThreatMonitoring({ locationName }: ThreatMonitoringProps) {
-    const [loading, setLoading] = useState(true)
-    const [row, setRow] = useState<ThreatPanelRow | null>(null)
+    // Restore the last saved card row for an instant, skeleton-free first paint.
+    const [row, setRow] = useState<ThreatPanelRow | null>(() => loadCachedThreatRow(THREAT_CARD_LAST_KEY))
+    const [loading, setLoading] = useState<boolean>(() => loadCachedThreatRow(THREAT_CARD_LAST_KEY) === null)
     const [error, setError] = useState<string | null>(null)
-    const [affectedAreaLabel, setAffectedAreaLabel] = useState('Regional scope')
+    const [affectedAreaLabel, setAffectedAreaLabel] = useState('United States')
+    // When the displayed KPI data was computed (from /summary, refined by /analyze).
+    const [updatedAt, setUpdatedAt] = useState<string | null>(null)
+    // Manual "Refresh now" in progress (force re-pull). Separate from the first-paint skeleton.
+    const [refreshing, setRefreshing] = useState(false)
+    // Re-render tick so the relative "Updated …" label stays current without a new fetch.
+    const [, setNowTick] = useState(0)
+    const busyRef = useRef(false)
+    const mountedRef = useRef(true)
+
+    // Live-Input reachability: undefined = probing, true/false = result per source key.
+    const [sourceHealth, setSourceHealth] = useState<Record<string, boolean>>({})
+
+    // Progressive "one-by-one" reveal state for the AI metrics.
+    const [revealCount, setRevealCount] = useState(0)
+    const revealedOnceRef = useRef(false)
+
+    // Whether we painted a cached row on mount (so we skip the deterministic Stage-1 overwrite).
+    const hadCachedRowRef = useRef<boolean | null>(null)
+    if (hadCachedRowRef.current === null) hadCachedRowRef.current = row !== null
 
     const label = locationName || 'Current Location'
 
@@ -94,11 +123,12 @@ export function ThreatMonitoring({ locationName }: ThreatMonitoringProps) {
                 // Continue to generic fallback.
             }
 
-            try {
-                if (!cancelled) setAffectedAreaLabel(label === 'USA' ? 'USA' : label !== 'Current Location' ? label : 'Regional scope')
-            } catch {
-                if (!cancelled) setAffectedAreaLabel('Regional scope')
-            }
+            // Final fallback. This card only renders on the nationwide super-admin/admin
+            // dashboard, so when no specific state/city resolves the actual scope is the whole
+            // country — never a vague "Regional scope".
+            const fallbackLabel =
+                label !== 'Current Location' && label !== 'USA' ? label : 'United States'
+            if (!cancelled) setAffectedAreaLabel(fallbackLabel)
         }
 
         resolveAffectedArea()
@@ -107,55 +137,146 @@ export function ThreatMonitoring({ locationName }: ThreatMonitoringProps) {
         }
     }, [label])
 
+    // Reconcile the restored row to the resolved scope: prefer the scoped entry, else fix the label.
+    useEffect(() => {
+        const scoped = loadCachedThreatRow(buildThreatCardCacheKey(affectedAreaLabel))
+        if (scoped) {
+            setRow(scoped)
+            setLoading(false)
+        } else {
+            setRow((prev) => (prev ? { ...prev, affectedAreas: affectedAreaLabel } : prev))
+        }
+    }, [affectedAreaLabel])
+
+    // Probe live data feeds once on mount; light each checkmark by real reachability.
     useEffect(() => {
         let cancelled = false
-
-        async function fetchDashboardAssessment() {
-            setLoading(true)
-            setError(null)
+        ;(async () => {
             try {
-                const response = await fetch('/api/risk-assessment/analyze', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'same-origin',
-                    /** Matches AI Risk Assessment page: nationwide dashboard ingest when body is empty. */
-                    body: JSON.stringify({}),
-                })
-                const json = await response.json().catch(() => ({}))
-
-                if (!response.ok) {
-                    const msg =
-                        response.status === 401
-                            ? 'Sign in required'
-                            : (json?.error || json?.message || `Request failed (${response.status})`)
-                    throw new Error(typeof msg === 'string' ? msg : 'Failed to load assessment')
-                }
-                if (!json?.report) {
-                    throw new Error('Invalid response: missing report')
-                }
-                if (!cancelled) setRow(reportToPanelRow(json.report as RiskReport, affectedAreaLabel))
-            } catch (err) {
-                console.error('Threat monitoring — risk assessment:', err)
-                if (!cancelled) {
-                    setError(err instanceof Error ? err.message : 'Service temporarily unavailable')
-                }
-            } finally {
-                if (!cancelled) setLoading(false)
+                const res = await fetch('/api/risk-assessment/source-health', { credentials: 'same-origin' })
+                if (!res.ok) return
+                const json = await res.json().catch(() => ({}))
+                const sources: { key: string; ok: boolean }[] = Array.isArray(json?.sources) ? json.sources : []
+                if (cancelled) return
+                const next: Record<string, boolean> = {}
+                for (const s of sources) next[s.key] = Boolean(s.ok)
+                setSourceHealth(next)
+            } catch {
+                // Leave marks pending on failure.
             }
-        }
-
-        fetchDashboardAssessment()
+        })()
         return () => {
             cancelled = true
         }
-    }, [affectedAreaLabel, label])
+    }, [])
 
-    const liveInputs = [
-        'NWS flood & hydro alerts',
-        'NOAA NWPS gauges · USGS hydrology',
-        'USGS earthquake feed',
-        'NASA FIRMS thermal activity',
-        'FEMA OpenFEMA declarations',
+    // Reveal the four AI metrics sequentially the first time data arrives; instant on later refines.
+    useEffect(() => {
+        if (!row) {
+            setRevealCount(0)
+            revealedOnceRef.current = false
+            return
+        }
+        if (revealedOnceRef.current) {
+            setRevealCount(4)
+            return
+        }
+        revealedOnceRef.current = true
+        const timers = Array.from({ length: 4 }, (_, i) =>
+            setTimeout(() => setRevealCount(i + 1), (i + 1) * 120),
+        )
+        return () => timers.forEach(clearTimeout)
+    }, [row])
+
+    // Single fast fetch: deterministic KPIs from the DB-backed /summary endpoint. The card
+    // intentionally does NOT call the heavy /analyze (8 live feeds + AI) — its KPIs are aligned
+    // to /summary, so /analyze adds latency without changing what's shown. A timeout guards
+    // against a slow/unreachable server so the card never spins indefinitely.
+    // opts.force = "Refresh now" → bypass the server cache. opts.silent = background poll.
+    const runAssessment = useCallback(
+        async (opts?: { force?: boolean; silent?: boolean }) => {
+            const force = opts?.force === true
+            const silent = opts?.silent === true
+            if (busyRef.current) return // don't stack overlapping runs (poll vs manual)
+            busyRef.current = true
+
+            const hasRestored = hadCachedRowRef.current === true
+            if (!silent) setError(null)
+            if (force) setRefreshing(true)
+            else if (!hasRestored && !silent) setLoading(true)
+
+            const alive = () => mountedRef.current
+            const ctrl = new AbortController()
+            const timeout = setTimeout(() => ctrl.abort(), 15000)
+
+            try {
+                const sumUrl = force
+                    ? '/api/risk-assessment/summary?refresh=1'
+                    : '/api/risk-assessment/summary'
+                const sumRes = await fetch(sumUrl, { credentials: 'same-origin', signal: ctrl.signal }).catch(() => null)
+                if (sumRes && sumRes.ok) {
+                    const sumJson = await sumRes.json().catch(() => ({}))
+                    if (alive() && sumJson) {
+                        const newRow: ThreatPanelRow = {
+                            relevance: overallLevelToRelevance(sumJson.overall_risk_level || 'NOMINAL'),
+                            severity: (sumJson.overall_risk_level || 'NOMINAL').toUpperCase(),
+                            affectedAreas: affectedAreaLabel,
+                            confidence: typeof sumJson.ai_confidence === 'number' ? sumJson.ai_confidence : 0,
+                        }
+                        setRow(newRow)
+                        setUpdatedAt(typeof sumJson.generated_at === 'string' ? sumJson.generated_at : new Date().toISOString())
+                        // Cache immediately so the next visit paints instantly (no skeleton).
+                        saveCachedThreatRow(buildThreatCardCacheKey(affectedAreaLabel), newRow)
+                    }
+                } else if (alive() && !hasRestored && !silent) {
+                    // Nothing cached and the request failed/timed out — surface a soft message.
+                    setError('Service temporarily unavailable')
+                }
+            } catch (err) {
+                console.error('Threat monitoring — summary:', err)
+            } finally {
+                clearTimeout(timeout)
+                busyRef.current = false
+                if (alive()) {
+                    setLoading(false)
+                    setRefreshing(false)
+                }
+            }
+        },
+        [affectedAreaLabel],
+    )
+
+    // Initial load + whenever the resolved scope changes.
+    useEffect(() => {
+        void runAssessment()
+    }, [runAssessment])
+
+    // Auto-refresh in the background every 90s (aligned with the server SWR fresh window).
+    useEffect(() => {
+        const id = setInterval(() => void runAssessment({ silent: true }), 90_000)
+        return () => clearInterval(id)
+    }, [runAssessment])
+
+    // Keep the relative "Updated …" label ticking without issuing a new fetch.
+    useEffect(() => {
+        const id = setInterval(() => setNowTick((n) => n + 1), 30_000)
+        return () => clearInterval(id)
+    }, [])
+
+    // Mark unmounted so in-flight fetches don't set state after teardown.
+    useEffect(() => {
+        mountedRef.current = true
+        return () => {
+            mountedRef.current = false
+        }
+    }, [])
+
+    const liveInputs: { key: string; label: string }[] = [
+        { key: 'nws', label: 'NWS flood & hydro alerts' },
+        { key: 'hydro', label: 'NOAA NWPS gauges · USGS hydrology' },
+        { key: 'eq', label: 'USGS earthquake feed' },
+        { key: 'firms', label: 'NASA FIRMS thermal activity' },
+        { key: 'fema', label: 'FEMA OpenFEMA declarations' },
     ]
 
     return (
@@ -167,24 +288,64 @@ export function ThreatMonitoring({ locationName }: ThreatMonitoringProps) {
             <div className="space-y-4">
                 <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight">Live Inputs</h3>
                 <div className="space-y-3">
-                    {liveInputs.map((input, index) => (
-                        <div key={index} className="flex items-center gap-3">
-                            <CheckCircle2
-                                className={cn('shrink-0', loading ? 'text-slate-200 animate-pulse' : 'text-emerald-500')}
-                                size={18}
-                            />
-                            <span className={cn('text-sm font-bold', loading ? 'text-slate-300' : 'text-slate-600')}>
-                                {input}
-                            </span>
-                        </div>
-                    ))}
+                    {liveInputs.map((input) => {
+                        const status = sourceHealth[input.key] // undefined = still probing
+                        const ok = status === true
+                        const down = status === false
+                        return (
+                            <div key={input.key} className="flex items-center gap-3">
+                                {down ? (
+                                    <AlertCircle className="shrink-0 text-rose-400" size={18} />
+                                ) : (
+                                    <CheckCircle2
+                                        className={cn(
+                                            'shrink-0 transition-colors duration-300',
+                                            ok ? 'text-emerald-500' : 'text-slate-200 animate-pulse',
+                                        )}
+                                        size={18}
+                                    />
+                                )}
+                                <span
+                                    className={cn(
+                                        'text-sm font-bold transition-colors duration-300',
+                                        ok ? 'text-slate-600' : down ? 'text-rose-400' : 'text-slate-300',
+                                    )}
+                                >
+                                    {input.label}
+                                </span>
+                            </div>
+                        )
+                    })}
                 </div>
             </div>
 
             <div className="space-y-6 pt-6 border-t border-slate-100 flex-1">
                 <div className="flex items-center justify-between">
                     <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight">AI Assessment</h3>
-                    {loading && <Loader2 className="animate-spin text-[#33375D]" size={16} />}
+                    <div className="flex items-center gap-2">
+                        {updatedAt && !loading && !refreshing && (
+                            <span className="text-[10px] font-bold text-slate-400 normal-case tracking-normal">
+                                Updated {formatUpdatedAt(updatedAt)}
+                            </span>
+                        )}
+                        {loading && <Loader2 className="animate-spin text-[#33375D]" size={16} />}
+                        <button
+                            type="button"
+                            onClick={() => void runAssessment({ force: true })}
+                            disabled={loading || refreshing}
+                            title="Refresh now"
+                            aria-label="Refresh now"
+                            className={cn(
+                                'inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-[10px] font-bold uppercase tracking-tight transition-colors',
+                                loading || refreshing
+                                    ? 'text-slate-400 cursor-not-allowed'
+                                    : 'text-[#33375D] hover:bg-slate-100',
+                            )}
+                        >
+                            <RefreshCw size={13} className={cn(refreshing && 'animate-spin')} />
+                            {refreshing ? 'Refreshing…' : 'Refresh'}
+                        </button>
+                    </div>
                 </div>
 
                 {error ? (
@@ -198,7 +359,7 @@ export function ThreatMonitoring({ locationName }: ThreatMonitoringProps) {
                             <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest">
                                 Geo-relevance
                             </p>
-                            {loading ? (
+                            {!row || revealCount <= 0 ? (
                                 <Skeleton className="h-6 w-16 bg-slate-50" />
                             ) : (
                                 <p
@@ -220,7 +381,7 @@ export function ThreatMonitoring({ locationName }: ThreatMonitoringProps) {
                             <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest">
                                 Severity Level
                             </p>
-                            {loading ? (
+                            {!row || revealCount <= 1 ? (
                                 <Skeleton className="h-6 w-40 bg-slate-50" />
                             ) : (
                                 <p className="text-lg font-black text-[#33375D] uppercase">{row?.severity || 'NOMINAL'}</p>
@@ -231,7 +392,7 @@ export function ThreatMonitoring({ locationName }: ThreatMonitoringProps) {
                             <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest">
                                 Affected Areas
                             </p>
-                            {loading ? (
+                            {!row || revealCount <= 2 ? (
                                 <Skeleton className="h-6 w-32 bg-slate-50" />
                             ) : (
                                 <p className="text-sm font-bold text-slate-900 uppercase tracking-tight leading-snug">
@@ -245,7 +406,7 @@ export function ThreatMonitoring({ locationName }: ThreatMonitoringProps) {
                                 <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest">
                                     Confidence Score
                                 </p>
-                                {loading ? (
+                                {!row || revealCount <= 3 ? (
                                     <Skeleton className="h-6 w-12 bg-slate-50" />
                                 ) : (
                                     <p className="text-lg font-black text-emerald-500">{row?.confidence ?? 0}%</p>
@@ -254,7 +415,7 @@ export function ThreatMonitoring({ locationName }: ThreatMonitoringProps) {
                             <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
                                 <div
                                     className="bg-emerald-500 h-full rounded-full transition-all duration-1000"
-                                    style={{ width: `${loading ? 0 : (row?.confidence ?? 0)}%` }}
+                                    style={{ width: `${row && revealCount > 3 ? (row?.confidence ?? 0) : 0}%` }}
                                 />
                             </div>
                         </div>

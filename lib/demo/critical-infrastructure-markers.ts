@@ -200,6 +200,12 @@ export type CriticalInfraAtRiskSummary = {
   label: string
   facilitiesAtRisk: number
   riskLevel: 'LOW' | 'MODERATE' | 'HIGH' | 'CRITICAL'
+  facilities: Array<{
+    id: string
+    name: string
+    address: string
+    riskLevel?: 'LOW' | 'MODERATE' | 'HIGH' | 'CRITICAL'
+  }>
 }
 
 export function buildCriticalInfraAtRiskSummary(
@@ -221,14 +227,33 @@ export function buildCriticalInfraAtRiskSummary(
     return max
   }
 
+  const sortFacilities = (
+    items: CriticalInfraMapMarker[],
+  ): CriticalInfraAtRiskSummary['facilities'] =>
+    items
+      .map((m) => ({
+        id: m.id,
+        name: m.title,
+        address: m.location || 'Address not available',
+        riskLevel: m.riskLevel,
+      }))
+      .sort((a, b) => {
+        const ra = order[a.riskLevel ?? 'LOW'] ?? 0
+        const rb = order[b.riskLevel ?? 'LOW'] ?? 0
+        if (rb !== ra) return rb - ra
+        return a.name.localeCompare(b.name)
+      })
+
   return Array.from(bySector.entries()).map(([sectorId, items]) => {
-    const atRisk = items.filter((i) => i.status === 'at_risk' || i.status === 'offline').length
+    const atRiskItems = items.filter((i) => i.status === 'at_risk' || i.status === 'offline')
+    const listed = atRiskItems.length > 0 ? atRiskItems : items
     const sectorDef = CRITICAL_INFRASTRUCTURE_SECTORS.find((s) => s.id === sectorId)
     return {
       sectorId,
       label: sectorDef?.label ?? sectorId,
-      facilitiesAtRisk: atRisk || items.length,
+      facilitiesAtRisk: atRiskItems.length || items.length,
       riskLevel: riskRank(items.map((i) => i.riskLevel)),
+      facilities: sortFacilities(listed),
     }
   })
 }
