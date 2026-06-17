@@ -345,6 +345,9 @@ function findNearestHeatIncident(
     return best && bestDist <= maxKm ? best : null
 }
 
+/** Extra padding so the full state (e.g. Arkansas) fits on first paint. */
+const STATE_VIEW_FIT_PADDING = 40
+
 function viewportExceedsStateBounds(map: google.maps.Map, bounds: MapStateBounds): boolean {
     const viewport = map.getBounds()
     if (!viewport) return false
@@ -630,7 +633,7 @@ function GoogleMapInner({
     const establishStateZoomLimit = useCallback(
         (targetMap: google.maps.Map, bounds: MapStateBounds, preserveView = false) => {
             if (!preserveView) {
-                fitBoundedView(targetMap, bounds, applyStateMinZoom, 24)
+                fitBoundedView(targetMap, bounds, applyStateMinZoom, STATE_VIEW_FIT_PADDING)
                 return
             }
             const prevZoom = targetMap.getZoom()
@@ -697,7 +700,7 @@ function GoogleMapInner({
             })
 
             if (!stateBoundsFittedRef.current) {
-                establishStateZoomLimit(map, stateBounds, !fitStateOnLoad)
+                establishStateZoomLimit(map, stateBounds, false)
                 stateBoundsFittedRef.current = true
             }
 
@@ -894,6 +897,22 @@ function GoogleMapInner({
         }
     }, [map, showHeatmap, validHeatPoints, heatmapFailed])
 
+    const mapDisplayCenter = useMemo(() => {
+        if (stateBounds) {
+            return {
+                lat: (stateBounds.south + stateBounds.north) / 2,
+                lng: (stateBounds.west + stateBounds.east) / 2,
+            }
+        }
+        if (coverageMapBounds) {
+            return {
+                lat: (coverageMapBounds.south + coverageMapBounds.north) / 2,
+                lng: (coverageMapBounds.west + coverageMapBounds.east) / 2,
+            }
+        }
+        return mapCenter
+    }, [stateBounds, coverageMapBounds, mapCenter])
+
     if (loadError || authFailed) {
         return (
             <GoogleMapsUnavailable
@@ -910,7 +929,7 @@ function GoogleMapInner({
         <div className="w-full h-full min-h-[400px] rounded-xl overflow-hidden shadow-inner border border-slate-200 relative">
             <GoogleMapComponent
                 mapContainerStyle={containerStyle}
-                center={mapCenter}
+                center={mapDisplayCenter}
                 zoom={stateBounds || coverageMapBounds ? undefined : zoom}
                 onLoad={onLoad}
                 onUnmount={onUnmount}

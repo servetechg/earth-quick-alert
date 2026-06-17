@@ -18,7 +18,8 @@ import {
     isSuperAdminNationwideView,
 } from '@/lib/constants/usa-map-bounds';
 import { normalizeStateToUsps } from '@/lib/utils/us-state-usps';
-import { maybeDemoJurisdictionOverride } from '@/lib/demo/provider';
+import { maybeDemoJurisdictionOverride, resolveDemoSessionContext } from '@/lib/demo/provider';
+import { filterDemoGisFilterPlaces } from '@/lib/demo/data/demo-gis-filter-places';
 import { resolveEnabledFilterLayers } from '@/lib/gis/gis-filter-layers';
 import { fetchAllFilterLayerPlaces } from '@/lib/gis/license-resource-sites-fetch';
 import User from '@/models/User';
@@ -119,7 +120,36 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'No valid filter layers' }, { status: 400 });
         }
 
+        const demoCtx = await resolveDemoSessionContext(
+            session.user.id as string,
+            session.user.email as string,
+        );
         const viewportBounds = parseBounds(body.bounds);
+
+        if (demoCtx) {
+            const stateCode =
+                role === 'sub-admin'
+                    ? (await maybeDemoJurisdictionOverride(session.user.id as string))?.stateCode ??
+                      'AR'
+                    : body.scopeState?.trim()
+                      ? normalizeStateToUsps(body.scopeState.trim()) ?? undefined
+                      : undefined;
+
+            const results = filterDemoGisFilterPlaces(layers, {
+                stateCode: stateCode ?? 'AR',
+            });
+
+            return NextResponse.json({
+                results,
+                count: results.length,
+                source: 'demo',
+                demo: true,
+                ranked: viewportBounds ? 'viewport' : 'comprehensive',
+                scope: viewportBounds ? 'bounds' : 'state',
+                coverage: 'state_license',
+            });
+        }
+
         let scope: InfrastructureSearchScope | null = null;
         let jurisdiction: SubAdminJurisdiction | null = null;
         let licenseId: string | null = null;
