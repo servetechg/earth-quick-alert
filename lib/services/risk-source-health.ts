@@ -11,7 +11,7 @@ const USER_AGENT =
   process.env.NWS_USER_AGENT ||
   'Ready2Go-EmergencyOps/1.0 (+https://localhost; ops@agency.local; source-health)';
 
-const PROBE_TIMEOUT_MS = 6000;
+const PROBE_TIMEOUT_MS = 30_000;
 
 export interface SourceHealth {
   key: string;
@@ -110,4 +110,18 @@ export async function probeSourceHealth(): Promise<SourceHealth[]> {
     probe(LIVE_INPUT_KEYS[3], probeFirms),
     probe(LIVE_INPUT_KEYS[4], probeFema),
   ]);
+}
+
+const PROBE_FN_MAP: Record<LiveInputKey, () => Promise<boolean>> = {
+  nws: probeNws,
+  hydro: probeHydro,
+  eq: probeEarthquake,
+  firms: probeFirms,
+  fema: probeFema,
+};
+
+/** Probe a single feed by key. Never rejects. */
+export async function probeSingleSource(key: LiveInputKey): Promise<SourceHealth> {
+  const fn = PROBE_FN_MAP[key];
+  return fn ? probe(key, fn) : { key, ok: false };
 }

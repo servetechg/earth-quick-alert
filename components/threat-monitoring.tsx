@@ -151,23 +151,35 @@ export function ThreatMonitoring({ locationName }: ThreatMonitoringProps) {
         }
     }, [affectedAreaLabel])
 
-    // Probe live data feeds once on mount; light each checkmark by real reachability.
+    // Probe each live feed independently on every mount so results appear as each one resolves
+    // rather than waiting for the slowest feed. Each key gets its own fresh server-side probe
+    // (no cache, up to 30 s per probe) so the UI is always current on page reload.
     useEffect(() => {
         let cancelled = false
-        ;(async () => {
+
+        const probeOne = async (key: string) => {
             try {
-                const res = await fetch('/api/risk-assessment/source-health', { credentials: 'same-origin' })
-                if (!res.ok) return
+                const res = await fetch(
+                    `/api/risk-assessment/source-health?key=${encodeURIComponent(key)}`,
+                    { credentials: 'same-origin' },
+                )
+                if (!res.ok || cancelled) return
                 const json = await res.json().catch(() => ({}))
-                const sources: { key: string; ok: boolean }[] = Array.isArray(json?.sources) ? json.sources : []
-                if (cancelled) return
-                const next: Record<string, boolean> = {}
-                for (const s of sources) next[s.key] = Boolean(s.ok)
-                setSourceHealth(next)
+                const sources: { key: string; ok: boolean }[] = Array.isArray(json?.sources)
+                    ? json.sources
+                    : []
+                const hit = sources.find((s) => s.key === key)
+                if (hit && !cancelled) {
+                    setSourceHealth((prev) => ({ ...prev, [key]: Boolean(hit.ok) }))
+                }
             } catch {
-                // Leave marks pending on failure.
+                // Leave the mark pulsing — it will be tried again next mount.
             }
-        })()
+        }
+
+        // Fire all 5 in parallel; each updates state the moment it resolves.
+        LIVE_INPUT_KEYS.forEach((key) => { void probeOne(key) })
+
         return () => {
             cancelled = true
         }
