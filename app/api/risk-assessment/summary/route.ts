@@ -19,6 +19,7 @@ import { resolveSubAdminJurisdiction } from '@/lib/sub-admin/jurisdiction';
 import { resolveDemoSessionContext, buildDemoSummaryResponse } from '@/lib/demo/provider';
 import { getOrRevalidate } from '@/lib/services/risk-report-cache';
 import { computeCensusExposureFromAlertRows } from '@/lib/services/alert-area-census-exposure';
+import { computeCriticalInfraAtRiskFromAlertRows } from '@/lib/services/alert-area-critical-infra-exposure';
 
 const ALLOWED_ROLES = new Set([
     'admin', 'super-admin', 'sub-admin', 'eoc-manager',
@@ -53,7 +54,7 @@ export async function GET(req: Request) {
             { nationwide: bodyNationwide, stateCd: bodyStateCd },
         );
 
-        const cacheKey = `${session.user.id}:${scope.stateCd}:aligned-v9-census-parse`;
+        const cacheKey = `${session.user.id}:${scope.stateCd}:aligned-v10-ci-alert`;
 
         const response = await getOrRevalidate(cacheKey, async () => {
             const events = await fetchAlignedUnifiedEventDocsForSession({
@@ -101,6 +102,10 @@ export async function GET(req: Request) {
                 dashboardStateCd: scope.stateCd,
                 jurisdiction,
             });
+            const criticalInfrastructureAtRisk = await computeCriticalInfraAtRiskFromAlertRows(
+                alignedCards,
+                { jurisdiction },
+            );
 
             // Strip raw event arrays from the response (only needed server-side)
             const { severity_buckets, ...rest } = snapshot;
@@ -114,6 +119,7 @@ export async function GET(req: Request) {
                 ready2go_users_at_risk: populationAtRiskUsers.length,
                 population_exposure: populationExposure,
                 population_at_risk_users: populationAtRiskUsers,
+                critical_infrastructure_at_risk: criticalInfrastructureAtRisk,
                 ai_available: aiAvailable,
                 severity_buckets: severity_buckets.map((b) => ({
                     severity: b.severity,

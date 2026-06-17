@@ -724,124 +724,6 @@ function PopulationAtRiskDialog({
   );
 }
 
-const SECTOR_CRITERIA_MAP: Record<string, { provider: string; criteria: string[] }> = {
-  ci_chemical: {
-    provider: 'DHS / FEMA / EPA',
-    criteria: [
-      'FEMA National Risk Index (NRI) – Hazard exposure and industrial risk layers',
-      'USGS National Structures Dataset – Industrial facility geospatial locations',
-      'EPA Facility Registry Service (FRS) – Facility locations, ownership, environmental permits'
-    ]
-  },
-  ci_commercial: {
-    provider: 'Department of Homeland Security (DHS)',
-    criteria: [
-      'Homeland Infrastructure Foundation-Level Data (HIFLD) – Commercial and public assets (grocery stores, pharmacies, banks, airports)',
-      'DHS Critical Facilities Registry – Commercial hubs, retail clusters, major banking branches'
-    ]
-  },
-  ci_communications: {
-    provider: 'Federal Communications Commission (FCC) / DHS',
-    criteria: [
-      'FCC Antenna Structure Registration (ASR) – Cell towers, broadcast antennas, microwave paths',
-      'HIFLD Communications Infrastructure – Fiber routing stations, satellite ground controls'
-    ]
-  },
-  ci_manufacturing: {
-    provider: 'Department of Commerce / USGS',
-    criteria: [
-      'USGS National Structures Dataset – Primary metals, machinery, electrical equipment plants',
-      'DHS Manufacturing Registry – Critical supply chain production facilities and warehouses'
-    ]
-  },
-  ci_dams: {
-    provider: 'US Army Corps of Engineers (USACE)',
-    criteria: [
-      'National Inventory of Dams (NID) – Hazard potential, storage capacity, structural conditions',
-      'FEMA Dam Safety Program – Emergency action plan status and inundation zone boundaries'
-    ]
-  },
-  ci_defense: {
-    provider: 'Department of Defense (DoD)',
-    criteria: [
-      'DoD Installation Geospatial Information – Military bases, depots, munitions storage sites',
-      'Defense Industrial Base (DIB) Registry – Privately-owned critical defense contractors'
-    ]
-  },
-  ci_emergency_services: {
-    provider: 'DHS / FEMA / DOJ',
-    criteria: [
-      'HIFLD Emergency Services – Fire stations, police departments, ambulance services, EOCs',
-      'FEMA National Emergency Response Registry – Search & rescue depots, disaster supply hubs'
-    ]
-  },
-  ci_energy: {
-    provider: 'Department of Energy (DOE) / EIA',
-    criteria: [
-      'EIA Energy Atlas – Electrical substations, power plants, gas pipelines, refineries',
-      'EPA eGRID – Regional electric grid interconnection nodes and transmission links'
-    ]
-  },
-  ci_financial: {
-    provider: 'FDIC / NCUA / Federal Reserve',
-    criteria: [
-      'FDIC Branch Office Locations – Commercial banks, vaults, regional processing centers',
-      'NCUA Credit Union Directory – Credit unions, ATM access networks, payment processing hubs'
-    ]
-  },
-  ci_food_ag: {
-    provider: 'USDA / FDA',
-    criteria: [
-      'USDA FSIS Facility Registry – Meat, poultry, and egg processing plants',
-      'FDA Food Facility Registration – Food processing plants, grain elevators, distribution hubs'
-    ]
-  },
-  ci_government: {
-    provider: 'General Services Administration (GSA)',
-    criteria: [
-      'GSA Federal Real Property Profile – Federal courthouses, EOCs, offices, continuity sites',
-      'State and Local Government Geospatial Database – City halls, county courthouses'
-    ]
-  },
-  ci_healthcare: {
-    provider: 'HHS / CMS / HRSA',
-    criteria: [
-      'HHS Hospital Directory – Level 1-4 trauma centers, acute care hospitals, emergency rooms',
-      'HRSA Geospatial Database – Community clinics, urgent care centers',
-      'CMS NPPES – Pharmacies, oxygen suppliers'
-    ]
-  },
-  ci_it: {
-    provider: 'DHS / FCC',
-    criteria: [
-      'HIFLD IT Infrastructure – Main data center locations, internet exchange points (IXPs)',
-      'FCC Fiber Backhaul Registry – Critical telecommunications and cloud hosting hubs'
-    ]
-  },
-  ci_nuclear: {
-    provider: 'Nuclear Regulatory Commission (NRC) / DOE',
-    criteria: [
-      'NRC Licensed Facilities – Nuclear power plants, research reactors, storage facilities',
-      'DOE Nuclear Waste Management Database – Radioactive materials transit and storage sites'
-    ]
-  },
-  ci_transportation: {
-    provider: 'Department of Transportation (DOT) / FAA / FRA',
-    criteria: [
-      'Bureau of Transportation Statistics (BTS) NTAD – Airports, railway lines, public transit hubs',
-      'FAA Airport Facilities Directory – Commercial and municipal airports, helipads, ATC towers',
-      'Federal Railroad Administration (FRA) – High-volume rail corridors and freight yards'
-    ]
-  },
-  ci_water: {
-    provider: 'Environmental Protection Agency (EPA)',
-    criteria: [
-      'EPA SDWIS (Safe Drinking Water Information System) – Water treatment plants, reservoirs',
-      'EPA Clean Water Act Facility Database – Wastewater treatment facilities, main pump stations'
-    ]
-  }
-};
-
 function CriticalInfrastructureAtRiskDialog({
   open,
   onOpenChange,
@@ -860,6 +742,7 @@ function CriticalInfrastructureAtRiskDialog({
         ...s,
         facilitiesAtRisk: match?.facilitiesAtRisk ?? 0,
         riskLevel: match?.riskLevel ?? 'LOW',
+        facilities: match?.facilities ?? [],
         isAtRisk: match ? match.facilitiesAtRisk > 0 : false,
       };
     }).sort((a, b) => {
@@ -879,17 +762,16 @@ function CriticalInfrastructureAtRiskDialog({
           </DialogTitle>
           <DialogDescription asChild>
             <p className="text-xs text-slate-500 leading-relaxed">
-              Assessment across the 16 national critical sectors designated by CISA. Double-check local GIS layers to stage resources.
+              Facilities near active alerts and incidents — hospitals, pharmacies, emergency services, and other GIS map layers in your coverage area.
             </p>
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-2 mt-4">
           {mergedSectors.map((sector) => {
-            const criteria = SECTOR_CRITERIA_MAP[sector.id];
             const isOpen = openSectorId === sector.id;
             const Icon = sector.Icon;
-            
+
             return (
               <div key={sector.id} className="rounded-xl border border-slate-200 bg-white overflow-hidden">
                 <button
@@ -907,11 +789,13 @@ function CriticalInfrastructureAtRiskDialog({
                     <div className="min-w-0">
                       <p className="text-sm font-bold text-slate-800 truncate">{sector.label}</p>
                       <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
-                        Provider: {criteria?.provider || 'Federal Agency'}
+                        {sector.isAtRisk
+                          ? `${sector.facilities.length} location${sector.facilities.length === 1 ? '' : 's'} listed`
+                          : 'No facilities near active alerts'}
                       </p>
                     </div>
                   </div>
-                  
+
                   <div className="flex items-center gap-3 shrink-0">
                     {sector.isAtRisk ? (
                       <span className="rounded-full px-2 py-0.5 text-[10px] font-black uppercase bg-red-50 text-red-600 border border-red-100">
@@ -932,23 +816,51 @@ function CriticalInfrastructureAtRiskDialog({
 
                 {isOpen && (
                   <div className="border-t border-slate-100 px-4 pb-4 pt-3 bg-slate-50/50 space-y-3">
-                    <div>
-                      <h4 className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1.5">
-                        National Risk Mapping Criteria
-                      </h4>
-                      <ul className="space-y-1.5 pl-1">
-                        {criteria?.criteria.map((c, idx) => (
-                          <li key={idx} className="flex gap-2 text-xs leading-relaxed text-slate-600">
-                            <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-slate-400" />
-                            <span>{c}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
+                    {sector.facilities.length > 0 ? (
+                      <div>
+                        <h4 className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-2">
+                          Facilities at risk
+                        </h4>
+                        <ul className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                          {sector.facilities.map((facility) => (
+                            <li
+                              key={facility.id}
+                              className="rounded-lg border border-slate-200 bg-white px-3 py-2.5"
+                            >
+                              <p className="text-sm font-semibold text-slate-800 leading-snug">
+                                {facility.name}
+                              </p>
+                              <p className="mt-0.5 text-xs text-slate-500 leading-relaxed">
+                                {facility.address}
+                              </p>
+                              {facility.riskLevel && facility.riskLevel !== 'LOW' && (
+                                <span
+                                  className={`mt-1.5 inline-block rounded px-1.5 py-0.5 text-[9px] font-bold uppercase ${
+                                    facility.riskLevel === 'CRITICAL'
+                                      ? 'bg-red-100 text-red-700'
+                                      : facility.riskLevel === 'HIGH'
+                                        ? 'bg-orange-100 text-orange-700'
+                                        : 'bg-amber-100 text-amber-800'
+                                  }`}
+                                >
+                                  {facility.riskLevel} risk
+                                </span>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-slate-500 leading-relaxed">
+                        {sector.isAtRisk
+                          ? 'Facility names and addresses are not available for this sector.'
+                          : 'No facilities identified near active alert areas in this sector.'}
+                      </p>
+                    )}
 
-                    <div className="flex items-center justify-between text-[10px] text-slate-400 border-t border-slate-100/60 pt-2 mt-2">
-                      <span>Risk Profile: {sector.riskLevel}</span>
-                      <span>Source: GIS Integration API</span>
+                    <div className="flex items-center justify-between text-[10px] text-slate-400 border-t border-slate-100/60 pt-2">
+                      <span>Sector risk profile: {sector.riskLevel}</span>
+                      <span>Source: Google Places / GIS layers</span>
                     </div>
                   </div>
                 )}
@@ -2057,7 +1969,8 @@ export default function RiskAssessment() {
               label="Critical Infrastructure at Risk"
               icon={Building2}
               headerAction={
-                hasReport && summary!.critical_infrastructure_at_risk?.length ? (
+                hasReport &&
+                summary!.critical_infrastructure_at_risk?.some((r) => r.facilitiesAtRisk > 0) ? (
                   <button
                     type="button"
                     onClick={() => setCiRiskOpen(true)}
@@ -2070,13 +1983,16 @@ export default function RiskAssessment() {
                 ) : null
               }
             >
-              {summary!.critical_infrastructure_at_risk?.length ? (
+              {summary!.critical_infrastructure_at_risk?.some((r) => r.facilitiesAtRisk > 0) ? (
                 <>
                   <p className="text-3xl font-extrabold tabular-nums text-slate-800">
                     {summary!.critical_infrastructure_at_risk.reduce(
                       (n, r) => n + r.facilitiesAtRisk,
                       0,
                     )}
+                  </p>
+                  <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
+                    Hospitals, pharmacies &amp; GIS layers near active alerts
                   </p>
                   <div className="mt-2 flex flex-wrap gap-1">
                     {summary!.critical_infrastructure_at_risk
@@ -2095,7 +2011,7 @@ export default function RiskAssessment() {
               ) : (
                 <>
                   <p className="text-3xl font-extrabold tabular-nums text-slate-400">—</p>
-                  <p className="mt-2 text-[11px] text-slate-500">Enable Dashboard A CI layers on map</p>
+                  <p className="mt-2 text-[11px] text-slate-500">No facilities near active alert areas</p>
                 </>
               )}
             </KpiCard>
