@@ -242,21 +242,21 @@ export default function AfterActionReviewPage() {
                 description={`Strategic tactical analysis of ${reviewData.name}. ${reviewData.demo ? 'Arkansas EF-3 tornado presentation scenario.' : 'Operational intelligence from resolved incident data.'}`}
                 actions={
                     <>
-                        <div className="hidden md:flex items-center gap-2 h-12 px-4 rounded-xl bg-slate-50 border border-slate-200">
+                        {/* <div className="hidden md:flex items-center gap-2 h-12 px-4 rounded-xl bg-slate-50 border border-slate-200">
                             <span className="inline-flex items-center gap-1.5 rounded-full bg-[#33375D] px-3 py-1 text-[9px] font-black uppercase tracking-widest text-white">
                                 {reviewData.demo ? 'Demo Record' : 'Official Record'}
                             </span>
                             <span className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 uppercase tracking-widest">
                                 <Clock size={12} /> {new Date().toLocaleDateString()}
                             </span>
-                        </div>
-                        <Button
+                        </div> */}
+                        {/* <Button
                             onClick={() => toast.success('Mission Intel serialized and distributed to command nodes.')}
                             variant="outline"
                             className="flex h-12 gap-2 rounded-xl border-slate-200 bg-white px-6 text-xs font-bold uppercase tracking-wider text-slate-700 shadow-sm transition-all hover:bg-slate-50 active:scale-95"
                         >
                             <Share2 size={16} /> Distribute Report
-                        </Button>
+                        </Button> */}
                         <Button
                             onClick={downloadReportPdf}
                             disabled={isExporting}
@@ -379,14 +379,14 @@ export default function AfterActionReviewPage() {
                                             </p>
                                         </div>
 
-                                        <div className="shrink-0 pt-1 opacity-0 group-hover:opacity-100 transition-all">
+                                        {/* <div className="shrink-0 pt-1 opacity-0 group-hover:opacity-100 transition-all">
                                             <Button
                                                 variant="outline"
                                                 className="h-10 px-4 rounded-xl text-[9px] font-bold text-[#33375D] uppercase tracking-widest border-slate-200 hover:bg-[#33375D]/5 hover:border-[#33375D]/30 transition-all gap-2"
                                             >
                                                 Examine Intel <ArrowUpRight size={14} />
                                             </Button>
-                                        </div>
+                                        </div> */}
                                     </div>
                                 </div>
                             ))}
