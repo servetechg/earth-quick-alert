@@ -44,6 +44,7 @@ import { MapLayersDropdown } from '@/components/gis/map-layers-dropdown'
 import {
   GIS_FILTER_MAP_LAYERS,
   buildDefaultMapLayerState,
+  buildDemoMapLayerState,
 } from '@/lib/gis/map-layer-config'
 import { gisFilterLayerByResultType, gisFilterLayerById } from '@/lib/gis/gis-filter-layers'
 import type { GisFilterLayerDef } from '@/lib/gis/gis-filter-layers'
@@ -860,6 +861,7 @@ export function GISMap({
   const infraTypesKeyRef = React.useRef<string>('')
 
   const demoModeRef = React.useRef(false)
+  const demoLayersInitializedRef = React.useRef(false)
 
   useEffect(() => {
     if (isDemoSimulation === demoModeRef.current) return
@@ -868,12 +870,26 @@ export function GISMap({
     infraTypesKeyRef.current = ''
     setCacheTrigger((t) => t + 1)
     if (!isDemoSimulation) {
+      demoLayersInitializedRef.current = false
       setCriticalInfraMarkers([])
     }
   }, [isDemoSimulation])
 
+  // Arkansas presentation demo — enable every infrastructure layer so each filter shows fixtures.
+  useEffect(() => {
+    if (!isDemoSimulation) return
+    if (demoLayersInitializedRef.current) return
+    demoLayersInitializedRef.current = true
+    setMapLayers(
+      buildDemoMapLayerState({
+        includeCriticalInfra: showCriticalInfraLayers,
+        includeDisasterZones: showDisasterZones,
+      }),
+    )
+  }, [isDemoSimulation, showCriticalInfraLayers, showDisasterZones])
+
   const applyDemoInfraToCache = useCallback(
-    (results: InfrastructurePlaceResult[]) => {
+    (results: InfrastructurePlaceResult[], opts?: { skipCoverageFilter?: boolean }) => {
       const fetchedResultTypes = new Set(
         enabledGisFilterLayerIds
           .map((id) => gisFilterLayerById(id)?.resultType)
@@ -899,7 +915,7 @@ export function GISMap({
         if (!layerDef) continue
 
         const placePos = { lat: place.lat, lng: place.lng }
-        if (!markerInCoverage(placePos)) continue
+        if (!opts?.skipCoverageFilter && !markerInCoverage(placePos)) continue
 
         if (!infraCacheRef.current.has(place.place_id)) {
           infraCacheRef.current.set(place.place_id, {
@@ -952,7 +968,7 @@ export function GISMap({
             stateCode: coverageMeta?.stateCode ?? licensedStateHint ?? 'AR',
           })
           if (!cancelled) {
-            applyDemoInfraToCache(results)
+            applyDemoInfraToCache(results, { skipCoverageFilter: true })
           }
           return
         }
@@ -1859,6 +1875,7 @@ export function GISMap({
           onHeatIncidentSelect={isDemoSimulation ? handleHeatIncidentSelect : undefined}
           onBoundsChanged={showLayersPanel ? handleMapBoundsChange : undefined}
           clusterInfrastructure={showLayersPanel && !isDemoSimulation}
+          allowZoomOut={stateScoped}
         />
 
         {(isSearchingInfra || isLoadingCriticalInfra || isLoadingRoadClosures) && (

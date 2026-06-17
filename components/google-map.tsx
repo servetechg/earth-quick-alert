@@ -140,6 +140,8 @@ interface GoogleMapProps {
     clusterInfrastructure?: boolean
     /** When true with stateBounds, fit the full state on initial load (sub-admin dashboards). */
     fitStateOnLoad?: boolean
+    /** Sub-admin: allow zooming out beyond the initial state/coverage fit (no minZoom lock). */
+    allowZoomOut?: boolean
 }
 
 const containerStyle = {
@@ -347,6 +349,8 @@ function findNearestHeatIncident(
 
 /** Extra padding so the full state (e.g. Arkansas) fits on first paint. */
 const STATE_VIEW_FIT_PADDING = 40
+/** Lowest zoom when sub-admin may zoom out for regional context. */
+const SUB_ADMIN_MIN_ZOOM = 3
 
 function viewportExceedsStateBounds(map: google.maps.Map, bounds: MapStateBounds): boolean {
     const viewport = map.getBounds()
@@ -392,6 +396,7 @@ function GoogleMapInner({
     onBoundsChanged,
     clusterInfrastructure = false,
     fitStateOnLoad = false,
+    allowZoomOut = false,
 }: GoogleMapProps) {
     const { isLoaded, loadError } = useJsApiLoader({
         id: GOOGLE_MAPS_LOADER_ID,
@@ -431,7 +436,7 @@ function GoogleMapInner({
     const lastZoomRef = useRef<number | null>(null)
 
     const coverageMapBounds = useMemo((): MapStateBounds | null => {
-        if (!lockToCoverage || !coverageCircle) return null
+        if (allowZoomOut || !lockToCoverage || !coverageCircle) return null
         if (
             !Number.isFinite(coverageCircle.center.lat) ||
             !Number.isFinite(coverageCircle.center.lng) ||
@@ -440,7 +445,7 @@ function GoogleMapInner({
             return null
         }
         return coverageToMapBounds(coverageCircle)
-    }, [lockToCoverage, coverageCircle])
+    }, [allowZoomOut, lockToCoverage, coverageCircle])
 
     const onLoad = useCallback(function callback(map: google.maps.Map) {
         setMap(map)
@@ -679,7 +684,7 @@ function GoogleMapInner({
         [applyCoverageMinZoom, fitBoundedView],
     )
 
-    // Apply state boundary restriction; warn only on zoom-out past full-state view
+    // Apply state boundary restriction; sub-admin may zoom out freely when allowZoomOut is set
     React.useEffect(() => {
         if (!map) return
 
@@ -688,8 +693,20 @@ function GoogleMapInner({
             stateMinZoomRef.current = null
             if (!coverageMapBounds) {
                 lastZoomRef.current = null
-                map.setOptions({ restriction: null, minZoom: undefined })
+                map.setOptions({
+                    restriction: null,
+                    minZoom: allowZoomOut ? SUB_ADMIN_MIN_ZOOM : undefined,
+                })
             }
+        } else if (allowZoomOut) {
+            if (!stateBoundsFittedRef.current && fitStateOnLoad) {
+                fitBoundedView(map, stateBounds, () => {}, STATE_VIEW_FIT_PADDING)
+                stateBoundsFittedRef.current = true
+            }
+            map.setOptions({
+                restriction: null,
+                minZoom: SUB_ADMIN_MIN_ZOOM,
+            })
         } else {
             const latLngBounds = toLatLngBounds(stateBounds)
             map.setOptions({
@@ -738,7 +755,16 @@ function GoogleMapInner({
                 google.maps.event.removeListener(dragEndListener)
             }
         }
-    }, [map, stateBounds, fitStateView, establishStateZoomLimit, coverageMapBounds, fitStateOnLoad])
+    }, [
+        map,
+        stateBounds,
+        fitStateView,
+        establishStateZoomLimit,
+        coverageMapBounds,
+        fitStateOnLoad,
+        allowZoomOut,
+        fitBoundedView,
+    ])
 
     // Lock sub-admin license radius: fit full circle and restrict pan/zoom to its bbox
     React.useEffect(() => {

@@ -193,6 +193,29 @@ export const DEMO_CRITICAL_INFRA_MARKERS: CriticalInfraMapMarker[] = [
     description: 'Radioactive isotopes and regulatory storage — containment verified intact.',
     riskLevel: 'LOW',
   },
+  {
+    id: 'ci-demo-commercial-1',
+    sectorId: 'ci_commercial',
+    lat: 34.7489,
+    lng: -92.4115,
+    title: 'Outlets of Little Rock — Retail & Supply Hub',
+    status: 'at_risk',
+    location: 'Little Rock, AR',
+    description:
+      'HIFLD commercial facilities — grocery, pharmacy, banking, and warehouse cluster for Zone A/B relief.',
+    riskLevel: 'HIGH',
+  },
+  {
+    id: 'ci-demo-commercial-2',
+    sectorId: 'ci_commercial',
+    lat: 34.7294,
+    lng: -92.2243,
+    title: 'Bill and Hillary Clinton National Airport (LIT)',
+    status: 'operational',
+    location: 'Little Rock, AR',
+    description: 'Commercial aviation hub — limited operations; FEMA staging adjacent.',
+    riskLevel: 'MODERATE',
+  },
 ]
 
 export type CriticalInfraAtRiskSummary = {
