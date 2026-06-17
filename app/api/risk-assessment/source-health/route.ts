@@ -1,7 +1,13 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { getOrRevalidate } from '@/lib/services/risk-report-cache';
-import { probeSourceHealth, LIVE_INPUT_KEYS, type SourceHealth } from '@/lib/services/risk-source-health';
+import {
+    probeSourceHealth,
+    probeSingleSource,
+    LIVE_INPUT_KEYS,
+    type LiveInputKey,
+    type SourceHealth,
+} from '@/lib/services/risk-source-health';
 import { resolveDemoSessionContext } from '@/lib/demo/provider';
 
 const ALLOWED_ROLES = new Set([
@@ -9,7 +15,7 @@ const ALLOWED_ROLES = new Set([
     'eoc-observer', 'manager', 'responder', 'observer',
 ]);
 
-export async function GET() {
+export async function GET(req: Request) {
     try {
         const session = await getSession();
         const role = session?.user?.role as string | undefined;
@@ -17,10 +23,24 @@ export async function GET() {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
+        const url = new URL(req.url);
+        const keyParam = url.searchParams.get('key') as LiveInputKey | null;
+
         const demoCtx = await resolveDemoSessionContext(
             session.user.id as string,
             session.user.email as string,
         );
+
+        // Per-key probe: always fresh (no cache), returns as soon as that one probe resolves.
+        if (keyParam && (LIVE_INPUT_KEYS as readonly string[]).includes(keyParam)) {
+            if (demoCtx) {
+                return NextResponse.json({ sources: [{ key: keyParam, ok: true }] });
+            }
+            const result = await probeSingleSource(keyParam);
+            return NextResponse.json({ sources: [result] });
+        }
+
+        // Bulk probe (legacy path): SWR-cached, all 5 at once.
         if (demoCtx) {
             const sources: SourceHealth[] = LIVE_INPUT_KEYS.map((key) => ({ key, ok: true }));
             return NextResponse.json({ sources });
