@@ -68,3 +68,23 @@ export function buildDefaultMapLayerState(opts?: {
   }
   return defaults
 }
+
+/** Arkansas demo — turn on every infrastructure filter so the presentation map is populated. */
+export function buildDemoMapLayerState(opts?: {
+  includeCriticalInfra?: boolean
+  includeDisasterZones?: boolean
+}): Record<string, boolean> {
+  const state = buildDefaultMapLayerState(opts)
+  GIS_FILTER_MAP_LAYERS.forEach((layer) => {
+    state[layer.id] = true
+  })
+  if (opts?.includeDisasterZones) {
+    state[DISASTER_ZONE_LAYER.id] = true
+  }
+  if (opts?.includeCriticalInfra) {
+    CRITICAL_INFRASTRUCTURE_SECTORS.forEach((sector) => {
+      state[sector.id] = true
+    })
+  }
+  return state
+}
