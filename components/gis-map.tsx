@@ -329,10 +329,35 @@ export function GISMap({
     return null
   }, [licensedStateMapBounds, isDemoSimulation, unifiedMapFeed, stateScoped])
 
-  useEffect(() => {
-    if (!mapStateBounds) return
-    setMapCenter(centerOfBounds(mapStateBounds))
-  }, [mapStateBounds])
+  /** Only re-center when navigation context changes — not on situational poll refreshes. */
+  const mapViewAnchorKey = useMemo(() => {
+    const coverageKey =
+      lockToCoverageCircle && coverageCircle
+        ? `${coverageCircle.center.lat},${coverageCircle.center.lng},${coverageCircle.radiusMeters}`
+        : ''
+    const boundsKey = mapStateBounds
+      ? `${mapStateBounds.west},${mapStateBounds.south},${mapStateBounds.east},${mapStateBounds.north}`
+      : ''
+    return [
+      selectedLocation,
+      (focusState || '').trim(),
+      (scopeState || '').trim(),
+      lockToCoverageCircle ? '1' : '0',
+      coverageKey,
+      boundsKey,
+      coverageMeta?.coverageType ?? '',
+      coverageMeta?.radiusMile ?? '',
+    ].join('|')
+  }, [
+    selectedLocation,
+    focusState,
+    scopeState,
+    lockToCoverageCircle,
+    coverageCircle,
+    mapStateBounds,
+    coverageMeta?.coverageType,
+    coverageMeta?.radiusMile,
+  ])
 
   useEffect(() => {
     setSelectedDemoHeat(null)
@@ -707,14 +732,8 @@ export function GISMap({
         return
       }
 
-      // Sub-admin state license: full state view is handled by GoogleMap fitBounds
-      if (mapStateBounds) {
-        const { west, south, east, north } = mapStateBounds
-        if (!cancelled) {
-          setMapCenter({ lat: (south + north) / 2, lng: (west + east) / 2 })
-        }
-        return
-      }
+      // Sub-admin state license / demo: GoogleMap fitBounds owns the viewport
+      if (mapStateBounds) return
 
       if (selectedLocation === 'All') {
         const stAll = (focusState || '').trim()
@@ -797,7 +816,7 @@ export function GISMap({
     return () => {
       cancelled = true
     }
-  }, [selectedLocation, focusState, subAdmins, impactedUsers, mapStateBounds, lockToCoverageCircle, coverageCircle, coverageMeta])
+  }, [mapViewAnchorKey])
 
   const enabledGisFilterLayerIds = useMemo(() => {
     return GIS_FILTER_MAP_LAYERS.filter((layer) => mapLayers[layer.id]).map((layer) => layer.id)
