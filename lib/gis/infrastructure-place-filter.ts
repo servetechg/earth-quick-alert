@@ -49,21 +49,33 @@ export function placeMatchesEmergencyService(
     return false
 }
 
+/** Heuristic when Google returns no `types` array. */
+function inferTypesFromName(name?: string): string[] {
+    const label = (name ?? '').toLowerCase()
+    if (/\b(cvs|walgreens|rite aid|pharmacy|drugstore|apothecary)\b/i.test(label)) {
+        return ['pharmacy']
+    }
+    if (/\b(hospital|medical center|med centre|health system|infirmary|regional medical)\b/i.test(label)) {
+        return ['hospital']
+    }
+    return []
+}
+
 /** Keep only establishments that match the requested Google place category. */
 export function placeMatchesRequestedType(
     placeTypes: string[] | undefined,
     requested: string,
     name?: string,
 ): boolean {
-    const types = placeTypes ?? []
-    if (types.length === 0 && requested !== 'fire_station') return true
+    const types =
+        placeTypes && placeTypes.length > 0 ? placeTypes : inferTypesFromName(name)
     if (types.includes('veterinary_care')) return false
 
     switch (requested) {
         case 'hospital':
             return types.includes('hospital')
         case 'pharmacy':
-            return types.includes('pharmacy')
+            return types.includes('pharmacy') && !types.includes('hospital')
         case 'police':
             return types.includes('police')
         case 'fire_station':
@@ -85,6 +97,19 @@ export function placeMatchesRequestedType(
     }
 }
 
+/** Ensure a fetched POI belongs on exactly one GIS filter layer. */
+export function placeBelongsToGisFilterResultType(
+    place: { placeType: string; name?: string; googleTypes?: string[] },
+    resultType: string,
+): boolean {
+    if (place.placeType !== resultType) return false
+    const types =
+        place.googleTypes && place.googleTypes.length > 0
+            ? place.googleTypes
+            : inferTypesFromName(place.name)
+    return placeMatchesRequestedType(types, resultType, place.name)
+}
+
 export function prominenceScore(rating?: number, reviewCount?: number): number {
     const reviews = typeof reviewCount === 'number' && reviewCount > 0 ? reviewCount : 0
     const stars = typeof rating === 'number' && rating > 0 ? rating : 0
@@ -93,25 +118,35 @@ export function prominenceScore(rating?: number, reviewCount?: number): number {
 
 /** Minimum Google review count — higher when zoomed out (show only well-known places). */
 export function minReviewCountForViewport(spanDeg: number, placeType: string): number {
-    const base = placeType === 'hospital' ? 20 : placeType === 'pharmacy' ? 10 : 5
-    if (spanDeg > 2.5) return Math.max(base, 30)
-    if (spanDeg > 1.2) return Math.max(base, 15)
-    if (spanDeg > 0.45) return Math.max(base, 8)
-    return Math.max(base, 3)
+    if (spanDeg <= 0.5) return 0
+    if (spanDeg > 2.5) return 0
+    const base = placeType === 'hospital' ? 4 : placeType === 'pharmacy' ? 3 : 2
+    if (spanDeg > 1.2) return Math.max(base, 4)
+    if (spanDeg > 0.75) return Math.max(base, 2)
+    return base
 }
 
 /** Max markers per category for the current map zoom. */
 export function maxResultsPerType(spanDeg: number, placeType?: string): number {
-    if (placeType === 'shelter') {
-        if (spanDeg > 2.5) return 8
-        if (spanDeg > 1.2) return 12
-        if (spanDeg > 0.45) return 18
-        if (spanDeg > 0.2) return 28
-        return 40
+    if (placeType === 'hospital') {
+        if (spanDeg > 6) return 80
+        if (spanDeg > 2.5) return 120
+        if (spanDeg > 1.0) return 80
+        if (spanDeg > 0.5) return 60
+        return 200
     }
 
-    if (spanDeg > 2.5) return 10
-    if (spanDeg > 1.2) return 16
-    if (spanDeg > 0.45) return 24
-    return 35
+    if (placeType === 'shelter') {
+        if (spanDeg > 2.5) return 120
+        if (spanDeg > 1.2) return 40
+        if (spanDeg > 0.45) return 60
+        if (spanDeg > 0.2) return 80
+        return 120
+    }
+
+    if (spanDeg > 6) return 100
+    if (spanDeg > 2.5) return 120
+    if (spanDeg > 1.0) return 64
+    if (spanDeg > 0.45) return 72
+    return 200
 }

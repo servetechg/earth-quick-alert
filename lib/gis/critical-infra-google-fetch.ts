@@ -21,7 +21,7 @@ import type { InfrastructurePlaceResult } from '@/lib/gis/infrastructure-places-
 import { pointInUsaBounds } from '@/lib/constants/usa-map-bounds'
 
 /** Keep critical-infra layers readable — Google Places only, capped per viewport. */
-const MAX_MARKERS_PER_SECTOR = 32
+const MAX_MARKERS_PER_SECTOR = 120
 const MAX_GRID_CELLS = 6
 const MAX_TEXT_QUERIES = 1
 
@@ -167,7 +167,8 @@ export async function fetchGoogleCriticalInfraMarkers(
   const markers: CriticalInfraMapMarker[] = []
   const globalSeen = new Set<string>()
   const plan = searchPlanForScope(scope)
-  const gridPoints = plan.points.slice(0, MAX_GRID_CELLS)
+  const gridCap = plan.spanDeg > 8 ? plan.points.length : MAX_GRID_CELLS
+  const gridPoints = plan.points.slice(0, gridCap)
   const rankBounds = viewportBoundsForScope(scope)
 
   for (const sectorId of requestedSectors) {

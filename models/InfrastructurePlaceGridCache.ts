@@ -9,6 +9,7 @@ export type CachedInfrastructurePlace = {
     vicinity: string;
     rating?: number;
     user_ratings_total?: number;
+    googleTypes?: string[];
 };
 
 const CachedPlaceSchema = new Schema(
@@ -21,6 +22,7 @@ const CachedPlaceSchema = new Schema(
         vicinity: { type: String, default: 'Address not available' },
         rating: { type: Number },
         user_ratings_total: { type: Number },
+        googleTypes: { type: [String] },
     },
     { _id: false },
 );

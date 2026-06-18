@@ -63,6 +63,16 @@ export function getUsStateBbox(usps: string): readonly [number, number, number, 
 }
 
 /** True if lon/lat lies inside the USPS state's approximate envelope (handles Alaska dateline). */
+/** Resolve USPS code for a coordinate inside the US (best-effort for shared edges). */
+export function resolveUsStateCode(lon: number, lat: number): string | null {
+    if (pointInUsStateBBox(lon, lat, 'DC')) return 'DC';
+    for (const code of Object.keys(US_STATE_BBOX)) {
+        if (code === 'DC') continue;
+        if (pointInUsStateBBox(lon, lat, code)) return code;
+    }
+    return null;
+}
+
 export function pointInUsStateBBox(lon: number, lat: number, usps: string): boolean {
     const u = usps.trim().toUpperCase();
     if (u === 'AK') {

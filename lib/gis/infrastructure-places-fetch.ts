@@ -8,7 +8,7 @@ import {
     type InfrastructureSearchScope,
     type MapBounds,
 } from '@/lib/gis/infrastructure-search-grid'
-import { placeMatchesRequestedType, placeMatchesShelter } from '@/lib/gis/infrastructure-place-filter'
+import { placeMatchesRequestedType, placeMatchesShelter, placeBelongsToGisFilterResultType } from '@/lib/gis/infrastructure-place-filter'
 import type { GisFilterLayerDef } from '@/lib/gis/gis-filter-layers'
 import { GOOGLE_MAPS_API_KEY } from '@/lib/constants/google-maps-config'
 import { pointInUsStateBBox } from '@/lib/constants/us-state-bounding-boxes'
@@ -17,7 +17,11 @@ import InfrastructurePlaceGridCache, {
     type CachedInfrastructurePlace,
 } from '@/models/InfrastructurePlaceGridCache'
 import connectDB from '@/lib/mongodb'
-import { rankPlacesForViewport } from '@/lib/gis/viewport-place-ranking'
+import {
+    isDenseViewportZoom,
+    rankPlacesForViewport,
+} from '@/lib/gis/viewport-place-ranking'
+import { viewportSpanDeg } from '@/lib/gis/infrastructure-search-grid'
 
 export type InfrastructurePlaceResult = {
     place_id: string
@@ -28,9 +32,10 @@ export type InfrastructurePlaceResult = {
     vicinity: string
     rating?: number
     user_ratings_total?: number
+    googleTypes?: string[]
 }
 
-const FETCH_CONCURRENCY = 10
+const FETCH_CONCURRENCY = 20
 const GRID_CACHE_TTL_MS = 24 * 60 * 60 * 1000
 const MEMORY_CACHE_TTL_MS = 10 * 60 * 1000
 const NEXT_PAGE_DELAY_MS = 2100
@@ -74,7 +79,10 @@ function scopeCacheKey(scope: InfrastructureSearchScope): string {
         return `radius:${scope.center.lat.toFixed(4)},${scope.center.lng.toFixed(4)}:${scope.radiusMile}`
     }
     const b = scope.bounds
-    return `bounds:${b.west.toFixed(2)},${b.south.toFixed(2)},${b.east.toFixed(2)},${b.north.toFixed(2)}`
+    const span = Math.max(b.north - b.south, b.east - b.west)
+    const prec = span < 0.5 ? 3 : span < 2 ? 2 : 1
+    const fmt = (n: number) => n.toFixed(prec)
+    return `bounds:${fmt(b.west)},${fmt(b.south)},${fmt(b.east)},${fmt(b.north)}`
 }
 
 function cellCacheTypeKey(layer: GisFilterLayerDef): string {
@@ -251,23 +259,21 @@ function rawToResult(
     if (place.business_status === 'CLOSED_PERMANENTLY') return null
     if (!placeInScope(lat, lng, scope)) return null
 
-    if (layer.fetch.mode === 'google_nearby' || layer.fetch.mode === 'google_composite') {
-        const requested = requestedTypeForLayer(layer)
-        const matchesPrimary = placeMatchesRequestedType(
-            place.types,
-            requested,
-            place.name,
-        )
+    if (layer.fetch.mode === 'google_nearby') {
+        const requested = layer.fetch.placeType
+        if (!placeMatchesRequestedType(place.types, requested, place.name)) {
+            return null
+        }
+    } else if (layer.fetch.mode === 'google_composite') {
+        const requested = layer.fetch.placeType
+        const matchesPrimary = placeMatchesRequestedType(place.types, requested, place.name)
         const matchesResultType =
             layer.resultType === 'shelter'
                 ? placeMatchesShelter(place.types, place.name)
                 : placeMatchesRequestedType(place.types, layer.resultType, place.name)
-        const matchesExtra =
-            layer.fetch.mode === 'google_composite'
-                ? (layer.fetch.extraNearbyTypes ?? []).some((type) =>
-                      placeMatchesRequestedType(place.types, type, place.name),
-                  )
-                : false
+        const matchesExtra = (layer.fetch.extraNearbyTypes ?? []).some((type) =>
+            placeMatchesRequestedType(place.types, type, place.name),
+        )
         if (!matchesPrimary && !matchesResultType && !matchesExtra) {
             return null
         }
@@ -289,6 +295,7 @@ function rawToResult(
             'Address not available',
         rating: place.rating,
         user_ratings_total: place.user_ratings_total,
+        googleTypes: place.types,
     }
 }
 
@@ -409,7 +416,18 @@ async function fetchGoogleCellPlaces(
     if (useDbCache) {
         const cached = await loadGridCellFromDb(scopeKey, cacheType, gridLat, gridLng)
         if (cached) {
-            return cached.map((p) => ({ ...p, placeType: layer.resultType }))
+            const requested =
+                layer.fetch.mode === 'google_nearby'
+                    ? layer.fetch.placeType
+                    : layer.fetch.mode === 'google_composite'
+                      ? layer.fetch.placeType
+                      : layer.resultType
+            return cached
+                .filter((p) => {
+                    const types = p.googleTypes
+                    return placeMatchesRequestedType(types, requested, p.name)
+                })
+                .map((p) => ({ ...p, placeType: layer.resultType }))
         }
     }
 
@@ -431,7 +449,7 @@ async function fetchGoogleCellPlaces(
             cacheType,
             gridLat,
             gridLng,
-            places.map(({ place_id, name, placeType, lat, lng, vicinity, rating, user_ratings_total }) => ({
+            places.map(({ place_id, name, placeType, lat, lng, vicinity, rating, user_ratings_total, googleTypes }) => ({
                 place_id,
                 name,
                 placeType,
@@ -440,6 +458,7 @@ async function fetchGoogleCellPlaces(
                 vicinity,
                 rating,
                 user_ratings_total,
+                googleTypes,
             })),
         )
     }
@@ -497,7 +516,8 @@ export async function fetchGoogleFilterLayerPlaces(
 
     for (const layerById of layerMaps) {
         for (const [id, place] of layerById) {
-            if (!byId.has(id)) byId.set(id, place)
+            const key = `${id}:${place.placeType}`
+            if (!byId.has(key)) byId.set(key, place)
         }
     }
 
@@ -532,7 +552,11 @@ export async function fetchInfrastructurePlacesForLayers(
         }
     }
 
-    const allResults = [...byId.values()]
+    const allResults = [...byId.values()].filter((place) => {
+        const layer = layers.find((l) => l.resultType === place.placeType)
+        if (!layer) return false
+        return placeBelongsToGisFilterResultType(place, layer.resultType)
+    })
     memoryCache.set(memKey, {
         expiresAt: Date.now() + MEMORY_CACHE_TTL_MS,
         results: allResults,
@@ -543,6 +567,10 @@ export async function fetchInfrastructurePlacesForLayers(
         (scope.mode === 'bounds' ? scope.bounds : null)
 
     if (viewport) {
+        const span = viewportSpanDeg(viewport)
+        if (isDenseViewportZoom(span)) {
+            return filterPlacesByBounds(allResults, viewport)
+        }
         return rankPlacesForViewport(allResults, viewport)
     }
 

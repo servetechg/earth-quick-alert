@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useMemo, useId, useCallback } from 'react'
+import React, { useState, useEffect, useMemo, useId, useCallback, useRef } from 'react'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -33,7 +33,7 @@ import type { UnifiedEventHeatPoint } from '@/lib/geo/unified-event-heatmap'
 import { cn } from '@/lib/utils'
 import { getUsStateBbox, pointInUsStateBBox } from '@/lib/constants/us-state-bounding-boxes'
 import { normalizeStateToUsps } from '@/lib/utils/us-state-usps'
-import { intersectBounds } from '@/lib/gis/infrastructure-search-grid'
+import { intersectBounds, estimateBoundsFromCenterZoom, viewportSpanDeg } from '@/lib/gis/infrastructure-search-grid'
 import { CONUS_MAP_BOUNDS, clampBoundsToUsa, viewportCenterInUsa, pointInUsaBounds } from '@/lib/constants/usa-map-bounds'
 import { ShieldCheck, Truck, Siren, Building2, MapPin } from 'lucide-react'
 import { geocodeAddress, calculateDistance } from '@/lib/services/mock-map-service'
@@ -49,7 +49,8 @@ import { gisFilterLayerByResultType, gisFilterLayerById } from '@/lib/gis/gis-fi
 import type { GisFilterLayerDef } from '@/lib/gis/gis-filter-layers'
 import { filterDemoGisFilterPlaces, pointInPaddedBounds } from '@/lib/demo/data/demo-gis-filter-places'
 import { DEMO_CRITICAL_INFRA_MARKERS } from '@/lib/demo/critical-infrastructure-markers'
-import { rankPlacesForViewport } from '@/lib/gis/viewport-place-ranking'
+import { isDenseViewportZoom, rankPlacesForViewport } from '@/lib/gis/viewport-place-ranking'
+import { placeBelongsToGisFilterResultType } from '@/lib/gis/infrastructure-place-filter'
 import type { InfrastructurePlaceResult } from '@/lib/gis/infrastructure-places-fetch'
 import { CRITICAL_INFRASTRUCTURE_SECTORS, criticalSectorById } from '@/lib/gis/critical-infrastructure-sectors'
 import {
@@ -166,6 +167,12 @@ export function GISMap({
     initialMapCenterForProps(focusState, scopeState, stateScoped),
   )
   const [mapZoom, setMapZoom] = useState(4)
+  const liveMapZoomRef = useRef(mapZoom)
+  const [mapFlyToKey, setMapFlyToKey] = useState(0)
+  const appliedMapViewKeyRef = useRef('')
+  const bumpMapFlyTo = useCallback(() => {
+    setMapFlyToKey((k) => k + 1)
+  }, [])
   const [activeTab, setActiveTab] = useState<GisMapTab>('Citizens')
   const [selectedDemoHeat, setSelectedDemoHeat] = useState<UnifiedEventHeatPoint | null>(null)
   const [showHeatmap, setShowHeatmap] = useState(true)
@@ -331,7 +338,8 @@ export function GISMap({
   useEffect(() => {
     if (!mapStateBounds) return
     setMapCenter(centerOfBounds(mapStateBounds))
-  }, [mapStateBounds])
+    bumpMapFlyTo()
+  }, [mapStateBounds, bumpMapFlyTo])
 
   useEffect(() => {
     setSelectedDemoHeat(null)
@@ -526,6 +534,7 @@ export function GISMap({
               if (typeof mile === 'number') {
                 setMapZoom(mapZoomForRadiusMiles(mile))
               }
+              bumpMapFlyTo()
             }
           }
         } else {
@@ -691,9 +700,21 @@ export function GISMap({
     fetchData()
   }, [stateScoped, unifiedMapFeed])
 
-  // Auto-zoom and center when selection changes (USA vs sub-admin state / metro)
+  // Recenter only when the user changes location focus — not when filters/API load or coverage metadata updates.
   useEffect(() => {
     let cancelled = false
+
+    const stateBoundsKey = mapStateBounds
+      ? `${mapStateBounds.west},${mapStateBounds.south},${mapStateBounds.east},${mapStateBounds.north}`
+      : ''
+    const coverageKey =
+      lockToCoverageCircle && coverageCircle
+        ? `${coverageCircle.center.lat},${coverageCircle.center.lng},${coverageCircle.radiusMeters}`
+        : ''
+    const viewKey = `${selectedLocation}|${focusState ?? ''}|${stateBoundsKey}|${coverageKey}|${lockToCoverageCircle}`
+
+    if (appliedMapViewKeyRef.current === viewKey) return
+    appliedMapViewKeyRef.current = viewKey
 
     async function applyCenter() {
       if (lockToCoverageCircle && coverageCircle) {
@@ -702,6 +723,7 @@ export function GISMap({
         if (!cancelled) {
           setMapCenter(coverageCircle.center)
           setMapZoom(mapZoomForRadiusMiles(mile))
+          bumpMapFlyTo()
         }
         return
       }
@@ -711,6 +733,7 @@ export function GISMap({
         const { west, south, east, north } = mapStateBounds
         if (!cancelled) {
           setMapCenter({ lat: (south + north) / 2, lng: (west + east) / 2 })
+          bumpMapFlyTo()
         }
         return
       }
@@ -728,11 +751,13 @@ export function GISMap({
           ) {
             setMapCenter(geo)
             setMapZoom(8)
+            bumpMapFlyTo()
             return
           }
         }
         setMapCenter({ lat: 37.0902, lng: -95.7129 })
         setMapZoom(4)
+        bumpMapFlyTo()
         return
       }
 
@@ -766,6 +791,7 @@ export function GISMap({
         if (!cancelled) {
           setMapCenter({ lat: avgLat, lng: avgLng })
           setMapZoom(dynamicZoom)
+          bumpMapFlyTo()
         }
         return
       }
@@ -782,6 +808,7 @@ export function GISMap({
         ) {
           setMapCenter(geo)
           setMapZoom(8)
+          bumpMapFlyTo()
           return
         }
       }
@@ -789,6 +816,7 @@ export function GISMap({
       if (adminPos && !cancelled) {
         setMapCenter(adminPos)
         setMapZoom(12)
+        bumpMapFlyTo()
       }
     }
 
@@ -796,7 +824,7 @@ export function GISMap({
     return () => {
       cancelled = true
     }
-  }, [selectedLocation, focusState, subAdmins, impactedUsers, mapStateBounds, lockToCoverageCircle, coverageCircle, coverageMeta])
+  }, [selectedLocation, focusState, mapStateBounds, lockToCoverageCircle, coverageCircle, bumpMapFlyTo])
 
   const enabledGisFilterLayerIds = useMemo(() => {
     return GIS_FILTER_MAP_LAYERS.filter((layer) => mapLayers[layer.id]).map((layer) => layer.id)
@@ -823,14 +851,14 @@ export function GISMap({
     } else if (mapZoom <= 7) {
       bounds = CONUS_MAP_BOUNDS
     } else {
-      return null
+      bounds = estimateBoundsFromCenterZoom(mapCenter, liveMapZoomRef.current)
     }
     return clampFetchBounds(bounds)
   }, [
     mapViewportBounds,
     stateBoundsRestriction,
     mapStateBounds,
-    mapZoom,
+    mapCenter,
     clampFetchBounds,
     restrictToUsa,
     isDemoSimulation,
@@ -839,20 +867,29 @@ export function GISMap({
   const infraFetchScopeKey = useMemo(() => {
     if (infraFetchBounds) {
       const b = infraFetchBounds
-      return `viewport:${b.west.toFixed(2)},${b.south.toFixed(2)},${b.east.toFixed(2)},${b.north.toFixed(2)}|${infraTypesKey}`
+      const span = Math.max(b.north - b.south, b.east - b.west)
+      const prec = span < 0.5 ? 3 : span < 2 ? 2 : 1
+      const fmt = (n: number) => n.toFixed(prec)
+      return `viewport:${fmt(b.west)},${fmt(b.south)},${fmt(b.east)},${fmt(b.north)}|${infraTypesKey}`
     }
     return `pending|${infraTypesKey}`
   }, [infraTypesKey, infraFetchBounds])
 
+  const handleMapZoomChange = useCallback((zoom: number) => {
+    liveMapZoomRef.current = zoom
+  }, [])
+
   const handleMapBoundsChange = useCallback((bounds: MapStateBounds) => {
     setMapViewportBounds((prev) => {
       if (!prev) return bounds
+      const span = Math.max(prev.north - prev.south, prev.east - prev.west)
       const delta =
         Math.abs(prev.west - bounds.west) +
         Math.abs(prev.east - bounds.east) +
         Math.abs(prev.south - bounds.south) +
         Math.abs(prev.north - bounds.north)
-      if (delta < 0.03) return prev
+      const threshold = span > 2 ? 0.4 : span > 0.5 ? 0.06 : span > 0.12 ? 0.02 : 0.008
+      if (delta < threshold) return prev
       return bounds
     })
   }, [])
@@ -873,15 +910,33 @@ export function GISMap({
   }, [isDemoSimulation])
 
   const applyDemoInfraToCache = useCallback(
-    (results: InfrastructurePlaceResult[]) => {
+    (results: InfrastructurePlaceResult[], fetchBounds?: MapStateBounds | null) => {
       const fetchedResultTypes = new Set(
         enabledGisFilterLayerIds
           .map((id) => gisFilterLayerById(id)?.resultType)
           .filter(Boolean) as string[],
       )
-      for (const [cacheId, cached] of infraCacheRef.current.entries()) {
-        if (fetchedResultTypes.has(cached.placeType)) {
-          infraCacheRef.current.delete(cacheId)
+
+      if (fetchBounds && fetchedResultTypes.size > 0) {
+        const latPad = (fetchBounds.north - fetchBounds.south) * 1.25
+        const lngPad = (fetchBounds.east - fetchBounds.west) * 1.25
+        const pruneBox = {
+          west: fetchBounds.west - lngPad,
+          east: fetchBounds.east + lngPad,
+          south: fetchBounds.south - latPad,
+          north: fetchBounds.north + latPad,
+        }
+        for (const [cacheId, cached] of infraCacheRef.current.entries()) {
+          if (!fetchedResultTypes.has(cached.placeType)) continue
+          const { lat, lng } = cached.position
+          if (
+            lng < pruneBox.west ||
+            lng > pruneBox.east ||
+            lat < pruneBox.south ||
+            lat > pruneBox.north
+          ) {
+            infraCacheRef.current.delete(cacheId)
+          }
         }
       }
 
@@ -893,16 +948,18 @@ export function GISMap({
         ) {
           continue
         }
-        const layerDef =
-          gisFilterLayerByResultType(place.placeType) ??
-          GIS_FILTER_MAP_LAYERS.find((l) => l.resultType === place.placeType)
-        if (!layerDef) continue
+        if (!fetchedResultTypes.has(place.placeType)) continue
+
+        const layerDef = gisFilterLayerByResultType(place.placeType)
+        if (!layerDef || !enabledGisFilterLayerIds.includes(layerDef.id)) continue
+        if (!placeBelongsToGisFilterResultType(place, layerDef.resultType)) continue
 
         const placePos = { lat: place.lat, lng: place.lng }
         if (!markerInCoverage(placePos)) continue
 
-        if (!infraCacheRef.current.has(place.place_id)) {
-          infraCacheRef.current.set(place.place_id, {
+        const cacheKey = `${place.place_id}:${place.placeType}`
+        if (!infraCacheRef.current.has(cacheKey)) {
+          infraCacheRef.current.set(cacheKey, {
             id: place.place_id,
             position: placePos,
             title: place.name,
@@ -915,6 +972,7 @@ export function GISMap({
             icon: layerDef.markerIcon ?? 'hospital',
             rating: place.rating,
             user_ratings_total: place.user_ratings_total,
+            googleTypes: place.googleTypes,
           })
         }
       }
@@ -952,7 +1010,7 @@ export function GISMap({
             stateCode: coverageMeta?.stateCode ?? licensedStateHint ?? 'AR',
           })
           if (!cancelled) {
-            applyDemoInfraToCache(results)
+            applyDemoInfraToCache(results, infraFetchBounds)
           }
           return
         }
@@ -978,7 +1036,7 @@ export function GISMap({
         const results = Array.isArray(data.results) ? data.results : []
 
         if (!cancelled) {
-          applyDemoInfraToCache(results)
+          applyDemoInfraToCache(results, infraFetchBounds)
         }
       } catch (error) {
         console.warn('Scoped infra search error:', error)
@@ -991,7 +1049,7 @@ export function GISMap({
 
     const timer = window.setTimeout(() => {
       void fetchScopedInfra()
-    }, 500)
+    }, 150)
 
     return () => {
       cancelled = true
@@ -1638,6 +1696,16 @@ export function GISMap({
 
       const markersForLayer = Array.from(infraCacheRef.current.values())
         .filter((m: any) => m.placeType === layer.resultType)
+        .filter((m: any) =>
+          placeBelongsToGisFilterResultType(
+            {
+              placeType: m.placeType,
+              name: m.title,
+              googleTypes: m.googleTypes,
+            },
+            layer.resultType as string,
+          ),
+        )
         .filter((m: any) => inUsaView(m.position.lat, m.position.lng))
         .filter((m: any) => markerInCoverage(m.position))
 
@@ -1657,6 +1725,15 @@ export function GISMap({
 
       if (!viewportRankBounds) {
         enabledLayerMarkers.push(...markersForLayer)
+        return
+      }
+
+      const spanDeg = viewportSpanDeg(viewportRankBounds)
+      if (isDenseViewportZoom(spanDeg)) {
+        const visible = markersForLayer.filter((m: any) =>
+          pointInPaddedBounds(m.position.lat, m.position.lng, viewportRankBounds, 0.12),
+        )
+        enabledLayerMarkers.push(...visible)
         return
       }
 
@@ -1846,6 +1923,7 @@ export function GISMap({
           markers={mapMarkers}
           zoom={mapZoom}
           center={mapCenter}
+          flyToKey={mapFlyToKey}
           heatPoints={heatPoints}
           showHeatmap={showHeatmap}
           stateBounds={mapStateBounds}
@@ -1858,6 +1936,7 @@ export function GISMap({
           heatClickOnly={usesUnifiedHeat}
           onHeatIncidentSelect={isDemoSimulation ? handleHeatIncidentSelect : undefined}
           onBoundsChanged={showLayersPanel ? handleMapBoundsChange : undefined}
+          onZoomChanged={showLayersPanel ? handleMapZoomChange : undefined}
           clusterInfrastructure={showLayersPanel && !isDemoSimulation}
         />
 

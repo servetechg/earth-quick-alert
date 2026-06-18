@@ -12,7 +12,11 @@ import ResponderEnergyDeployment from '@/models/ResponderEnergyDeployment'
 import ResponderFoodLogisticsDeployment from '@/models/ResponderFoodLogisticsDeployment'
 import ResponderNonprofitDeployment from '@/models/ResponderNonprofitDeployment'
 import mongoose from 'mongoose'
-import { rankPlacesForViewport } from '@/lib/gis/viewport-place-ranking'
+import {
+    isDenseViewportZoom,
+    rankPlacesForViewport,
+} from '@/lib/gis/viewport-place-ranking'
+import { viewportSpanDeg } from '@/lib/gis/infrastructure-search-grid'
 
 type SiteRow = {
     id: string
@@ -193,6 +197,16 @@ export async function fetchAllFilterLayerPlaces(
 
     const merged = [...byId.values()]
     if (opts?.viewportBounds) {
+        const span = viewportSpanDeg(opts.viewportBounds)
+        if (isDenseViewportZoom(span)) {
+            return merged.filter(
+                (p) =>
+                    p.lng >= opts.viewportBounds!.west &&
+                    p.lng <= opts.viewportBounds!.east &&
+                    p.lat >= opts.viewportBounds!.south &&
+                    p.lat <= opts.viewportBounds!.north,
+            )
+        }
         return rankPlacesForViewport(merged, opts.viewportBounds)
     }
     return merged

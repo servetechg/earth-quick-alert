@@ -136,8 +136,12 @@ interface GoogleMapProps {
     onHeatIncidentSelect?: (incident: UnifiedEventHeatPoint) => void
     /** Debounced viewport bounds for nationwide infrastructure loading. */
     onBoundsChanged?: (bounds: MapStateBounds) => void
+    /** Fired when zoom changes (pan/zoom) so parents can refetch viewport-scoped data. */
+    onZoomChanged?: (zoom: number) => void
     /** Cluster infrastructure markers for large datasets. */
     clusterInfrastructure?: boolean
+    /** When set with center/zoom, fly the map only when this key changes (not on marker updates). */
+    flyToKey?: number
     /** When true with stateBounds, fit the full state on initial load (sub-admin dashboards). */
     fitStateOnLoad?: boolean
 }
@@ -178,7 +182,7 @@ const makeEmergencyServicePinIcon = () => ({
 })
 
 /** Above this zoom, infrastructure markers render individually (Google Maps–style). */
-const INFRA_CLUSTER_MAX_ZOOM = 10
+const INFRA_CLUSTER_MAX_ZOOM = 13
 
 /** Cluster radius in pixels — tighter groups at low zoom, expands as user zooms in. */
 const INFRA_CLUSTER_RADIUS_PX = 58
@@ -392,6 +396,8 @@ function GoogleMapInner({
     onBoundsChanged,
     clusterInfrastructure = false,
     fitStateOnLoad = false,
+    flyToKey,
+    onZoomChanged,
 }: GoogleMapProps) {
     const { isLoaded, loadError } = useJsApiLoader({
         id: GOOGLE_MAPS_LOADER_ID,
@@ -429,6 +435,11 @@ function GoogleMapInner({
     const stateMinZoomRef = useRef<number | null>(null)
     const coverageMinZoomRef = useRef<number | null>(null)
     const lastZoomRef = useRef<number | null>(null)
+    const lastFlyToKeyRef = useRef<number | undefined>(undefined)
+    const [mapReady, setMapReady] = useState(false)
+    const [centerPropLocked, setCenterPropLocked] = useState(false)
+    const lockedCenterRef = useRef(mapCenter)
+    const initialZoomRef = useRef(zoom ?? 10)
 
     const coverageMapBounds = useMemo((): MapStateBounds | null => {
         if (!lockToCoverage || !coverageCircle) return null
@@ -442,32 +453,46 @@ function GoogleMapInner({
         return coverageToMapBounds(coverageCircle)
     }, [lockToCoverage, coverageCircle])
 
+    const flyTargetRef = useRef({ center, zoom })
+    flyTargetRef.current = { center, zoom }
+
     const onLoad = useCallback(function callback(map: google.maps.Map) {
         setMap(map)
+        const current = map.getCenter()
+        if (current) {
+            lockedCenterRef.current = { lat: current.lat(), lng: current.lng() }
+        }
+        const z = map.getZoom()
+        if (z != null) initialZoomRef.current = z
+        setCenterPropLocked(true)
+        setMapReady(true)
     }, [])
 
     useEffect(() => {
-        if (!map || !onBoundsChanged) return
+        if (!map || (!onBoundsChanged && !onZoomChanged)) return
 
-        const emitBounds = () => {
+        const emitViewport = () => {
             const bounds = map.getBounds()
-            if (!bounds) return
-            const ne = bounds.getNorthEast()
-            const sw = bounds.getSouthWest()
-            onBoundsChanged({
-                west: sw.lng(),
-                south: sw.lat(),
-                east: ne.lng(),
-                north: ne.lat(),
-            })
+            if (bounds) {
+                const ne = bounds.getNorthEast()
+                const sw = bounds.getSouthWest()
+                onBoundsChanged?.({
+                    west: sw.lng(),
+                    south: sw.lat(),
+                    east: ne.lng(),
+                    north: ne.lat(),
+                })
+            }
+            const z = map.getZoom()
+            if (z != null) onZoomChanged?.(z)
         }
 
-        emitBounds()
-        const listener = map.addListener('idle', emitBounds)
+        emitViewport()
+        const listener = map.addListener('idle', emitViewport)
         return () => {
             google.maps.event.removeListener(listener)
         }
-    }, [map, onBoundsChanged])
+    }, [map, onBoundsChanged, onZoomChanged])
 
     const validMarkers = useMemo(
         () =>
@@ -496,11 +521,13 @@ function GoogleMapInner({
     const clusterMarkersRef = useRef<google.maps.Marker[]>([])
 
     useEffect(() => {
-        if (!map || !clusterInfrastructure) return
-
-        clustererRef.current?.clearMarkers()
-        clusterMarkersRef.current.forEach((m) => m.setMap(null))
-        clusterMarkersRef.current = []
+        if (!map || !clusterInfrastructure) {
+            clustererRef.current?.clearMarkers()
+            clustererRef.current = null
+            clusterMarkersRef.current.forEach((m) => m.setMap(null))
+            clusterMarkersRef.current = []
+            return
+        }
 
         const gMarkers = infrastructureMarkers.map((marker) => {
             const gMarker = new google.maps.Marker({
@@ -515,6 +542,14 @@ function GoogleMapInner({
             return gMarker
         })
 
+        if (clustererRef.current) {
+            clustererRef.current.clearMarkers()
+            clusterMarkersRef.current.forEach((m) => m.setMap(null))
+            clusterMarkersRef.current = gMarkers
+            clustererRef.current.addMarkers(gMarkers)
+            return
+        }
+
         clusterMarkersRef.current = gMarkers
         clustererRef.current = new MarkerClusterer({
             map,
@@ -525,18 +560,9 @@ function GoogleMapInner({
                 minPoints: 3,
             }),
             renderer: createCountlessClusterRenderer(),
-            onClusterClick: (_event, cluster, clusterMap) => {
-                const bounds = new google.maps.LatLngBounds()
-                for (const m of cluster.markers) {
-                    const pos =
-                        typeof (m as google.maps.Marker).getPosition === 'function'
-                            ? (m as google.maps.Marker).getPosition()
-                            : (m as { position?: google.maps.LatLng }).position
-                    if (pos) bounds.extend(pos)
-                }
-                if (!bounds.isEmpty()) {
-                    clusterMap.fitBounds(bounds, 56)
-                }
+            onClusterClick: (_event, _cluster, clusterMap) => {
+                const current = clusterMap.getZoom() ?? 10
+                clusterMap.setZoom(Math.min(current + 1, 20))
             },
         })
 
@@ -556,6 +582,8 @@ function GoogleMapInner({
             deckOverlayRef.current = null
         }
         setMap(null)
+        setMapReady(false)
+        setCenterPropLocked(false)
     }, [])
 
     const validHeatPoints = useMemo(
@@ -589,11 +617,22 @@ function GoogleMapInner({
         Number.isFinite(coverageCircle.center.lng) &&
         coverageCircle.radiusMeters > 0
 
-    // Smooth pan when center changes (skip when locked to state or coverage — fitBounds owns the view)
+    // Programmatic fly-to only when parent bumps flyToKey — never on marker/filter updates.
     React.useEffect(() => {
-        if (!map || !center || stateBounds || coverageMapBounds) return
-        map.panTo(center)
-    }, [map, center, stateBounds, coverageMapBounds])
+        if (!map || flyToKey == null || stateBounds || coverageMapBounds) return
+        if (lastFlyToKeyRef.current === flyToKey) return
+        lastFlyToKeyRef.current = flyToKey
+        const { center: flyCenter, zoom: flyZoom } = flyTargetRef.current
+        if (flyCenter) {
+            map.setCenter(flyCenter)
+            lockedCenterRef.current = flyCenter
+        }
+        if (flyZoom != null) {
+            map.setZoom(flyZoom)
+            lastZoomRef.current = flyZoom
+            initialZoomRef.current = flyZoom
+        }
+    }, [map, flyToKey, stateBounds, coverageMapBounds])
 
     const applyStateMinZoom = useCallback((targetMap: google.maps.Map, bounds: MapStateBounds) => {
         const tighten = (attempt: number) => {
@@ -913,6 +952,8 @@ function GoogleMapInner({
         return mapCenter
     }, [stateBounds, coverageMapBounds, mapCenter])
 
+    const mapComponentCenter = centerPropLocked ? lockedCenterRef.current : mapDisplayCenter
+
     if (loadError || authFailed) {
         return (
             <GoogleMapsUnavailable
@@ -929,8 +970,12 @@ function GoogleMapInner({
         <div className="w-full h-full min-h-[400px] rounded-xl overflow-hidden shadow-inner border border-slate-200 relative">
             <GoogleMapComponent
                 mapContainerStyle={containerStyle}
-                center={mapDisplayCenter}
-                zoom={stateBounds || coverageMapBounds ? undefined : zoom}
+                center={mapComponentCenter}
+                zoom={
+                    mapReady || stateBounds || coverageMapBounds
+                        ? undefined
+                        : initialZoomRef.current
+                }
                 onLoad={onLoad}
                 onUnmount={onUnmount}
                 onClick={handleMapClick}
@@ -941,7 +986,8 @@ function GoogleMapInner({
                     scaleControl: true,
                     streetViewControl: false,
                     rotateControl: true,
-                    fullscreenControl: true
+                    fullscreenControl: true,
+                    gestureHandling: 'greedy',
                 }}
             >
                 {map && showCoverageCircle && (

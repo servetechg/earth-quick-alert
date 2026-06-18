@@ -1,4 +1,4 @@
-import { getUsStateBbox } from '@/lib/constants/us-state-bounding-boxes'
+import { getUsStateBbox, US_STATE_BBOX } from '@/lib/constants/us-state-bounding-boxes'
 
 /** Google Places Nearby Search maximum radius (meters). */
 export const PLACES_SEARCH_RADIUS_M = 50_000
@@ -85,12 +85,13 @@ export function capGridPoints(
 function maxGridCellsForSpan(spanDeg: number): number {
     if (spanDeg > 15) return 64
     if (spanDeg > 10) return 49
-    if (spanDeg > 6) return 36
-    if (spanDeg > 3) return 25
-    if (spanDeg > 1.5) return 16
-    if (spanDeg > 0.75) return 12
-    if (spanDeg > 0.35) return 9
-    return 6
+    if (spanDeg > 6) return 42
+    if (spanDeg > 3) return 36
+    if (spanDeg > 1.5) return 25
+    if (spanDeg > 0.75) return 16
+    if (spanDeg > 0.35) return 12
+    if (spanDeg > 0.12) return 8
+    return 4
 }
 
 export function boundsFromStateCode(stateCode: string): MapBounds | null {
@@ -118,6 +119,23 @@ export function intersectBounds(a: MapBounds, b: MapBounds): MapBounds | null {
 
 export function viewportSpanDeg(bounds: MapBounds): number {
     return Math.max(bounds.north - bounds.south, bounds.east - bounds.west)
+}
+
+/** Approximate visible bounds before the map `idle` event fires (zoom > CONUS fallback). */
+export function estimateBoundsFromCenterZoom(
+    center: { lat: number; lng: number },
+    zoom: number,
+): MapBounds {
+    const z = Math.max(4, Math.min(20, zoom))
+    const worldSpan = 360 / 2 ** z
+    const latSpan = worldSpan * 0.55
+    const lngSpan = worldSpan * Math.cos((center.lat * Math.PI) / 180)
+    return {
+        west: center.lng - lngSpan / 2,
+        east: center.lng + lngSpan / 2,
+        south: center.lat - latSpan / 2,
+        north: center.lat + latSpan / 2,
+    }
 }
 
 export function boundsCoveringRadiusM(bounds: MapBounds): number {
@@ -216,6 +234,25 @@ export function radiusSearchPlan(
     }
 }
 
+/** One Nearby Search per state centroid — fast nationwide coverage at country zoom. */
+export function nationwideStateCentroidPlan(): {
+    points: { lat: number; lng: number }[]
+    radiusM: number
+    spanDeg: number
+} {
+    const points: { lat: number; lng: number }[] = []
+    for (const stateCode of Object.keys(US_STATE_BBOX)) {
+        const bbox = getUsStateBbox(stateCode)
+        if (!bbox) continue
+        const [west, south, east, north] = bbox
+        points.push({
+            lat: (south + north) / 2,
+            lng: (west + east) / 2,
+        })
+    }
+    return { points, radiusM: PLACES_SEARCH_RADIUS_M, spanDeg: 30 }
+}
+
 /** Overlapping 50 km grid across the viewport — dense enough to show data without zooming in. */
 export function viewportSearchPlan(bounds: MapBounds): {
     points: { lat: number; lng: number }[]
@@ -223,6 +260,10 @@ export function viewportSearchPlan(bounds: MapBounds): {
     spanDeg: number
 } {
     const span = viewportSpanDeg(bounds)
+    if (span > 8) {
+        return nationwideStateCentroidPlan()
+    }
+
     const coverR = boundsCoveringRadiusM(bounds)
     const maxCells = maxGridCellsForSpan(span)
     const points = capGridPoints(buildStateSearchGrid(bounds), maxCells)
