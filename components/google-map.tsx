@@ -434,6 +434,8 @@ function GoogleMapInner({
     const stateMinZoomRef = useRef<number | null>(null)
     const coverageMinZoomRef = useRef<number | null>(null)
     const lastZoomRef = useRef<number | null>(null)
+    /** After initial fit or user pan, stop passing controlled center so data refreshes do not reset the view. */
+    const [releaseControlledViewport, setReleaseControlledViewport] = useState(false)
 
     const coverageMapBounds = useMemo((): MapStateBounds | null => {
         if (allowZoomOut || !lockToCoverage || !coverageCircle) return null
@@ -700,8 +702,10 @@ function GoogleMapInner({
             }
         } else if (allowZoomOut) {
             if (!stateBoundsFittedRef.current && fitStateOnLoad) {
-                fitBoundedView(map, stateBounds, () => {}, STATE_VIEW_FIT_PADDING)
-                stateBoundsFittedRef.current = true
+                fitBoundedView(map, stateBounds, () => {
+                    stateBoundsFittedRef.current = true
+                    setReleaseControlledViewport(true)
+                }, STATE_VIEW_FIT_PADDING)
             }
             map.setOptions({
                 restriction: null,
@@ -939,6 +943,34 @@ function GoogleMapInner({
         return mapCenter
     }, [stateBounds, coverageMapBounds, mapCenter])
 
+    const stateBoundsKey = stateBounds
+        ? `${stateBounds.west},${stateBounds.south},${stateBounds.east},${stateBounds.north}`
+        : ''
+
+    React.useEffect(() => {
+        setReleaseControlledViewport(false)
+    }, [stateBoundsKey])
+
+    // Sub-admin / demo maps: once the user pans, keep the viewport uncontrolled across parent re-renders.
+    React.useEffect(() => {
+        if (!map || !allowZoomOut) return
+
+        const releaseViewport = () => {
+            stateBoundsFittedRef.current = true
+            setReleaseControlledViewport(true)
+        }
+
+        const dragListener = map.addListener('dragend', releaseViewport)
+        return () => {
+            google.maps.event.removeListener(dragListener)
+        }
+    }, [map, allowZoomOut])
+
+    const useUncontrolledViewport = allowZoomOut && releaseControlledViewport
+    const googleMapCenter = useUncontrolledViewport ? undefined : mapDisplayCenter
+    const googleMapZoom =
+        useUncontrolledViewport || stateBounds || coverageMapBounds ? undefined : zoom
+
     if (loadError || authFailed) {
         return (
             <GoogleMapsUnavailable
@@ -955,8 +987,8 @@ function GoogleMapInner({
         <div className="w-full h-full min-h-[400px] rounded-xl overflow-hidden shadow-inner border border-slate-200 relative">
             <GoogleMapComponent
                 mapContainerStyle={containerStyle}
-                center={mapDisplayCenter}
-                zoom={stateBounds || coverageMapBounds ? undefined : zoom}
+                center={googleMapCenter}
+                zoom={googleMapZoom}
                 onLoad={onLoad}
                 onUnmount={onUnmount}
                 onClick={handleMapClick}
