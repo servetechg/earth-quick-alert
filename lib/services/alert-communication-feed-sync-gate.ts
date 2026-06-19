@@ -39,12 +39,14 @@ export async function syncAlertCommunicationFeedsGate(): Promise<void> {
     const feedFilter = unifiedEventFeedFilter();
     const hasLiveRows = !!(await UnifiedEvent.findOne(feedFilter).select('_id').lean());
     if (!hasLiveRows) {
-        await forceSyncAllAlertCommunicationFeedsNow();
-        if (process.env.UNIFIED_EVENT_HISTORICAL_ENABLED !== 'false') {
-            await syncAllHistoricalUnifiedEvents().catch((e) =>
-                console.error('[unified-historical:bootstrap]', e),
-            );
-        }
+        void (async () => {
+            await forceSyncAllAlertCommunicationFeedsNow();
+            if (process.env.UNIFIED_EVENT_HISTORICAL_ENABLED !== 'false') {
+                await syncAllHistoricalUnifiedEvents().catch((e) =>
+                    console.error('[unified-historical:bootstrap]', e),
+                );
+            }
+        })().catch((e) => console.error('[feed-sync-gate:cold-start]', e));
     } else {
         void Promise.all([syncNwsAlertsIfStale(), syncAllSourcesIfStale()])
             .catch((e) => console.error('[feed-sync-gate:stale]', e));

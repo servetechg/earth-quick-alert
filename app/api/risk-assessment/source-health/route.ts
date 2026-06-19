@@ -31,12 +31,16 @@ export async function GET(req: Request) {
             session.user.email as string,
         );
 
-        // Per-key probe: always fresh (no cache), returns as soon as that one probe resolves.
+        // Per-key probe: SWR-cached so reloads don't block on 5× sequential timeouts.
         if (keyParam && (LIVE_INPUT_KEYS as readonly string[]).includes(keyParam)) {
             if (demoCtx) {
                 return NextResponse.json({ sources: [{ key: keyParam, ok: true }] });
             }
-            const result = await probeSingleSource(keyParam);
+            const result = await getOrRevalidate(
+                `source-health:key:${keyParam}`,
+                () => probeSingleSource(keyParam),
+                { ttlMs: 120_000, staleMs: 300_000 },
+            );
             return NextResponse.json({ sources: [result] });
         }
 

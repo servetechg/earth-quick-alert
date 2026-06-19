@@ -11,7 +11,7 @@ const USER_AGENT =
   process.env.NWS_USER_AGENT ||
   'Ready2Go-EmergencyOps/1.0 (+https://localhost; ops@agency.local; source-health)';
 
-const PROBE_TIMEOUT_MS = 30_000;
+const PROBE_TIMEOUT_MS = 8_000;
 
 export interface SourceHealth {
   key: string;

@@ -1,4 +1,5 @@
 import connectDB from '@/lib/mongodb'
+import { cacheGetJson, cacheSetJson } from '@/lib/cache/cache-store'
 import {
     boundsFromStateCode,
     type InfrastructureSearchScope,
@@ -11,7 +12,7 @@ import IncidentReport from '@/models/IncidentReport'
 
 const NWS_BASE = 'https://api.weather.gov'
 const CACHE_TTL_MS = 5 * 60 * 1000
-const memoryCache = new Map<string, { expiresAt: number; closures: RoadClosureSegment[] }>()
+const ROAD_CLOSURE_PREFIX = 'roads:'
 
 function nwsHeaders(): HeadersInit {
     return {
@@ -380,11 +381,11 @@ async function fetchTomTomClosures(scope: InfrastructureSearchScope): Promise<Ro
 export async function fetchRoadClosures(
     scope: InfrastructureSearchScope,
 ): Promise<{ closures: RoadClosureSegment[]; sources: string[]; fetchedAt: string }> {
-    const key = scopeCacheKey(scope)
-    const cached = memoryCache.get(key)
-    if (cached && cached.expiresAt > Date.now()) {
+    const key = `${ROAD_CLOSURE_PREFIX}${scopeCacheKey(scope)}`
+    const cached = await cacheGetJson<RoadClosureSegment[]>(key)
+    if (cached) {
         return {
-            closures: cached.closures,
+            closures: cached,
             sources: configuredSources(),
             fetchedAt: new Date().toISOString(),
         }
@@ -406,7 +407,7 @@ export async function fetchRoadClosures(
     }
 
     const closures = [...byId.values()]
-    memoryCache.set(key, { expiresAt: Date.now() + CACHE_TTL_MS, closures })
+    await cacheSetJson(key, closures, CACHE_TTL_MS)
 
     return { closures, sources, fetchedAt: new Date().toISOString() }
 }

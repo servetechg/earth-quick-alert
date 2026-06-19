@@ -2,10 +2,9 @@ import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import dbConnect from '@/lib/mongodb';
 import { resolveRiskIngestScopeForSession } from '@/lib/risk-assessment/resolve-ingest-scope';
-import { resolveDemoSessionContext, buildDemoSummaryResponse } from '@/lib/demo/provider';
+import { resolveDemoSessionContext } from '@/lib/demo/provider';
 import { getOrRevalidate } from '@/lib/services/risk-report-cache';
 import {
-    buildLiteRiskSummary,
     buildRiskSummaryEnrichment,
     loadAlignedEventsForRiskSummary,
 } from '@/lib/services/risk-summary-builder';
@@ -14,9 +13,6 @@ const ALLOWED_ROLES = new Set([
     'admin', 'super-admin', 'sub-admin', 'eoc-manager',
     'eoc-observer', 'manager', 'responder', 'observer',
 ]);
-
-const LITE_CACHE_OPTS = { ttlMs: 300_000, staleMs: 900_000 };
-const FULL_CACHE_OPTS = { ttlMs: 300_000, staleMs: 900_000 };
 
 export async function GET(req: Request) {
     try {
@@ -32,14 +28,19 @@ export async function GET(req: Request) {
             session.user.email as string,
         );
         if (demoCtx) {
-            return NextResponse.json(buildDemoSummaryResponse());
+            return NextResponse.json({
+                populations_at_risk: 0,
+                ready2go_users_at_risk: 0,
+                population_exposure: null,
+                population_at_risk_users: [],
+                critical_infrastructure_at_risk: [],
+            });
         }
 
         const url = new URL(req.url);
         const bodyStateCd = url.searchParams.get('stateCd') ?? undefined;
         const bodyNationwide = url.searchParams.get('nationwide') !== 'false';
         const forceRefresh = url.searchParams.get('refresh') === '1';
-        const lite = url.searchParams.get('lite') === '1';
 
         const scope = await resolveRiskIngestScopeForSession(
             role,
@@ -47,35 +48,31 @@ export async function GET(req: Request) {
             { nationwide: bodyNationwide, stateCd: bodyStateCd },
         );
 
-        const userId = session.user.id as string | undefined;
-        const cacheKey = lite
-            ? `${userId}:${scope.stateCd}:summary-lite-v1`
-            : `${userId}:${scope.stateCd}:aligned-v11-ci-parallel`;
+        const cacheKey = `${session.user.id}:${scope.stateCd}:summary-enrichment-v1`;
 
-        const cacheOpts = lite ? LITE_CACHE_OPTS : FULL_CACHE_OPTS;
-
-        const response = await getOrRevalidate(
+        const enrichment = await getOrRevalidate(
             cacheKey,
             async () => {
-                const { docs, cards } = await loadAlignedEventsForRiskSummary({ userId, role });
-
-                if (lite) {
-                    return buildLiteRiskSummary({ userId, role, events: docs, alignedCards: cards });
-                }
-
-                const [liteSummary, enrichment] = await Promise.all([
-                    buildLiteRiskSummary({ userId, role, events: docs, alignedCards: cards }),
-                    buildRiskSummaryEnrichment({ userId, role, scope, alignedCards: cards }),
-                ]);
-
-                return { ...liteSummary, ...enrichment };
+                const { cards } = await loadAlignedEventsForRiskSummary({
+                    userId: session.user.id as string | undefined,
+                    role,
+                });
+                return buildRiskSummaryEnrichment({
+                    userId: session.user.id as string | undefined,
+                    role,
+                    scope,
+                    alignedCards: cards,
+                });
             },
-            { ...cacheOpts, force: forceRefresh },
+            { force: forceRefresh, ttlMs: 300_000, staleMs: 900_000 },
         );
 
-        return NextResponse.json(response);
+        return NextResponse.json(enrichment);
     } catch (e: any) {
-        console.error('risk-assessment/summary:', e);
-        return NextResponse.json({ error: 'Failed to compute summary', message: e?.message }, { status: 500 });
+        console.error('risk-assessment/summary-enrichment:', e);
+        return NextResponse.json(
+            { error: 'Failed to compute enrichment', message: e?.message },
+            { status: 500 },
+        );
     }
 }

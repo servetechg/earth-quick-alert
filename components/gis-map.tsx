@@ -58,6 +58,11 @@ import {
   zoneLabelPosition,
 } from '@/lib/demo/disaster-zones-lrk'
 import type { MapDisasterZoneCircleSpec } from '@/components/google-map'
+import {
+  useInfrastructurePlaces,
+  useRoadClosures,
+  useSituationalMap,
+} from '@/lib/hooks/admin-map-queries'
 
 type GisMapTab = 'Citizens' | 'Responders' | 'Leaders'
 
@@ -372,20 +377,24 @@ export function GISMap({
     [isDemoSimulation, activeTab],
   )
 
-  useEffect(() => {
-    let cancelled = false
+  const situationalEnabled = stateScoped || showLayersPanel || unifiedMapFeed
+  const situationalQuery = useSituationalMap({
+    enabled: situationalEnabled,
+    scopeState,
+  })
 
-    async function fetchSituational() {
-      if (!stateScoped && !showLayersPanel && !unifiedMapFeed) return
-      setSituationalLoading(true)
-      try {
-        const qs = scopeState?.trim()
-          ? `?scopeState=${encodeURIComponent(scopeState.trim())}`
-          : ''
-        const res = await fetch(`/api/admin/situational-map${qs}`)
-        if (!res.ok) return
-        const data = await res.json()
-        if (cancelled) return
+  useEffect(() => {
+    setSituationalLoading(situationalQuery.isFetching)
+    if (situationalQuery.isSuccess && (unifiedMapFeed || stateScoped)) {
+      setIsLoading(false)
+    }
+  }, [situationalQuery.isFetching, situationalQuery.isSuccess, unifiedMapFeed, stateScoped])
+
+  useEffect(() => {
+    const data = situationalQuery.data
+    if (!data || !situationalEnabled) return
+
+    try {
         setScenarioDemo(data.demo === true)
         const incidents = Array.isArray(data.incidents) ? data.incidents : []
         setUnifiedIncidents(
@@ -600,27 +609,23 @@ export function GISMap({
             })
             setMapZoom(10)
           }
-        } else {
-          setTornadoPathPoints([])
-          setTornadoPolylines([])
-        }
-      } catch (e) {
-        console.error('Situational map feed:', e)
-      } finally {
-        if (!cancelled) {
-          setSituationalLoading(false)
-          if (unifiedMapFeed || stateScoped) setIsLoading(false)
-        }
+      } else {
+        setTornadoPathPoints([])
+        setTornadoPolylines([])
       }
+    } catch (e) {
+      console.error('Situational map feed:', e)
     }
-
-    void fetchSituational()
-    const interval = setInterval(fetchSituational, 60_000)
-    return () => {
-      cancelled = true
-      clearInterval(interval)
-    }
-  }, [showLayersPanel, stateScoped, unifiedMapFeed, scopeState, restrictToUsa, focusState])
+  }, [
+    situationalQuery.data,
+    situationalEnabled,
+    showLayersPanel,
+    stateScoped,
+    unifiedMapFeed,
+    scopeState,
+    restrictToUsa,
+    focusState,
+  ])
 
   useEffect(() => {
     if (stateScoped || unifiedMapFeed) return
@@ -856,6 +861,31 @@ export function GISMap({
     isDemoSimulation,
   ])
 
+  const infraPlacesQuery = useInfrastructurePlaces({
+    enabled:
+      !isDemoSimulation &&
+      enabledGisFilterLayerIds.length > 0 &&
+      Boolean(infraFetchBounds) &&
+      viewportInUsa,
+    layers: enabledGisFilterLayerIds,
+    bounds: infraFetchBounds,
+    scopeState: scopeState?.trim() || undefined,
+  })
+
+  const roadFetchBounds = useMemo(
+    () =>
+      clampFetchBounds(
+        mapViewportBounds ?? stateBoundsRestriction ?? mapStateBounds ?? null,
+      ),
+    [mapViewportBounds, stateBoundsRestriction, mapStateBounds, clampFetchBounds],
+  )
+
+  const roadClosuresQuery = useRoadClosures({
+    enabled: mapLayers.roads && viewportInUsa,
+    bounds: roadFetchBounds,
+    scopeState: scopeState?.trim() || undefined,
+  })
+
   const infraFetchScopeKey = useMemo(() => {
     if (infraFetchBounds) {
       const b = infraFetchBounds
@@ -958,207 +988,120 @@ export function GISMap({
     [enabledGisFilterLayerIds, inUsaView, markerInCoverage],
   )
 
-  // Google Places — grid search with backend cache; merge markers as the map moves
+  // Infrastructure layers — TanStack Query + backend Redis/Mongo cache
   useEffect(() => {
-    let cancelled = false
-
-    if (enabledGisFilterLayerIds.length === 0 || !infraFetchBounds || !viewportInUsa) {
-      if (!viewportInUsa && restrictToUsa) {
-        infraCacheRef.current.clear()
-        setCacheTrigger((t) => t + 1)
-      }
-      return
+    if (!viewportInUsa && restrictToUsa) {
+      infraCacheRef.current.clear()
+      setCacheTrigger((t) => t + 1)
     }
+  }, [viewportInUsa, restrictToUsa])
 
-    async function fetchScopedInfra() {
-      if (infraTypesKeyRef.current !== infraTypesKey) {
-        infraCacheRef.current.clear()
-        infraTypesKeyRef.current = infraTypesKey
-      }
-      infraScopeKeyRef.current = infraFetchScopeKey
-
-      setIsSearchingInfra(true)
-      try {
-        if (isDemoSimulation) {
-          const layerDefs = enabledGisFilterLayerIds
-            .map((id) => gisFilterLayerById(id))
-            .filter((layer): layer is GisFilterLayerDef => Boolean(layer))
-          const results = filterDemoGisFilterPlaces(layerDefs, {
-            stateCode: coverageMeta?.stateCode ?? licensedStateHint ?? 'AR',
-          })
-          if (!cancelled) {
-            applyDemoInfraToCache(results, { skipCoverageFilter: true })
-          }
-          return
-        }
-
-        const body: Record<string, unknown> = {
-          layers: enabledGisFilterLayerIds,
-          bounds: infraFetchBounds,
-        }
-        if (scopeState?.trim()) {
-          body.scopeState = scopeState.trim()
-        }
-
-        const res = await fetch('/api/admin/infrastructure-places', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify(body),
-        })
-
-        if (!res.ok || cancelled) return
-
-        const data = await res.json()
-        const results = Array.isArray(data.results) ? data.results : []
-
-        if (!cancelled) {
-          applyDemoInfraToCache(results)
-        }
-      } catch (error) {
-        console.warn('Scoped infra search error:', error)
-      } finally {
-        if (!cancelled) {
-          setIsSearchingInfra(false)
-        }
-      }
+  useEffect(() => {
+    if (infraTypesKeyRef.current !== infraTypesKey) {
+      infraCacheRef.current.clear()
+      infraTypesKeyRef.current = infraTypesKey
     }
+    infraScopeKeyRef.current = infraFetchScopeKey
+  }, [infraTypesKey, infraFetchScopeKey])
 
-    const timer = window.setTimeout(() => {
-      void fetchScopedInfra()
-    }, 500)
+  useEffect(() => {
+    if (!isDemoSimulation) return
+    if (enabledGisFilterLayerIds.length === 0 || !infraFetchBounds || !viewportInUsa) return
 
-    return () => {
-      cancelled = true
-      window.clearTimeout(timer)
-    }
+    const layerDefs = enabledGisFilterLayerIds
+      .map((id) => gisFilterLayerById(id))
+      .filter((layer): layer is GisFilterLayerDef => Boolean(layer))
+    const results = filterDemoGisFilterPlaces(layerDefs, {
+      stateCode: coverageMeta?.stateCode ?? licensedStateHint ?? 'AR',
+    })
+    applyDemoInfraToCache(results, { skipCoverageFilter: true })
   }, [
-    enabledGisFilterLayerIds,
-    infraFetchScopeKey,
-    infraTypesKey,
-    markerInCoverage,
-    infraFetchBounds,
-    inUsaView,
-    viewportInUsa,
-    restrictToUsa,
     isDemoSimulation,
+    enabledGisFilterLayerIds,
+    infraFetchBounds,
+    viewportInUsa,
     applyDemoInfraToCache,
     coverageMeta?.stateCode,
     licensedStateHint,
   ])
 
   useEffect(() => {
-    let cancelled = false
+    if (isDemoSimulation) return
+    if (!infraPlacesQuery.data) return
+    applyDemoInfraToCache(infraPlacesQuery.data)
+  }, [isDemoSimulation, infraPlacesQuery.data, applyDemoInfraToCache])
 
+  useEffect(() => {
+    if (isDemoSimulation) {
+      setIsSearchingInfra(false)
+      return
+    }
+    setIsSearchingInfra(infraPlacesQuery.isFetching)
+  }, [isDemoSimulation, infraPlacesQuery.isFetching])
+
+  useEffect(() => {
     if (!mapLayers.roads || !viewportInUsa) {
       if (!viewportInUsa) setRoadClosurePolylines([])
       return
     }
 
-    async function fetchRoadClosures() {
-      setIsLoadingRoadClosures(true)
-      try {
-        const body: Record<string, unknown> = {}
-        if (scopeState?.trim()) {
-          body.scopeState = scopeState.trim()
-        }
-        const bounds = clampFetchBounds(
-          mapViewportBounds ?? stateBoundsRestriction ?? mapStateBounds ?? null,
+    const closures = roadClosuresQuery.data ?? []
+    const polylines: MapPolylineSpec[] = []
+    for (const raw of closures) {
+      const path = Array.isArray(raw.path)
+        ? raw.path.filter(
+            (p: { lat?: number; lng?: number }) =>
+              Number.isFinite(p.lat) && Number.isFinite(p.lng),
+          )
+        : []
+      if (path.length < 2) continue
+      if (
+        restrictToUsa &&
+        !path.some((p: { lat?: number; lng?: number }) =>
+          inUsaView(p.lat as number, p.lng as number),
         )
-        if (bounds) {
-          body.bounds = bounds
-        }
-
-        const res = await fetch('/api/admin/road-closures', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify(body),
-        })
-
-        if (!res.ok || cancelled) return
-
-        const data = await res.json()
-        const closures = Array.isArray(data.closures) ? data.closures : []
-
-        const polylines: MapPolylineSpec[] = []
-        for (const raw of closures) {
-          const path = Array.isArray(raw.path)
-            ? raw.path.filter(
-                (p: { lat?: number; lng?: number }) =>
-                  Number.isFinite(p.lat) && Number.isFinite(p.lng),
-              )
-            : []
-          if (path.length < 2) continue
-          if (restrictToUsa && !path.some((p: { lat?: number; lng?: number }) => inUsaView(p.lat as number, p.lng as number))) {
-            continue
-          }
-
-          const status = String(raw.status ?? 'Unknown')
-          const strokeColor =
-            status === 'Closed'
-              ? '#DC2626'
-              : status === 'Restricted'
-                ? '#F59E0B'
-                : '#EAB308'
-
-          polylines.push({
-            id: `closure-shadow-${String(raw.id)}`,
-            path,
-            strokeColor: '#7F1D1D',
-            strokeWeight: 11,
-            strokeOpacity: 0.35,
-            kind: 'road_closure',
-          })
-          polylines.push({
-            id: String(raw.id),
-            path,
-            strokeColor,
-            strokeWeight: 7,
-            strokeOpacity: 0.92,
-            kind: 'road_closure',
-            label: String(raw.roadName ?? 'Road closure'),
-            closure: {
-              roadName: String(raw.roadName ?? 'Road closure'),
-              status,
-              reason: raw.reason ? String(raw.reason) : undefined,
-              startLocation: raw.startLocation ? String(raw.startLocation) : undefined,
-              endLocation: raw.endLocation ? String(raw.endLocation) : undefined,
-              updatedAt: raw.updatedAt ? String(raw.updatedAt) : undefined,
-              source: raw.source ? String(raw.source) : undefined,
-            },
-          })
-        }
-
-        if (!cancelled) {
-          setRoadClosurePolylines(polylines)
-        }
-      } catch (error) {
-        console.warn('Road closures fetch error:', error)
-        if (!cancelled) setRoadClosurePolylines([])
-      } finally {
-        if (!cancelled) setIsLoadingRoadClosures(false)
+      ) {
+        continue
       }
+
+      const status = String(raw.status ?? 'Unknown')
+      const strokeColor =
+        status === 'Closed' ? '#DC2626' : status === 'Restricted' ? '#F59E0B' : '#EAB308'
+
+      polylines.push({
+        id: `closure-shadow-${String(raw.id)}`,
+        path,
+        strokeColor: '#7F1D1D',
+        strokeWeight: 11,
+        strokeOpacity: 0.35,
+        kind: 'road_closure',
+      })
+      polylines.push({
+        id: String(raw.id),
+        path,
+        strokeColor,
+        strokeWeight: 7,
+        strokeOpacity: 0.92,
+        kind: 'road_closure',
+        label: String(raw.roadName ?? 'Road closure'),
+        closure: {
+          roadName: String(raw.roadName ?? 'Road closure'),
+          status,
+          reason: raw.reason ? String(raw.reason) : undefined,
+          startLocation: raw.startLocation ? String(raw.startLocation) : undefined,
+          endLocation: raw.endLocation ? String(raw.endLocation) : undefined,
+          updatedAt: raw.updatedAt ? String(raw.updatedAt) : undefined,
+          source: raw.source ? String(raw.source) : undefined,
+        },
+      })
     }
 
-    void fetchRoadClosures()
-    const interval = window.setInterval(fetchRoadClosures, 5 * 60 * 1000)
+    setRoadClosurePolylines(polylines)
+  }, [mapLayers.roads, roadClosuresQuery.data, restrictToUsa, inUsaView, viewportInUsa])
 
-    return () => {
-      cancelled = true
-      window.clearInterval(interval)
-    }
-  }, [
-    mapLayers.roads,
-    scopeState,
-    mapViewportBounds,
-    stateBoundsRestriction,
-    mapStateBounds,
-    clampFetchBounds,
-    restrictToUsa,
-    inUsaView,
-    viewportInUsa,
-  ])
+  useEffect(() => {
+    setIsLoadingRoadClosures(roadClosuresQuery.isFetching)
+  }, [roadClosuresQuery.isFetching])
 
   const operationalAlertLayersKey = useMemo(() => {
     const keys = ['weather', 'risk', 'flood'].filter((id) => mapLayers[id])

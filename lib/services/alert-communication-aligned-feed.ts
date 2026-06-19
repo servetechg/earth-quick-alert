@@ -202,6 +202,18 @@ export async function fetchAlignedUnifiedEventFeed(options: {
     return entry.cards;
 }
 
+/** Single load for docs + legacy cards (summary / enrichment — avoids duplicate DB reads). */
+export async function loadAlignedUnifiedEventBundle(options: {
+    userId?: string;
+    role: string;
+    syncFeeds?: boolean;
+}): Promise<FeedCacheEntry> {
+    return loadAlignedUnifiedEvents({
+        ...options,
+        syncFeeds: options.syncFeeds ?? false,
+    });
+}
+
 /** @deprecated Use `fetchAlignedUnifiedEventFeed` */
 export const fetchAlignedAlertCommunicationFeed = fetchAlignedUnifiedEventFeed;
 

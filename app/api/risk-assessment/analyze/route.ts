@@ -142,7 +142,7 @@ export async function POST(req: Request) {
             populationAtRiskRows,
             jurisdiction,
         );
-        setPopulationAtRiskCache(
+        await setPopulationAtRiskCache(
             buildPopulationAtRiskCacheKey(session.user.id as string, stateCd),
             usersAtRiskList,
         );

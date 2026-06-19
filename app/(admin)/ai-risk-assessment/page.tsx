@@ -526,6 +526,20 @@ function ready2goUsersAtRisk(summary: RiskSummaryPayload): number {
   return summary.ready2go_users_at_risk ?? summary.population_at_risk_users?.length ?? 0;
 }
 
+async function fetchSummaryEnrichment(scopeQuery: string): Promise<Partial<RiskSummaryPayload>> {
+  const res = await fetch(`/api/risk-assessment/summary-enrichment?${scopeQuery}`);
+  if (!res.ok) return {};
+  return res.json() as Promise<Partial<RiskSummaryPayload>>;
+}
+
+function mergeSummaryEnrichment(
+  summary: RiskSummaryPayload,
+  enrichment: Partial<RiskSummaryPayload>,
+): RiskSummaryPayload {
+  if (!enrichment || Object.keys(enrichment).length === 0) return summary;
+  return { ...summary, ...enrichment };
+}
+
 // ─── PopulationAtRiskDialog ───────────────────────────────────────────────────
 
 function PopulationAtRiskDialog({
@@ -1222,6 +1236,13 @@ function HistoricalAnalysisSection({
 
   const currentTab = activeTab && activeCategories.includes(activeTab) ? activeTab : (activeCategories[0] ?? null);
 
+  useEffect(() => {
+    if (!currentTab) return;
+    if (tabDataMap.has(currentTab) || loadingCategories.has(currentTab)) return;
+    if (currentTab === activeCategories[0]) return;
+    retryCategory(currentTab);
+  }, [currentTab, activeCategories, tabDataMap, loadingCategories, retryCategory]);
+
   if (!activeCategories.length) return null;
 
   return (
@@ -1761,38 +1782,43 @@ export default function RiskAssessment() {
     setLoadingCategories(new Set());
 
     try {
-      // Stage 1: summary (deterministic, fast). Explicit Generate always forces fresh data,
-      // bypassing the server SWR cache so the user sees a genuine re-pull, not a cached snapshot.
       const qs = new URLSearchParams();
       if (scopeBody.stateCd) qs.set("stateCd", scopeBody.stateCd as string);
       if (scopeBody.nationwide === false) qs.set("nationwide", "false");
-      qs.set("refresh", "1");
-      const summaryRes = await fetch(`/api/risk-assessment/summary?${qs}`);
+
+      const summaryRes = await fetch(`/api/risk-assessment/summary?lite=1&${qs}`);
       if (!summaryRes.ok) throw new Error("Summary request failed");
       let summaryData: RiskSummaryPayload = await summaryRes.json();
-
-      if (summaryMissingPopulationUsers(summaryData)) {
-        const users = await fetchPopulationAtRiskUsers(qs.toString());
-        summaryData = withPopulationAtRiskUsers(summaryData, users);
-      }
 
       setSummary(summaryData);
       setLoadingSummary(false);
 
       const activeCategories = summaryData.active_categories ?? [];
+      const enrichmentPromise = fetchSummaryEnrichment(qs.toString())
+        .then((enrichment) => {
+          setSummary((prev) => (prev ? mergeSummaryEnrichment(prev, enrichment) : prev));
+          return enrichment;
+        })
+        .catch(() => ({} as Partial<RiskSummaryPayload>));
+
       if (!activeCategories.length) {
         setLoadingSeverity(false);
+        await enrichmentPromise;
+        toast.success("AI Risk Assessment generated.", {
+          description: `${summaryData.alerts_count} active incident(s).`,
+        });
         return;
       }
 
-      // Stages 2 + 3 in parallel: severity summaries + historical tabs (all forced fresh)
-      const [sevRes] = await Promise.all([
+      const firstCat = activeCategories[0];
+      const [sevRes, , enrichment] = await Promise.all([
         fetch("/api/risk-assessment/severity-summaries", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...scopeBody, forceRefresh: true }),
+          body: JSON.stringify({ ...scopeBody, forceRefresh: false }),
         }),
-        ...activeCategories.map((cat) => fetchHistoricalCategory(cat, { force: true })),
+        fetchHistoricalCategory(firstCat, { force: false }),
+        enrichmentPromise,
       ]);
 
       if (sevRes.ok) {
@@ -1800,6 +1826,12 @@ export default function RiskAssessment() {
         setSeverityBuckets(sevData.buckets ?? []);
       }
       setLoadingSeverity(false);
+
+      const merged = mergeSummaryEnrichment(summaryData, enrichment ?? {});
+      if (summaryMissingPopulationUsers(merged)) {
+        const users = await fetchPopulationAtRiskUsers(qs.toString());
+        setSummary((prev) => (prev ? withPopulationAtRiskUsers(prev, users) : prev));
+      }
 
       toast.success("AI Risk Assessment generated.", {
         description: `${summaryData.alerts_count} active incident(s) across ${activeCategories.length} category type(s).`,
