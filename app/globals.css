@@ -161,3 +161,12 @@ html, body, #__next {
   z-index: 9999 !important;
   pointer-events: auto !important;
 }
+
+/* Leaflet situational map — custom divIcon markers */
+.situational-map-pin,
+.situational-map-glyph-icon,
+.situational-map-cluster,
+.leaflet-div-icon.dz-label {
+  background: transparent !important;
+  border: none !important;
+}

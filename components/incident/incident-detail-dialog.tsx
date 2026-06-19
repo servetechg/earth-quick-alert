@@ -258,6 +258,8 @@ export type IncidentDetailDialogProps = {
   onOpenChange: (open: boolean) => void
   eventIds: string[]
   bulletText: string
+  /** Render above Leaflet map layers (use on GIS / heatmap maps). */
+  elevated?: boolean
 }
 
 /** AI incident summary dialog — same UX as AI Risk Assessment “Learn more”. */
@@ -266,6 +268,7 @@ export function IncidentDetailDialog({
   onOpenChange,
   eventIds,
   bulletText,
+  elevated = false,
 }: IncidentDetailDialogProps) {
   const [groups, setGroups] = useState<EventGroupSummary[]>([])
   const [loading, setLoading] = useState(false)
@@ -358,7 +361,7 @@ export function IncidentDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[88vh] overflow-y-auto">
+      <DialogContent elevated={elevated} className="max-w-2xl max-h-[88vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-base font-extrabold text-slate-800 flex items-center gap-2">
             <BookOpen className="h-4 w-4 text-[#33375D]" />
