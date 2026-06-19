@@ -7,7 +7,7 @@ import { Card } from '@/components/ui/card'
 import dynamic from 'next/dynamic'
 import { cn } from '@/lib/utils'
 
-import { GoogleMap } from '@/components/google-map'
+import { SituationalLeafletMap } from '@/components/situational-leaflet-map'
 
 interface GISEOCActivatedModalProps {
   isOpen: boolean
@@ -110,7 +110,7 @@ export function GISEOCActivatedModal({ isOpen, onClose }: GISEOCActivatedModalPr
 
           {/* Map Container */}
           <div className="w-full h-[380px] rounded-2xl overflow-hidden border border-slate-100 shadow-inner relative group">
-            <GoogleMap
+            <SituationalLeafletMap
               center={{ lat: 41.8781, lng: -87.6298 }}
               zoom={13}
               markers={[

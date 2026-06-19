@@ -1,8 +1,15 @@
 /**
- * Shared Google Maps configuration to prevent "Loader must not be called again with different options" error.
+ * Google Maps / Places configuration (Autocomplete + license preview maps only).
  *
- * Client map components require NEXT_PUBLIC_GOOGLE_MAPS_API_KEY in .env
- * (GOOGLE_MAPS_API_KEY alone is server-only and is not sent to the browser).
+ * The admin GIS situational map uses OpenStreetMap + Leaflet — it does NOT load
+ * the Google Maps JavaScript API. Keep NEXT_PUBLIC_GOOGLE_MAPS_API_KEY set for:
+ * - Address Autocomplete (Places) in license modals, signup, responder deployment
+ * - Optional small GoogleMap previews inside those forms
+ *
+ * Restrict the API key in Google Cloud Console to Places API (+ Geocoding if used
+ * server-side for licenses) and omit Maps JavaScript API if you want zero map tile billing.
+ *
+ * AI Risk critical infrastructure uses free HIFLD/ArcGIS layers — not Google Places.
  */
 
 export const GOOGLE_MAPS_API_KEY =
@@ -16,4 +23,4 @@ export function isGoogleMapsConfigured(): boolean {
 
 export const GOOGLE_MAPS_LIBRARIES: ("places" | "drawing" | "geometry")[] = ["places"];
 
-export const GOOGLE_MAPS_LOADER_ID = "google-map-script";
+export const GOOGLE_MAPS_LOADER_ID = 'google-places-autocomplete-script';

@@ -10,9 +10,9 @@ import {
     type CriticalInfraSectorId,
 } from '@/lib/gis/critical-infrastructure-sectors';
 import {
-    fetchGoogleCriticalInfraMarkers,
-    type CiGoogleSearchScope,
-} from '@/lib/gis/critical-infra-google-fetch';
+    fetchHifldCriticalInfraMarkers,
+    type CiInfraSearchScope,
+} from '@/lib/gis/critical-infra-hifld-fetch';
 import { parseMapBounds } from '@/lib/gis/map-api-bounds';
 import {
     clampBoundsToUsa,
@@ -30,7 +30,7 @@ function resolveSearchScope(input: {
     lat?: number;
     lng?: number;
     radius?: number;
-}): CiGoogleSearchScope | null {
+}): CiInfraSearchScope | null {
     if (input.bounds) {
         return { mode: 'bounds', bounds: input.bounds };
     }
@@ -100,7 +100,7 @@ export async function GET(req: Request) {
                     markers: [],
                     demo: false,
                     scope: 'bounds',
-                    source: 'google_places',
+                    source: 'hifld',
                 });
             }
             return NextResponse.json(
@@ -112,7 +112,7 @@ export async function GET(req: Request) {
             );
         }
 
-        let markers = await fetchGoogleCriticalInfraMarkers(requestedSectors, scope);
+        let markers = await fetchHifldCriticalInfraMarkers(requestedSectors, scope);
         if (isSuperAdminNationwideView(role)) {
             markers = filterLatLngInUsa(markers);
         }
@@ -121,7 +121,7 @@ export async function GET(req: Request) {
             markers,
             demo: false,
             scope: scope.mode,
-            source: 'google_places',
+            source: 'hifld',
         });
     } catch (error) {
         console.error('critical-infrastructure error:', error);
@@ -186,7 +186,7 @@ export async function POST(req: Request) {
                     markers: [],
                     demo: false,
                     scope: 'bounds',
-                    source: 'google_places',
+                    source: 'hifld',
                 });
             }
             return NextResponse.json(
@@ -195,7 +195,7 @@ export async function POST(req: Request) {
             );
         }
 
-        let markers = await fetchGoogleCriticalInfraMarkers(requestedSectors, scope);
+        let markers = await fetchHifldCriticalInfraMarkers(requestedSectors, scope);
         if (isSuperAdminNationwideView(role)) {
             markers = filterLatLngInUsa(markers);
         }
@@ -204,7 +204,7 @@ export async function POST(req: Request) {
             markers,
             demo: false,
             scope: scope.mode,
-            source: 'google_places',
+            source: 'hifld',
         });
     } catch (error) {
         console.error('critical-infrastructure POST error:', error);
