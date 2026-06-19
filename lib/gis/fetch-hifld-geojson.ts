@@ -1,4 +1,5 @@
 import type { MapBounds } from '@/lib/gis/infrastructure-search-grid'
+import { cacheGetJson, cacheSetJson } from '@/lib/cache/cache-store'
 import {
   boundsToEnvelope,
   featureCentroid,
@@ -22,7 +23,7 @@ export interface HifldMapFeature {
 }
 
 const CACHE_TTL_MS = 5 * 60 * 1000
-const cache = new Map<string, { expiresAt: number; features: HifldMapFeature[] }>()
+const HIFLD_PREFIX = 'hifld:'
 
 function cacheKey(layerUrl: string, where: string, bounds: MapBounds | null): string {
   const b = bounds
@@ -78,9 +79,9 @@ export async function fetchHifldLayerFeatures(
   const bounds = opts?.bounds ?? null
   const limit = opts?.limit ?? 500
   const where = layer.where?.trim() || '1=1'
-  const key = cacheKey(layer.layerUrl, where, bounds)
-  const hit = cache.get(key)
-  if (hit && hit.expiresAt > Date.now()) return hit.features
+  const key = `${HIFLD_PREFIX}${cacheKey(layer.layerUrl, where, bounds)}`
+  const hit = await cacheGetJson<HifldMapFeature[]>(key)
+  if (hit) return hit
 
   const url = buildQueryUrl(layer, bounds, limit)
   const res = await fetch(url, {
@@ -126,7 +127,7 @@ export async function fetchHifldLayerFeatures(
     })
   }
 
-  cache.set(key, { expiresAt: Date.now() + CACHE_TTL_MS, features })
+  await cacheSetJson(key, features, CACHE_TTL_MS)
   return features
 }
 

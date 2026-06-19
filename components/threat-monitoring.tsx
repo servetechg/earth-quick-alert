@@ -151,11 +151,10 @@ export function ThreatMonitoring({ locationName }: ThreatMonitoringProps) {
         }
     }, [affectedAreaLabel])
 
-    // Probe each live feed independently on every mount so results appear as each one resolves
-    // rather than waiting for the slowest feed. Each key gets its own fresh server-side probe
-    // (no cache, up to 30 s per probe) so the UI is always current on page reload.
+    // Defer live-input probes until after the threat KPI row loads so summary isn't competing.
     useEffect(() => {
         let cancelled = false
+        let deferTimer: ReturnType<typeof setTimeout> | null = null
 
         const probeOne = async (key: string) => {
             try {
@@ -177,13 +176,17 @@ export function ThreatMonitoring({ locationName }: ThreatMonitoringProps) {
             }
         }
 
-        // Fire all 5 in parallel; each updates state the moment it resolves.
-        LIVE_INPUT_KEYS.forEach((key) => { void probeOne(key) })
+        const startProbes = () => {
+            LIVE_INPUT_KEYS.forEach((key) => { void probeOne(key) })
+        }
+
+        deferTimer = setTimeout(startProbes, row ? 0 : 1500)
 
         return () => {
             cancelled = true
+            if (deferTimer !== null) clearTimeout(deferTimer)
         }
-    }, [])
+    }, [row])
 
     // Reveal the four AI metrics sequentially the first time data arrives; instant on later refines.
     useEffect(() => {
@@ -197,10 +200,7 @@ export function ThreatMonitoring({ locationName }: ThreatMonitoringProps) {
             return
         }
         revealedOnceRef.current = true
-        const timers = Array.from({ length: 4 }, (_, i) =>
-            setTimeout(() => setRevealCount(i + 1), (i + 1) * 120),
-        )
-        return () => timers.forEach(clearTimeout)
+        setRevealCount(4)
     }, [row])
 
     // Single fast fetch: deterministic KPIs from the DB-backed /summary endpoint. The card
@@ -229,12 +229,12 @@ export function ThreatMonitoring({ locationName }: ThreatMonitoringProps) {
 
             const alive = () => mountedRef.current
             const ctrl = new AbortController()
-            const timeout = setTimeout(() => ctrl.abort(), 15000)
+            const timeout = setTimeout(() => ctrl.abort(), 8000)
 
             try {
                 const sumUrl = force
-                    ? '/api/risk-assessment/summary?refresh=1'
-                    : '/api/risk-assessment/summary'
+                    ? '/api/risk-assessment/summary?lite=1&refresh=1'
+                    : '/api/risk-assessment/summary?lite=1'
                 const sumRes = await fetch(sumUrl, { credentials: 'same-origin', signal: ctrl.signal }).catch(() => null)
                 if (sumRes && sumRes.ok) {
                     const sumJson = await sumRes.json().catch(() => ({}))

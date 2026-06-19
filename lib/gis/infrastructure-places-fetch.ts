@@ -13,10 +13,12 @@ import type { GisFilterLayerDef } from '@/lib/gis/gis-filter-layers'
 import { GOOGLE_MAPS_API_KEY } from '@/lib/constants/google-maps-config'
 import { pointInUsStateBBox } from '@/lib/constants/us-state-bounding-boxes'
 import { calculateDistance } from '@/lib/services/mock-map-service'
-import InfrastructurePlaceGridCache, {
-    type CachedInfrastructurePlace,
-} from '@/models/InfrastructurePlaceGridCache'
-import connectDB from '@/lib/mongodb'
+import type { CachedInfrastructurePlace } from '@/models/InfrastructurePlaceGridCache'
+import {
+    loadGridCellFromCache,
+    saveGridCellToCache,
+} from '@/lib/gis/infrastructure-grid-cache'
+import { cacheGetJson, cacheSetJson } from '@/lib/cache/cache-store'
 import { rankPlacesForViewport } from '@/lib/gis/viewport-place-ranking'
 
 export type InfrastructurePlaceResult = {
@@ -31,7 +33,6 @@ export type InfrastructurePlaceResult = {
 }
 
 const FETCH_CONCURRENCY = 10
-const GRID_CACHE_TTL_MS = 24 * 60 * 60 * 1000
 const MEMORY_CACHE_TTL_MS = 10 * 60 * 1000
 const NEXT_PAGE_DELAY_MS = 2100
 const MAX_PLACES_PAGES = 3
@@ -307,13 +308,10 @@ async function runPool<T>(
     await Promise.all(runners)
 }
 
-const memoryCache = new Map<
-    string,
-    { expiresAt: number; results: InfrastructurePlaceResult[] }
->()
+const INFRA_RESULTS_PREFIX = 'infra:results:'
 
 function memoryCacheKey(scope: InfrastructureSearchScope, layerIds: string[]) {
-    return `${scopeCacheKey(scope)}|${layerIds.sort().join(',')}`
+    return `${INFRA_RESULTS_PREFIX}${scopeCacheKey(scope)}|${layerIds.sort().join(',')}`
 }
 
 function buildSearchPlan(
@@ -357,42 +355,6 @@ export function resolveFetchScope(
     return scope
 }
 
-async function loadGridCellFromDb(
-    scopeKey: string,
-    cacheType: string,
-    gridLat: number,
-    gridLng: number,
-): Promise<CachedInfrastructurePlace[] | null> {
-    await connectDB()
-    const doc = await InfrastructurePlaceGridCache.findOne({
-        scopeKey,
-        placeType: cacheType,
-        gridLat,
-        gridLng,
-        expiresAt: { $gt: new Date() },
-    })
-        .select('places')
-        .lean()
-
-    if (!doc || !Array.isArray(doc.places)) return null
-    return doc.places as CachedInfrastructurePlace[]
-}
-
-async function saveGridCellToDb(
-    scopeKey: string,
-    cacheType: string,
-    gridLat: number,
-    gridLng: number,
-    places: CachedInfrastructurePlace[],
-) {
-    await connectDB()
-    await InfrastructurePlaceGridCache.findOneAndUpdate(
-        { scopeKey, placeType: cacheType, gridLat, gridLng },
-        { $set: { places, expiresAt: new Date(Date.now() + GRID_CACHE_TTL_MS) } },
-        { upsert: true },
-    )
-}
-
 async function fetchGoogleCellPlaces(
     scope: InfrastructureSearchScope,
     scopeKey: string,
@@ -407,7 +369,7 @@ async function fetchGoogleCellPlaces(
     const gridLng = roundGridCoord(center.lng)
 
     if (useDbCache) {
-        const cached = await loadGridCellFromDb(scopeKey, cacheType, gridLat, gridLng)
+        const cached = await loadGridCellFromCache(scopeKey, cacheType, gridLat, gridLng)
         if (cached) {
             return cached.map((p) => ({ ...p, placeType: layer.resultType }))
         }
@@ -426,7 +388,7 @@ async function fetchGoogleCellPlaces(
     }
 
     if (useDbCache) {
-        await saveGridCellToDb(
+        await saveGridCellToCache(
             scopeKey,
             cacheType,
             gridLat,
@@ -513,14 +475,13 @@ export async function fetchInfrastructurePlacesForLayers(
 
     const layerIds = layers.map((l) => l.id)
     const memKey = memoryCacheKey(scope, layerIds)
-    const cachedMem = memoryCache.get(memKey)
+    const cachedMem = await cacheGetJson<InfrastructurePlaceResult[]>(memKey)
 
     const byId = new Map<string, InfrastructurePlaceResult>()
     const googleLayers = layers.filter((l) => l.fetch.mode !== 'deployment')
-    const cacheValid = cachedMem && cachedMem.expiresAt > Date.now()
 
-    if (cacheValid) {
-        for (const place of cachedMem!.results) byId.set(place.place_id, place)
+    if (cachedMem?.length) {
+        for (const place of cachedMem) byId.set(place.place_id, place)
     } else if (googleLayers.length > 0) {
         const googleResults = await fetchGoogleFilterLayerPlaces(
             scope,
@@ -533,10 +494,9 @@ export async function fetchInfrastructurePlacesForLayers(
     }
 
     const allResults = [...byId.values()]
-    memoryCache.set(memKey, {
-        expiresAt: Date.now() + MEMORY_CACHE_TTL_MS,
-        results: allResults,
-    })
+    if (allResults.length > 0) {
+        await cacheSetJson(memKey, allResults, MEMORY_CACHE_TTL_MS)
+    }
 
     const viewport =
         opts?.viewportBounds ??

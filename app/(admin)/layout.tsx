@@ -8,6 +8,7 @@ import { SessionIdleWatcher } from '@/components/session-idle-watcher'
 import { AdminPageLoader } from '@/components/admin-page-loader'
 import { notifyAuthSessionChanged } from '@/lib/sync-client-user-profile'
 import { DemoSimulationBar } from '@/components/demo/demo-simulation-bar'
+import { QueryProvider } from '@/components/providers/query-provider'
 
 export default function AdminLayout({
     children,
@@ -82,6 +83,7 @@ export default function AdminLayout({
         (responderVertical === 'hospital' || responderVertical === 'healthcare-hospital')
 
     return (
+        <QueryProvider>
         <div className="flex h-screen min-h-0 bg-background text-foreground">
             <SessionIdleWatcher />
             <Sidebar />
@@ -98,5 +100,6 @@ export default function AdminLayout({
                 </div>
             </div>
         </div>
+        </QueryProvider>
     )
 }
