@@ -215,7 +215,7 @@ export default function Dashboard() {
             <IncidentTimelineCard />
           </div>
 
-          {/* Live Situational Map — same Google Map as super-admin, with Map Layers overlay */}
+          {/* Live Situational Map — OpenStreetMap / Leaflet (no Google Maps JS billing) */}
           <GISMap
             title="Live Situational Map"
             showLayersPanel

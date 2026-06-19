@@ -25,9 +25,10 @@ const MAX_MARKERS_PER_SECTOR = 32
 const MAX_GRID_CELLS = 6
 const MAX_TEXT_QUERIES = 1
 
-export type CiGoogleSearchScope =
-  | { mode: 'bounds'; bounds: MapBounds }
-  | { mode: 'radius'; lat: number; lng: number; radiusMeters: number }
+import type { CiInfraSearchScope } from '@/lib/gis/critical-infra-hifld-fetch'
+
+/** @deprecated Critical infra uses HIFLD — kept for legacy imports only. */
+export type CiGoogleSearchScope = CiInfraSearchScope
 
 function searchPlanForScope(scope: CiGoogleSearchScope) {
   if (scope.mode === 'bounds') {

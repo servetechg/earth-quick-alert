@@ -28,7 +28,13 @@ import {
   AlertOctagon,
   X,
 } from 'lucide-react'
-import { GoogleMap, type CoverageCircleSpec, type MapPolylineSpec, type MapStateBounds } from '@/components/google-map'
+import {
+  SituationalLeafletMap,
+  type CoverageCircleSpec,
+  type MapPolylineSpec,
+  type MapStateBounds,
+  type MapDisasterZoneCircleSpec,
+} from '@/components/situational-leaflet-map'
 import type { UnifiedEventHeatPoint } from '@/lib/geo/unified-event-heatmap'
 import { cn } from '@/lib/utils'
 import { getUsStateBbox, pointInUsStateBBox } from '@/lib/constants/us-state-bounding-boxes'
@@ -40,7 +46,7 @@ import { geocodeAddress, calculateDistance } from '@/lib/services/mock-map-servi
 import { mapZoomForRadiusMiles, pointInCoverageCircle } from '@/lib/geo/license-coverage-radius'
 import { Switch } from '@/components/ui/switch'
 
-import { MapLayersDropdown } from '@/components/gis/map-layers-dropdown'
+// import { MapLayersDropdown } from '@/components/gis/map-layers-dropdown'
 import {
   GIS_FILTER_MAP_LAYERS,
   buildDefaultMapLayerState,
@@ -57,7 +63,6 @@ import {
   disasterZonesToMapCircles,
   zoneLabelPosition,
 } from '@/lib/demo/disaster-zones-lrk'
-import type { MapDisasterZoneCircleSpec } from '@/components/google-map'
 import {
   useInfrastructurePlaces,
   useRoadClosures,
@@ -68,6 +73,9 @@ type GisMapTab = 'Citizens' | 'Responders' | 'Leaders'
 
 const ALL_GIS_TABS: GisMapTab[] = ['Citizens', 'Responders', 'Leaders']
 const SUB_ADMIN_GIS_TABS: GisMapTab[] = ['Citizens', 'Responders']
+
+/** GIS filter/layers UI + Google Places layer fetches disabled (free OSM map only). */
+const GIS_MAP_FILTER_LAYERS_ENABLED = false
 
 function centerOfBounds(bounds: MapStateBounds): { lat: number; lng: number } {
   return {
@@ -156,6 +164,7 @@ export function GISMap({
   showCriticalInfraLayers = false,
   showDisasterZones = false,
 }: GISMapProps) {
+  const layersUiActive = showLayersPanel && GIS_MAP_FILTER_LAYERS_ENABLED
   const tabs = useMemo(() => {
     if (hideTabs) return [] as GisMapTab[]
     if (visibleTabs?.length) return visibleTabs
@@ -863,6 +872,7 @@ export function GISMap({
 
   const infraPlacesQuery = useInfrastructurePlaces({
     enabled:
+      GIS_MAP_FILTER_LAYERS_ENABLED &&
       !isDemoSimulation &&
       enabledGisFilterLayerIds.length > 0 &&
       Boolean(infraFetchBounds) &&
@@ -881,7 +891,7 @@ export function GISMap({
   )
 
   const roadClosuresQuery = useRoadClosures({
-    enabled: mapLayers.roads && viewportInUsa,
+    enabled: GIS_MAP_FILTER_LAYERS_ENABLED && mapLayers.roads && viewportInUsa,
     bounds: roadFetchBounds,
     scopeState: scopeState?.trim() || undefined,
   })
@@ -1368,7 +1378,12 @@ export function GISMap({
   ])
 
   useEffect(() => {
-    if (!showCriticalInfraLayers || enabledCriticalSectors.length === 0 || !ciFetchScope) {
+    if (
+      !GIS_MAP_FILTER_LAYERS_ENABLED ||
+      !showCriticalInfraLayers ||
+      enabledCriticalSectors.length === 0 ||
+      !ciFetchScope
+    ) {
       setCriticalInfraMarkers([])
       return
     }
@@ -1602,7 +1617,7 @@ export function GISMap({
   const mapMarkers = useMemo(() => {
     const activeTabMarkers = markers
     const enabledLayerMarkers: any[] = []
-    const showFilterLayers = !restrictToUsa || viewportInUsa
+    const showFilterLayers = GIS_MAP_FILTER_LAYERS_ENABLED && (!restrictToUsa || viewportInUsa)
 
     // Unified heat feed: incidents show on heatmap only (click for details), not as blue pins.
     if (showFilterLayers && incidentsVisible && unifiedIncidents.length === 0) {
@@ -1805,7 +1820,8 @@ export function GISMap({
                 {tab}
               </button>
             ))}
-            {showLayersPanel && (
+            {/* Map filter/layers disabled — Google Places layer fetches avoided; OSM base map only.
+            {layersUiActive && (
               <MapLayersDropdown
                 layers={mapLayers}
                 onChange={setMapLayers}
@@ -1814,13 +1830,14 @@ export function GISMap({
                 demoPresentation={isDemoSimulation}
               />
             )}
+            */}
           </div>
         )}
       </div>
 
       <div className="flex-1 flex flex-col min-h-0">
         <div className="flex-1 relative min-h-0">
-        <GoogleMap
+        <SituationalLeafletMap
           markers={mapMarkers}
           zoom={mapZoom}
           center={mapCenter}
@@ -1835,8 +1852,8 @@ export function GISMap({
           heatIncidents={usesUnifiedHeat ? heatIncidentsForMap : undefined}
           heatClickOnly={usesUnifiedHeat}
           onHeatIncidentSelect={isDemoSimulation ? handleHeatIncidentSelect : undefined}
-          onBoundsChanged={showLayersPanel ? handleMapBoundsChange : undefined}
-          clusterInfrastructure={showLayersPanel && !isDemoSimulation}
+          onBoundsChanged={layersUiActive ? handleMapBoundsChange : undefined}
+          clusterInfrastructure={layersUiActive && !isDemoSimulation}
           allowZoomOut={stateScoped}
         />
 
