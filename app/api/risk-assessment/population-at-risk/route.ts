@@ -82,7 +82,7 @@ export async function GET(req: Request) {
         });
 
         const cacheKey = buildPopulationAtRiskCacheKey(session.user.id as string, scope.stateCd);
-        const cached = getPopulationAtRiskCache(cacheKey);
+        const cached = await getPopulationAtRiskCache(cacheKey);
         if (cached) {
             return NextResponse.json({
                 census_population_estimate: 0,
@@ -115,7 +115,7 @@ export async function GET(req: Request) {
         });
 
         const users = await listUsersInAlignedAlertAreas(userRows, jurisdiction);
-        setPopulationAtRiskCache(cacheKey, users);
+        await setPopulationAtRiskCache(cacheKey, users);
 
         return NextResponse.json({
             census_population_estimate: populationExposure?.populationAffectedEstimate ?? 0,

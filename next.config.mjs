@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  serverExternalPackages: ['ioredis', '@upstash/redis'],
   typescript: {
     ignoreBuildErrors: true,
   },

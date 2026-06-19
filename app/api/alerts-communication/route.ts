@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongodb';
 import UnifiedEvent from '@/models/UnifiedEvent';
-import { forceSyncAllAlertCommunicationFeedsNow } from '@/lib/services/alert-communication-feed-sync-gate';
+import {
+    forceSyncAllAlertCommunicationFeedsNow,
+    syncAlertCommunicationFeedsGate,
+} from '@/lib/services/alert-communication-feed-sync-gate';
 import { unifiedEventToLegacyAlertCard } from '@/lib/unified-event/legacy-card';
 import { getSession } from '@/lib/auth';
 import {
@@ -16,7 +19,11 @@ export async function GET() {
         const role = String(session?.user?.role ?? '');
         const userId = session?.user?.id as string | undefined;
 
-        const filtered = await fetchAlignedUnifiedEventFeed({ userId, role, syncFeeds: true });
+        const filtered = await fetchAlignedUnifiedEventFeed({ userId, role, syncFeeds: false });
+
+        void syncAlertCommunicationFeedsGate().catch((e) =>
+            console.error('[alerts-communication:bg-sync]', e),
+        );
 
         return NextResponse.json(filtered);
     } catch (error: any) {
