@@ -155,29 +155,48 @@ export function ThreatMonitoring({ locationName }: ThreatMonitoringProps) {
     useEffect(() => {
         let cancelled = false
         let deferTimer: ReturnType<typeof setTimeout> | null = null
+        let retryTimer: ReturnType<typeof setTimeout> | null = null
 
-        const probeOne = async (key: string) => {
+        const applySources = (sources: { key: string; ok: boolean }[]) => {
+            if (cancelled) return
+            const next: Record<string, boolean> = {}
+            for (const s of sources) {
+                if (s?.key) next[s.key] = Boolean(s.ok)
+            }
+            if (Object.keys(next).length > 0) {
+                setSourceHealth((prev) => ({ ...prev, ...next }))
+            }
+        }
+
+        const probeAll = async (force = false) => {
             try {
-                const res = await fetch(
-                    `/api/risk-assessment/source-health?key=${encodeURIComponent(key)}`,
-                    { credentials: 'same-origin' },
-                )
-                if (!res.ok || cancelled) return
+                const qs = force ? '?refresh=1' : ''
+                const res = await fetch(`/api/risk-assessment/source-health${qs}`, {
+                    credentials: 'same-origin',
+                })
+                if (!res.ok || cancelled) return null
                 const json = await res.json().catch(() => ({}))
                 const sources: { key: string; ok: boolean }[] = Array.isArray(json?.sources)
                     ? json.sources
                     : []
-                const hit = sources.find((s) => s.key === key)
-                if (hit && !cancelled) {
-                    setSourceHealth((prev) => ({ ...prev, [key]: Boolean(hit.ok) }))
-                }
+                applySources(sources)
+                return sources
             } catch {
-                // Leave the mark pulsing — it will be tried again next mount.
+                return null
             }
         }
 
         const startProbes = () => {
-            LIVE_INPUT_KEYS.forEach((key) => { void probeOne(key) })
+            void (async () => {
+                const sources = await probeAll(false)
+                if (cancelled || !sources) return
+                const anyDown = sources.some((s) => !s.ok)
+                if (anyDown) {
+                    retryTimer = setTimeout(() => {
+                        void probeAll(true)
+                    }, 8_000)
+                }
+            })()
         }
 
         deferTimer = setTimeout(startProbes, row ? 0 : 1500)
@@ -185,6 +204,7 @@ export function ThreatMonitoring({ locationName }: ThreatMonitoringProps) {
         return () => {
             cancelled = true
             if (deferTimer !== null) clearTimeout(deferTimer)
+            if (retryTimer !== null) clearTimeout(retryTimer)
         }
     }, [row])
 

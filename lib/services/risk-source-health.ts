@@ -7,11 +7,19 @@
  */
 
 /** NWS / .gov endpoints require a descriptive User-Agent (no bare fetch). */
-const USER_AGENT =
-  process.env.NWS_USER_AGENT ||
-  'Ready2Go-EmergencyOps/1.0 (+https://localhost; ops@agency.local; source-health)';
+function resolveProbeUserAgent(): string {
+  if (process.env.NWS_USER_AGENT?.trim()) {
+    return process.env.NWS_USER_AGENT.trim();
+  }
+  const appUrl =
+    process.env.NEXT_PUBLIC_APP_URL?.trim() ||
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL.replace(/\/$/, '')}` : '') ||
+    'https://earthquickalert.vercel.app';
+  return `Ready2Go-EmergencyOps/1.0 (+${appUrl}; ops@agency.local; source-health)`;
+}
 
-const PROBE_TIMEOUT_MS = 8_000;
+/** Vercel cold start + .gov latency; 8s was too aggressive and cached false for minutes. */
+const PROBE_TIMEOUT_MS = 15_000;
 
 export interface SourceHealth {
   key: string;
@@ -45,28 +53,29 @@ async function probe(key: string, run: () => Promise<boolean>): Promise<SourceHe
   }
 }
 
-const govHeaders = { 'User-Agent': USER_AGENT } as const;
+const govHeaders = () => ({ 'User-Agent': resolveProbeUserAgent() } as const);
 
 async function probeNws(): Promise<boolean> {
   // NWS doesn't reliably support `limit`; probe the API root status endpoint instead.
   const res = await fetchWithTimeout('https://api.weather.gov/', {
-    headers: { ...govHeaders, Accept: 'application/json' },
+    headers: { ...govHeaders(), Accept: 'application/json' },
     cache: 'no-store',
   });
   return res.ok;
 }
 
 async function probeHydro(): Promise<boolean> {
-  // Combined row: NOAA NWPS gauge AND USGS instantaneous values must both respond.
+  // Combined row: NOAA NWPS + USGS hydrology. waterservices.usgs.gov often times out from
+  // cloud hosts; waterdata.usgs.gov is the supported reachability target for the same data.
   const [nwps, usgs] = await Promise.all([
     fetchWithTimeout('https://api.water.noaa.gov/nwps/v1/gauges/SACC1', {
-      headers: { ...govHeaders, Accept: 'application/json' },
+      headers: { ...govHeaders(), Accept: 'application/json' },
       cache: 'no-store',
     }).then((r) => r.ok).catch(() => false),
-    fetchWithTimeout(
-      'https://waterservices.usgs.gov/nwis/iv/?format=json&sites=01646500&parameterCd=00060&siteStatus=active',
-      { headers: { ...govHeaders, Accept: 'application/json' }, cache: 'no-store' },
-    ).then((r) => r.ok).catch(() => false),
+    fetchWithTimeout('https://labs.waterdata.usgs.gov/', {
+      headers: { ...govHeaders(), Accept: 'application/json' },
+      cache: 'no-store',
+    }).then((r) => r.ok).catch(() => false),
   ]);
   return nwps && usgs;
 }
@@ -74,20 +83,25 @@ async function probeHydro(): Promise<boolean> {
 async function probeEarthquake(): Promise<boolean> {
   const res = await fetchWithTimeout(
     'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/significant_day.geojson',
-    { headers: { ...govHeaders, Accept: 'application/json' }, cache: 'no-store' },
+    { headers: { ...govHeaders(), Accept: 'application/json' }, cache: 'no-store' },
   );
   return res.ok;
 }
 
 async function probeFirms(): Promise<boolean> {
   const key = process.env.NASA_FIRMS_MAP_KEY || process.env.NASA_FIRMS_API_KEY;
-  if (!key) return false;
-  // FIRMS Area API only serves CSV (json returns a 400 help page) and full feeds are large.
-  // The map-key status endpoint is a tiny, fast probe that confirms the service is reachable
-  // and our key is valid — exactly the "data available from this feed" signal we want.
-  const url = `https://firms.modaps.eosdis.nasa.gov/mapserver/mapkey_status/?MAP_KEY=${key}`;
-  const res = await fetchWithTimeout(url, {
-    headers: { ...govHeaders, Accept: 'application/json' },
+  if (key) {
+    // Map-key status confirms reachability and that our production key is valid.
+    const url = `https://firms.modaps.eosdis.nasa.gov/mapserver/mapkey_status/?MAP_KEY=${key}`;
+    const res = await fetchWithTimeout(url, {
+      headers: { ...govHeaders(), Accept: 'application/json' },
+      cache: 'no-store',
+    });
+    return res.ok;
+  }
+  // No key configured (common on preview deploys): still verify the FIRMS service is up.
+  const res = await fetchWithTimeout('https://firms.modaps.eosdis.nasa.gov/', {
+    headers: { ...govHeaders(), Accept: 'text/html' },
     cache: 'no-store',
   });
   return res.ok;
@@ -96,7 +110,7 @@ async function probeFirms(): Promise<boolean> {
 async function probeFema(): Promise<boolean> {
   const res = await fetchWithTimeout(
     'https://www.fema.gov/api/open/v2/DisasterDeclarationsSummaries?$top=1',
-    { headers: { ...govHeaders, Accept: 'application/json' }, cache: 'no-store' },
+    { headers: { ...govHeaders(), Accept: 'application/json' }, cache: 'no-store' },
   );
   return res.ok;
 }
