@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
-import { getOrRevalidate } from '@/lib/services/risk-report-cache';
+import { cacheGetJson, cacheSetJson } from '@/lib/cache/cache-store';
 import {
     probeSourceHealth,
     probeSingleSource,
@@ -9,6 +9,58 @@ import {
     type SourceHealth,
 } from '@/lib/services/risk-source-health';
 import { resolveDemoSessionContext } from '@/lib/demo/provider';
+
+export const maxDuration = 30;
+
+type SwrEntry<T> = { value: T; freshUntil: number; staleUntil: number };
+
+/** Shorter TTL when a probe fails so transient timeouts don't stay red for minutes. */
+async function getCachedProbe(
+    cacheKey: string,
+    probe: () => Promise<SourceHealth>,
+    force = false,
+): Promise<SourceHealth> {
+    const storeKey = `swr:${cacheKey}`;
+    const now = Date.now();
+    const hit = force ? null : await cacheGetJson<SwrEntry<SourceHealth>>(storeKey);
+
+    if (hit && now < hit.freshUntil) {
+        return hit.value;
+    }
+
+    const value = await probe();
+    const ttlMs = value.ok ? 120_000 : 30_000;
+    const staleMs = value.ok ? 300_000 : 60_000;
+    const entry: SwrEntry<SourceHealth> = {
+        value,
+        freshUntil: now + ttlMs,
+        staleUntil: now + ttlMs + staleMs,
+    };
+    await cacheSetJson(storeKey, entry, ttlMs + staleMs);
+    return value;
+}
+
+async function getCachedBulkProbe(force = false): Promise<SourceHealth[]> {
+    const storeKey = 'swr:source-health:v1';
+    const now = Date.now();
+    const hit = force ? null : await cacheGetJson<SwrEntry<SourceHealth[]>>(storeKey);
+
+    if (hit && now < hit.freshUntil) {
+        return hit.value;
+    }
+
+    const value = await probeSourceHealth();
+    const allOk = value.every((s) => s.ok);
+    const ttlMs = allOk ? 60_000 : 30_000;
+    const staleMs = allOk ? 120_000 : 60_000;
+    const entry: SwrEntry<SourceHealth[]> = {
+        value,
+        freshUntil: now + ttlMs,
+        staleUntil: now + ttlMs + staleMs,
+    };
+    await cacheSetJson(storeKey, entry, ttlMs + staleMs);
+    return value;
+}
 
 const ALLOWED_ROLES = new Set([
     'admin', 'super-admin', 'sub-admin', 'eoc-manager',
@@ -25,36 +77,33 @@ export async function GET(req: Request) {
 
         const url = new URL(req.url);
         const keyParam = url.searchParams.get('key') as LiveInputKey | null;
+        const force = url.searchParams.get('refresh') === '1';
 
         const demoCtx = await resolveDemoSessionContext(
             session.user.id as string,
             session.user.email as string,
         );
 
-        // Per-key probe: SWR-cached so reloads don't block on 5× sequential timeouts.
+        // Per-key probe (legacy): SWR-cached with shorter TTL on failures.
         if (keyParam && (LIVE_INPUT_KEYS as readonly string[]).includes(keyParam)) {
             if (demoCtx) {
                 return NextResponse.json({ sources: [{ key: keyParam, ok: true }] });
             }
-            const result = await getOrRevalidate(
+            const result = await getCachedProbe(
                 `source-health:key:${keyParam}`,
                 () => probeSingleSource(keyParam),
-                { ttlMs: 120_000, staleMs: 300_000 },
+                force,
             );
             return NextResponse.json({ sources: [result] });
         }
 
-        // Bulk probe (legacy path): SWR-cached, all 5 at once.
+        // Bulk probe: one serverless invocation, all 5 feeds in parallel.
         if (demoCtx) {
             const sources: SourceHealth[] = LIVE_INPUT_KEYS.map((key) => ({ key, ok: true }));
             return NextResponse.json({ sources });
         }
 
-        const sources = await getOrRevalidate(
-            'source-health:v1',
-            () => probeSourceHealth(),
-            { ttlMs: 60_000, staleMs: 120_000 },
-        );
+        const sources = await getCachedBulkProbe(force);
 
         return NextResponse.json({ sources });
     } catch (e: any) {
