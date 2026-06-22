@@ -87,6 +87,66 @@ export type RoadClosurePayload = {
     [key: string]: unknown;
 };
 
+export type DamMapMarkerPayload = {
+    id: string;
+    federalId: string;
+    title: string;
+    lat: number;
+    lng: number;
+    stateKey: string;
+    county: string;
+    hazardClass: string;
+    condition: string;
+    maxStorage: number | null;
+    damHeight: number | null;
+    location: string;
+};
+
+async function fetchDamLayerMarkers(input: {
+    stateKey?: string;
+    bounds?: MapBoundsPayload | null;
+}): Promise<DamMapMarkerPayload[]> {
+    const params = new URLSearchParams();
+    if (input.stateKey) params.set('state', input.stateKey);
+    if (input.bounds) {
+        params.set('west', String(input.bounds.west));
+        params.set('south', String(input.bounds.south));
+        params.set('east', String(input.bounds.east));
+        params.set('north', String(input.bounds.north));
+    }
+    const res = await fetch(`/api/map/layers/dams?${params.toString()}`, {
+        credentials: 'include',
+    });
+    if (!res.ok) throw new Error(`map/layers/dams ${res.status}`);
+    const data = await res.json();
+    return Array.isArray(data.markers) ? data.markers : [];
+}
+
+export function useMapLayerDams(opts: {
+    enabled: boolean;
+    stateKey?: string | null;
+    bounds?: MapBoundsPayload | null;
+}) {
+    const stateKey = opts.stateKey?.trim().toUpperCase() ?? '';
+    const boundsKey = opts.bounds
+        ? `${opts.bounds.west.toFixed(3)},${opts.bounds.south.toFixed(3)},${opts.bounds.east.toFixed(3)},${opts.bounds.north.toFixed(3)}`
+        : 'none';
+
+    return useQuery({
+        queryKey: ['map-layer', 'dams', stateKey || 'auto', boundsKey],
+        queryFn: () =>
+            fetchDamLayerMarkers({
+                stateKey: stateKey || undefined,
+                bounds: stateKey ? null : opts.bounds ?? null,
+            }),
+        enabled:
+            opts.enabled &&
+            Boolean(stateKey || opts.bounds),
+        staleTime: 10 * 60_000,
+        gcTime: 30 * 60_000,
+    });
+}
+
 async function fetchRoadClosures(input: {
     bounds?: MapBoundsPayload;
     scopeState?: string;

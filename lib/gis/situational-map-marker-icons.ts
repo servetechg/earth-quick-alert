@@ -52,6 +52,15 @@ const PIN_COLORS: Record<string, string> = {
 };
 
 export function buildLeafletMarkerIcon(marker: SituationalMapMarker): L.DivIcon | L.Icon {
+    if (marker.icon === 'dam' || (marker.type === 'infrastructure' && marker.category === 'Dams')) {
+        return L.icon({
+            iconUrl: '/icons/dam-marker.svg',
+            iconSize: [36, 36],
+            iconAnchor: [18, 18],
+            popupAnchor: [0, -18],
+        });
+    }
+
     if (marker.type === 'infrastructure' && marker.glyph) {
         const bg = marker.color || '#6366F1';
         const size = 34;
@@ -125,6 +134,19 @@ export function clusterIcon(): L.DivIcon {
         html: svg,
         iconSize: [42, 42],
         iconAnchor: [21, 21],
+    });
+}
+
+/** Red dam cluster badge with count — matches dam-marker.svg. */
+export function damClusterIcon(count: number): L.DivIcon {
+    const label = count > 999 ? '999+' : String(count);
+    const size = count > 99 ? 44 : 38;
+    const html = `<div style="width:${size}px;height:${size}px;border-radius:50%;background:#E32C28;border:2.5px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.28);display:flex;align-items:center;justify-content:center;color:#fff;font-family:Arial,sans-serif;font-weight:800;font-size:${count > 99 ? 10 : 12}px;">${label}</div>`;
+    return L.divIcon({
+        className: 'situational-map-dam-cluster',
+        html,
+        iconSize: [size, size],
+        iconAnchor: [size / 2, size / 2],
     });
 }
 
