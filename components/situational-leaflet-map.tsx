@@ -36,7 +36,7 @@ import {
     SUB_ADMIN_MIN_ZOOM,
     viewportExceedsBounds,
 } from '@/lib/gis/situational-map-utils';
-import { buildLeafletMarkerIcon, clusterIcon, damClusterIcon, heatIncidentPinIcon } from '@/lib/gis/situational-map-marker-icons';
+import { buildLeafletMarkerIcon, clusterIcon, damClusterIcon, heatIncidentPinIcon, shelterClusterIcon } from '@/lib/gis/situational-map-marker-icons';
 import type { UnifiedEventHeatPoint } from '@/lib/geo/unified-event-heatmap';
 
 export type {
@@ -235,7 +235,7 @@ function InfrastructureClusterLayer({
     markers: SituationalMapMarker[];
     enabled: boolean;
     onSelect: (m: SituationalMapMarker) => void;
-    clusterMode?: 'default' | 'dams';
+    clusterMode?: 'default' | 'dams' | 'shelters';
 }) {
     const map = useMap();
     const groupRef = useRef<L.MarkerClusterGroup | null>(null);
@@ -248,15 +248,19 @@ function InfrastructureClusterLayer({
         if (!enabled || markers.length === 0) return;
 
         const isDams = clusterMode === 'dams';
+        const isShelters = clusterMode === 'shelters';
+        const isFacilities = isDams || isShelters;
 
         const group = L.markerClusterGroup({
             showCoverageOnHover: false,
-            maxClusterRadius: isDams ? 45 : 58,
-            disableClusteringAtZoom: isDams ? 7 : 11,
-            spiderfyOnMaxZoom: isDams,
+            maxClusterRadius: isFacilities ? 45 : 58,
+            disableClusteringAtZoom: isFacilities ? 7 : 11,
+            spiderfyOnMaxZoom: isFacilities,
             iconCreateFunction: isDams
                 ? (cluster) => damClusterIcon(cluster.getChildCount())
-                : () => clusterIcon(),
+                : isShelters
+                  ? (cluster) => shelterClusterIcon(cluster.getChildCount())
+                  : () => clusterIcon(),
         });
 
         for (const marker of markers) {
