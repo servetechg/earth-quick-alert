@@ -40,17 +40,19 @@ import { cn } from '@/lib/utils'
 import { getUsStateBbox, pointInUsStateBBox } from '@/lib/constants/us-state-bounding-boxes'
 import { normalizeStateToUsps } from '@/lib/utils/us-state-usps'
 import { intersectBounds } from '@/lib/gis/infrastructure-search-grid'
+import { radiusBounds } from '@/lib/gis/geojson-map-utils'
 import { CONUS_MAP_BOUNDS, clampBoundsToUsa, viewportCenterInUsa, pointInUsaBounds } from '@/lib/constants/usa-map-bounds'
 import { ShieldCheck, Truck, Siren, Building2, MapPin } from 'lucide-react'
 import { geocodeAddress, calculateDistance } from '@/lib/services/mock-map-service'
 import { mapZoomForRadiusMiles, pointInCoverageCircle } from '@/lib/geo/license-coverage-radius'
 import { Switch } from '@/components/ui/switch'
 
-// import { MapLayersDropdown } from '@/components/gis/map-layers-dropdown'
+import { MapLayersDropdown } from '@/components/gis/map-layers-dropdown'
 import {
   GIS_FILTER_MAP_LAYERS,
   buildDefaultMapLayerState,
   buildDemoMapLayerState,
+  DAMS_MAP_LAYER,
 } from '@/lib/gis/map-layer-config'
 import { gisFilterLayerByResultType, gisFilterLayerById } from '@/lib/gis/gis-filter-layers'
 import type { GisFilterLayerDef } from '@/lib/gis/gis-filter-layers'
@@ -65,6 +67,7 @@ import {
 } from '@/lib/demo/disaster-zones-lrk'
 import {
   useInfrastructurePlaces,
+  useMapLayerDams,
   useRoadClosures,
   useSituationalMap,
 } from '@/lib/hooks/admin-map-queries'
@@ -76,6 +79,9 @@ const SUB_ADMIN_GIS_TABS: GisMapTab[] = ['Citizens', 'Responders']
 
 /** GIS filter/layers UI + Google Places layer fetches disabled (free OSM map only). */
 const GIS_MAP_FILTER_LAYERS_ENABLED = false
+
+/** Open-source map layers (NID dams) — no Google / HIFLD. */
+const OPEN_SOURCE_MAP_LAYERS_ENABLED = true
 
 function centerOfBounds(bounds: MapStateBounds): { lat: number; lng: number } {
   return {
@@ -164,7 +170,8 @@ export function GISMap({
   showCriticalInfraLayers = false,
   showDisasterZones = false,
 }: GISMapProps) {
-  const layersUiActive = showLayersPanel && GIS_MAP_FILTER_LAYERS_ENABLED
+  const openSourceLayersUiActive = showLayersPanel && OPEN_SOURCE_MAP_LAYERS_ENABLED
+  const interactiveMapLayersActive = openSourceLayersUiActive
   const tabs = useMemo(() => {
     if (hideTabs) return [] as GisMapTab[]
     if (visibleTabs?.length) return visibleTabs
@@ -236,6 +243,13 @@ export function GISMap({
     stateScoped,
     showLayersPanel,
   ])
+
+  const damsStateKey = useMemo(() => {
+    const hint = licensedStateHint?.trim()
+    if (!hint) return null
+    if (hint.length === 2) return hint.toUpperCase()
+    return normalizeStateToUsps(hint)
+  }, [licensedStateHint])
 
   const stateBoundsRestriction = useMemo(
     (): MapStateBounds | null => boundsFromStateHint(licensedStateHint),
@@ -894,6 +908,59 @@ export function GISMap({
     enabled: GIS_MAP_FILTER_LAYERS_ENABLED && mapLayers.roads && viewportInUsa,
     bounds: roadFetchBounds,
     scopeState: scopeState?.trim() || undefined,
+  })
+
+  /** Super-admin: viewport bbox across USA. Sub-admin / scoped state: full state. Sub-admin radius: circle bounds. */
+  const damsFetchScope = useMemo((): {
+    stateKey?: string
+    bounds?: MapStateBounds | null
+  } | null => {
+    if (!mapLayers.dams) return null
+
+    if (lockToCoverageCircle && coverageCircle) {
+      const bounds = radiusBounds(
+        coverageCircle.center.lat,
+        coverageCircle.center.lng,
+        coverageCircle.radiusMeters * 1.08,
+      )
+      return { bounds }
+    }
+
+    const stateScopedView = Boolean(stateScoped || stateBoundsRestriction)
+    const hasStateScope = Boolean(damsStateKey && (stateScopedView || scopeState?.trim() || focusState?.trim()))
+
+    if (hasStateScope && damsStateKey) {
+      return { stateKey: damsStateKey }
+    }
+
+    if (restrictToUsa && infraFetchBounds) {
+      return { bounds: infraFetchBounds }
+    }
+
+    if (damsStateKey) return { stateKey: damsStateKey }
+    if (infraFetchBounds) return { bounds: infraFetchBounds }
+    return null
+  }, [
+    mapLayers.dams,
+    lockToCoverageCircle,
+    coverageCircle,
+    damsStateKey,
+    stateScoped,
+    stateBoundsRestriction,
+    restrictToUsa,
+    infraFetchBounds,
+    scopeState,
+    focusState,
+  ])
+
+  const damsLayerQuery = useMapLayerDams({
+    enabled:
+      OPEN_SOURCE_MAP_LAYERS_ENABLED &&
+      Boolean(damsFetchScope) &&
+      viewportInUsa &&
+      !isDemoSimulation,
+    stateKey: damsFetchScope?.stateKey ?? null,
+    bounds: damsFetchScope?.stateKey ? null : damsFetchScope?.bounds ?? null,
   })
 
   const infraFetchScopeKey = useMemo(() => {
@@ -1702,6 +1769,29 @@ export function GISMap({
       enabledLayerMarkers.push(...operationalIncidentMarkers)
     }
 
+    if (OPEN_SOURCE_MAP_LAYERS_ENABLED && mapLayers.dams && damsLayerQuery.data?.length) {
+      const skipCoverageFilter = restrictToUsa && !stateBoundsRestriction && !lockToCoverageCircle
+      for (const dam of damsLayerQuery.data) {
+        if (!inUsaView(dam.lat, dam.lng)) continue
+        if (!skipCoverageFilter && !markerInCoverage({ lat: dam.lat, lng: dam.lng })) continue
+        const parts = [`ID: ${dam.federalId}`, `Hazard: ${dam.hazardClass}`, `Condition: ${dam.condition}`]
+        if (dam.maxStorage != null) parts.push(`Max storage: ${dam.maxStorage} ac-ft`)
+        if (dam.damHeight != null) parts.push(`Height: ${dam.damHeight} ft`)
+        enabledLayerMarkers.push({
+          id: dam.id,
+          position: { lat: dam.lat, lng: dam.lng },
+          title: dam.title,
+          type: 'infrastructure' as const,
+          category: DAMS_MAP_LAYER.label,
+          status: `${dam.hazardClass} hazard`,
+          location: dam.location,
+          description: parts.join(' · '),
+        color: DAMS_MAP_LAYER.color,
+        icon: DAMS_MAP_LAYER.markerIcon,
+      })
+      }
+    }
+
     return [...activeTabMarkers, ...enabledLayerMarkers]
   }, [
     markers,
@@ -1719,6 +1809,7 @@ export function GISMap({
     viewportInUsa,
     inUsaView,
     isDemoSimulation,
+    damsLayerQuery.data,
   ])
 
   const disasterZonesVisible = useMemo(() => {
@@ -1820,17 +1911,9 @@ export function GISMap({
                 {tab}
               </button>
             ))}
-            {/* Map filter/layers disabled — Google Places layer fetches avoided; OSM base map only.
-            {layersUiActive && (
-              <MapLayersDropdown
-                layers={mapLayers}
-                onChange={setMapLayers}
-                showCriticalInfra={showCriticalInfraLayers}
-                showDisasterZones={showDisasterZones}
-                demoPresentation={isDemoSimulation}
-              />
+            {openSourceLayersUiActive && (
+              <MapLayersDropdown layers={mapLayers} onChange={setMapLayers} />
             )}
-            */}
           </div>
         )}
       </div>
@@ -1852,15 +1935,20 @@ export function GISMap({
           heatIncidents={usesUnifiedHeat ? heatIncidentsForMap : undefined}
           heatClickOnly={usesUnifiedHeat}
           onHeatIncidentSelect={isDemoSimulation ? handleHeatIncidentSelect : undefined}
-          onBoundsChanged={layersUiActive ? handleMapBoundsChange : undefined}
-          clusterInfrastructure={layersUiActive && !isDemoSimulation}
+          onBoundsChanged={interactiveMapLayersActive ? handleMapBoundsChange : undefined}
+          clusterInfrastructure={interactiveMapLayersActive && !isDemoSimulation}
+          infrastructureClusterMode={mapLayers.dams ? 'dams' : 'default'}
           allowZoomOut={stateScoped}
         />
 
-        {(isSearchingInfra || isLoadingCriticalInfra || isLoadingRoadClosures) && (
+        {(damsLayerQuery.isFetching ||
+          (GIS_MAP_FILTER_LAYERS_ENABLED &&
+            (isSearchingInfra || isLoadingCriticalInfra || isLoadingRoadClosures))) && (
           <div className="absolute right-4 top-4 bg-white/90 backdrop-blur-md px-4 py-2 rounded-2xl shadow-2xl border border-slate-100 flex items-center gap-2 z-50 animate-in fade-in slide-in-from-top-2 duration-300">
             <Loader2 className="w-4 h-4 text-[#33375D] animate-spin" />
-            <span className="text-[10px] font-black uppercase tracking-widest text-slate-600">Locating Facilities...</span>
+            <span className="text-[10px] font-black uppercase tracking-widest text-slate-600">
+              {damsLayerQuery.isFetching ? 'Loading Dams…' : 'Locating Facilities…'}
+            </span>
           </div>
         )}
         </div>

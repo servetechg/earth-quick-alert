@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useMemo } from 'react'
-import { ChevronDown, Layers, Building2 } from 'lucide-react'
+import { ChevronDown, Layers } from 'lucide-react'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import {
@@ -10,20 +10,14 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
-import {
-  GIS_FILTER_MAP_LAYERS,
-  TOP_LEVEL_MAP_LAYERS,
-  DISASTER_ZONE_LAYER,
-} from '@/lib/gis/map-layer-config'
-import { CRITICAL_INFRASTRUCTURE_SECTORS } from '@/lib/gis/critical-infrastructure-sectors'
+import { DAMS_MAP_LAYER } from '@/lib/gis/map-layer-config'
+
+/** Open-source map layers shown in the GIS filter (extend when new APIs are wired). */
+const OPEN_SOURCE_MAP_LAYERS = [DAMS_MAP_LAYER] as const
 
 interface MapLayersDropdownProps {
   layers: Record<string, boolean>
   onChange: (updater: (prev: Record<string, boolean>) => Record<string, boolean>) => void
-  showCriticalInfra?: boolean
-  showDisasterZones?: boolean
-  /** Arkansas demo — show infrastructure filters only (hide live operational feeds). */
-  demoPresentation?: boolean
 }
 
 function LayerRow({
@@ -33,7 +27,6 @@ function LayerRow({
   Icon,
   checked,
   onToggle,
-  compact,
 }: {
   id: string
   label: string
@@ -41,7 +34,6 @@ function LayerRow({
   Icon: React.ComponentType<{ className?: string }>
   checked: boolean
   onToggle: () => void
-  compact?: boolean
 }) {
   return (
     <div className="flex items-center gap-2.5 py-1.5 px-1 rounded-lg hover:bg-slate-50">
@@ -60,8 +52,7 @@ function LayerRow({
       <Label
         htmlFor={`layer-dd-${id}`}
         className={cn(
-          'font-black text-[#33375D]/95 uppercase tracking-wide cursor-pointer select-none flex-1 leading-tight',
-          compact ? 'text-[10px]' : 'text-[11px]',
+          'font-black text-[#33375D]/95 uppercase tracking-wide cursor-pointer select-none flex-1 leading-tight text-[11px]',
         )}
       >
         {label}
@@ -70,26 +61,15 @@ function LayerRow({
   )
 }
 
-export function MapLayersDropdown({
-  layers,
-  onChange,
-  showCriticalInfra = false,
-  showDisasterZones = false,
-  demoPresentation = false,
-}: MapLayersDropdownProps) {
-  const enabledCount = useMemo(() => {
-    return Object.entries(layers).filter(([, v]) => v).length
-  }, [layers])
+export function MapLayersDropdown({ layers, onChange }: MapLayersDropdownProps) {
+  const enabledCount = useMemo(
+    () => OPEN_SOURCE_MAP_LAYERS.filter((l) => layers[l.id]).length,
+    [layers],
+  )
 
   const toggle = (id: string) => {
     onChange((prev) => ({ ...prev, [id]: !prev[id] }))
   }
-
-  const topLayers = demoPresentation
-    ? GIS_FILTER_MAP_LAYERS
-    : showDisasterZones
-      ? [...TOP_LEVEL_MAP_LAYERS, DISASTER_ZONE_LAYER]
-      : TOP_LEVEL_MAP_LAYERS
 
   return (
     <DropdownMenu modal={false}>
@@ -114,81 +94,24 @@ export function MapLayersDropdown({
 
       <DropdownMenuContent
         align="end"
-        className="w-72 max-h-[min(70vh,520px)] overflow-y-auto p-3 rounded-2xl border-slate-200 shadow-xl"
+        className="w-72 max-h-[min(70vh,520px)] overflow-y-auto p-3 rounded-2xl border-slate-200 shadow-xl z-500"
       >
         <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1 pb-2 mb-1 border-b border-slate-100">
-          {demoPresentation ? 'Infrastructure & Resources' : 'Map Layers'}
+          Map Layers
         </p>
-
-        {!demoPresentation && (
-          <div className="space-y-0.5">
-            {topLayers.map((layer) => (
-              <LayerRow
-                key={layer.id}
-                id={layer.id}
-                label={layer.label}
-                color={layer.color}
-                Icon={layer.Icon}
-                checked={!!layers[layer.id]}
-                onToggle={() => toggle(layer.id)}
-              />
-            ))}
-          </div>
-        )}
-
-        {demoPresentation && (
-          <div className="space-y-0.5">
-            {GIS_FILTER_MAP_LAYERS.map((layer) => (
-              <LayerRow
-                key={layer.id}
-                id={layer.id}
-                label={layer.label}
-                color={layer.color}
-                Icon={layer.Icon}
-                checked={!!layers[layer.id]}
-                onToggle={() => toggle(layer.id)}
-              />
-            ))}
-          </div>
-        )}
-
-        {demoPresentation && showDisasterZones && (
-          <div className="mt-3 pt-2 border-t border-slate-100">
+        <div className="space-y-0.5">
+          {OPEN_SOURCE_MAP_LAYERS.map((layer) => (
             <LayerRow
-              id={DISASTER_ZONE_LAYER.id}
-              label={DISASTER_ZONE_LAYER.label}
-              color={DISASTER_ZONE_LAYER.color}
-              Icon={DISASTER_ZONE_LAYER.Icon}
-              checked={!!layers[DISASTER_ZONE_LAYER.id]}
-              onToggle={() => toggle(DISASTER_ZONE_LAYER.id)}
+              key={layer.id}
+              id={layer.id}
+              label={layer.label}
+              color={layer.color}
+              Icon={layer.Icon}
+              checked={!!layers[layer.id]}
+              onToggle={() => toggle(layer.id)}
             />
-          </div>
-        )}
-
-        {showCriticalInfra && (
-          <div className="mt-3 pt-2 border-t border-slate-100">
-            <div className="flex items-center gap-1.5 px-1 pb-2">
-              <Building2 className="w-3.5 h-3.5 text-amber-600" />
-              <span className="text-[10px] font-black uppercase tracking-widest text-amber-700">
-                Critical Infrastructure (16)
-              </span>
-            </div>
-            <div className="space-y-0.5 pl-1">
-              {CRITICAL_INFRASTRUCTURE_SECTORS.map((sector) => (
-                <LayerRow
-                  key={sector.id}
-                  id={sector.id}
-                  label={sector.shortLabel}
-                  color={sector.color}
-                  Icon={sector.Icon}
-                  checked={!!layers[sector.id]}
-                  onToggle={() => toggle(sector.id)}
-                  compact
-                />
-              ))}
-            </div>
-          </div>
-        )}
+          ))}
+        </div>
       </DropdownMenuContent>
     </DropdownMenu>
   )
