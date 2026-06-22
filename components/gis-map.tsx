@@ -53,6 +53,7 @@ import {
   buildDefaultMapLayerState,
   buildDemoMapLayerState,
   DAMS_MAP_LAYER,
+  SHELTERS_MAP_LAYER,
 } from '@/lib/gis/map-layer-config'
 import { gisFilterLayerByResultType, gisFilterLayerById } from '@/lib/gis/gis-filter-layers'
 import type { GisFilterLayerDef } from '@/lib/gis/gis-filter-layers'
@@ -68,6 +69,7 @@ import {
 import {
   useInfrastructurePlaces,
   useMapLayerDams,
+  useMapLayerShelters,
   useRoadClosures,
   useSituationalMap,
 } from '@/lib/hooks/admin-map-queries'
@@ -80,7 +82,7 @@ const SUB_ADMIN_GIS_TABS: GisMapTab[] = ['Citizens', 'Responders']
 /** GIS filter/layers UI + Google Places layer fetches disabled (free OSM map only). */
 const GIS_MAP_FILTER_LAYERS_ENABLED = false
 
-/** Open-source map layers (NID dams) — no Google / HIFLD. */
+/** Open-source map layers (NID dams, FEMA shelters) — no Google / HIFLD. */
 const OPEN_SOURCE_MAP_LAYERS_ENABLED = true
 
 function centerOfBounds(bounds: MapStateBounds): { lat: number; lng: number } {
@@ -963,6 +965,58 @@ export function GISMap({
     bounds: damsFetchScope?.stateKey ? null : damsFetchScope?.bounds ?? null,
   })
 
+  const sheltersFetchScope = useMemo((): {
+    stateKey?: string
+    bounds?: MapStateBounds | null
+  } | null => {
+    if (!mapLayers.shelters) return null
+
+    if (lockToCoverageCircle && coverageCircle) {
+      const bounds = radiusBounds(
+        coverageCircle.center.lat,
+        coverageCircle.center.lng,
+        coverageCircle.radiusMeters * 1.08,
+      )
+      return { bounds }
+    }
+
+    const stateScopedView = Boolean(stateScoped || stateBoundsRestriction)
+    const hasStateScope = Boolean(damsStateKey && (stateScopedView || scopeState?.trim() || focusState?.trim()))
+
+    if (hasStateScope && damsStateKey) {
+      return { stateKey: damsStateKey }
+    }
+
+    if (restrictToUsa && infraFetchBounds) {
+      return { bounds: infraFetchBounds }
+    }
+
+    if (damsStateKey) return { stateKey: damsStateKey }
+    if (infraFetchBounds) return { bounds: infraFetchBounds }
+    return null
+  }, [
+    mapLayers.shelters,
+    lockToCoverageCircle,
+    coverageCircle,
+    damsStateKey,
+    stateScoped,
+    stateBoundsRestriction,
+    restrictToUsa,
+    infraFetchBounds,
+    scopeState,
+    focusState,
+  ])
+
+  const sheltersLayerQuery = useMapLayerShelters({
+    enabled:
+      OPEN_SOURCE_MAP_LAYERS_ENABLED &&
+      Boolean(sheltersFetchScope) &&
+      viewportInUsa &&
+      !isDemoSimulation,
+    stateKey: sheltersFetchScope?.stateKey ?? null,
+    bounds: sheltersFetchScope?.stateKey ? null : sheltersFetchScope?.bounds ?? null,
+  })
+
   const infraFetchScopeKey = useMemo(() => {
     if (infraFetchBounds) {
       const b = infraFetchBounds
@@ -1792,6 +1846,45 @@ export function GISMap({
       }
     }
 
+    if (OPEN_SOURCE_MAP_LAYERS_ENABLED && mapLayers.shelters && sheltersLayerQuery.data?.length) {
+      const skipCoverageFilter = restrictToUsa && !stateBoundsRestriction && !lockToCoverageCircle
+      for (const shelter of sheltersLayerQuery.data) {
+        if (!inUsaView(shelter.lat, shelter.lng)) continue
+        if (!skipCoverageFilter && !markerInCoverage({ lat: shelter.lat, lng: shelter.lng })) continue
+        const parts = [
+          `Status: ${shelter.status}`,
+          `Usage: ${shelter.facilityUsage}`,
+        ]
+        if (shelter.evacuationCapacity != null) {
+          parts.push(`Evac capacity: ${shelter.evacuationCapacity}`)
+        }
+        if (shelter.postImpactCapacity != null) {
+          parts.push(`Post-impact capacity: ${shelter.postImpactCapacity}`)
+        }
+        if (shelter.wheelchairAccessible && shelter.wheelchairAccessible !== 'Unknown') {
+          parts.push(`Wheelchair: ${shelter.wheelchairAccessible}`)
+        }
+        if (shelter.address) {
+          parts.push(shelter.address)
+        }
+        if (shelter.organization) {
+          parts.push(shelter.organization)
+        }
+        enabledLayerMarkers.push({
+          id: shelter.id,
+          position: { lat: shelter.lat, lng: shelter.lng },
+          title: shelter.title,
+          type: 'infrastructure' as const,
+          category: SHELTERS_MAP_LAYER.label,
+          status: shelter.status,
+          location: shelter.location,
+          description: parts.join(' · '),
+          color: SHELTERS_MAP_LAYER.color,
+          icon: SHELTERS_MAP_LAYER.markerIcon,
+        })
+      }
+    }
+
     return [...activeTabMarkers, ...enabledLayerMarkers]
   }, [
     markers,
@@ -1810,6 +1903,7 @@ export function GISMap({
     inUsaView,
     isDemoSimulation,
     damsLayerQuery.data,
+    sheltersLayerQuery.data,
   ])
 
   const disasterZonesVisible = useMemo(() => {
@@ -1937,17 +2031,24 @@ export function GISMap({
           onHeatIncidentSelect={isDemoSimulation ? handleHeatIncidentSelect : undefined}
           onBoundsChanged={interactiveMapLayersActive ? handleMapBoundsChange : undefined}
           clusterInfrastructure={interactiveMapLayersActive && !isDemoSimulation}
-          infrastructureClusterMode={mapLayers.dams ? 'dams' : 'default'}
+          infrastructureClusterMode={
+            mapLayers.dams ? 'dams' : mapLayers.shelters ? 'shelters' : 'default'
+          }
           allowZoomOut={stateScoped}
         />
 
         {(damsLayerQuery.isFetching ||
+          sheltersLayerQuery.isFetching ||
           (GIS_MAP_FILTER_LAYERS_ENABLED &&
             (isSearchingInfra || isLoadingCriticalInfra || isLoadingRoadClosures))) && (
           <div className="absolute right-4 top-4 bg-white/90 backdrop-blur-md px-4 py-2 rounded-2xl shadow-2xl border border-slate-100 flex items-center gap-2 z-50 animate-in fade-in slide-in-from-top-2 duration-300">
             <Loader2 className="w-4 h-4 text-[#33375D] animate-spin" />
             <span className="text-[10px] font-black uppercase tracking-widest text-slate-600">
-              {damsLayerQuery.isFetching ? 'Loading Dams…' : 'Locating Facilities…'}
+              {damsLayerQuery.isFetching
+                ? 'Loading Dams…'
+                : sheltersLayerQuery.isFetching
+                  ? 'Loading Shelters…'
+                  : 'Locating Facilities…'}
             </span>
           </div>
         )}

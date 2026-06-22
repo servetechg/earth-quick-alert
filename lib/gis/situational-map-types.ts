@@ -94,7 +94,7 @@ export interface SituationalMapProps {
     onBoundsChanged?: (bounds: MapStateBounds) => void;
     clusterInfrastructure?: boolean;
     /** Use dam-friendly clustering (lower uncluster zoom, count badges). */
-    infrastructureClusterMode?: 'default' | 'dams';
+    infrastructureClusterMode?: 'default' | 'dams' | 'shelters';
     fitStateOnLoad?: boolean;
     allowZoomOut?: boolean;
 }

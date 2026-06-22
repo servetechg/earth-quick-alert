@@ -4,7 +4,7 @@ import {
   type GisFilterLayerDef,
 } from '@/lib/gis/gis-filter-layers'
 import { CRITICAL_INFRASTRUCTURE_SECTORS } from '@/lib/gis/critical-infrastructure-sectors'
-import { AlertTriangle, Droplets } from 'lucide-react'
+import { AlertTriangle, Droplets, Home } from 'lucide-react'
 
 export type { GisFilterLayerDef } from '@/lib/gis/gis-filter-layers'
 
@@ -59,6 +59,15 @@ export const DAMS_MAP_LAYER = {
   markerIcon: 'dam',
 } as const
 
+/** Open-source FEMA NSS shelters layer (no Google billing). */
+export const SHELTERS_MAP_LAYER = {
+  id: 'shelters',
+  label: 'Shelters',
+  Icon: Home,
+  color: '#16A34A',
+  markerIcon: 'shelter',
+} as const
+
 export function buildDefaultMapLayerState(opts?: {
   includeCriticalInfra?: boolean
   includeDisasterZones?: boolean
@@ -76,6 +85,7 @@ export function buildDefaultMapLayerState(opts?: {
     })
   }
   defaults[DAMS_MAP_LAYER.id] = false
+  defaults[SHELTERS_MAP_LAYER.id] = false
   return defaults
 }
 
