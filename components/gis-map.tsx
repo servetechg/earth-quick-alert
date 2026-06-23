@@ -53,6 +53,7 @@ import {
   buildDefaultMapLayerState,
   buildDemoMapLayerState,
   DAMS_MAP_LAYER,
+  FUEL_SITES_MAP_LAYER,
   SHELTERS_MAP_LAYER,
 } from '@/lib/gis/map-layer-config'
 import { gisFilterLayerByResultType, gisFilterLayerById } from '@/lib/gis/gis-filter-layers'
@@ -69,10 +70,13 @@ import {
 import {
   useInfrastructurePlaces,
   useMapLayerDams,
+  useMapLayerFuelSites,
   useMapLayerShelters,
   useRoadClosures,
   useSituationalMap,
 } from '@/lib/hooks/admin-map-queries'
+import { useDebouncedMapBounds } from '@/lib/hooks/use-debounced-map-bounds'
+import { quantizeLayerFetchBounds } from '@/lib/gis/layers/map-layer-bounds-utils'
 
 type GisMapTab = 'Citizens' | 'Responders' | 'Leaders'
 
@@ -82,7 +86,7 @@ const SUB_ADMIN_GIS_TABS: GisMapTab[] = ['Citizens', 'Responders']
 /** GIS filter/layers UI + Google Places layer fetches disabled (free OSM map only). */
 const GIS_MAP_FILTER_LAYERS_ENABLED = false
 
-/** Open-source map layers (NID dams, FEMA shelters) — no Google / HIFLD. */
+/** Open-source map layers (NID dams, FEMA shelters, NREL fuel sites) — no Google / HIFLD. */
 const OPEN_SOURCE_MAP_LAYERS_ENABLED = true
 
 function centerOfBounds(bounds: MapStateBounds): { lat: number; lng: number } {
@@ -102,6 +106,55 @@ function boundsFromStateHint(hint?: string | null): MapStateBounds | null {
   if (!bbox) return null
   const [west, south, east, north] = bbox
   return { west, south, east, north }
+}
+
+type OpenSourceLayerFetchScope = {
+  stateKey?: string
+  bounds?: MapStateBounds | null
+} | null
+
+function buildOpenSourceLayerFetchScope(
+  layerEnabled: boolean,
+  opts: {
+    lockToCoverageCircle: boolean
+    coverageCircle: CoverageCircleSpec | null
+    stateScoped: boolean
+    stateBoundsRestriction: MapStateBounds | null
+    licensedStateKey: string | null
+    restrictToUsa: boolean
+    fetchBounds: MapStateBounds | null
+    scopeState?: string
+    focusState?: string
+  },
+): OpenSourceLayerFetchScope {
+  if (!layerEnabled) return null
+
+  if (opts.lockToCoverageCircle && opts.coverageCircle) {
+    const bounds = radiusBounds(
+      opts.coverageCircle.center.lat,
+      opts.coverageCircle.center.lng,
+      opts.coverageCircle.radiusMeters * 1.08,
+    )
+    return { bounds }
+  }
+
+  const stateScopedView = Boolean(opts.stateScoped || opts.stateBoundsRestriction)
+  const hasStateScope = Boolean(
+    opts.licensedStateKey &&
+      (stateScopedView || opts.scopeState?.trim() || opts.focusState?.trim()),
+  )
+
+  if (hasStateScope && opts.licensedStateKey) {
+    return { stateKey: opts.licensedStateKey }
+  }
+
+  if (opts.restrictToUsa && opts.fetchBounds) {
+    return { bounds: opts.fetchBounds }
+  }
+
+  if (opts.licensedStateKey) return { stateKey: opts.licensedStateKey }
+  if (opts.fetchBounds) return { bounds: opts.fetchBounds }
+  return null
 }
 
 function readScopedStateHint(focusState?: string, scopeState?: string): string | undefined {
@@ -886,6 +939,32 @@ export function GISMap({
     isDemoSimulation,
   ])
 
+  const debouncedViewportBounds = useDebouncedMapBounds(mapViewportBounds, 350)
+
+  /** Quantized + debounced bounds for open-source layer API fetches (dams, shelters, fuel). */
+  const openSourceLayerFetchBounds = useMemo((): MapStateBounds | null => {
+    if (restrictToUsa && debouncedViewportBounds && !viewportCenterInUsa(debouncedViewportBounds)) {
+      return null
+    }
+    let bounds: MapStateBounds | null = null
+    if (debouncedViewportBounds) {
+      bounds = quantizeLayerFetchBounds(debouncedViewportBounds, mapZoom)
+    } else if (mapZoom <= 7) {
+      bounds = CONUS_MAP_BOUNDS
+    } else {
+      return null
+    }
+    return clampFetchBounds(bounds)
+  }, [debouncedViewportBounds, mapZoom, clampFetchBounds, restrictToUsa])
+
+  const markerInLayerViewport = useCallback(
+    (lat: number, lng: number) => {
+      if (!mapViewportBounds) return true
+      return pointInPaddedBounds(lat, lng, mapViewportBounds, 0.25)
+    },
+    [mapViewportBounds],
+  )
+
   const infraPlacesQuery = useInfrastructurePlaces({
     enabled:
       GIS_MAP_FILTER_LAYERS_ENABLED &&
@@ -913,47 +992,38 @@ export function GISMap({
   })
 
   /** Super-admin: viewport bbox across USA. Sub-admin / scoped state: full state. Sub-admin radius: circle bounds. */
-  const damsFetchScope = useMemo((): {
-    stateKey?: string
-    bounds?: MapStateBounds | null
-  } | null => {
-    if (!mapLayers.dams) return null
-
-    if (lockToCoverageCircle && coverageCircle) {
-      const bounds = radiusBounds(
-        coverageCircle.center.lat,
-        coverageCircle.center.lng,
-        coverageCircle.radiusMeters * 1.08,
-      )
-      return { bounds }
-    }
-
-    const stateScopedView = Boolean(stateScoped || stateBoundsRestriction)
-    const hasStateScope = Boolean(damsStateKey && (stateScopedView || scopeState?.trim() || focusState?.trim()))
-
-    if (hasStateScope && damsStateKey) {
-      return { stateKey: damsStateKey }
-    }
-
-    if (restrictToUsa && infraFetchBounds) {
-      return { bounds: infraFetchBounds }
-    }
-
-    if (damsStateKey) return { stateKey: damsStateKey }
-    if (infraFetchBounds) return { bounds: infraFetchBounds }
-    return null
-  }, [
-    mapLayers.dams,
-    lockToCoverageCircle,
-    coverageCircle,
-    damsStateKey,
-    stateScoped,
-    stateBoundsRestriction,
-    restrictToUsa,
-    infraFetchBounds,
-    scopeState,
-    focusState,
-  ])
+  const { dams: damsFetchScope, shelters: sheltersFetchScope, fuel_sites: fuelSitesFetchScope } =
+    useMemo(() => {
+      const ctx = {
+        lockToCoverageCircle,
+        coverageCircle,
+        stateScoped,
+        stateBoundsRestriction,
+        licensedStateKey: damsStateKey,
+        restrictToUsa,
+        fetchBounds: openSourceLayerFetchBounds,
+        scopeState,
+        focusState,
+      }
+      return {
+        dams: buildOpenSourceLayerFetchScope(mapLayers.dams, ctx),
+        shelters: buildOpenSourceLayerFetchScope(mapLayers.shelters, ctx),
+        fuel_sites: buildOpenSourceLayerFetchScope(mapLayers.fuel_sites, ctx),
+      }
+    }, [
+      mapLayers.dams,
+      mapLayers.shelters,
+      mapLayers.fuel_sites,
+      lockToCoverageCircle,
+      coverageCircle,
+      damsStateKey,
+      stateScoped,
+      stateBoundsRestriction,
+      restrictToUsa,
+      openSourceLayerFetchBounds,
+      scopeState,
+      focusState,
+    ])
 
   const damsLayerQuery = useMapLayerDams({
     enabled:
@@ -965,48 +1035,6 @@ export function GISMap({
     bounds: damsFetchScope?.stateKey ? null : damsFetchScope?.bounds ?? null,
   })
 
-  const sheltersFetchScope = useMemo((): {
-    stateKey?: string
-    bounds?: MapStateBounds | null
-  } | null => {
-    if (!mapLayers.shelters) return null
-
-    if (lockToCoverageCircle && coverageCircle) {
-      const bounds = radiusBounds(
-        coverageCircle.center.lat,
-        coverageCircle.center.lng,
-        coverageCircle.radiusMeters * 1.08,
-      )
-      return { bounds }
-    }
-
-    const stateScopedView = Boolean(stateScoped || stateBoundsRestriction)
-    const hasStateScope = Boolean(damsStateKey && (stateScopedView || scopeState?.trim() || focusState?.trim()))
-
-    if (hasStateScope && damsStateKey) {
-      return { stateKey: damsStateKey }
-    }
-
-    if (restrictToUsa && infraFetchBounds) {
-      return { bounds: infraFetchBounds }
-    }
-
-    if (damsStateKey) return { stateKey: damsStateKey }
-    if (infraFetchBounds) return { bounds: infraFetchBounds }
-    return null
-  }, [
-    mapLayers.shelters,
-    lockToCoverageCircle,
-    coverageCircle,
-    damsStateKey,
-    stateScoped,
-    stateBoundsRestriction,
-    restrictToUsa,
-    infraFetchBounds,
-    scopeState,
-    focusState,
-  ])
-
   const sheltersLayerQuery = useMapLayerShelters({
     enabled:
       OPEN_SOURCE_MAP_LAYERS_ENABLED &&
@@ -1015,6 +1043,16 @@ export function GISMap({
       !isDemoSimulation,
     stateKey: sheltersFetchScope?.stateKey ?? null,
     bounds: sheltersFetchScope?.stateKey ? null : sheltersFetchScope?.bounds ?? null,
+  })
+
+  const fuelSitesLayerQuery = useMapLayerFuelSites({
+    enabled:
+      OPEN_SOURCE_MAP_LAYERS_ENABLED &&
+      Boolean(fuelSitesFetchScope) &&
+      viewportInUsa &&
+      !isDemoSimulation,
+    stateKey: fuelSitesFetchScope?.stateKey ?? null,
+    bounds: fuelSitesFetchScope?.stateKey ? null : fuelSitesFetchScope?.bounds ?? null,
   })
 
   const infraFetchScopeKey = useMemo(() => {
@@ -1828,6 +1866,7 @@ export function GISMap({
       for (const dam of damsLayerQuery.data) {
         if (!inUsaView(dam.lat, dam.lng)) continue
         if (!skipCoverageFilter && !markerInCoverage({ lat: dam.lat, lng: dam.lng })) continue
+        if (skipCoverageFilter && !markerInLayerViewport(dam.lat, dam.lng)) continue
         const parts = [`ID: ${dam.federalId}`, `Hazard: ${dam.hazardClass}`, `Condition: ${dam.condition}`]
         if (dam.maxStorage != null) parts.push(`Max storage: ${dam.maxStorage} ac-ft`)
         if (dam.damHeight != null) parts.push(`Height: ${dam.damHeight} ft`)
@@ -1851,6 +1890,7 @@ export function GISMap({
       for (const shelter of sheltersLayerQuery.data) {
         if (!inUsaView(shelter.lat, shelter.lng)) continue
         if (!skipCoverageFilter && !markerInCoverage({ lat: shelter.lat, lng: shelter.lng })) continue
+        if (skipCoverageFilter && !markerInLayerViewport(shelter.lat, shelter.lng)) continue
         const parts = [
           `Status: ${shelter.status}`,
           `Usage: ${shelter.facilityUsage}`,
@@ -1885,6 +1925,35 @@ export function GISMap({
       }
     }
 
+    if (OPEN_SOURCE_MAP_LAYERS_ENABLED && mapLayers.fuel_sites && fuelSitesLayerQuery.data?.length) {
+      const skipCoverageFilter = restrictToUsa && !stateBoundsRestriction && !lockToCoverageCircle
+      for (const site of fuelSitesLayerQuery.data) {
+        if (!inUsaView(site.lat, site.lng)) continue
+        if (!skipCoverageFilter && !markerInCoverage({ lat: site.lat, lng: site.lng })) continue
+        if (skipCoverageFilter && !markerInLayerViewport(site.lat, site.lng)) continue
+        const parts = [
+          `Fuel: ${site.fuelType}`,
+          `Access: ${site.access}`,
+          `Status: ${site.status}`,
+        ]
+        if (site.accessHours) parts.push(site.accessHours)
+        if (site.address) parts.push(site.address)
+        if (site.phone) parts.push(site.phone)
+        enabledLayerMarkers.push({
+          id: site.id,
+          position: { lat: site.lat, lng: site.lng },
+          title: site.title,
+          type: 'infrastructure' as const,
+          category: FUEL_SITES_MAP_LAYER.label,
+          status: site.status,
+          location: site.location,
+          description: parts.join(' · '),
+          color: FUEL_SITES_MAP_LAYER.color,
+          icon: FUEL_SITES_MAP_LAYER.markerIcon,
+        })
+      }
+    }
+
     return [...activeTabMarkers, ...enabledLayerMarkers]
   }, [
     markers,
@@ -1904,6 +1973,8 @@ export function GISMap({
     isDemoSimulation,
     damsLayerQuery.data,
     sheltersLayerQuery.data,
+    fuelSitesLayerQuery.data,
+    markerInLayerViewport,
   ])
 
   const disasterZonesVisible = useMemo(() => {
@@ -2032,23 +2103,32 @@ export function GISMap({
           onBoundsChanged={interactiveMapLayersActive ? handleMapBoundsChange : undefined}
           clusterInfrastructure={interactiveMapLayersActive && !isDemoSimulation}
           infrastructureClusterMode={
-            mapLayers.dams ? 'dams' : mapLayers.shelters ? 'shelters' : 'default'
+            mapLayers.dams
+              ? 'dams'
+              : mapLayers.shelters
+                ? 'shelters'
+                : mapLayers.fuel_sites
+                  ? 'fuel'
+                  : 'default'
           }
           allowZoomOut={stateScoped}
         />
 
-        {(damsLayerQuery.isFetching ||
-          sheltersLayerQuery.isFetching ||
+        {((damsLayerQuery.isFetching && !damsLayerQuery.data?.length) ||
+          (sheltersLayerQuery.isFetching && !sheltersLayerQuery.data?.length) ||
+          (fuelSitesLayerQuery.isFetching && !fuelSitesLayerQuery.data?.length) ||
           (GIS_MAP_FILTER_LAYERS_ENABLED &&
             (isSearchingInfra || isLoadingCriticalInfra || isLoadingRoadClosures))) && (
           <div className="absolute right-4 top-4 bg-white/90 backdrop-blur-md px-4 py-2 rounded-2xl shadow-2xl border border-slate-100 flex items-center gap-2 z-50 animate-in fade-in slide-in-from-top-2 duration-300">
             <Loader2 className="w-4 h-4 text-[#33375D] animate-spin" />
             <span className="text-[10px] font-black uppercase tracking-widest text-slate-600">
-              {damsLayerQuery.isFetching
+              {damsLayerQuery.isFetching && !damsLayerQuery.data?.length
                 ? 'Loading Dams…'
-                : sheltersLayerQuery.isFetching
+                : sheltersLayerQuery.isFetching && !sheltersLayerQuery.data?.length
                   ? 'Loading Shelters…'
-                  : 'Locating Facilities…'}
+                  : fuelSitesLayerQuery.isFetching && !fuelSitesLayerQuery.data?.length
+                    ? 'Loading Fuel Sites…'
+                    : 'Locating Facilities…'}
             </span>
           </div>
         )}
