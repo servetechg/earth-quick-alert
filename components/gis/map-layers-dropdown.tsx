@@ -10,10 +10,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
-import { DAMS_MAP_LAYER, SHELTERS_MAP_LAYER } from '@/lib/gis/map-layer-config'
-
-/** Open-source map layers shown in the GIS filter (extend when new APIs are wired). */
-const OPEN_SOURCE_MAP_LAYERS = [DAMS_MAP_LAYER, SHELTERS_MAP_LAYER] as const
+import { OPEN_SOURCE_MAP_LAYERS } from '@/lib/gis/map-layer-config'
 
 interface MapLayersDropdownProps {
   layers: Record<string, boolean>

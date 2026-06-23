@@ -1,6 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import { layerBoundsCacheKey } from '@/lib/gis/layers/map-layer-bounds-utils';
 import type { InfrastructurePlaceResult } from '@/lib/gis/infrastructure-places-fetch';
 
 export type MapBoundsPayload = {
@@ -128,9 +129,7 @@ export function useMapLayerDams(opts: {
     bounds?: MapBoundsPayload | null;
 }) {
     const stateKey = opts.stateKey?.trim().toUpperCase() ?? '';
-    const boundsKey = opts.bounds
-        ? `${opts.bounds.west.toFixed(3)},${opts.bounds.south.toFixed(3)},${opts.bounds.east.toFixed(3)},${opts.bounds.north.toFixed(3)}`
-        : 'none';
+    const boundsKey = opts.bounds ? layerBoundsCacheKey(opts.bounds) : 'none';
 
     return useQuery({
         queryKey: ['map-layer', 'dams', stateKey || 'auto', boundsKey],
@@ -142,8 +141,9 @@ export function useMapLayerDams(opts: {
         enabled:
             opts.enabled &&
             Boolean(stateKey || opts.bounds),
-        staleTime: 10 * 60_000,
-        gcTime: 30 * 60_000,
+        staleTime: 15 * 60_000,
+        gcTime: 60 * 60_000,
+        placeholderData: (prev) => prev,
     });
 }
 
@@ -194,9 +194,7 @@ export function useMapLayerShelters(opts: {
     bounds?: MapBoundsPayload | null;
 }) {
     const stateKey = opts.stateKey?.trim().toUpperCase() ?? '';
-    const boundsKey = opts.bounds
-        ? `${opts.bounds.west.toFixed(2)},${opts.bounds.south.toFixed(2)},${opts.bounds.east.toFixed(2)},${opts.bounds.north.toFixed(2)}`
-        : 'none';
+    const boundsKey = opts.bounds ? layerBoundsCacheKey(opts.bounds) : 'none';
 
     return useQuery({
         queryKey: ['map-layer', 'shelters', stateKey || 'auto', boundsKey],
@@ -208,8 +206,71 @@ export function useMapLayerShelters(opts: {
         enabled:
             opts.enabled &&
             Boolean(stateKey || opts.bounds),
-        staleTime: 10 * 60_000,
-        gcTime: 30 * 60_000,
+        staleTime: 15 * 60_000,
+        gcTime: 60 * 60_000,
+        placeholderData: (prev) => prev,
+    });
+}
+
+export type FuelSiteMapMarkerPayload = {
+    id: string;
+    stationRecordId: string;
+    title: string;
+    lat: number;
+    lng: number;
+    stateKey: string;
+    city: string;
+    address: string;
+    zip: string;
+    fuelType: string;
+    access: string;
+    status: string;
+    facilityType: string;
+    phone: string;
+    accessHours: string;
+    location: string;
+};
+
+async function fetchFuelSiteLayerMarkers(input: {
+    stateKey?: string;
+    bounds?: MapBoundsPayload | null;
+}): Promise<FuelSiteMapMarkerPayload[]> {
+    const params = new URLSearchParams();
+    if (input.stateKey) params.set('state', input.stateKey);
+    if (input.bounds) {
+        params.set('west', String(input.bounds.west));
+        params.set('south', String(input.bounds.south));
+        params.set('east', String(input.bounds.east));
+        params.set('north', String(input.bounds.north));
+    }
+    const res = await fetch(`/api/map/layers/fuel-sites?${params.toString()}`, {
+        credentials: 'include',
+    });
+    if (!res.ok) throw new Error(`map/layers/fuel-sites ${res.status}`);
+    const data = await res.json();
+    return Array.isArray(data.markers) ? data.markers : [];
+}
+
+export function useMapLayerFuelSites(opts: {
+    enabled: boolean;
+    stateKey?: string | null;
+    bounds?: MapBoundsPayload | null;
+}) {
+    const stateKey = opts.stateKey?.trim().toUpperCase() ?? '';
+    const boundsKey = opts.bounds ? layerBoundsCacheKey(opts.bounds) : 'none';
+
+    return useQuery({
+        queryKey: ['map-layer', 'fuel-sites', stateKey || 'auto', boundsKey],
+        queryFn: () =>
+            fetchFuelSiteLayerMarkers({
+                stateKey: stateKey || undefined,
+                bounds: stateKey ? null : opts.bounds ?? null,
+            }),
+        enabled:
+            opts.enabled &&
+            Boolean(stateKey || opts.bounds),
+        staleTime: 15 * 60_000,
+        gcTime: 60 * 60_000,
         placeholderData: (prev) => prev,
     });
 }
