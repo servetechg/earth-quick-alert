@@ -93,6 +93,8 @@ export interface SituationalMapProps {
     onHeatIncidentSelect?: (incident: UnifiedEventHeatPoint) => void;
     onBoundsChanged?: (bounds: MapStateBounds) => void;
     clusterInfrastructure?: boolean;
+    /** Use dam-friendly clustering (lower uncluster zoom, count badges). */
+    infrastructureClusterMode?: 'default' | 'dams' | 'shelters' | 'fuel';
     fitStateOnLoad?: boolean;
     allowZoomOut?: boolean;
 }

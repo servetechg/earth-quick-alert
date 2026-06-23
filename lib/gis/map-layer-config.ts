@@ -4,7 +4,7 @@ import {
   type GisFilterLayerDef,
 } from '@/lib/gis/gis-filter-layers'
 import { CRITICAL_INFRASTRUCTURE_SECTORS } from '@/lib/gis/critical-infrastructure-sectors'
-import { AlertTriangle } from 'lucide-react'
+import { AlertTriangle, Droplets, Fuel, Home } from 'lucide-react'
 
 export type { GisFilterLayerDef } from '@/lib/gis/gis-filter-layers'
 
@@ -50,6 +50,40 @@ export const DISASTER_ZONE_LAYER: MapLayerDef = {
   color: '#DC2626',
 }
 
+/** Open-source NID dams layer (no Google billing). */
+export const DAMS_MAP_LAYER = {
+  id: 'dams',
+  label: 'Dams',
+  Icon: Droplets,
+  color: '#E32C28',
+  markerIcon: 'dam',
+} as const
+
+/** Open-source FEMA NSS shelters layer (no Google billing). */
+export const SHELTERS_MAP_LAYER = {
+  id: 'shelters',
+  label: 'Shelters',
+  Icon: Home,
+  color: '#16A34A',
+  markerIcon: 'shelter',
+} as const
+
+/** Open-source NREL AFDC fuel sites layer (no Google billing). */
+export const FUEL_SITES_MAP_LAYER = {
+  id: 'fuel_sites',
+  label: 'Fuel Sites',
+  Icon: Fuel,
+  color: '#D74C30',
+  markerIcon: 'fuel',
+} as const
+
+/** Layers shown in the open-source GIS filter dropdown. */
+export const OPEN_SOURCE_MAP_LAYERS = [
+  DAMS_MAP_LAYER,
+  SHELTERS_MAP_LAYER,
+  FUEL_SITES_MAP_LAYER,
+] as const
+
 export function buildDefaultMapLayerState(opts?: {
   includeCriticalInfra?: boolean
   includeDisasterZones?: boolean
@@ -66,6 +100,9 @@ export function buildDefaultMapLayerState(opts?: {
       defaults[sector.id] = false
     })
   }
+  defaults[DAMS_MAP_LAYER.id] = false
+  defaults[SHELTERS_MAP_LAYER.id] = false
+  defaults[FUEL_SITES_MAP_LAYER.id] = false
   return defaults
 }
 

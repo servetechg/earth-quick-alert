@@ -36,7 +36,7 @@ import {
     SUB_ADMIN_MIN_ZOOM,
     viewportExceedsBounds,
 } from '@/lib/gis/situational-map-utils';
-import { buildLeafletMarkerIcon, clusterIcon, heatIncidentPinIcon } from '@/lib/gis/situational-map-marker-icons';
+import { buildLeafletMarkerIcon, clusterIcon, damClusterIcon, fuelClusterIcon, heatIncidentPinIcon, shelterClusterIcon } from '@/lib/gis/situational-map-marker-icons';
 import type { UnifiedEventHeatPoint } from '@/lib/geo/unified-event-heatmap';
 
 export type {
@@ -230,10 +230,12 @@ function InfrastructureClusterLayer({
     markers,
     enabled,
     onSelect,
+    clusterMode = 'default',
 }: {
     markers: SituationalMapMarker[];
     enabled: boolean;
     onSelect: (m: SituationalMapMarker) => void;
+    clusterMode?: 'default' | 'dams' | 'shelters' | 'fuel';
 }) {
     const map = useMap();
     const groupRef = useRef<L.MarkerClusterGroup | null>(null);
@@ -245,11 +247,23 @@ function InfrastructureClusterLayer({
         }
         if (!enabled || markers.length === 0) return;
 
+        const isDams = clusterMode === 'dams';
+        const isShelters = clusterMode === 'shelters';
+        const isFuel = clusterMode === 'fuel';
+        const isFacilities = isDams || isShelters || isFuel;
+
         const group = L.markerClusterGroup({
             showCoverageOnHover: false,
-            maxClusterRadius: 58,
-            disableClusteringAtZoom: 11,
-            iconCreateFunction: () => clusterIcon(),
+            maxClusterRadius: isFacilities ? 45 : 58,
+            disableClusteringAtZoom: isFacilities ? 7 : 11,
+            spiderfyOnMaxZoom: isFacilities,
+            iconCreateFunction: isDams
+                ? (cluster) => damClusterIcon(cluster.getChildCount())
+                : isShelters
+                  ? (cluster) => shelterClusterIcon(cluster.getChildCount())
+                  : isFuel
+                    ? (cluster) => fuelClusterIcon(cluster.getChildCount())
+                    : () => clusterIcon(),
         });
 
         for (const marker of markers) {
@@ -270,7 +284,7 @@ function InfrastructureClusterLayer({
                 groupRef.current = null;
             }
         };
-    }, [map, markers, enabled, onSelect]);
+    }, [map, markers, enabled, onSelect, clusterMode]);
 
     return null;
 }
@@ -306,12 +320,19 @@ function MapClickHeatHandler({
 function MarkerPopupContent({
     marker,
     onViewDetails,
+    onClose,
 }: {
     marker: SituationalMapMarker;
     onViewDetails?: () => void;
+    onClose?: () => void;
 }) {
     return (
         <div className="p-2 min-w-[200px] max-w-[300px] text-slate-900">
+            {marker.category && (
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">
+                    {marker.category}
+                </p>
+            )}
             <h3 className="font-extrabold text-sm mb-1 uppercase tracking-tight">{marker.title}</h3>
             {marker.description && (
                 <p className="text-xs text-slate-600 mb-2 leading-relaxed">{marker.description}</p>
@@ -326,10 +347,14 @@ function MarkerPopupContent({
                     className={`text-[10px] font-black uppercase inline-block px-2 py-0.5 rounded ${
                         isHelpStatus(marker.status, marker.isSafe)
                             ? 'bg-red-100 text-red-700'
-                            : 'bg-emerald-100 text-emerald-700'
+                            : marker.type === 'infrastructure'
+                              ? 'bg-red-100 text-red-700'
+                              : 'bg-emerald-100 text-emerald-700'
                     }`}
                 >
-                    {formatMarkerStatus(marker.status, marker.isSafe)}
+                    {marker.type === 'infrastructure' && marker.status
+                        ? marker.status
+                        : formatMarkerStatus(marker.status, marker.isSafe)}
                 </p>
             )}
             {marker.riskReportHref && (
@@ -350,6 +375,18 @@ function MarkerPopupContent({
                     }}
                 >
                     View details →
+                </button>
+            )}
+            {onClose && (
+                <button
+                    type="button"
+                    className="mt-3 text-xs font-bold text-slate-500 hover:text-slate-800"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onClose();
+                    }}
+                >
+                    Close
                 </button>
             )}
         </div>
@@ -374,6 +411,7 @@ export function SituationalLeafletMap({
     onHeatIncidentSelect,
     onBoundsChanged,
     clusterInfrastructure = false,
+    infrastructureClusterMode = 'default',
     fitStateOnLoad = false,
     allowZoomOut = false,
 }: SituationalMapProps) {
@@ -471,6 +509,7 @@ export function SituationalLeafletMap({
 
     const handleInfraSelect = useCallback((m: SituationalMapMarker) => {
         setSelectedHeatIncident(null);
+        setSelectedRoadClosure(null);
         setSelectedMarker(m);
     }, []);
 
@@ -549,6 +588,7 @@ export function SituationalLeafletMap({
                     markers={infrastructureMarkers}
                     enabled={clusterInfrastructure}
                     onSelect={handleInfraSelect}
+                    clusterMode={infrastructureClusterMode}
                 />
                 <MapClickHeatHandler
                     heatClickOnly={heatClickOnly}
@@ -711,6 +751,15 @@ export function SituationalLeafletMap({
                     >
                         Close
                     </button>
+                </div>
+            )}
+
+            {selectedMarker?.type === 'infrastructure' && clusterInfrastructure && (
+                <div className="absolute left-4 bottom-4 z-[500] max-w-[320px] rounded-xl border border-slate-200 bg-white shadow-xl">
+                    <MarkerPopupContent
+                        marker={selectedMarker}
+                        onClose={() => setSelectedMarker(null)}
+                    />
                 </div>
             )}
 
