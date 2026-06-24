@@ -2,6 +2,8 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { layerBoundsCacheKey } from '@/lib/gis/layers/map-layer-bounds-utils';
+import type { ChemicalSiteMapMarker } from '@/lib/gis/layers/chemical-sites-types';
+import type { FinancialSiteMapMarker } from '@/lib/gis/layers/financial-sites-types';
 import type { InfrastructurePlaceResult } from '@/lib/gis/infrastructure-places-fetch';
 
 export type MapBoundsPayload = {
@@ -263,6 +265,98 @@ export function useMapLayerFuelSites(opts: {
         queryKey: ['map-layer', 'fuel-sites', stateKey || 'auto', boundsKey],
         queryFn: () =>
             fetchFuelSiteLayerMarkers({
+                stateKey: stateKey || undefined,
+                bounds: stateKey ? null : opts.bounds ?? null,
+            }),
+        enabled:
+            opts.enabled &&
+            Boolean(stateKey || opts.bounds),
+        staleTime: 15 * 60_000,
+        gcTime: 60 * 60_000,
+        placeholderData: (prev) => prev,
+    });
+}
+
+export type ChemicalSiteMapMarkerPayload = ChemicalSiteMapMarker;
+
+async function fetchChemicalSiteLayerMarkers(input: {
+    stateKey?: string;
+    bounds?: MapBoundsPayload | null;
+}): Promise<ChemicalSiteMapMarkerPayload[]> {
+    const params = new URLSearchParams();
+    if (input.stateKey) params.set('state', input.stateKey);
+    if (input.bounds) {
+        params.set('west', String(input.bounds.west));
+        params.set('south', String(input.bounds.south));
+        params.set('east', String(input.bounds.east));
+        params.set('north', String(input.bounds.north));
+    }
+    const res = await fetch(`/api/map/layers/chemical-sites?${params.toString()}`, {
+        credentials: 'include',
+    });
+    if (!res.ok) throw new Error(`map/layers/chemical-sites ${res.status}`);
+    const data = await res.json();
+    return Array.isArray(data.markers) ? data.markers : [];
+}
+
+export function useMapLayerChemicalSites(opts: {
+    enabled: boolean;
+    stateKey?: string | null;
+    bounds?: MapBoundsPayload | null;
+}) {
+    const stateKey = opts.stateKey?.trim().toUpperCase() ?? '';
+    const boundsKey = opts.bounds ? layerBoundsCacheKey(opts.bounds) : 'none';
+
+    return useQuery({
+        queryKey: ['map-layer', 'chemical-sites', stateKey || 'auto', boundsKey],
+        queryFn: () =>
+            fetchChemicalSiteLayerMarkers({
+                stateKey: stateKey || undefined,
+                bounds: stateKey ? null : opts.bounds ?? null,
+            }),
+        enabled:
+            opts.enabled &&
+            Boolean(stateKey || opts.bounds),
+        staleTime: 15 * 60_000,
+        gcTime: 60 * 60_000,
+        placeholderData: (prev) => prev,
+    });
+}
+
+export type FinancialSiteMapMarkerPayload = FinancialSiteMapMarker;
+
+async function fetchFinancialSiteLayerMarkers(input: {
+    stateKey?: string;
+    bounds?: MapBoundsPayload | null;
+}): Promise<FinancialSiteMapMarkerPayload[]> {
+    const params = new URLSearchParams();
+    if (input.stateKey) params.set('state', input.stateKey);
+    if (input.bounds) {
+        params.set('west', String(input.bounds.west));
+        params.set('south', String(input.bounds.south));
+        params.set('east', String(input.bounds.east));
+        params.set('north', String(input.bounds.north));
+    }
+    const res = await fetch(`/api/map/layers/financial-sites?${params.toString()}`, {
+        credentials: 'include',
+    });
+    if (!res.ok) throw new Error(`map/layers/financial-sites ${res.status}`);
+    const data = await res.json();
+    return Array.isArray(data.markers) ? data.markers : [];
+}
+
+export function useMapLayerFinancialSites(opts: {
+    enabled: boolean;
+    stateKey?: string | null;
+    bounds?: MapBoundsPayload | null;
+}) {
+    const stateKey = opts.stateKey?.trim().toUpperCase() ?? '';
+    const boundsKey = opts.bounds ? layerBoundsCacheKey(opts.bounds) : 'none';
+
+    return useQuery({
+        queryKey: ['map-layer', 'financial-sites', stateKey || 'auto', boundsKey],
+        queryFn: () =>
+            fetchFinancialSiteLayerMarkers({
                 stateKey: stateKey || undefined,
                 bounds: stateKey ? null : opts.bounds ?? null,
             }),

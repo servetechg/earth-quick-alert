@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useMemo } from 'react'
-import { ChevronDown, Layers } from 'lucide-react'
+import { Building2, ChevronDown, Layers } from 'lucide-react'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import {
@@ -10,11 +10,17 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
-import { OPEN_SOURCE_MAP_LAYERS } from '@/lib/gis/map-layer-config'
+import {
+  DISASTER_ZONE_LAYER,
+  IMPLEMENTED_CRITICAL_INFRA_MAP_SECTORS,
+  OPEN_SOURCE_MAP_LAYERS,
+} from '@/lib/gis/map-layer-config'
 
 interface MapLayersDropdownProps {
   layers: Record<string, boolean>
   onChange: (updater: (prev: Record<string, boolean>) => Record<string, boolean>) => void
+  showCriticalInfra?: boolean
+  showDisasterZones?: boolean
 }
 
 function LayerRow({
@@ -24,6 +30,7 @@ function LayerRow({
   Icon,
   checked,
   onToggle,
+  compact,
 }: {
   id: string
   label: string
@@ -31,6 +38,7 @@ function LayerRow({
   Icon: React.ComponentType<{ className?: string }>
   checked: boolean
   onToggle: () => void
+  compact?: boolean
 }) {
   return (
     <div className="flex items-center gap-2.5 py-1.5 px-1 rounded-lg hover:bg-slate-50">
@@ -49,7 +57,8 @@ function LayerRow({
       <Label
         htmlFor={`layer-dd-${id}`}
         className={cn(
-          'font-black text-[#33375D]/95 uppercase tracking-wide cursor-pointer select-none flex-1 leading-tight text-[11px]',
+          'font-black text-[#33375D]/95 uppercase tracking-wide cursor-pointer select-none flex-1 leading-tight',
+          compact ? 'text-[10px]' : 'text-[11px]',
         )}
       >
         {label}
@@ -58,11 +67,22 @@ function LayerRow({
   )
 }
 
-export function MapLayersDropdown({ layers, onChange }: MapLayersDropdownProps) {
-  const enabledCount = useMemo(
-    () => OPEN_SOURCE_MAP_LAYERS.filter((l) => layers[l.id]).length,
-    [layers],
-  )
+export function MapLayersDropdown({
+  layers,
+  onChange,
+  showCriticalInfra = false,
+  showDisasterZones = false,
+}: MapLayersDropdownProps) {
+  const enabledCount = useMemo(() => {
+    let count = OPEN_SOURCE_MAP_LAYERS.filter((l) => layers[l.id]).length
+    if (showCriticalInfra) {
+      count += IMPLEMENTED_CRITICAL_INFRA_MAP_SECTORS.filter((s) => layers[s.id]).length
+    }
+    if (showDisasterZones && layers[DISASTER_ZONE_LAYER.id]) {
+      count += 1
+    }
+    return count
+  }, [layers, showCriticalInfra, showDisasterZones])
 
   const toggle = (id: string) => {
     onChange((prev) => ({ ...prev, [id]: !prev[id] }))
@@ -109,6 +129,44 @@ export function MapLayersDropdown({ layers, onChange }: MapLayersDropdownProps) 
             />
           ))}
         </div>
+
+        {/* {showDisasterZones && (
+          <div className="mt-3 pt-2 border-t border-slate-100">
+            <LayerRow
+              id={DISASTER_ZONE_LAYER.id}
+              label={DISASTER_ZONE_LAYER.label}
+              color={DISASTER_ZONE_LAYER.color}
+              Icon={DISASTER_ZONE_LAYER.Icon}
+              checked={!!layers[DISASTER_ZONE_LAYER.id]}
+              onToggle={() => toggle(DISASTER_ZONE_LAYER.id)}
+            />
+          </div>
+        )} */}
+
+        {showCriticalInfra && (
+          <div className="mt-3 pt-2 border-t border-slate-100">
+            <div className="flex items-center gap-1.5 px-1 pb-2">
+              <Building2 className="w-3.5 h-3.5 text-amber-600" />
+              <span className="text-[10px] font-black uppercase tracking-widest text-amber-700">
+                Critical Infrastructure
+              </span>
+            </div>
+            <div className="space-y-0.5 pl-1">
+              {IMPLEMENTED_CRITICAL_INFRA_MAP_SECTORS.map((sector) => (
+                <LayerRow
+                  key={sector.id}
+                  id={sector.id}
+                  label={sector.shortLabel}
+                  color={sector.color}
+                  Icon={sector.Icon}
+                  checked={!!layers[sector.id]}
+                  onToggle={() => toggle(sector.id)}
+                  compact
+                />
+              ))}
+            </div>
+          </div>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   )
