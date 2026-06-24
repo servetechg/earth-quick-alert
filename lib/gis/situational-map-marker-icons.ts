@@ -79,6 +79,24 @@ export function buildLeafletMarkerIcon(marker: SituationalMapMarker): L.DivIcon 
         });
     }
 
+    if (marker.icon === 'chemical' || (marker.type === 'infrastructure' && (marker.category === 'Chemical' || marker.category === 'Chemical Sites' || marker.category === 'Chemical Storage & Manufacturing'))) {
+        return L.icon({
+            iconUrl: '/icons/chemical-marker.svg',
+            iconSize: [36, 36],
+            iconAnchor: [18, 18],
+            popupAnchor: [0, -18],
+        });
+    }
+
+    if (marker.icon === 'financial' || (marker.type === 'infrastructure' && (marker.category === 'Financial' || marker.category === 'Financial Sites' || marker.category === 'Financial Services'))) {
+        return L.icon({
+            iconUrl: '/icons/financial-marker.svg',
+            iconSize: [36, 36],
+            iconAnchor: [18, 18],
+            popupAnchor: [0, -18],
+        });
+    }
+
     if (marker.type === 'infrastructure' && marker.glyph) {
         const bg = marker.color || '#6366F1';
         const size = 34;
@@ -175,6 +193,32 @@ export function fuelClusterIcon(count: number): L.DivIcon {
     const html = `<div style="width:${size}px;height:${size}px;border-radius:50%;background:#D74C30;border:2.5px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.28);display:flex;align-items:center;justify-content:center;color:#fff;font-family:Arial,sans-serif;font-weight:800;font-size:${count > 99 ? 10 : 12}px;">${label}</div>`;
     return L.divIcon({
         className: 'situational-map-fuel-cluster',
+        html,
+        iconSize: [size, size],
+        iconAnchor: [size / 2, size / 2],
+    });
+}
+
+/** Purple chemical cluster badge with count — matches chemical-marker.svg. */
+export function chemicalClusterIcon(count: number): L.DivIcon {
+    const label = count > 999 ? '999+' : String(count);
+    const size = count > 99 ? 44 : 38;
+    const html = `<div style="width:${size}px;height:${size}px;border-radius:50%;background:#7C3AED;border:2.5px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.28);display:flex;align-items:center;justify-content:center;color:#fff;font-family:Arial,sans-serif;font-weight:800;font-size:${count > 99 ? 10 : 12}px;">${label}</div>`;
+    return L.divIcon({
+        className: 'situational-map-chemical-cluster',
+        html,
+        iconSize: [size, size],
+        iconAnchor: [size / 2, size / 2],
+    });
+}
+
+/** Green financial cluster badge with count — matches financial-marker.svg. */
+export function financialClusterIcon(count: number): L.DivIcon {
+    const label = count > 999 ? '999+' : String(count);
+    const size = count > 99 ? 44 : 38;
+    const html = `<div style="width:${size}px;height:${size}px;border-radius:50%;background:#059669;border:2.5px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.28);display:flex;align-items:center;justify-content:center;color:#fff;font-family:Arial,sans-serif;font-weight:800;font-size:${count > 99 ? 10 : 12}px;">${label}</div>`;
+    return L.divIcon({
+        className: 'situational-map-financial-cluster',
         html,
         iconSize: [size, size],
         iconAnchor: [size / 2, size / 2],

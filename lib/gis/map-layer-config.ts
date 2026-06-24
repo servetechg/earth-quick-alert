@@ -3,8 +3,11 @@ import {
   OPERATIONAL_MAP_LAYERS,
   type GisFilterLayerDef,
 } from '@/lib/gis/gis-filter-layers'
-import { CRITICAL_INFRASTRUCTURE_SECTORS } from '@/lib/gis/critical-infrastructure-sectors'
-import { AlertTriangle, Droplets, Fuel, Home } from 'lucide-react'
+import {
+  CRITICAL_INFRASTRUCTURE_SECTORS,
+  type CriticalInfraSectorId,
+} from '@/lib/gis/critical-infrastructure-sectors'
+import { AlertTriangle, Droplets, FlaskConical, Fuel, Home, Landmark } from 'lucide-react'
 
 export type { GisFilterLayerDef } from '@/lib/gis/gis-filter-layers'
 
@@ -77,12 +80,44 @@ export const FUEL_SITES_MAP_LAYER = {
   markerIcon: 'fuel',
 } as const
 
-/** Layers shown in the open-source GIS filter dropdown. */
+/** Mongo-backed EPA FRS chemical (SEMS) — toggled under Critical Infrastructure. */
+export const CHEMICAL_SITES_MAP_LAYER = {
+  id: 'ci_chemical',
+  label: 'Chemical',
+  Icon: FlaskConical,
+  color: '#7C3AED',
+  markerIcon: 'chemical',
+} as const
+
+/** Mongo-backed FDIC bank branches — toggled under Critical Infrastructure. */
+export const FINANCIAL_SITES_MAP_LAYER = {
+  id: 'ci_financial',
+  label: 'Financial',
+  Icon: Landmark,
+  color: '#059669',
+  markerIcon: 'financial',
+} as const
+
+/** General open-source facility layers — national Mongo ingest complete (52/52 states). */
 export const OPEN_SOURCE_MAP_LAYERS = [
   DAMS_MAP_LAYER,
   SHELTERS_MAP_LAYER,
   FUEL_SITES_MAP_LAYER,
 ] as const
+
+/** CI sectors with Mongo-backed map layers (shown in Filter dropdown). */
+export const MONGO_CRITICAL_INFRA_SECTOR_IDS: CriticalInfraSectorId[] = [
+  'ci_chemical',
+  'ci_financial',
+]
+
+/** @deprecated Use MONGO_CRITICAL_INFRA_SECTOR_IDS */
+export const IMPLEMENTED_CRITICAL_INFRA_SECTOR_IDS = MONGO_CRITICAL_INFRA_SECTOR_IDS
+
+/** Critical Infrastructure rows shown in the GIS Filter dropdown (implemented only). */
+export const IMPLEMENTED_CRITICAL_INFRA_MAP_SECTORS = CRITICAL_INFRASTRUCTURE_SECTORS.filter(
+  (s) => MONGO_CRITICAL_INFRA_SECTOR_IDS.includes(s.id),
+)
 
 export function buildDefaultMapLayerState(opts?: {
   includeCriticalInfra?: boolean
@@ -96,8 +131,8 @@ export function buildDefaultMapLayerState(opts?: {
     defaults[DISASTER_ZONE_LAYER.id] = false
   }
   if (opts?.includeCriticalInfra) {
-    CRITICAL_INFRASTRUCTURE_SECTORS.forEach((sector) => {
-      defaults[sector.id] = false
+    MONGO_CRITICAL_INFRA_SECTOR_IDS.forEach((sectorId) => {
+      defaults[sectorId] = false
     })
   }
   defaults[DAMS_MAP_LAYER.id] = false
@@ -119,8 +154,8 @@ export function buildDemoMapLayerState(opts?: {
     state[DISASTER_ZONE_LAYER.id] = true
   }
   if (opts?.includeCriticalInfra) {
-    CRITICAL_INFRASTRUCTURE_SECTORS.forEach((sector) => {
-      state[sector.id] = true
+    MONGO_CRITICAL_INFRA_SECTOR_IDS.forEach((sectorId) => {
+      state[sectorId] = true
     })
   }
   return state

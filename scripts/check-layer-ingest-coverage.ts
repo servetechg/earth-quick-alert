@@ -2,6 +2,8 @@ import 'dotenv/config';
 import connectDB from '../lib/mongodb';
 import MapLayerShelter from '../models/MapLayerShelter';
 import MapLayerFuelSite from '../models/MapLayerFuelSite';
+import MapLayerChemicalSite from '../models/MapLayerChemicalSite';
+import MapLayerFinancialSite from '../models/MapLayerFinancialSite';
 import { US_STATE_BBOX } from '../lib/constants/us-state-bounding-boxes';
 
 async function main() {
@@ -11,6 +13,8 @@ async function main() {
     for (const [label, Model] of [
         ['shelters', MapLayerShelter],
         ['fuel_sites', MapLayerFuelSite],
+        ['chemical_sites', MapLayerChemicalSite],
+        ['financial_sites', MapLayerFinancialSite],
     ] as const) {
         const total = await Model.countDocuments();
         const byState = await Model.aggregate<{ _id: string; count: number }>([
