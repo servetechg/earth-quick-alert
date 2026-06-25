@@ -1,38 +1,38 @@
 import mongoose, { Schema, model, models } from 'mongoose';
 
-const MapLayerChemicalSiteSchema = new Schema(
+const MapLayerHifldSiteSchema = new Schema(
     {
-        registryId: { type: String, required: true, unique: true, index: true },
+        facilityId: { type: String, required: true, index: true },
+        sectorId: { type: String, required: true, index: true },
         name: { type: String, required: true },
         stateKey: { type: String, required: true, index: true },
         state: { type: String, default: '' },
-        county: { type: String, default: '' },
         city: { type: String, default: '' },
         address: { type: String, default: '' },
         zip: { type: String, default: '' },
+        status: { type: String, default: '' },
+        datasetSlug: { type: String, default: '' },
         lat: { type: Number, required: true },
         lng: { type: Number, required: true },
         location: {
             type: { type: String, enum: ['Point'], default: 'Point' },
             coordinates: { type: [Number], required: true },
         },
-        programAcronym: { type: String, default: 'SEMS', index: true },
-        fipsCode: { type: String, default: '' },
-        supplementalLocation: { type: String, default: '' },
         properties: { type: Schema.Types.Mixed, default: {} },
         ingestedAt: { type: Date, default: Date.now },
     },
     { timestamps: true },
 );
 
-MapLayerChemicalSiteSchema.index({ location: '2dsphere' });
-MapLayerChemicalSiteSchema.index({ stateKey: 1, registryId: 1 });
+MapLayerHifldSiteSchema.index({ location: '2dsphere' });
+MapLayerHifldSiteSchema.index({ sectorId: 1, facilityId: 1 }, { unique: true });
+MapLayerHifldSiteSchema.index({ sectorId: 1, stateKey: 1 });
 
-if (process.env.NODE_ENV !== 'production' && models.MapLayerChemicalSite) {
-    delete models.MapLayerChemicalSite;
+if (process.env.NODE_ENV !== 'production' && models.MapLayerHifldSite) {
+    delete models.MapLayerHifldSite;
 }
 
-const MapLayerChemicalSite =
-    models.MapLayerChemicalSite || model('MapLayerChemicalSite', MapLayerChemicalSiteSchema);
+const MapLayerHifldSite =
+    models.MapLayerHifldSite || model('MapLayerHifldSite', MapLayerHifldSiteSchema);
 
-export default MapLayerChemicalSite;
+export default MapLayerHifldSite;

@@ -54,10 +54,12 @@ import {
   buildDemoMapLayerState,
   DAMS_MAP_LAYER,
   FUEL_SITES_MAP_LAYER,
-  CHEMICAL_SITES_MAP_LAYER,
   FINANCIAL_SITES_MAP_LAYER,
+  HIFLD_NEXT_IMPLEMENTED_SECTOR_IDS,
   MONGO_CRITICAL_INFRA_SECTOR_IDS,
   SHELTERS_MAP_LAYER,
+  criticalInfraSectorMarkerIcon,
+  resolveInfrastructureClusterMode,
 } from '@/lib/gis/map-layer-config'
 import { gisFilterLayerByResultType, gisFilterLayerById } from '@/lib/gis/gis-filter-layers'
 import type { GisFilterLayerDef } from '@/lib/gis/gis-filter-layers'
@@ -72,10 +74,10 @@ import {
 } from '@/lib/demo/disaster-zones-lrk'
 import {
   useInfrastructurePlaces,
-  useMapLayerChemicalSites,
   useMapLayerDams,
   useMapLayerFinancialSites,
   useMapLayerFuelSites,
+  useMapLayerHifldSites,
   useMapLayerShelters,
   useRoadClosures,
   useSituationalMap,
@@ -997,7 +999,7 @@ export function GISMap({
   })
 
   /** Super-admin: viewport bbox across USA. Sub-admin / scoped state: full state. Sub-admin radius: circle bounds. */
-  const { dams: damsFetchScope, shelters: sheltersFetchScope, fuel_sites: fuelSitesFetchScope, ci_chemical: chemicalSitesFetchScope, ci_financial: financialSitesFetchScope } =
+  const { dams: damsFetchScope, shelters: sheltersFetchScope, fuel_sites: fuelSitesFetchScope, ci_financial: financialSitesFetchScope } =
     useMemo(() => {
       const ctx = {
         lockToCoverageCircle,
@@ -1014,14 +1016,12 @@ export function GISMap({
         dams: buildOpenSourceLayerFetchScope(mapLayers.dams, ctx),
         shelters: buildOpenSourceLayerFetchScope(mapLayers.shelters, ctx),
         fuel_sites: buildOpenSourceLayerFetchScope(mapLayers.fuel_sites, ctx),
-        ci_chemical: buildOpenSourceLayerFetchScope(mapLayers.ci_chemical, ctx),
         ci_financial: buildOpenSourceLayerFetchScope(mapLayers.ci_financial, ctx),
       }
     }, [
       mapLayers.dams,
       mapLayers.shelters,
       mapLayers.fuel_sites,
-      mapLayers.ci_chemical,
       mapLayers.ci_financial,
       lockToCoverageCircle,
       coverageCircle,
@@ -1064,16 +1064,6 @@ export function GISMap({
     bounds: fuelSitesFetchScope?.stateKey ? null : fuelSitesFetchScope?.bounds ?? null,
   })
 
-  const chemicalSitesLayerQuery = useMapLayerChemicalSites({
-    enabled:
-      OPEN_SOURCE_MAP_LAYERS_ENABLED &&
-      Boolean(chemicalSitesFetchScope) &&
-      viewportInUsa &&
-      !isDemoSimulation,
-    stateKey: chemicalSitesFetchScope?.stateKey ?? null,
-    bounds: chemicalSitesFetchScope?.stateKey ? null : chemicalSitesFetchScope?.bounds ?? null,
-  })
-
   const financialSitesLayerQuery = useMapLayerFinancialSites({
     enabled:
       OPEN_SOURCE_MAP_LAYERS_ENABLED &&
@@ -1082,6 +1072,50 @@ export function GISMap({
       !isDemoSimulation,
     stateKey: financialSitesFetchScope?.stateKey ?? null,
     bounds: financialSitesFetchScope?.stateKey ? null : financialSitesFetchScope?.bounds ?? null,
+  })
+
+  const enabledHifldMongoSectors = useMemo(() => {
+    if (!showCriticalInfraLayers) return [] as (typeof HIFLD_NEXT_IMPLEMENTED_SECTOR_IDS)[number][]
+    return HIFLD_NEXT_IMPLEMENTED_SECTOR_IDS.filter((id) => mapLayers[id])
+  }, [showCriticalInfraLayers, mapLayers])
+
+  const hifldSitesFetchScope = useMemo(() => {
+    if (enabledHifldMongoSectors.length === 0) return null
+    const ctx = {
+      lockToCoverageCircle,
+      coverageCircle,
+      stateScoped,
+      stateBoundsRestriction,
+      licensedStateKey: damsStateKey,
+      restrictToUsa,
+      fetchBounds: openSourceLayerFetchBounds,
+      scopeState,
+      focusState,
+    }
+    return buildOpenSourceLayerFetchScope(true, ctx)
+  }, [
+    enabledHifldMongoSectors.length,
+    lockToCoverageCircle,
+    coverageCircle,
+    damsStateKey,
+    stateScoped,
+    stateBoundsRestriction,
+    restrictToUsa,
+    openSourceLayerFetchBounds,
+    scopeState,
+    focusState,
+  ])
+
+  const hifldSitesLayerQuery = useMapLayerHifldSites({
+    enabled:
+      OPEN_SOURCE_MAP_LAYERS_ENABLED &&
+      enabledHifldMongoSectors.length > 0 &&
+      Boolean(hifldSitesFetchScope) &&
+      viewportInUsa &&
+      !isDemoSimulation,
+    sectors: enabledHifldMongoSectors,
+    stateKey: hifldSitesFetchScope?.stateKey ?? null,
+    bounds: hifldSitesFetchScope?.stateKey ? null : hifldSitesFetchScope?.bounds ?? null,
   })
 
   const infraFetchScopeKey = useMemo(() => {
@@ -1991,33 +2025,6 @@ export function GISMap({
       }
     }
 
-    if (OPEN_SOURCE_MAP_LAYERS_ENABLED && mapLayers.ci_chemical && chemicalSitesLayerQuery.data?.length) {
-      const skipCoverageFilter = restrictToUsa && !stateBoundsRestriction && !lockToCoverageCircle
-      for (const site of chemicalSitesLayerQuery.data) {
-        if (!inUsaView(site.lat, site.lng)) continue
-        if (!skipCoverageFilter && !markerInCoverage({ lat: site.lat, lng: site.lng })) continue
-        if (skipCoverageFilter && !markerInLayerViewport(site.lat, site.lng)) continue
-        const parts = [
-          `Program: ${site.programAcronym}`,
-          `Registry: ${site.registryId}`,
-        ]
-        if (site.address) parts.push(site.address)
-        if (site.county) parts.push(site.county)
-        enabledLayerMarkers.push({
-          id: site.id,
-          position: { lat: site.lat, lng: site.lng },
-          title: site.title,
-          type: 'infrastructure' as const,
-          category: CHEMICAL_SITES_MAP_LAYER.label,
-          status: site.programAcronym,
-          location: site.location,
-          description: parts.join(' · '),
-          color: CHEMICAL_SITES_MAP_LAYER.color,
-          icon: CHEMICAL_SITES_MAP_LAYER.markerIcon,
-        })
-      }
-    }
-
     if (OPEN_SOURCE_MAP_LAYERS_ENABLED && mapLayers.ci_financial && financialSitesLayerQuery.data?.length) {
       const skipCoverageFilter = restrictToUsa && !stateBoundsRestriction && !lockToCoverageCircle
       for (const site of financialSitesLayerQuery.data) {
@@ -2042,6 +2049,34 @@ export function GISMap({
       }
     }
 
+    if (OPEN_SOURCE_MAP_LAYERS_ENABLED && hifldSitesLayerQuery.data?.length) {
+      const skipCoverageFilter = restrictToUsa && !stateBoundsRestriction && !lockToCoverageCircle
+      for (const site of hifldSitesLayerQuery.data) {
+        if (!mapLayers[site.sectorId]) continue
+        if (!inUsaView(site.lat, site.lng)) continue
+        if (!skipCoverageFilter && !markerInCoverage({ lat: site.lat, lng: site.lng })) continue
+        if (skipCoverageFilter && !markerInLayerViewport(site.lat, site.lng)) continue
+        const sectorDef = criticalSectorById(site.sectorId)
+        const markerIcon = criticalInfraSectorMarkerIcon(site.sectorId)
+        const parts = [site.status]
+        if (site.address) parts.push(site.address)
+        if (site.city) parts.push(site.city)
+        if (site.zip) parts.push(site.zip)
+        enabledLayerMarkers.push({
+          id: site.id,
+          position: { lat: site.lat, lng: site.lng },
+          title: site.title,
+          type: 'infrastructure' as const,
+          category: sectorDef?.label ?? site.sectorId,
+          status: site.status,
+          location: site.location,
+          description: parts.join(' · '),
+          color: sectorDef?.color ?? '#6366F1',
+          ...(markerIcon ? { icon: markerIcon } : { glyph: sectorDef?.markerGlyph }),
+        })
+      }
+    }
+
     return [...activeTabMarkers, ...enabledLayerMarkers]
   }, [
     markers,
@@ -2062,8 +2097,8 @@ export function GISMap({
     damsLayerQuery.data,
     sheltersLayerQuery.data,
     fuelSitesLayerQuery.data,
-    chemicalSitesLayerQuery.data,
     financialSitesLayerQuery.data,
+    hifldSitesLayerQuery.data,
     markerInLayerViewport,
   ])
 
@@ -2197,27 +2232,15 @@ export function GISMap({
           onHeatIncidentSelect={isDemoSimulation ? handleHeatIncidentSelect : undefined}
           onBoundsChanged={interactiveMapLayersActive ? handleMapBoundsChange : undefined}
           clusterInfrastructure={interactiveMapLayersActive && !isDemoSimulation}
-          infrastructureClusterMode={
-            mapLayers.dams
-              ? 'dams'
-              : mapLayers.shelters
-                ? 'shelters'
-                : mapLayers.fuel_sites
-                  ? 'fuel'
-                  : mapLayers.ci_chemical
-                    ? 'chemical'
-                    : mapLayers.ci_financial
-                      ? 'financial'
-                      : 'default'
-          }
+          infrastructureClusterMode={resolveInfrastructureClusterMode(mapLayers)}
           allowZoomOut={stateScoped}
         />
 
         {((damsLayerQuery.isFetching && !damsLayerQuery.data?.length) ||
           (sheltersLayerQuery.isFetching && !sheltersLayerQuery.data?.length) ||
           (fuelSitesLayerQuery.isFetching && !fuelSitesLayerQuery.data?.length) ||
-          (chemicalSitesLayerQuery.isFetching && !chemicalSitesLayerQuery.data?.length) ||
           (financialSitesLayerQuery.isFetching && !financialSitesLayerQuery.data?.length) ||
+          (hifldSitesLayerQuery.isFetching && !hifldSitesLayerQuery.data?.length) ||
           (showCriticalInfraLayers && isLoadingCriticalInfra) ||
           (GIS_MAP_FILTER_LAYERS_ENABLED &&
             (isSearchingInfra || isLoadingRoadClosures))) && (
@@ -2230,8 +2253,8 @@ export function GISMap({
                   ? 'Loading Shelters…'
                   : fuelSitesLayerQuery.isFetching && !fuelSitesLayerQuery.data?.length
                     ? 'Loading Fuel Sites…'
-                    : chemicalSitesLayerQuery.isFetching && !chemicalSitesLayerQuery.data?.length
-                      ? 'Loading Chemical Sites…'
+                    : hifldSitesLayerQuery.isFetching && !hifldSitesLayerQuery.data?.length
+                      ? 'Loading Critical Infrastructure…'
                       : financialSitesLayerQuery.isFetching && !financialSitesLayerQuery.data?.length
                         ? 'Loading Financial Sites…'
                         : showCriticalInfraLayers && isLoadingCriticalInfra

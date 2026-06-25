@@ -34,12 +34,6 @@ export const GIS_FILTER_MAP_LAYERS: MapLayerDef[] = ALL_GIS_FILTER_LAYERS.map((l
   markerIcon: layer.markerIcon,
 }))
 
-/** @deprecated Use GIS_FILTER_MAP_LAYERS */
-export const GOOGLE_PLACE_MAP_LAYERS: MapLayerDef[] = GIS_FILTER_MAP_LAYERS
-
-/** @deprecated Use GIS_FILTER_MAP_LAYERS */
-export const INFRASTRUCTURE_SUB_LAYERS = GIS_FILTER_MAP_LAYERS
-
 export const TOP_LEVEL_MAP_LAYERS: MapLayerDef[] = [
   ...OPERATIONAL_MAP_LAYERS.map((layer) => ({ ...layer })),
   ...GIS_FILTER_MAP_LAYERS,
@@ -80,7 +74,7 @@ export const FUEL_SITES_MAP_LAYER = {
   markerIcon: 'fuel',
 } as const
 
-/** Mongo-backed EPA FRS chemical (SEMS) — toggled under Critical Infrastructure. */
+/** HIFLD-backed chemical (RMP + SEMS) — toggled under Critical Infrastructure. */
 export const CHEMICAL_SITES_MAP_LAYER = {
   id: 'ci_chemical',
   label: 'Chemical',
@@ -105,14 +99,55 @@ export const OPEN_SOURCE_MAP_LAYERS = [
   FUEL_SITES_MAP_LAYER,
 ] as const
 
-/** CI sectors with Mongo-backed map layers (shown in Filter dropdown). */
-export const MONGO_CRITICAL_INFRA_SECTOR_IDS: CriticalInfraSectorId[] = [
+/** HIFLD Next sectors available on the map (Mongo and/or live fallback). */
+export const HIFLD_NEXT_IMPLEMENTED_SECTOR_IDS: CriticalInfraSectorId[] = [
   'ci_chemical',
-  'ci_financial',
+  'ci_healthcare',
+  'ci_emergency_services',
+  'ci_energy',
+  'ci_nuclear',
+  'ci_transportation',
+  'ci_water',
+  'ci_defense',
+  'ci_manufacturing',
+  'ci_communications',
 ]
 
-/** @deprecated Use MONGO_CRITICAL_INFRA_SECTOR_IDS */
-export const IMPLEMENTED_CRITICAL_INFRA_SECTOR_IDS = MONGO_CRITICAL_INFRA_SECTOR_IDS
+/** CI sectors with Mongo-backed map layers (shown in Filter dropdown). */
+export const MONGO_CRITICAL_INFRA_SECTOR_IDS: CriticalInfraSectorId[] = [
+  'ci_financial',
+  ...HIFLD_NEXT_IMPLEMENTED_SECTOR_IDS,
+]
+
+export type InfrastructureClusterMode =
+  | 'default'
+  | 'dams'
+  | 'shelters'
+  | 'fuel'
+  | 'chemical'
+  | 'financial'
+  | 'critical-infra'
+
+/** Match open-source facility clustering (dams / shelters / fuel) for active map layer. */
+export function resolveInfrastructureClusterMode(
+  mapLayers: Record<string, boolean>,
+): InfrastructureClusterMode {
+  if (mapLayers.dams) return 'dams'
+  if (mapLayers.shelters) return 'shelters'
+  if (mapLayers.fuel_sites) return 'fuel'
+  if (mapLayers.ci_chemical) return 'chemical'
+  if (mapLayers.ci_financial) return 'financial'
+  if (HIFLD_NEXT_IMPLEMENTED_SECTOR_IDS.some((id) => mapLayers[id])) return 'critical-infra'
+  return 'default'
+}
+
+/** SVG marker icon id for Mongo-backed CI sectors (glyph used when undefined). */
+export function criticalInfraSectorMarkerIcon(sectorId: CriticalInfraSectorId): string | undefined {
+  if (sectorId === 'ci_chemical') return CHEMICAL_SITES_MAP_LAYER.markerIcon
+  if (sectorId === 'ci_financial') return FINANCIAL_SITES_MAP_LAYER.markerIcon
+  return undefined
+}
+
 
 /** Critical Infrastructure rows shown in the GIS Filter dropdown (implemented only). */
 export const IMPLEMENTED_CRITICAL_INFRA_MAP_SECTORS = CRITICAL_INFRASTRUCTURE_SECTORS.filter(
