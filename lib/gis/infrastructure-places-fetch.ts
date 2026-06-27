@@ -513,17 +513,4 @@ export async function fetchInfrastructurePlacesForLayers(
     return filterPlacesByBounds(allResults, opts?.viewportBounds)
 }
 
-/** @deprecated use fetchInfrastructurePlacesForLayers */
-export async function fetchInfrastructurePlaces(
-    scope: InfrastructureSearchScope,
-    types: string[],
-    opts?: { viewportBounds?: MapBounds | null },
-): Promise<InfrastructurePlaceResult[]> {
-    const { GOOGLE_GIS_FILTER_LAYERS } = await import('@/lib/gis/gis-filter-layers')
-    const layers = GOOGLE_GIS_FILTER_LAYERS.filter((l) =>
-        l.fetch.mode === 'google_nearby' ? types.includes(l.fetch.placeType) : types.includes(l.resultType),
-    )
-    return fetchInfrastructurePlacesForLayers(scope, layers, opts)
-}
-
 export { boundsFromStateCode, PLACES_SEARCH_RADIUS_M }

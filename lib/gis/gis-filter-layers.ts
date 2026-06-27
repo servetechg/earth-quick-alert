@@ -2,7 +2,6 @@ import {
   CloudRain,
   AlertTriangle,
   Waves,
-  Home as HomeIcon,
   PlusSquare,
   Construction,
   Zap,
@@ -12,7 +11,6 @@ import {
   Flame,
   Siren,
   Pill,
-  Fuel,
   UtensilsCrossed,
   Users,
   type LucideIcon,
@@ -93,15 +91,6 @@ export const GOOGLE_GIS_FILTER_LAYERS: GisFilterLayerDef[] = [
     markerIcon: 'fire',
   },
   {
-    id: 'fuel_sites',
-    label: 'Fuel Sites',
-    Icon: Fuel,
-    color: '#D74C30',
-    fetch: { mode: 'google_nearby', placeType: 'gas_station' },
-    resultType: 'gas_station',
-    markerIcon: 'fuel',
-  },
-  {
     id: 'generators',
     label: 'Generators',
     Icon: Zap,
@@ -118,19 +107,6 @@ export const GOOGLE_GIS_FILTER_LAYERS: GisFilterLayerDef[] = [
     fetch: { mode: 'google_text', query: 'food bank meal distribution emergency feeding' },
     resultType: 'meals_ready',
     markerIcon: 'meals',
-  },
-  {
-    id: 'shelters',
-    label: 'Shelters',
-    Icon: HomeIcon,
-    color: '#16A34A',
-    fetch: {
-      mode: 'google_composite',
-      placeType: 'community_center',
-      textQuery: 'emergency shelter evacuation center disaster shelter red cross',
-    },
-    resultType: 'shelter',
-    markerIcon: 'shelter',
   },
 ]
 

@@ -79,17 +79,6 @@ const FIRE_SEEDS: DemoSiteSeed[] = [
   { name: 'NLR EMS Task Force Staging', lat: 34.765, lng: -92.36, vicinity: 'North Little Rock, AR' },
 ]
 
-const FUEL_SEEDS: DemoSiteSeed[] = [
-  { name: 'Shell — I-430 & Chenal', lat: 34.756, lng: -92.405, vicinity: 'Little Rock, AR' },
-  { name: 'Murphy USA — Jacksonville', lat: 34.858, lng: -92.11, vicinity: 'Jacksonville, AR' },
-  { name: 'Exxon — Austin', lat: 35.0, lng: -91.985, vicinity: 'Austin, AR' },
-  { name: 'Casey\'s — Beebe', lat: 35.067, lng: -91.881, vicinity: 'Beebe, AR' },
-  { name: 'Shell — Ward', lat: 35.032, lng: -91.953, vicinity: 'Ward, AR' },
-  { name: 'BP — Sherwood', lat: 34.806, lng: -92.225, vicinity: 'Sherwood, AR' },
-  { name: 'Chevron — Cabot', lat: 34.972, lng: -92.022, vicinity: 'Cabot, AR' },
-  { name: 'Murphy USA — NLR McCain', lat: 34.778, lng: -92.242, vicinity: 'North Little Rock, AR' },
-]
-
 const GENERATOR_SEEDS: DemoSiteSeed[] = [
   { name: 'United Rentals — Generator Fleet', lat: 34.728, lng: -92.262, vicinity: 'Little Rock, AR' },
   { name: 'Sunbelt Rentals Emergency Power', lat: 34.781, lng: -92.241, vicinity: 'North Little Rock, AR' },
@@ -104,15 +93,6 @@ const MEALS_SEEDS: DemoSiteSeed[] = [
   { name: 'Salvation Army — Beebe Kitchen', lat: 35.066, lng: -91.896, vicinity: 'Beebe, AR' },
   { name: 'VOAD Meal Site — Ward', lat: 35.027, lng: -91.938, vicinity: 'Ward, AR' },
   { name: 'NLR Emergency Feeding Center', lat: 34.784, lng: -92.268, vicinity: 'North Little Rock, AR' },
-]
-
-const SHELTER_SEEDS: DemoSiteSeed[] = [
-  { name: 'Bowling World Shelter — NLR', lat: 34.785, lng: -92.27, vicinity: 'North Little Rock, AR' },
-  { name: 'Sherwood Community Center Shelter', lat: 34.815, lng: -92.215, vicinity: 'Sherwood, AR' },
-  { name: 'Beebe Community Shelter', lat: 35.07, lng: -91.9, vicinity: 'Beebe, AR' },
-  { name: 'Ward High School Evacuation Shelter', lat: 35.033, lng: -91.946, vicinity: 'Ward, AR' },
-  { name: 'Jacksonville Community Shelter', lat: 34.864, lng: -92.112, vicinity: 'Jacksonville, AR' },
-  { name: 'Cabot Civic Center Shelter', lat: 34.976, lng: -92.008, vicinity: 'Cabot, AR' },
 ]
 
 const POWER_CREW_SEEDS: DemoSiteSeed[] = [
@@ -141,10 +121,8 @@ export const DEMO_GIS_FILTER_PLACES: InfrastructurePlaceResult[] = [
   ...seedPlaces(PHARMACY_SEEDS, 'pharmacy', 'pharm'),
   ...seedPlaces(POLICE_SEEDS, 'police', 'police'),
   ...seedPlaces(FIRE_SEEDS, 'fire_station', 'fire'),
-  ...seedPlaces(FUEL_SEEDS, 'gas_station', 'fuel'),
   ...seedPlaces(GENERATOR_SEEDS, 'generator', 'gen'),
   ...seedPlaces(MEALS_SEEDS, 'meals_ready', 'meals'),
-  ...seedPlaces(SHELTER_SEEDS, 'shelter', 'shelter'),
   ...seedPlaces(POWER_CREW_SEEDS, 'power_crews', 'power'),
   ...seedPlaces(WATER_CREW_SEEDS, 'water_crews', 'water'),
   ...seedPlaces(VOLUNTEER_SEEDS, 'volunteers', 'vol'),

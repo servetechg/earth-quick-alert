@@ -238,6 +238,19 @@ export function damClusterIcon(count: number): L.DivIcon {
     });
 }
 
+/** Amber cluster badge for HIFLD-backed critical infrastructure sectors. */
+export function criticalInfraClusterIcon(count: number): L.DivIcon {
+    const label = count > 999 ? '999+' : String(count);
+    const size = count > 99 ? 44 : 38;
+    const html = `<div style="width:${size}px;height:${size}px;border-radius:50%;background:#D97706;border:2.5px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.28);display:flex;align-items:center;justify-content:center;color:#fff;font-family:Arial,sans-serif;font-weight:800;font-size:${count > 99 ? 10 : 12}px;">${label}</div>`;
+    return L.divIcon({
+        className: 'situational-map-critical-infra-cluster',
+        html,
+        iconSize: [size, size],
+        iconAnchor: [size / 2, size / 2],
+    });
+}
+
 /** Pin for heatmap incident selection popup */
 export function heatIncidentPinIcon(): L.DivIcon {
     return pinDivIcon('#EA4335', '#C5221F');
