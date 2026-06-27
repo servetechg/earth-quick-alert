@@ -36,7 +36,7 @@ import {
     SUB_ADMIN_MIN_ZOOM,
     viewportExceedsBounds,
 } from '@/lib/gis/situational-map-utils';
-import { buildLeafletMarkerIcon, chemicalClusterIcon, clusterIcon, damClusterIcon, financialClusterIcon, fuelClusterIcon, heatIncidentPinIcon, shelterClusterIcon } from '@/lib/gis/situational-map-marker-icons';
+import { buildLeafletMarkerIcon, chemicalClusterIcon, clusterIcon, criticalInfraClusterIcon, damClusterIcon, financialClusterIcon, fuelClusterIcon, heatIncidentPinIcon, shelterClusterIcon } from '@/lib/gis/situational-map-marker-icons';
 import type { UnifiedEventHeatPoint } from '@/lib/geo/unified-event-heatmap';
 
 export type {
@@ -235,7 +235,7 @@ function InfrastructureClusterLayer({
     markers: SituationalMapMarker[];
     enabled: boolean;
     onSelect: (m: SituationalMapMarker) => void;
-    clusterMode?: 'default' | 'dams' | 'shelters' | 'fuel' | 'chemical' | 'financial';
+    clusterMode?: 'default' | 'dams' | 'shelters' | 'fuel' | 'chemical' | 'financial' | 'critical-infra';
 }) {
     const map = useMap();
     const groupRef = useRef<L.MarkerClusterGroup | null>(null);
@@ -252,7 +252,8 @@ function InfrastructureClusterLayer({
         const isFuel = clusterMode === 'fuel';
         const isChemical = clusterMode === 'chemical';
         const isFinancial = clusterMode === 'financial';
-        const isFacilities = isDams || isShelters || isFuel || isChemical || isFinancial;
+        const isCriticalInfra = clusterMode === 'critical-infra';
+        const isFacilities = isDams || isShelters || isFuel || isChemical || isFinancial || isCriticalInfra;
 
         const group = L.markerClusterGroup({
             showCoverageOnHover: false,
@@ -269,6 +270,8 @@ function InfrastructureClusterLayer({
                       ? (cluster) => chemicalClusterIcon(cluster.getChildCount())
                       : isFinancial
                         ? (cluster) => financialClusterIcon(cluster.getChildCount())
+                        : isCriticalInfra
+                          ? (cluster) => criticalInfraClusterIcon(cluster.getChildCount())
                         : () => clusterIcon(),
         });
 

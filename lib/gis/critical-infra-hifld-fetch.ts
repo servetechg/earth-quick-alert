@@ -14,9 +14,6 @@ export type CiInfraSearchScope =
     | { mode: 'bounds'; bounds: MapBounds }
     | { mode: 'radius'; lat: number; lng: number; radiusMeters: number };
 
-/** @deprecated use CiInfraSearchScope */
-export type CiGoogleSearchScope = CiInfraSearchScope;
-
 const MAX_MARKERS_PER_SECTOR = 48;
 const FEATURE_LIMIT_PER_FILTER = 250;
 
@@ -82,11 +79,4 @@ export async function fetchHifldCriticalInfraMarkers(
     }
 
     return markers;
-}
-
-/** Sectors with at least one HIFLD layer mapping. */
-export function criticalInfraSectorsWithHifldData(): CriticalInfraSectorId[] {
-    return hifldFiltersForSectors(CRITICAL_INFRASTRUCTURE_SECTORS.map((s) => s.id)).map(
-        (f) => f.sectorId!,
-    );
 }

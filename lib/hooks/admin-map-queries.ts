@@ -2,8 +2,9 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { layerBoundsCacheKey } from '@/lib/gis/layers/map-layer-bounds-utils';
-import type { ChemicalSiteMapMarker } from '@/lib/gis/layers/chemical-sites-types';
 import type { FinancialSiteMapMarker } from '@/lib/gis/layers/financial-sites-types';
+import type { HifldSiteMapMarker } from '@/lib/gis/hifld-next/types';
+import type { CriticalInfraSectorId } from '@/lib/gis/critical-infrastructure-sectors';
 import type { InfrastructurePlaceResult } from '@/lib/gis/infrastructure-places-fetch';
 
 export type MapBoundsPayload = {
@@ -277,52 +278,6 @@ export function useMapLayerFuelSites(opts: {
     });
 }
 
-export type ChemicalSiteMapMarkerPayload = ChemicalSiteMapMarker;
-
-async function fetchChemicalSiteLayerMarkers(input: {
-    stateKey?: string;
-    bounds?: MapBoundsPayload | null;
-}): Promise<ChemicalSiteMapMarkerPayload[]> {
-    const params = new URLSearchParams();
-    if (input.stateKey) params.set('state', input.stateKey);
-    if (input.bounds) {
-        params.set('west', String(input.bounds.west));
-        params.set('south', String(input.bounds.south));
-        params.set('east', String(input.bounds.east));
-        params.set('north', String(input.bounds.north));
-    }
-    const res = await fetch(`/api/map/layers/chemical-sites?${params.toString()}`, {
-        credentials: 'include',
-    });
-    if (!res.ok) throw new Error(`map/layers/chemical-sites ${res.status}`);
-    const data = await res.json();
-    return Array.isArray(data.markers) ? data.markers : [];
-}
-
-export function useMapLayerChemicalSites(opts: {
-    enabled: boolean;
-    stateKey?: string | null;
-    bounds?: MapBoundsPayload | null;
-}) {
-    const stateKey = opts.stateKey?.trim().toUpperCase() ?? '';
-    const boundsKey = opts.bounds ? layerBoundsCacheKey(opts.bounds) : 'none';
-
-    return useQuery({
-        queryKey: ['map-layer', 'chemical-sites', stateKey || 'auto', boundsKey],
-        queryFn: () =>
-            fetchChemicalSiteLayerMarkers({
-                stateKey: stateKey || undefined,
-                bounds: stateKey ? null : opts.bounds ?? null,
-            }),
-        enabled:
-            opts.enabled &&
-            Boolean(stateKey || opts.bounds),
-        staleTime: 15 * 60_000,
-        gcTime: 60 * 60_000,
-        placeholderData: (prev) => prev,
-    });
-}
-
 export type FinancialSiteMapMarkerPayload = FinancialSiteMapMarker;
 
 async function fetchFinancialSiteLayerMarkers(input: {
@@ -362,6 +317,60 @@ export function useMapLayerFinancialSites(opts: {
             }),
         enabled:
             opts.enabled &&
+            Boolean(stateKey || opts.bounds),
+        staleTime: 15 * 60_000,
+        gcTime: 60 * 60_000,
+        placeholderData: (prev) => prev,
+    });
+}
+
+export type HifldSiteMapMarkerPayload = HifldSiteMapMarker;
+
+async function fetchHifldSiteLayerMarkers(input: {
+    sectors: CriticalInfraSectorId[];
+    stateKey?: string;
+    bounds?: MapBoundsPayload | null;
+}): Promise<HifldSiteMapMarkerPayload[]> {
+    const params = new URLSearchParams();
+    if (input.sectors.length > 0) {
+        params.set('sectors', input.sectors.join(','));
+    }
+    if (input.stateKey) params.set('state', input.stateKey);
+    if (input.bounds) {
+        params.set('west', String(input.bounds.west));
+        params.set('south', String(input.bounds.south));
+        params.set('east', String(input.bounds.east));
+        params.set('north', String(input.bounds.north));
+    }
+    const res = await fetch(`/api/map/layers/hifld-sites?${params.toString()}`, {
+        credentials: 'include',
+    });
+    if (!res.ok) throw new Error(`map/layers/hifld-sites ${res.status}`);
+    const data = await res.json();
+    return Array.isArray(data.markers) ? data.markers : [];
+}
+
+export function useMapLayerHifldSites(opts: {
+    enabled: boolean;
+    sectors: CriticalInfraSectorId[];
+    stateKey?: string | null;
+    bounds?: MapBoundsPayload | null;
+}) {
+    const stateKey = opts.stateKey?.trim().toUpperCase() ?? '';
+    const boundsKey = opts.bounds ? layerBoundsCacheKey(opts.bounds) : 'none';
+    const sectorsKey = [...opts.sectors].sort().join(',');
+
+    return useQuery({
+        queryKey: ['map-layer', 'hifld-sites', sectorsKey, stateKey || 'auto', boundsKey],
+        queryFn: () =>
+            fetchHifldSiteLayerMarkers({
+                sectors: opts.sectors,
+                stateKey: stateKey || undefined,
+                bounds: stateKey ? null : opts.bounds ?? null,
+            }),
+        enabled:
+            opts.enabled &&
+            opts.sectors.length > 0 &&
             Boolean(stateKey || opts.bounds),
         staleTime: 15 * 60_000,
         gcTime: 60 * 60_000,
