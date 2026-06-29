@@ -79,6 +79,19 @@ export function buildLeafletMarkerIcon(marker: SituationalMapMarker): L.DivIcon 
         });
     }
 
+    if (marker.icon === 'pharmacy' || (marker.type === 'infrastructure' && marker.category === 'Pharmacies')) {
+        return L.icon({
+            iconUrl: '/icons/pharmacy-marker.svg',
+            iconSize: [36, 36],
+            iconAnchor: [18, 18],
+            popupAnchor: [0, -18],
+        });
+    }
+
+    if (marker.icon === 'police' || (marker.type === 'infrastructure' && marker.category === 'Police Stations')) {
+        return pinDivIcon('#1E3A8A', '#1e293b');
+    }
+
     if (marker.icon === 'chemical' || (marker.type === 'infrastructure' && (marker.category === 'Chemical' || marker.category === 'Chemical Sites' || marker.category === 'Chemical Storage & Manufacturing'))) {
         return L.icon({
             iconUrl: '/icons/chemical-marker.svg',
@@ -136,15 +149,6 @@ export function buildLeafletMarkerIcon(marker: SituationalMapMarker): L.DivIcon 
         return pinDivIcon(marker.color || PIN_COLORS.blue, '#1d4ed8');
     }
 
-    if (marker.icon === 'pharmacy') {
-        return L.icon({
-            iconUrl: '/icons/pharmacy-marker.svg',
-            iconSize: [32, 42],
-            iconAnchor: [16, 42],
-            popupAnchor: [0, -36],
-        });
-    }
-
     if (marker.icon === 'emergency' || marker.icon === 'hospital') {
         return L.icon({
             iconUrl: '/icons/emergency-service-marker.svg',
@@ -193,6 +197,32 @@ export function fuelClusterIcon(count: number): L.DivIcon {
     const html = `<div style="width:${size}px;height:${size}px;border-radius:50%;background:#D74C30;border:2.5px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.28);display:flex;align-items:center;justify-content:center;color:#fff;font-family:Arial,sans-serif;font-weight:800;font-size:${count > 99 ? 10 : 12}px;">${label}</div>`;
     return L.divIcon({
         className: 'situational-map-fuel-cluster',
+        html,
+        iconSize: [size, size],
+        iconAnchor: [size / 2, size / 2],
+    });
+}
+
+/** Green pharmacy cluster badge with count — matches pharmacy-marker.svg. */
+export function pharmacyClusterIcon(count: number): L.DivIcon {
+    const label = count > 999 ? '999+' : String(count);
+    const size = count > 99 ? 44 : 38;
+    const html = `<div style="width:${size}px;height:${size}px;border-radius:50%;background:#10B981;border:2.5px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.28);display:flex;align-items:center;justify-content:center;color:#fff;font-family:Arial,sans-serif;font-weight:800;font-size:${count > 99 ? 10 : 12}px;">${label}</div>`;
+    return L.divIcon({
+        className: 'situational-map-pharmacy-cluster',
+        html,
+        iconSize: [size, size],
+        iconAnchor: [size / 2, size / 2],
+    });
+}
+
+/** Navy police cluster badge with count. */
+export function policeClusterIcon(count: number): L.DivIcon {
+    const label = count > 999 ? '999+' : String(count);
+    const size = count > 99 ? 44 : 38;
+    const html = `<div style="width:${size}px;height:${size}px;border-radius:50%;background:#1E3A8A;border:2.5px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.28);display:flex;align-items:center;justify-content:center;color:#fff;font-family:Arial,sans-serif;font-weight:800;font-size:${count > 99 ? 10 : 12}px;">${label}</div>`;
+    return L.divIcon({
+        className: 'situational-map-police-cluster',
         html,
         iconSize: [size, size],
         iconAnchor: [size / 2, size / 2],

@@ -2,15 +2,11 @@ import {
   CloudRain,
   AlertTriangle,
   Waves,
-  PlusSquare,
   Construction,
   Zap,
   Droplets,
   Boxes,
   AlertOctagon,
-  Flame,
-  Siren,
-  Pill,
   UtensilsCrossed,
   Users,
   type LucideIcon,
@@ -48,48 +44,8 @@ export interface GisFilterLayerDef {
   markerIcon: string
 }
 
-/** Layers backed by Google Places (nearby or text search). */
+/** Layers backed by Google Places, text search, or responder deployment. */
 export const GOOGLE_GIS_FILTER_LAYERS: GisFilterLayerDef[] = [
-  {
-    id: 'hospitals',
-    label: 'Hospitals',
-    Icon: PlusSquare,
-    color: '#22A9A1',
-    fetch: { mode: 'google_nearby', placeType: 'hospital' },
-    resultType: 'hospital',
-    markerIcon: 'hospital',
-  },
-  {
-    id: 'pharmacy',
-    label: 'Pharmacies',
-    Icon: Pill,
-    color: '#10B981',
-    fetch: { mode: 'google_nearby', placeType: 'pharmacy' },
-    resultType: 'pharmacy',
-    markerIcon: 'pharmacy',
-  },
-  {
-    id: 'police',
-    label: 'Police Stations',
-    Icon: Siren,
-    color: '#1E3A8A',
-    fetch: { mode: 'google_nearby', placeType: 'police' },
-    resultType: 'police',
-    markerIcon: 'police',
-  },
-  {
-    id: 'fire_station',
-    label: 'Emergency Service Providers / Fire Stations',
-    Icon: Flame,
-    color: '#EF4444',
-    fetch: {
-      mode: 'google_composite',
-      placeType: 'fire_station',
-      textQuery: 'fire station fire department ambulance emergency medical services EMS paramedic',
-    },
-    resultType: 'fire_station',
-    markerIcon: 'fire',
-  },
   {
     id: 'generators',
     label: 'Generators',

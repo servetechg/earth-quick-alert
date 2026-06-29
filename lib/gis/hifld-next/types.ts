@@ -59,4 +59,5 @@ export interface HifldSiteMapMarker {
     zip: string;
     status: string;
     location: string;
+    datasetSlug?: string;
 }

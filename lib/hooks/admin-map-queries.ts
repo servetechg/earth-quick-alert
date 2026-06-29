@@ -278,6 +278,116 @@ export function useMapLayerFuelSites(opts: {
     });
 }
 
+export type PharmacyMapMarkerPayload = {
+    id: string;
+    placeId: string;
+    title: string;
+    lat: number;
+    lng: number;
+    stateKey: string;
+    address: string;
+    location: string;
+};
+
+async function fetchPharmacyLayerMarkers(input: {
+    stateKey?: string;
+    bounds?: MapBoundsPayload | null;
+}): Promise<PharmacyMapMarkerPayload[]> {
+    const params = new URLSearchParams();
+    if (input.stateKey) params.set('state', input.stateKey);
+    if (input.bounds) {
+        params.set('west', String(input.bounds.west));
+        params.set('south', String(input.bounds.south));
+        params.set('east', String(input.bounds.east));
+        params.set('north', String(input.bounds.north));
+    }
+    const res = await fetch(`/api/map/layers/pharmacies?${params.toString()}`, {
+        credentials: 'include',
+    });
+    if (!res.ok) throw new Error(`map/layers/pharmacies ${res.status}`);
+    const data = await res.json();
+    return Array.isArray(data.markers) ? data.markers : [];
+}
+
+export function useMapLayerPharmacies(opts: {
+    enabled: boolean;
+    stateKey?: string | null;
+    bounds?: MapBoundsPayload | null;
+}) {
+    const stateKey = opts.stateKey?.trim().toUpperCase() ?? '';
+    const boundsKey = opts.bounds ? layerBoundsCacheKey(opts.bounds) : 'none';
+
+    return useQuery({
+        queryKey: ['map-layer', 'pharmacies', stateKey || 'auto', boundsKey],
+        queryFn: () =>
+            fetchPharmacyLayerMarkers({
+                stateKey: stateKey || undefined,
+                bounds: stateKey ? null : opts.bounds ?? null,
+            }),
+        enabled:
+            opts.enabled &&
+            Boolean(stateKey || opts.bounds),
+        staleTime: 15 * 60_000,
+        gcTime: 60 * 60_000,
+        placeholderData: (prev) => prev,
+    });
+}
+
+export type PoliceStationMapMarkerPayload = {
+    id: string;
+    placeId: string;
+    title: string;
+    lat: number;
+    lng: number;
+    stateKey: string;
+    address: string;
+    location: string;
+};
+
+async function fetchPoliceStationLayerMarkers(input: {
+    stateKey?: string;
+    bounds?: MapBoundsPayload | null;
+}): Promise<PoliceStationMapMarkerPayload[]> {
+    const params = new URLSearchParams();
+    if (input.stateKey) params.set('state', input.stateKey);
+    if (input.bounds) {
+        params.set('west', String(input.bounds.west));
+        params.set('south', String(input.bounds.south));
+        params.set('east', String(input.bounds.east));
+        params.set('north', String(input.bounds.north));
+    }
+    const res = await fetch(`/api/map/layers/police-stations?${params.toString()}`, {
+        credentials: 'include',
+    });
+    if (!res.ok) throw new Error(`map/layers/police-stations ${res.status}`);
+    const data = await res.json();
+    return Array.isArray(data.markers) ? data.markers : [];
+}
+
+export function useMapLayerPoliceStations(opts: {
+    enabled: boolean;
+    stateKey?: string | null;
+    bounds?: MapBoundsPayload | null;
+}) {
+    const stateKey = opts.stateKey?.trim().toUpperCase() ?? '';
+    const boundsKey = opts.bounds ? layerBoundsCacheKey(opts.bounds) : 'none';
+
+    return useQuery({
+        queryKey: ['map-layer', 'police-stations', stateKey || 'auto', boundsKey],
+        queryFn: () =>
+            fetchPoliceStationLayerMarkers({
+                stateKey: stateKey || undefined,
+                bounds: stateKey ? null : opts.bounds ?? null,
+            }),
+        enabled:
+            opts.enabled &&
+            Boolean(stateKey || opts.bounds),
+        staleTime: 15 * 60_000,
+        gcTime: 60 * 60_000,
+        placeholderData: (prev) => prev,
+    });
+}
+
 export type FinancialSiteMapMarkerPayload = FinancialSiteMapMarker;
 
 async function fetchFinancialSiteLayerMarkers(input: {
@@ -330,10 +440,14 @@ async function fetchHifldSiteLayerMarkers(input: {
     sectors: CriticalInfraSectorId[];
     stateKey?: string;
     bounds?: MapBoundsPayload | null;
+    datasetSlugs?: string[];
 }): Promise<HifldSiteMapMarkerPayload[]> {
     const params = new URLSearchParams();
     if (input.sectors.length > 0) {
         params.set('sectors', input.sectors.join(','));
+    }
+    if (input.datasetSlugs?.length) {
+        params.set('datasets', input.datasetSlugs.join(','));
     }
     if (input.stateKey) params.set('state', input.stateKey);
     if (input.bounds) {
@@ -355,18 +469,21 @@ export function useMapLayerHifldSites(opts: {
     sectors: CriticalInfraSectorId[];
     stateKey?: string | null;
     bounds?: MapBoundsPayload | null;
+    datasetSlugs?: string[];
 }) {
     const stateKey = opts.stateKey?.trim().toUpperCase() ?? '';
     const boundsKey = opts.bounds ? layerBoundsCacheKey(opts.bounds) : 'none';
     const sectorsKey = [...opts.sectors].sort().join(',');
+    const datasetsKey = opts.datasetSlugs?.length ? [...opts.datasetSlugs].sort().join(',') : 'all';
 
     return useQuery({
-        queryKey: ['map-layer', 'hifld-sites', sectorsKey, stateKey || 'auto', boundsKey],
+        queryKey: ['map-layer', 'hifld-sites', sectorsKey, datasetsKey, stateKey || 'auto', boundsKey],
         queryFn: () =>
             fetchHifldSiteLayerMarkers({
                 sectors: opts.sectors,
                 stateKey: stateKey || undefined,
                 bounds: stateKey ? null : opts.bounds ?? null,
+                datasetSlugs: opts.datasetSlugs,
             }),
         enabled:
             opts.enabled &&

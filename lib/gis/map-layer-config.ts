@@ -3,11 +3,12 @@ import {
   OPERATIONAL_MAP_LAYERS,
   type GisFilterLayerDef,
 } from '@/lib/gis/gis-filter-layers'
+import { HIFLD_OPERATIONAL_MAP_LAYERS } from '@/lib/gis/hifld-operational-layers'
 import {
   CRITICAL_INFRASTRUCTURE_SECTORS,
   type CriticalInfraSectorId,
 } from '@/lib/gis/critical-infrastructure-sectors'
-import { AlertTriangle, Droplets, FlaskConical, Fuel, Home, Landmark } from 'lucide-react'
+import { AlertTriangle, Droplets, FlaskConical, Fuel, Home, Landmark, Pill, Siren } from 'lucide-react'
 
 export type { GisFilterLayerDef } from '@/lib/gis/gis-filter-layers'
 
@@ -39,6 +40,11 @@ export const TOP_LEVEL_MAP_LAYERS: MapLayerDef[] = [
   ...GIS_FILTER_MAP_LAYERS,
 ]
 
+/** NWS alert polygon layers shown in the map Filter dropdown (weather radar deferred). */
+export const ALERT_ZONE_MAP_LAYERS: MapLayerDef[] = OPERATIONAL_MAP_LAYERS.filter(
+  (layer) => layer.id === 'risk' || layer.id === 'flood',
+).map((layer) => ({ ...layer }))
+
 /** Demo — post-disaster zones A/B/C (Arkansas tornado scenario). */
 export const DISASTER_ZONE_LAYER: MapLayerDef = {
   id: 'disaster_zones',
@@ -47,9 +53,9 @@ export const DISASTER_ZONE_LAYER: MapLayerDef = {
   color: '#DC2626',
 }
 
-/** Open-source NID dams layer (no Google billing). */
+/** NID dams — toggled under Critical Infrastructure (`ci_dams`). */
 export const DAMS_MAP_LAYER = {
-  id: 'dams',
+  id: 'ci_dams',
   label: 'Dams',
   Icon: Droplets,
   color: '#E32C28',
@@ -74,29 +80,33 @@ export const FUEL_SITES_MAP_LAYER = {
   markerIcon: 'fuel',
 } as const
 
-/** HIFLD-backed chemical (RMP + SEMS) — toggled under Critical Infrastructure. */
-export const CHEMICAL_SITES_MAP_LAYER = {
-  id: 'ci_chemical',
-  label: 'Chemical',
-  Icon: FlaskConical,
-  color: '#7C3AED',
-  markerIcon: 'chemical',
+/** Mongo-backed US pharmacy locations (Google Places text search ingest). */
+export const PHARMACIES_MAP_LAYER = {
+  id: 'pharmacies',
+  label: 'Pharmacies',
+  Icon: Pill,
+  color: '#10B981',
+  markerIcon: 'pharmacy',
 } as const
 
-/** Mongo-backed FDIC bank branches — toggled under Critical Infrastructure. */
-export const FINANCIAL_SITES_MAP_LAYER = {
-  id: 'ci_financial',
-  label: 'Financial',
-  Icon: Landmark,
-  color: '#059669',
-  markerIcon: 'financial',
+/** Mongo-backed US police stations (Google Places text search ingest). */
+export const POLICE_STATIONS_MAP_LAYER = {
+  id: 'police',
+  label: 'Police Stations',
+  Icon: Siren,
+  color: '#1E3A8A',
+  markerIcon: 'police',
 } as const
+
+/** HIFLD Next situational facility layers (hospitals, fire/EMS). */
+export { HIFLD_OPERATIONAL_MAP_LAYERS }
 
 /** General open-source facility layers — national Mongo ingest complete (52/52 states). */
 export const OPEN_SOURCE_MAP_LAYERS = [
-  DAMS_MAP_LAYER,
   SHELTERS_MAP_LAYER,
   FUEL_SITES_MAP_LAYER,
+  PHARMACIES_MAP_LAYER,
+  POLICE_STATIONS_MAP_LAYER,
 ] as const
 
 /** HIFLD Next sectors available on the map (Mongo and/or live fallback). */
@@ -116,8 +126,27 @@ export const HIFLD_NEXT_IMPLEMENTED_SECTOR_IDS: CriticalInfraSectorId[] = [
   'ci_government',
 ]
 
+/** HIFLD-backed chemical (RMP + SEMS) — toggled under Critical Infrastructure. */
+export const CHEMICAL_SITES_MAP_LAYER = {
+  id: 'ci_chemical',
+  label: 'Chemical',
+  Icon: FlaskConical,
+  color: '#7C3AED',
+  markerIcon: 'chemical',
+} as const
+
+/** Mongo-backed FDIC bank branches — toggled under Critical Infrastructure. */
+export const FINANCIAL_SITES_MAP_LAYER = {
+  id: 'ci_financial',
+  label: 'Financial',
+  Icon: Landmark,
+  color: '#059669',
+  markerIcon: 'financial',
+} as const
+
 /** CI sectors with Mongo-backed map layers (shown in Filter dropdown). */
 export const MONGO_CRITICAL_INFRA_SECTOR_IDS: CriticalInfraSectorId[] = [
+  'ci_dams',
   'ci_financial',
   ...HIFLD_NEXT_IMPLEMENTED_SECTOR_IDS,
 ]
@@ -127,6 +156,8 @@ export type InfrastructureClusterMode =
   | 'dams'
   | 'shelters'
   | 'fuel'
+  | 'pharmacies'
+  | 'police'
   | 'chemical'
   | 'financial'
   | 'critical-infra'
@@ -135,12 +166,15 @@ export type InfrastructureClusterMode =
 export function resolveInfrastructureClusterMode(
   mapLayers: Record<string, boolean>,
 ): InfrastructureClusterMode {
-  if (mapLayers.dams) return 'dams'
+  if (mapLayers.ci_dams) return 'dams'
   if (mapLayers.shelters) return 'shelters'
   if (mapLayers.fuel_sites) return 'fuel'
+  if (mapLayers.pharmacies) return 'pharmacies'
+  if (mapLayers.police) return 'police'
   if (mapLayers.ci_chemical) return 'chemical'
   if (mapLayers.ci_financial) return 'financial'
   if (HIFLD_NEXT_IMPLEMENTED_SECTOR_IDS.some((id) => mapLayers[id])) return 'critical-infra'
+  if (HIFLD_OPERATIONAL_MAP_LAYERS.some((layer) => mapLayers[layer.id])) return 'critical-infra'
   return 'default'
 }
 
@@ -148,6 +182,7 @@ export function resolveInfrastructureClusterMode(
 export function criticalInfraSectorMarkerIcon(sectorId: CriticalInfraSectorId): string | undefined {
   if (sectorId === 'ci_chemical') return CHEMICAL_SITES_MAP_LAYER.markerIcon
   if (sectorId === 'ci_financial') return FINANCIAL_SITES_MAP_LAYER.markerIcon
+  if (sectorId === 'ci_dams') return DAMS_MAP_LAYER.markerIcon
   return undefined
 }
 
@@ -173,9 +208,13 @@ export function buildDefaultMapLayerState(opts?: {
       defaults[sectorId] = false
     })
   }
-  defaults[DAMS_MAP_LAYER.id] = false
+  HIFLD_OPERATIONAL_MAP_LAYERS.forEach((layer) => {
+    defaults[layer.id] = false
+  })
   defaults[SHELTERS_MAP_LAYER.id] = false
   defaults[FUEL_SITES_MAP_LAYER.id] = false
+  defaults[PHARMACIES_MAP_LAYER.id] = false
+  defaults[POLICE_STATIONS_MAP_LAYER.id] = false
   return defaults
 }
 
@@ -189,6 +228,9 @@ export function buildDemoMapLayerState(opts?: {
     state[layer.id] = true
   })
   OPEN_SOURCE_MAP_LAYERS.forEach((layer) => {
+    state[layer.id] = true
+  })
+  HIFLD_OPERATIONAL_MAP_LAYERS.forEach((layer) => {
     state[layer.id] = true
   })
   if (opts?.includeDisasterZones) {

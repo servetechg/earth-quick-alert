@@ -36,7 +36,7 @@ import {
     SUB_ADMIN_MIN_ZOOM,
     viewportExceedsBounds,
 } from '@/lib/gis/situational-map-utils';
-import { buildLeafletMarkerIcon, chemicalClusterIcon, clusterIcon, criticalInfraClusterIcon, damClusterIcon, financialClusterIcon, fuelClusterIcon, heatIncidentPinIcon, shelterClusterIcon } from '@/lib/gis/situational-map-marker-icons';
+import { buildLeafletMarkerIcon, chemicalClusterIcon, clusterIcon, criticalInfraClusterIcon, damClusterIcon, financialClusterIcon, fuelClusterIcon, heatIncidentPinIcon, pharmacyClusterIcon, policeClusterIcon, shelterClusterIcon } from '@/lib/gis/situational-map-marker-icons';
 import type { UnifiedEventHeatPoint } from '@/lib/geo/unified-event-heatmap';
 
 export type {
@@ -235,7 +235,7 @@ function InfrastructureClusterLayer({
     markers: SituationalMapMarker[];
     enabled: boolean;
     onSelect: (m: SituationalMapMarker) => void;
-    clusterMode?: 'default' | 'dams' | 'shelters' | 'fuel' | 'chemical' | 'financial' | 'critical-infra';
+    clusterMode?: 'default' | 'dams' | 'shelters' | 'fuel' | 'pharmacies' | 'police' | 'chemical' | 'financial' | 'critical-infra';
 }) {
     const map = useMap();
     const groupRef = useRef<L.MarkerClusterGroup | null>(null);
@@ -250,10 +250,20 @@ function InfrastructureClusterLayer({
         const isDams = clusterMode === 'dams';
         const isShelters = clusterMode === 'shelters';
         const isFuel = clusterMode === 'fuel';
+        const isPharmacies = clusterMode === 'pharmacies';
+        const isPolice = clusterMode === 'police';
         const isChemical = clusterMode === 'chemical';
         const isFinancial = clusterMode === 'financial';
         const isCriticalInfra = clusterMode === 'critical-infra';
-        const isFacilities = isDams || isShelters || isFuel || isChemical || isFinancial || isCriticalInfra;
+        const isFacilities =
+            isDams ||
+            isShelters ||
+            isFuel ||
+            isPharmacies ||
+            isPolice ||
+            isChemical ||
+            isFinancial ||
+            isCriticalInfra;
 
         const group = L.markerClusterGroup({
             showCoverageOnHover: false,
@@ -266,13 +276,17 @@ function InfrastructureClusterLayer({
                   ? (cluster) => shelterClusterIcon(cluster.getChildCount())
                   : isFuel
                     ? (cluster) => fuelClusterIcon(cluster.getChildCount())
-                    : isChemical
-                      ? (cluster) => chemicalClusterIcon(cluster.getChildCount())
-                      : isFinancial
-                        ? (cluster) => financialClusterIcon(cluster.getChildCount())
-                        : isCriticalInfra
-                          ? (cluster) => criticalInfraClusterIcon(cluster.getChildCount())
-                        : () => clusterIcon(),
+                    : isPharmacies
+                      ? (cluster) => pharmacyClusterIcon(cluster.getChildCount())
+                      : isPolice
+                        ? (cluster) => policeClusterIcon(cluster.getChildCount())
+                        : isChemical
+                          ? (cluster) => chemicalClusterIcon(cluster.getChildCount())
+                          : isFinancial
+                            ? (cluster) => financialClusterIcon(cluster.getChildCount())
+                            : isCriticalInfra
+                              ? (cluster) => criticalInfraClusterIcon(cluster.getChildCount())
+                              : () => clusterIcon(),
         });
 
         for (const marker of markers) {
@@ -505,7 +519,11 @@ export function SituationalLeafletMap({
         return polylines.flatMap((line, idx) => {
             const path = line.path.filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng));
             if (path.length < 2) return [];
-            const key = `polyline-${line.label ?? idx}-${path.length}`;
+            const first = path[0];
+            const last = path[path.length - 1];
+            const key =
+                line.id ??
+                `polyline-${idx}-${path.length}-${first.lat.toFixed(5)}-${first.lng.toFixed(5)}-${last.lat.toFixed(5)}-${last.lng.toFixed(5)}`;
             return [{ ...line, path, key }];
         });
     }, [polylines]);

@@ -44,6 +44,12 @@ export async function GET(req: Request) {
         const url = new URL(req.url);
         const force = url.searchParams.get('refresh') === '1';
         const sectors = parseSectors(url.searchParams.get('sectors'));
+        const datasetSlugs =
+            url.searchParams
+                .get('datasets')
+                ?.split(',')
+                .map((s) => s.trim())
+                .filter(Boolean) ?? undefined;
         const stateParam = url.searchParams.get('state')?.trim() ?? '';
         const stateKey =
             normalizeStateToUsps(stateParam) ?? (stateParam.length === 2 ? stateParam.toUpperCase() : null);
@@ -60,6 +66,7 @@ export async function GET(req: Request) {
             const { markers, cached } = await queryHifldSitesByBounds(sectors, bounds, {
                 stateKey: stateKey ?? undefined,
                 force,
+                datasetSlugs,
             });
             return NextResponse.json({
                 markers,
@@ -71,7 +78,10 @@ export async function GET(req: Request) {
             });
         }
 
-        const { markers, cached } = await queryHifldSitesByState(sectors, stateKey!, { force });
+        const { markers, cached } = await queryHifldSitesByState(sectors, stateKey!, {
+            force,
+            datasetSlugs,
+        });
         return NextResponse.json({
             markers,
             count: markers.length,
