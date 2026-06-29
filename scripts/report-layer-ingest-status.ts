@@ -8,6 +8,8 @@ import connectDB from '../lib/mongodb';
 import MapLayerDam from '../models/MapLayerDam';
 import MapLayerShelter from '../models/MapLayerShelter';
 import MapLayerFuelSite from '../models/MapLayerFuelSite';
+import MapLayerPharmacy from '../models/MapLayerPharmacy';
+import MapLayerPoliceStation from '../models/MapLayerPoliceStation';
 import MapLayerFinancialSite from '../models/MapLayerFinancialSite';
 import MapLayerHifldSite from '../models/MapLayerHifldSite';
 import { US_STATE_BBOX } from '../lib/constants/us-state-bounding-boxes';
@@ -39,9 +41,11 @@ async function main() {
     const rows: LayerStatus[] = [];
 
     for (const [id, Model, label] of [
-        ['dams', MapLayerDam, 'Dams (NID)'],
+        ['ci_dams', MapLayerDam, 'Dams (NID)'],
         ['shelters', MapLayerShelter, 'Shelters (FEMA NSS)'],
         ['fuel_sites', MapLayerFuelSite, 'Fuel Sites (NREL AFDC)'],
+        ['pharmacies', MapLayerPharmacy, 'Pharmacies (US Google Places ingest)'],
+        ['police', MapLayerPoliceStation, 'Police Stations (US Google Places ingest)'],
         ['ci_financial', MapLayerFinancialSite, 'Financial (FDIC)'],
     ] as const) {
         const { total, states } = await stateCoverage(Model);

@@ -59,11 +59,25 @@ function toHifldSiteMapMarker(doc: HifldSiteDoc): HifldSiteMapMarker {
         zip: String(doc.zip ?? '').trim(),
         status: String(doc.status ?? '').trim() || 'Active',
         location: city ? `${city}, ${stateKey}` : stateKey,
+        datasetSlug: String(doc.datasetSlug ?? '').trim() || undefined,
     };
 }
 
-function sectorCacheKey(sectors: CriticalInfraSectorId[]): string {
-    return [...sectors].sort().join(',');
+function sectorCacheKey(sectors: CriticalInfraSectorId[], datasetSlugs?: string[]): string {
+    const sectorPart = [...sectors].sort().join(',');
+    if (!datasetSlugs?.length) return sectorPart;
+    return `${sectorPart}:${[...datasetSlugs].sort().join(',')}`;
+}
+
+function mongoSectorFilter(
+    sectors: CriticalInfraSectorId[],
+    datasetSlugs?: string[],
+): Record<string, unknown> {
+    const filter: Record<string, unknown> = { sectorId: { $in: sectors } };
+    if (datasetSlugs?.length) {
+        filter.datasetSlug = { $in: datasetSlugs };
+    }
+    return filter;
 }
 
 async function getHifldMongoCountsBySector(
@@ -168,10 +182,10 @@ export async function invalidateHifldSitesLayerCache(
 export async function queryHifldSitesByState(
     sectors: CriticalInfraSectorId[],
     stateKey: string,
-    opts?: { force?: boolean },
+    opts?: { force?: boolean; datasetSlugs?: string[] },
 ): Promise<{ markers: HifldSiteMapMarker[]; cached: boolean }> {
     const usps = stateKey.trim().toUpperCase();
-    const sectorKey = sectorCacheKey(sectors);
+    const sectorKey = sectorCacheKey(sectors, opts?.datasetSlugs);
     const cacheKey = `map-layer:hifld-sites:state:${sectorKey}:${usps}`;
 
     if (!opts?.force) {
@@ -181,7 +195,7 @@ export async function queryHifldSitesByState(
 
     await connectDB();
     const docs = await MapLayerHifldSite.find({
-        sectorId: { $in: sectors },
+        ...mongoSectorFilter(sectors, opts?.datasetSlugs),
         stateKey: usps,
     })
         .select(HIFLD_SELECT)
@@ -189,13 +203,15 @@ export async function queryHifldSitesByState(
 
     let markers = docs.map(toHifldSiteMapMarker);
 
-    const { markers: liveMarkers } = await loadHifldLiveSupplementMarkers(sectors, {
-        force: opts?.force,
-    });
-    markers = mergeMarkers(
-        markers,
-        filterLiveHifldMarkersByState(liveMarkers, usps),
-    );
+    if (!opts?.datasetSlugs?.length) {
+        const { markers: liveMarkers } = await loadHifldLiveSupplementMarkers(sectors, {
+            force: opts?.force,
+        });
+        markers = mergeMarkers(
+            markers,
+            filterLiveHifldMarkersByState(liveMarkers, usps),
+        );
+    }
 
     await cacheSetJson(cacheKey, markers, STATE_CACHE_TTL_MS);
     return { markers, cached: false };
@@ -204,10 +220,10 @@ export async function queryHifldSitesByState(
 async function queryHifldSitesByBoundsSampled(
     sectors: CriticalInfraSectorId[],
     bounds: MapBounds,
-    opts?: { stateKey?: string; force?: boolean; limit?: number },
+    opts?: { stateKey?: string; force?: boolean; limit?: number; datasetSlugs?: string[] },
 ): Promise<{ markers: HifldSiteMapMarker[]; cached: boolean }> {
     const limit = Math.min(Math.max(opts?.limit ?? MAX_MARKERS_WIDE_SAMPLE, 1), MAX_MARKERS_WIDE_SAMPLE);
-    const sectorKey = sectorCacheKey(sectors);
+    const sectorKey = sectorCacheKey(sectors, opts?.datasetSlugs);
     const cacheKey = wideSampleCacheKey(`${LAYER}:${sectorKey}`, bounds, limit);
 
     if (!opts?.force) {
@@ -230,7 +246,7 @@ async function queryHifldSitesByBoundsSampled(
                 const geo = cellGeoFilter(cell.bounds, opts?.stateKey);
                 return MapLayerHifldSite.find({
                     ...geo,
-                    sectorId: { $in: sectors },
+                    ...mongoSectorFilter(sectors, opts?.datasetSlugs),
                 })
                     .select(HIFLD_SELECT)
                     .limit(perCell)
@@ -250,7 +266,9 @@ async function queryHifldSitesByBoundsSampled(
         }
     }
 
-    const merged = await appendLiveSupplementMarkers(sectors, bounds, markers, opts);
+    const merged = opts?.datasetSlugs?.length
+        ? markers
+        : await appendLiveSupplementMarkers(sectors, bounds, markers, opts);
     await cacheSetJson(cacheKey, merged, BBOX_CACHE_TTL_MS);
     return { markers: merged, cached: false };
 }
@@ -258,7 +276,7 @@ async function queryHifldSitesByBoundsSampled(
 export async function queryHifldSitesByBounds(
     sectors: CriticalInfraSectorId[],
     bounds: MapBounds,
-    opts?: { stateKey?: string; force?: boolean; limit?: number },
+    opts?: { stateKey?: string; force?: boolean; limit?: number; datasetSlugs?: string[] },
 ): Promise<{ markers: HifldSiteMapMarker[]; cached: boolean }> {
     if (sectors.length === 0) {
         return { markers: [], cached: false };
@@ -269,7 +287,7 @@ export async function queryHifldSitesByBounds(
     }
 
     const limit = Math.min(Math.max(opts?.limit ?? MAX_MARKERS_BBOX, 1), MAX_MARKERS_BBOX);
-    const sectorKey = sectorCacheKey(sectors);
+    const sectorKey = sectorCacheKey(sectors, opts?.datasetSlugs);
     const cacheKey = `${layerBboxCacheKey(LAYER, bounds)}:${sectorKey}`;
 
     if (!opts?.force) {
@@ -282,14 +300,16 @@ export async function queryHifldSitesByBounds(
     const geo = cellGeoFilter(bounds, opts?.stateKey);
     const docs = await MapLayerHifldSite.find({
         ...geo,
-        sectorId: { $in: sectors },
+        ...mongoSectorFilter(sectors, opts?.datasetSlugs),
     })
         .select(HIFLD_SELECT)
         .limit(limit)
         .lean<HifldSiteDoc[]>();
 
     let markers = docs.map(toHifldSiteMapMarker);
-    markers = await appendLiveSupplementMarkers(sectors, bounds, markers, { ...opts, limit });
+    markers = opts?.datasetSlugs?.length
+        ? markers.slice(0, limit)
+        : await appendLiveSupplementMarkers(sectors, bounds, markers, { ...opts, limit });
     await cacheSetJson(cacheKey, markers, BBOX_CACHE_TTL_MS);
     return { markers, cached: false };
 }

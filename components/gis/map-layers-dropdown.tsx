@@ -11,7 +11,9 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
 import {
+  ALERT_ZONE_MAP_LAYERS,
   DISASTER_ZONE_LAYER,
+  HIFLD_OPERATIONAL_MAP_LAYERS,
   IMPLEMENTED_CRITICAL_INFRA_MAP_SECTORS,
   OPEN_SOURCE_MAP_LAYERS,
 } from '@/lib/gis/map-layer-config'
@@ -74,7 +76,9 @@ export function MapLayersDropdown({
   showDisasterZones = false,
 }: MapLayersDropdownProps) {
   const enabledCount = useMemo(() => {
-    let count = OPEN_SOURCE_MAP_LAYERS.filter((l) => layers[l.id]).length
+    let count = ALERT_ZONE_MAP_LAYERS.filter((l) => layers[l.id]).length
+    count += OPEN_SOURCE_MAP_LAYERS.filter((l) => layers[l.id]).length
+    count += HIFLD_OPERATIONAL_MAP_LAYERS.filter((l) => layers[l.id]).length
     if (showCriticalInfra) {
       count += IMPLEMENTED_CRITICAL_INFRA_MAP_SECTORS.filter((s) => layers[s.id]).length
     }
@@ -117,7 +121,29 @@ export function MapLayersDropdown({
           Map Layers
         </p>
         <div className="space-y-0.5">
+          {ALERT_ZONE_MAP_LAYERS.map((layer) => (
+            <LayerRow
+              key={layer.id}
+              id={layer.id}
+              label={layer.label}
+              color={layer.color}
+              Icon={layer.Icon}
+              checked={!!layers[layer.id]}
+              onToggle={() => toggle(layer.id)}
+            />
+          ))}
           {OPEN_SOURCE_MAP_LAYERS.map((layer) => (
+            <LayerRow
+              key={layer.id}
+              id={layer.id}
+              label={layer.label}
+              color={layer.color}
+              Icon={layer.Icon}
+              checked={!!layers[layer.id]}
+              onToggle={() => toggle(layer.id)}
+            />
+          ))}
+          {HIFLD_OPERATIONAL_MAP_LAYERS.map((layer) => (
             <LayerRow
               key={layer.id}
               id={layer.id}
