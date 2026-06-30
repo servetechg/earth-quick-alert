@@ -92,6 +92,18 @@ export function buildLeafletMarkerIcon(marker: SituationalMapMarker): L.DivIcon 
         return pinDivIcon('#1E3A8A', '#1e293b');
     }
 
+    if (
+        marker.icon === 'road_closure' ||
+        (marker.type === 'infrastructure' && marker.category === 'Road Closures')
+    ) {
+        return L.divIcon({
+            className: 'situational-map-road-closure-icon',
+            html: glyphSvg('#DC2626', '−', 34),
+            iconSize: [34, 34],
+            iconAnchor: [17, 17],
+        });
+    }
+
     if (marker.icon === 'chemical' || (marker.type === 'infrastructure' && (marker.category === 'Chemical' || marker.category === 'Chemical Sites' || marker.category === 'Chemical Storage & Manufacturing'))) {
         return L.icon({
             iconUrl: '/icons/chemical-marker.svg',
@@ -161,6 +173,19 @@ export function buildLeafletMarkerIcon(marker: SituationalMapMarker): L.DivIcon 
     const iconKey = marker.icon ?? 'red';
     const color = PIN_COLORS[iconKey] ?? PIN_COLORS.red;
     return pinDivIcon(color);
+}
+
+/** Red road-closure cluster badge with count. */
+export function roadClosureClusterIcon(count: number): L.DivIcon {
+    const label = count > 999 ? '999+' : String(count);
+    const size = count > 99 ? 44 : 38;
+    const html = `<div style="width:${size}px;height:${size}px;border-radius:50%;background:#DC2626;border:2.5px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.28);display:flex;align-items:center;justify-content:center;color:#fff;font-family:Arial,sans-serif;font-weight:800;font-size:${count > 99 ? 10 : 12}px;">${label}</div>`;
+    return L.divIcon({
+        className: 'situational-map-road-closure-cluster',
+        html,
+        iconSize: [size, size],
+        iconAnchor: [size / 2, size / 2],
+    });
 }
 
 export function clusterIcon(): L.DivIcon {

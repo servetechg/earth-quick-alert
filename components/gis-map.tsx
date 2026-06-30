@@ -55,6 +55,7 @@ import {
   FUEL_SITES_MAP_LAYER,
   PHARMACIES_MAP_LAYER,
   POLICE_STATIONS_MAP_LAYER,
+  ROAD_CLOSURES_MAP_LAYER,
   FINANCIAL_SITES_MAP_LAYER,
   HIFLD_NEXT_IMPLEMENTED_SECTOR_IDS,
   HIFLD_OPERATIONAL_MAP_LAYERS,
@@ -988,22 +989,8 @@ export function GISMap({
     scopeState: scopeState?.trim() || undefined,
   })
 
-  const roadFetchBounds = useMemo(
-    () =>
-      clampFetchBounds(
-        mapViewportBounds ?? stateBoundsRestriction ?? mapStateBounds ?? null,
-      ),
-    [mapViewportBounds, stateBoundsRestriction, mapStateBounds, clampFetchBounds],
-  )
-
-  const roadClosuresQuery = useRoadClosures({
-    enabled: GIS_MAP_FILTER_LAYERS_ENABLED && mapLayers.roads && viewportInUsa,
-    bounds: roadFetchBounds,
-    scopeState: scopeState?.trim() || undefined,
-  })
-
   /** Super-admin: viewport bbox across USA. Sub-admin / scoped state: full state. Sub-admin radius: circle bounds. */
-  const { dams: damsFetchScope, shelters: sheltersFetchScope, fuel_sites: fuelSitesFetchScope, pharmacies: pharmaciesFetchScope, police: policeFetchScope, ci_financial: financialSitesFetchScope } =
+  const { dams: damsFetchScope, shelters: sheltersFetchScope, fuel_sites: fuelSitesFetchScope, pharmacies: pharmaciesFetchScope, police: policeFetchScope, ci_financial: financialSitesFetchScope, roads: roadsFetchScope } =
     useMemo(() => {
       const ctx = {
         lockToCoverageCircle,
@@ -1023,6 +1010,7 @@ export function GISMap({
         ),
         shelters: buildOpenSourceLayerFetchScope(mapLayers.shelters, ctx),
         fuel_sites: buildOpenSourceLayerFetchScope(mapLayers.fuel_sites, ctx),
+        roads: buildOpenSourceLayerFetchScope(mapLayers.roads, ctx),
         pharmacies: buildOpenSourceLayerFetchScope(mapLayers.pharmacies, ctx),
         police: buildOpenSourceLayerFetchScope(mapLayers.police, ctx),
         ci_financial: buildOpenSourceLayerFetchScope(mapLayers.ci_financial, ctx),
@@ -1032,6 +1020,7 @@ export function GISMap({
       mapLayers.ci_dams,
       mapLayers.shelters,
       mapLayers.fuel_sites,
+      mapLayers.roads,
       mapLayers.pharmacies,
       mapLayers.police,
       mapLayers.ci_financial,
@@ -1045,6 +1034,15 @@ export function GISMap({
       scopeState,
       focusState,
     ])
+
+  const roadClosuresQuery = useRoadClosures({
+    enabled:
+      Boolean(roadsFetchScope) &&
+      mapLayers.roads &&
+      viewportInUsa,
+    bounds: roadsFetchScope?.stateKey ? null : roadsFetchScope?.bounds ?? null,
+    scopeState: roadsFetchScope?.stateKey ?? (scopeState?.trim() || undefined),
+  })
 
   const damsLayerQuery = useMapLayerDams({
     enabled:
@@ -1318,7 +1316,7 @@ export function GISMap({
 
   useEffect(() => {
     if (!mapLayers.roads || !viewportInUsa) {
-      if (!viewportInUsa) setRoadClosurePolylines([])
+      setRoadClosurePolylines([])
       return
     }
 
@@ -1336,6 +1334,14 @@ export function GISMap({
         restrictToUsa &&
         !path.some((p: { lat?: number; lng?: number }) =>
           inUsaView(p.lat as number, p.lng as number),
+        )
+      ) {
+        continue
+      }
+      if (
+        mapViewportBounds &&
+        !path.some((p: { lat?: number; lng?: number }) =>
+          markerInLayerViewport(p.lat as number, p.lng as number),
         )
       ) {
         continue
@@ -1374,7 +1380,15 @@ export function GISMap({
     }
 
     setRoadClosurePolylines(polylines)
-  }, [mapLayers.roads, roadClosuresQuery.data, restrictToUsa, inUsaView, viewportInUsa])
+  }, [
+    mapLayers.roads,
+    roadClosuresQuery.data,
+    restrictToUsa,
+    inUsaView,
+    viewportInUsa,
+    mapViewportBounds,
+    markerInLayerViewport,
+  ])
 
   useEffect(() => {
     setIsLoadingRoadClosures(roadClosuresQuery.isFetching)
@@ -1569,11 +1583,13 @@ export function GISMap({
   ])
 
   const combinedPolylines = useMemo(
-    () =>
-      viewportInUsa
-        ? [...tornadoPolylines, ...roadClosurePolylines, ...operationalAlertPolylines]
-        : [...tornadoPolylines],
-    [tornadoPolylines, roadClosurePolylines, operationalAlertPolylines, viewportInUsa],
+    () => {
+      const visibleRoadClosures = mapLayers.roads ? roadClosurePolylines : []
+      return viewportInUsa
+        ? [...tornadoPolylines, ...visibleRoadClosures, ...operationalAlertPolylines]
+        : [...tornadoPolylines]
+    },
+    [tornadoPolylines, roadClosurePolylines, operationalAlertPolylines, viewportInUsa, mapLayers.roads],
   )
 
   const markers = useMemo(() => {
@@ -1641,13 +1657,13 @@ export function GISMap({
     inUsaView,
   ])
 
-  /** Operational dashboards always show incidents/heatmap; Filter checkbox is optional elsewhere. */
+  /** Operational incident pins (separate from heat). */
   const incidentsVisible = unifiedMapFeed || stateScoped || mapLayers.incidents
-  /** Incident heat — Risk Areas toggle on scoped maps; always on state-scoped / unified feeds. */
-  const riskHeatEnabled = mapLayers.risk || stateScoped || unifiedMapFeed
+  /** Incident heat — controlled by Risk Areas toggle (default on). */
+  const riskHeatEnabled = mapLayers.risk
 
   const heatPoints = useMemo(() => {
-    if (!showHeatmap || !incidentsVisible || !riskHeatEnabled) return []
+    if (!showHeatmap || !riskHeatEnabled) return []
     if (restrictToUsa && !viewportInUsa) return []
 
     const inCoverage = (lat: number, lng: number) => {
@@ -1687,7 +1703,6 @@ export function GISMap({
     return base.slice(0, 24)
   }, [
     showHeatmap,
-    incidentsVisible,
     riskHeatEnabled,
     unifiedIncidents,
     impactedUsers,
@@ -2017,6 +2032,38 @@ export function GISMap({
       }
     }
 
+    if (OPEN_SOURCE_MAP_LAYERS_ENABLED && mapLayers.roads && roadClosuresQuery.data?.length) {
+      const skipCoverageFilter = restrictToUsa && !stateBoundsRestriction && !lockToCoverageCircle
+      for (const closure of roadClosuresQuery.data) {
+        const path = Array.isArray(closure.path)
+          ? closure.path.filter(
+              (p: { lat?: number; lng?: number }) =>
+                Number.isFinite(p.lat) && Number.isFinite(p.lng),
+            )
+          : []
+        if (path.length < 2) continue
+        const mid = path[Math.floor(path.length / 2)]!
+        if (!inUsaView(mid.lat, mid.lng)) continue
+        if (!skipCoverageFilter && !markerInCoverage({ lat: mid.lat, lng: mid.lng })) continue
+        if (skipCoverageFilter && !markerInLayerViewport(mid.lat, mid.lng)) continue
+        const parts = [closure.status]
+        if (closure.reason) parts.push(closure.reason)
+        if (closure.source) parts.push(`Source: ${closure.source}`)
+        enabledLayerMarkers.push({
+          id: `road-closure-marker-${closure.id}`,
+          position: { lat: mid.lat, lng: mid.lng },
+          title: closure.roadName,
+          type: 'infrastructure' as const,
+          category: ROAD_CLOSURES_MAP_LAYER.label,
+          status: closure.status,
+          location: closure.startLocation ?? closure.roadName,
+          description: parts.join(' · '),
+          color: ROAD_CLOSURES_MAP_LAYER.color,
+          icon: ROAD_CLOSURES_MAP_LAYER.markerIcon,
+        })
+      }
+    }
+
     return [...activeTabMarkers, ...enabledLayerMarkers]
   }, [
     markers,
@@ -2042,6 +2089,7 @@ export function GISMap({
     enabledOperationalHifldLayers,
     showCriticalInfraLayers,
     markerInLayerViewport,
+    roadClosuresQuery.data,
   ])
 
   const disasterZonesVisible = useMemo(() => {
@@ -2187,8 +2235,8 @@ export function GISMap({
           (policeStationsLayerQuery.isFetching && !policeStationsLayerQuery.data?.length) ||
           (financialSitesLayerQuery.isFetching && !financialSitesLayerQuery.data?.length) ||
           (hifldSitesLayerQuery.isFetching && !hifldSitesLayerQuery.data?.length) ||
-          (GIS_MAP_FILTER_LAYERS_ENABLED &&
-            (isSearchingInfra || isLoadingRoadClosures))) && (
+          (mapLayers.roads && isLoadingRoadClosures) ||
+          (GIS_MAP_FILTER_LAYERS_ENABLED && isSearchingInfra)) && (
           <div className="absolute right-4 top-4 bg-white/90 backdrop-blur-md px-4 py-2 rounded-2xl shadow-2xl border border-slate-100 flex items-center gap-2 z-50 animate-in fade-in slide-in-from-top-2 duration-300">
             <Loader2 className="w-4 h-4 text-[#33375D] animate-spin" />
             <span className="text-[10px] font-black uppercase tracking-widest text-slate-600">
@@ -2206,6 +2254,8 @@ export function GISMap({
                       ? 'Loading Critical Infrastructure…'
                       : financialSitesLayerQuery.isFetching && !financialSitesLayerQuery.data?.length
                         ? 'Loading Financial Sites…'
+                        : isLoadingRoadClosures
+                          ? 'Loading Road Closures…'
                         : 'Locating Facilities…'}
             </span>
           </div>

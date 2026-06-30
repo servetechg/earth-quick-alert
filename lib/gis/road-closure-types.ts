@@ -11,9 +11,3 @@ export type RoadClosureSegment = {
     source: string
     path: { lat: number; lng: number }[]
 }
-
-export type RoadClosureFetchResult = {
-    closures: RoadClosureSegment[]
-    fetchedAt: string
-    sources: string[]
-}

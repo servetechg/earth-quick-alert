@@ -518,16 +518,19 @@ export function useRoadClosures(opts: {
     const boundsKey = opts.bounds
         ? `${opts.bounds.west.toFixed(3)},${opts.bounds.south.toFixed(3)},${opts.bounds.east.toFixed(3)},${opts.bounds.north.toFixed(3)}`
         : 'none';
+    const scopeKey = opts.scopeState?.trim().toUpperCase() || 'none';
 
     return useQuery({
-        queryKey: ['road-closures', boundsKey, opts.scopeState ?? ''],
+        queryKey: ['road-closures', boundsKey, scopeKey],
         queryFn: () =>
             fetchRoadClosures({
                 bounds: opts.bounds ?? undefined,
                 scopeState: opts.scopeState,
             }),
-        enabled: opts.enabled,
-        staleTime: 5 * 60_000,
-        refetchInterval: 5 * 60_000,
+        enabled: opts.enabled && Boolean(opts.bounds || opts.scopeState?.trim()),
+        staleTime: 10 * 60_000,
+        gcTime: 60 * 60_000,
+        refetchInterval: 10 * 60_000,
+        placeholderData: (prev) => prev,
     });
 }
