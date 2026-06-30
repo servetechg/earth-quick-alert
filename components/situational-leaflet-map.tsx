@@ -36,7 +36,7 @@ import {
     SUB_ADMIN_MIN_ZOOM,
     viewportExceedsBounds,
 } from '@/lib/gis/situational-map-utils';
-import { buildLeafletMarkerIcon, chemicalClusterIcon, clusterIcon, criticalInfraClusterIcon, damClusterIcon, financialClusterIcon, fuelClusterIcon, heatIncidentPinIcon, pharmacyClusterIcon, policeClusterIcon, shelterClusterIcon } from '@/lib/gis/situational-map-marker-icons';
+import { buildLeafletMarkerIcon, chemicalClusterIcon, clusterIcon, criticalInfraClusterIcon, damClusterIcon, financialClusterIcon, fuelClusterIcon, heatIncidentPinIcon, pharmacyClusterIcon, policeClusterIcon, roadClosureClusterIcon, shelterClusterIcon } from '@/lib/gis/situational-map-marker-icons';
 import type { UnifiedEventHeatPoint } from '@/lib/geo/unified-event-heatmap';
 
 export type {
@@ -235,7 +235,7 @@ function InfrastructureClusterLayer({
     markers: SituationalMapMarker[];
     enabled: boolean;
     onSelect: (m: SituationalMapMarker) => void;
-    clusterMode?: 'default' | 'dams' | 'shelters' | 'fuel' | 'pharmacies' | 'police' | 'chemical' | 'financial' | 'critical-infra';
+    clusterMode?: 'default' | 'dams' | 'shelters' | 'fuel' | 'pharmacies' | 'police' | 'chemical' | 'financial' | 'roads' | 'critical-infra';
 }) {
     const map = useMap();
     const groupRef = useRef<L.MarkerClusterGroup | null>(null);
@@ -248,6 +248,7 @@ function InfrastructureClusterLayer({
         if (!enabled || markers.length === 0) return;
 
         const isDams = clusterMode === 'dams';
+        const isRoads = clusterMode === 'roads';
         const isShelters = clusterMode === 'shelters';
         const isFuel = clusterMode === 'fuel';
         const isPharmacies = clusterMode === 'pharmacies';
@@ -257,6 +258,7 @@ function InfrastructureClusterLayer({
         const isCriticalInfra = clusterMode === 'critical-infra';
         const isFacilities =
             isDams ||
+            isRoads ||
             isShelters ||
             isFuel ||
             isPharmacies ||
@@ -272,6 +274,8 @@ function InfrastructureClusterLayer({
             spiderfyOnMaxZoom: isFacilities,
             iconCreateFunction: isDams
                 ? (cluster) => damClusterIcon(cluster.getChildCount())
+                : isRoads
+                  ? (cluster) => roadClosureClusterIcon(cluster.getChildCount())
                 : isShelters
                   ? (cluster) => shelterClusterIcon(cluster.getChildCount())
                   : isFuel

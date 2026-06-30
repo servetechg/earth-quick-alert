@@ -16,6 +16,7 @@ import {
   HIFLD_OPERATIONAL_MAP_LAYERS,
   IMPLEMENTED_CRITICAL_INFRA_MAP_SECTORS,
   OPEN_SOURCE_MAP_LAYERS,
+  ROAD_CLOSURES_MAP_LAYER,
 } from '@/lib/gis/map-layer-config'
 
 interface MapLayersDropdownProps {
@@ -77,6 +78,7 @@ export function MapLayersDropdown({
 }: MapLayersDropdownProps) {
   const enabledCount = useMemo(() => {
     let count = ALERT_ZONE_MAP_LAYERS.filter((l) => layers[l.id]).length
+    if (layers[ROAD_CLOSURES_MAP_LAYER.id]) count += 1
     count += OPEN_SOURCE_MAP_LAYERS.filter((l) => layers[l.id]).length
     count += HIFLD_OPERATIONAL_MAP_LAYERS.filter((l) => layers[l.id]).length
     if (showCriticalInfra) {
@@ -132,6 +134,14 @@ export function MapLayersDropdown({
               onToggle={() => toggle(layer.id)}
             />
           ))}
+          <LayerRow
+            id={ROAD_CLOSURES_MAP_LAYER.id}
+            label={ROAD_CLOSURES_MAP_LAYER.label}
+            color={ROAD_CLOSURES_MAP_LAYER.color}
+            Icon={ROAD_CLOSURES_MAP_LAYER.Icon}
+            checked={!!layers[ROAD_CLOSURES_MAP_LAYER.id]}
+            onToggle={() => toggle(ROAD_CLOSURES_MAP_LAYER.id)}
+          />
           {OPEN_SOURCE_MAP_LAYERS.map((layer) => (
             <LayerRow
               key={layer.id}

@@ -8,7 +8,7 @@ import {
   CRITICAL_INFRASTRUCTURE_SECTORS,
   type CriticalInfraSectorId,
 } from '@/lib/gis/critical-infrastructure-sectors'
-import { AlertTriangle, Droplets, FlaskConical, Fuel, Home, Landmark, Pill, Siren } from 'lucide-react'
+import { AlertTriangle, Construction, Droplets, FlaskConical, Fuel, Home, Landmark, Pill, Siren } from 'lucide-react'
 
 export type { GisFilterLayerDef } from '@/lib/gis/gis-filter-layers'
 
@@ -44,6 +44,15 @@ export const TOP_LEVEL_MAP_LAYERS: MapLayerDef[] = [
 export const ALERT_ZONE_MAP_LAYERS: MapLayerDef[] = OPERATIONAL_MAP_LAYERS.filter(
   (layer) => layer.id === 'risk' || layer.id === 'flood',
 ).map((layer) => ({ ...layer }))
+
+/** Real-time DOT work zones (WZDX). */
+export const ROAD_CLOSURES_MAP_LAYER: MapLayerDef = {
+  id: 'roads',
+  label: 'Road Closures',
+  Icon: Construction,
+  color: '#DC2626',
+  markerIcon: 'road_closure',
+}
 
 /** Demo — post-disaster zones A/B/C (Arkansas tornado scenario). */
 export const DISASTER_ZONE_LAYER: MapLayerDef = {
@@ -160,6 +169,7 @@ export type InfrastructureClusterMode =
   | 'police'
   | 'chemical'
   | 'financial'
+  | 'roads'
   | 'critical-infra'
 
 /** Match open-source facility clustering (dams / shelters / fuel) for active map layer. */
@@ -167,6 +177,7 @@ export function resolveInfrastructureClusterMode(
   mapLayers: Record<string, boolean>,
 ): InfrastructureClusterMode {
   if (mapLayers.ci_dams) return 'dams'
+  if (mapLayers.roads) return 'roads'
   if (mapLayers.shelters) return 'shelters'
   if (mapLayers.fuel_sites) return 'fuel'
   if (mapLayers.pharmacies) return 'pharmacies'
@@ -200,6 +211,7 @@ export function buildDefaultMapLayerState(opts?: {
   TOP_LEVEL_MAP_LAYERS.forEach((layer) => {
     defaults[layer.id] = false
   })
+  defaults.risk = true
   if (opts?.includeDisasterZones) {
     defaults[DISASTER_ZONE_LAYER.id] = false
   }
@@ -215,6 +227,7 @@ export function buildDefaultMapLayerState(opts?: {
   defaults[FUEL_SITES_MAP_LAYER.id] = false
   defaults[PHARMACIES_MAP_LAYER.id] = false
   defaults[POLICE_STATIONS_MAP_LAYER.id] = false
+  defaults[ROAD_CLOSURES_MAP_LAYER.id] = false
   return defaults
 }
 
@@ -241,5 +254,6 @@ export function buildDemoMapLayerState(opts?: {
       state[sectorId] = true
     })
   }
+  state[ROAD_CLOSURES_MAP_LAYER.id] = true
   return state
 }

@@ -40,16 +40,19 @@ function resolveSuperAdminScope(
     scopeState: string | undefined,
     bounds: MapBounds | null,
 ): InfrastructureSearchScope | null {
+    const stateCode = scopeState ? normalizeStateToUsps(scopeState) : null
+
+    if (stateCode && !bounds) {
+        return { mode: 'state', stateCode }
+    }
+
     if (!bounds) return null
 
-    if (scopeState) {
-        const stateCode = normalizeStateToUsps(scopeState)
-        if (stateCode) {
-            const stateBounds = boundsFromStateCode(stateCode)
-            if (stateBounds) {
-                const clipped = intersectBounds(bounds, stateBounds)
-                if (clipped) return { mode: 'bounds', bounds: clipped }
-            }
+    if (stateCode) {
+        const stateBounds = boundsFromStateCode(stateCode)
+        if (stateBounds) {
+            const clipped = intersectBounds(bounds, stateBounds)
+            if (clipped) return { mode: 'bounds', bounds: clipped }
         }
     }
     return { mode: 'bounds', bounds }

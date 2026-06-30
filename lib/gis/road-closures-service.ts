@@ -8,11 +8,13 @@ import {
 import { pointInUsStateBBox } from '@/lib/constants/us-state-bounding-boxes'
 import { calculateDistance } from '@/lib/services/mock-map-service'
 import type { RoadClosureSegment, RoadClosureStatus } from '@/lib/gis/road-closure-types'
+import { fetchWzdxClosures, wzdxStateCodesForScope } from '@/lib/gis/wzdx/wzdx-road-closures'
 import IncidentReport from '@/models/IncidentReport'
 
 const NWS_BASE = 'https://api.weather.gov'
-const CACHE_TTL_MS = 5 * 60 * 1000
-const ROAD_CLOSURE_PREFIX = 'roads:'
+/** Combined road-closure API response cache (Redis + memory fallback). */
+const CACHE_TTL_MS = 10 * 60 * 1000
+const ROAD_CLOSURE_PREFIX = 'map-layer:road-closures:'
 
 function nwsHeaders(): HeadersInit {
     return {
@@ -22,7 +24,7 @@ function nwsHeaders(): HeadersInit {
 }
 
 function configuredSources(): string[] {
-    const raw = process.env.ROAD_CLOSURE_DATA_SOURCES ?? 'nws,osm,reports'
+    const raw = process.env.ROAD_CLOSURE_DATA_SOURCES ?? 'wzdx,nws,reports'
     return raw
         .split(',')
         .map((s) => s.trim().toLowerCase())
@@ -33,6 +35,10 @@ function scopeCacheKey(scope: InfrastructureSearchScope): string {
     if (scope.mode === 'state') return `state:${scope.stateCode.toUpperCase()}`
     if (scope.mode === 'radius') {
         return `radius:${scope.center.lat.toFixed(3)},${scope.center.lng.toFixed(3)}:${scope.radiusMile}`
+    }
+    const wzdxStates = wzdxStateCodesForScope(scope)
+    if (wzdxStates.length > 0) {
+        return `states:${[...wzdxStates].sort().join(',')}`
     }
     const b = scope.bounds
     return `bounds:${b.west.toFixed(2)},${b.south.toFixed(2)},${b.east.toFixed(2)},${b.north.toFixed(2)}`
@@ -83,6 +89,16 @@ function parseStartEnd(text: string): { start?: string; end?: string } {
     const fromTo = text.match(/from\s+(.+?)\s+to\s+(.+?)(?:\.|,|$)/i)
     if (fromTo) return { start: fromTo[1].trim(), end: fromTo[2].trim() }
     return {}
+}
+
+function isNwsAlertActiveNow(props: Record<string, unknown>, nowMs = Date.now()): boolean {
+    const expiresMs = Date.parse(String(props.expires ?? props.ends ?? ''))
+    if (Number.isFinite(expiresMs) && expiresMs < nowMs) return false
+
+    const onsetMs = Date.parse(String(props.onset ?? props.effective ?? ''))
+    if (Number.isFinite(onsetMs) && onsetMs > nowMs) return false
+
+    return true
 }
 
 function isRoadClosureAlert(props: Record<string, unknown>): boolean {
@@ -137,17 +153,6 @@ function segmentFromPoint(lat: number, lng: number, label?: string): { lat: numb
     ]
 }
 
-function strokeForStatus(status: RoadClosureStatus): string {
-    if (status === 'Closed') return '#DC2626'
-    if (status === 'Restricted') return '#F59E0B'
-    if (status === 'Lane Closure') return '#EAB308'
-    return '#EF4444'
-}
-
-export function roadClosureStrokeColor(status: RoadClosureStatus): string {
-    return strokeForStatus(status)
-}
-
 async function fetchNwsClosures(scope: InfrastructureSearchScope): Promise<RoadClosureSegment[]> {
     const area =
         scope.mode === 'state' && scope.stateCode
@@ -172,7 +177,7 @@ async function fetchNwsClosures(scope: InfrastructureSearchScope): Promise<RoadC
             properties?: Record<string, unknown>
         }
         const props = f.properties ?? {}
-        if (!isRoadClosureAlert(props)) continue
+        if (!isRoadClosureAlert(props) || !isNwsAlertActiveNow(props)) continue
 
         const paths = geoJsonToPaths(f.geometry)
         const event = String(props.event ?? 'Road Closure')
@@ -394,6 +399,7 @@ export async function fetchRoadClosures(
     const sources = configuredSources()
     const batches: RoadClosureSegment[][] = []
 
+    if (sources.includes('wzdx')) batches.push(await fetchWzdxClosures(scope))
     if (sources.includes('nws')) batches.push(await fetchNwsClosures(scope))
     if (sources.includes('osm')) batches.push(await fetchOsmClosures(scope))
     if (sources.includes('reports')) batches.push(await fetchReportClosures(scope))
