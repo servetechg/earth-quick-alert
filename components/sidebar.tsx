@@ -12,6 +12,7 @@ import {
   Brain,
   ClipboardList,
   FileText,
+  ScrollText,
   Settings,
   HelpCircle,
   LogOut,
@@ -39,7 +40,7 @@ export const menuItems = [
   // { icon: AlertCircle, label: 'Emergency Events', href: '/emergency-events' },
   // { icon: Map, label: 'GIS & Mapping', href: '/gis-mapping' },
   { icon: Bell, label: 'Alerts & Communication', href: '/alerts-communication' },
-  // { icon: Brain, label: 'Virtual EOC / AI Center', href: '/virtual-eoc-ai-center' },
+  { icon: ScrollText, label: 'Disaster Surveys', href: '/disaster-surveys' },
   { icon: ClipboardList, label: 'After Action Review', href: '/after-action-review' },
   { icon: FileText, label: 'COOP/BC Plans', href: '/emergency-plan' },
   { icon: FileText, label: 'Preparedness Information', href: '/preparedness-information' },
@@ -110,6 +111,7 @@ export function Sidebar({ className }: { className?: string }) {
     ? [
         { icon: LayoutDashboard, label: 'Dashboard', href: '/super-admin-dashboard' },
         { icon: Bell, label: 'Alerts & Communication', href: '/alerts-communication' },
+        { icon: ScrollText, label: 'Disaster Surveys', href: '/disaster-surveys' },
         { icon: FileText, label: 'Preparedness Information', href: '/preparedness-information' },
         { icon: Building2, label: 'Licenses', href: '/admin/licenses' },
         { icon: Shield, label: 'Sub-Admins', href: '/admin/sub-admins' },
@@ -123,6 +125,7 @@ export function Sidebar({ className }: { className?: string }) {
         ? [
             menuItems[0],
             menuItems[1],
+            { icon: ScrollText, label: 'Disaster Surveys', href: '/disaster-surveys' },
             { icon: Sparkles, label: 'AI Risk Assessment', href: '/ai-risk-assessment' },
             ...menuItems.slice(2),
           ]
