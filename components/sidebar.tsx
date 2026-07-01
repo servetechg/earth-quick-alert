@@ -24,6 +24,7 @@ import {
   CloudRain,
   RefreshCw,
   Sparkles,
+  Activity,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import Image from 'next/image'
@@ -113,6 +114,7 @@ export function Sidebar({ className }: { className?: string }) {
         { icon: Building2, label: 'Licenses', href: '/admin/licenses' },
         { icon: Shield, label: 'Sub-Admins', href: '/admin/sub-admins' },
         { icon: Users, label: 'Responder and Leader Approval', href: '/admin/users' },
+        { icon: Activity, label: 'Citizen Activity Feed', href: '/citizen-activity-feed' },
         { icon: Sparkles, label: 'AI Risk Assessment', href: '/ai-risk-assessment' },
       ]
     : isEOCRole
@@ -127,6 +129,7 @@ export function Sidebar({ className }: { className?: string }) {
         : isOperationalAdmin
           ? [
               ...menuItems,
+              { icon: Activity, label: 'Citizen Activity Feed', href: '/citizen-activity-feed' },
               { icon: Users, label: 'Responder and Leader Approval', href: '/admin/users' },
             ]
           : [...menuItems]

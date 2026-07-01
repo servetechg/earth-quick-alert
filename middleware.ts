@@ -80,6 +80,7 @@ export function middleware(request: NextRequest) {
             '/sub-admin-settings',
             '/admin/users',
             '/ai-risk-assessment',
+            '/citizen-activity-feed',
         ]
 
         const isAdminRoute = adminRoutes.some(route => pathname.startsWith(route))
@@ -175,6 +176,25 @@ export function middleware(request: NextRequest) {
                 userRole === 'observer' ||
                 userRole === 'manager'
             if (!canAccessAiRisk) {
+                const dest =
+                    userRole === 'responder' || userRole === 'public_official'
+                        ? '/responder-dashboard'
+                        : '/user-dashboard'
+                return NextResponse.redirect(new URL(dest, request.url))
+            }
+        }
+
+        if (pathname.startsWith('/citizen-activity-feed')) {
+            if (isEOCRole) {
+                return NextResponse.redirect(new URL('/virtual-eoc', request.url))
+            }
+            const canAccessCitizenFeed =
+                userRole === 'super-admin' ||
+                userRole === 'admin' ||
+                userRole === 'sub-admin' ||
+                userRole === 'observer' ||
+                userRole === 'manager'
+            if (!canAccessCitizenFeed) {
                 const dest =
                     userRole === 'responder' || userRole === 'public_official'
                         ? '/responder-dashboard'
