@@ -1,0 +1,4614 @@
+{
+  "metadata": {
+    "generatedAt": "2026-06-29T12:18:31.843Z",
+    "updatedAt": "2026-06-29T12:19:41.664Z",
+    "source": "Google Places API (New) — places:searchText",
+    "apiEndpoint": "https://places.googleapis.com/v1/places:searchText",
+    "fieldMask": "places.id,places.displayName,places.formattedAddress,places.location,nextPageToken",
+    "searchQueries": [
+      {
+        "category": "generator_suppliers",
+        "template": "generator suppliers in {stateName}"
+      },
+      {
+        "category": "generator_rental",
+        "template": "generator rental companies in {stateName}"
+      },
+      {
+        "category": "backup_power",
+        "template": "backup power providers in {stateName}"
+      },
+      {
+        "category": "emergency_generator",
+        "template": "emergency generator services in {stateName}"
+      }
+    ],
+    "statesProcessed": [
+      "AL",
+      "AK"
+    ],
+    "statesPending": [
+      "AZ",
+      "AR",
+      "CA",
+      "CO",
+      "CT",
+      "DE",
+      "FL",
+      "GA",
+      "HI",
+      "ID",
+      "IL",
+      "IN",
+      "IA",
+      "KS",
+      "KY",
+      "LA",
+      "ME",
+      "MD",
+      "MA",
+      "MI",
+      "MN",
+      "MS",
+      "MO",
+      "MT",
+      "NE",
+      "NV",
+      "NH",
+      "NJ",
+      "NM",
+      "NY",
+      "NC",
+      "ND",
+      "OH",
+      "OK",
+      "OR",
+      "PA",
+      "RI",
+      "SC",
+      "SD",
+      "TN",
+      "TX",
+      "UT",
+      "VT",
+      "VA",
+      "WA",
+      "WV",
+      "WI",
+      "WY"
+    ],
+    "perStateCounts": {
+      "AL": 231,
+      "AK": 117
+    },
+    "totalRecords": 348,
+    "totalApiRequests": 34,
+    "errors": []
+  },
+  "generatorLocations": [
+    {
+      "placeId": "ChIJ77h8ij8FiYgRmwL1fdoLG8Y",
+      "displayName": "Thompson Power Systems - Birmingham",
+      "formattedAddress": "2258 Pinson Valley Pkwy, Birmingham, AL 35217, USA",
+      "location": {
+        "latitude": 33.5953935,
+        "longitude": -86.7618365
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_suppliers",
+      "sourceTextQuery": "generator suppliers in Alabama"
+    },
+    {
+      "placeId": "ChIJo-NtA1ZzYogRDMmDRAIeEc8",
+      "displayName": "Current Electrical and Generator Services",
+      "formattedAddress": "GeneracSuperStore.com, 1068 Hwy 231, Laceys Spring, AL 35754, USA",
+      "location": {
+        "latitude": 34.5492729,
+        "longitude": -86.5854622
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_suppliers",
+      "sourceTextQuery": "generator suppliers in Alabama"
+    },
+    {
+      "placeId": "ChIJgwHfY8ANiYgRyZjD-rzwEIA",
+      "displayName": "Energy Systems Southeast, LLC",
+      "formattedAddress": "3235 Veterans Cir, Birmingham, AL 35235, USA",
+      "location": {
+        "latitude": 33.5973591,
+        "longitude": -86.64212549999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_suppliers",
+      "sourceTextQuery": "generator suppliers in Alabama"
+    },
+    {
+      "placeId": "ChIJ1Zn7CwsDhogRV_F5JUOyCqg",
+      "displayName": "Thompson Power Systems - Tuscaloosa",
+      "formattedAddress": "3550 Joe Mallisham Pkwy, Tuscaloosa, AL 35401, USA",
+      "location": {
+        "latitude": 33.182999599999995,
+        "longitude": -87.61597669999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_suppliers",
+      "sourceTextQuery": "generator suppliers in Alabama"
+    },
+    {
+      "placeId": "ChIJyx_6qyIhjIgR9mWbcE6q0OY",
+      "displayName": "RLA Power Solutions",
+      "formattedAddress": "145 Grier Rd, Wetumpka, AL 36092, USA",
+      "location": {
+        "latitude": 32.603301,
+        "longitude": -86.20578359999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_suppliers",
+      "sourceTextQuery": "generator suppliers in Alabama"
+    },
+    {
+      "placeId": "ChIJucBb2j8XiYgRry9QxeD3eaA",
+      "displayName": "Advanced Generator Technologies LLC",
+      "formattedAddress": "2146 Tyler Rd #240, Hoover, AL 35226, USA",
+      "location": {
+        "latitude": 33.417154,
+        "longitude": -86.8431638
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_suppliers",
+      "sourceTextQuery": "generator suppliers in Alabama"
+    },
+    {
+      "placeId": "ChIJTXSBqywtjIgRDSkjpgmSF34",
+      "displayName": "Thompson Power Systems - Montgomery",
+      "formattedAddress": "10120 US-80, Montgomery, AL 36117, USA",
+      "location": {
+        "latitude": 32.3662434,
+        "longitude": -86.13041319999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_suppliers",
+      "sourceTextQuery": "generator suppliers in Alabama"
+    },
+    {
+      "placeId": "ChIJ5aP_XmCxi4gRv4gUy0E0BJs",
+      "displayName": "Thompson Power Systems - Oxford/Anniston",
+      "formattedAddress": "2300 AL-21, Oxford, AL 36203, USA",
+      "location": {
+        "latitude": 33.5948415,
+        "longitude": -85.8444121
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_suppliers",
+      "sourceTextQuery": "generator suppliers in Alabama"
+    },
+    {
+      "placeId": "ChIJyRSML8ZjiYgRkq6WT0-2-Js",
+      "displayName": "Generator Solutions, Inc.",
+      "formattedAddress": "6300 Harmon Dr, Pell City, AL 35128, USA",
+      "location": {
+        "latitude": 33.5165758,
+        "longitude": -86.2626835
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_suppliers",
+      "sourceTextQuery": "generator suppliers in Alabama"
+    },
+    {
+      "placeId": "ChIJJZoXdV5nYogReBPV94UeKvQ",
+      "displayName": "Heritage Generator LLC",
+      "formattedAddress": "8097 Madison Blvd #105, Madison, AL 35758, USA",
+      "location": {
+        "latitude": 34.6881458,
+        "longitude": -86.7217208
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_suppliers",
+      "sourceTextQuery": "generator suppliers in Alabama"
+    },
+    {
+      "placeId": "ChIJXXIxOIWJYogR5utQRnoJ5FQ",
+      "displayName": "Thompson Power Systems - Decatur",
+      "formattedAddress": "6969 US-31, Tanner, AL 35671, USA",
+      "location": {
+        "latitude": 34.6576349,
+        "longitude": -86.95138469999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_suppliers",
+      "sourceTextQuery": "generator suppliers in Alabama"
+    },
+    {
+      "placeId": "ChIJq1K2fgxPmogR6bpYGEBLpeI",
+      "displayName": "The Generator Guys, Forrest Jordan and Associates",
+      "formattedAddress": "1801 15th St, Mobile, AL 36615, USA",
+      "location": {
+        "latitude": 30.6466497,
+        "longitude": -88.06583839999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_suppliers",
+      "sourceTextQuery": "generator suppliers in Alabama"
+    },
+    {
+      "placeId": "ChIJLQENQlvkiIgRPScSDkgGXIk",
+      "displayName": "Alabama Generator Services",
+      "formattedAddress": "750 Crocker Rd, Mulga, AL 35118, USA",
+      "location": {
+        "latitude": 33.52698300000001,
+        "longitude": -87.00831099999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_suppliers",
+      "sourceTextQuery": "generator suppliers in Alabama"
+    },
+    {
+      "placeId": "ChIJITOIWueuiYgR432OFF6yS4I",
+      "displayName": "Mid-America Engine",
+      "formattedAddress": "2500 AL-160, Warrior, AL 35180, USA",
+      "location": {
+        "latitude": 33.866987,
+        "longitude": -86.7872694
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_suppliers",
+      "sourceTextQuery": "generator suppliers in Alabama"
+    },
+    {
+      "placeId": "ChIJ53hbJrsYiYgROpWsuBrdHXw",
+      "displayName": "Northern Tool + Equipment",
+      "formattedAddress": "495 Southland Dr, Hoover, AL 35226, USA",
+      "location": {
+        "latitude": 33.4107032,
+        "longitude": -86.8077074
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_suppliers",
+      "sourceTextQuery": "generator suppliers in Alabama"
+    },
+    {
+      "placeId": "ChIJT5lwKhPfiIgRlO0lBZMt1cs",
+      "displayName": "Taylor Power Systems",
+      "formattedAddress": "1050 Powder Plant Rd, Bessemer, AL 35022, USA",
+      "location": {
+        "latitude": 33.3733901,
+        "longitude": -87.01128829999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_suppliers",
+      "sourceTextQuery": "generator suppliers in Alabama"
+    },
+    {
+      "placeId": "ChIJySOJPWJpmogRWBuQKt-gwC4",
+      "displayName": "Thompson Power Systems - Mobile",
+      "formattedAddress": "30950 State Hwy 181, Spanish Fort, AL 36527, USA",
+      "location": {
+        "latitude": 30.675362199999995,
+        "longitude": -87.85074639999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_suppliers",
+      "sourceTextQuery": "generator suppliers in Alabama"
+    },
+    {
+      "placeId": "ChIJp2E_THefiYgR4L21ejWR4dk",
+      "displayName": "Auxiliary Power Systems, Inc",
+      "formattedAddress": "944 Fall Branch Rd, Remlap, AL 35133, USA",
+      "location": {
+        "latitude": 33.79893,
+        "longitude": -86.569502
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_suppliers",
+      "sourceTextQuery": "generator suppliers in Alabama"
+    },
+    {
+      "placeId": "ChIJufoeotDhiYgRs4Eb4alLPn8",
+      "displayName": "Gen Man Generators",
+      "formattedAddress": "178 Elmore Dr, Arab, AL 35016, USA",
+      "location": {
+        "latitude": 34.376199299999996,
+        "longitude": -86.5512109
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_suppliers",
+      "sourceTextQuery": "generator suppliers in Alabama"
+    },
+    {
+      "placeId": "ChIJYW-h_AIp9YgRw69f0wUVhcI",
+      "displayName": "Anderson Power Services",
+      "formattedAddress": "13211 Veterans Memorial Hwy, Douglasville, GA 30134, USA",
+      "location": {
+        "latitude": 33.738171799999996,
+        "longitude": -84.7903915
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_suppliers",
+      "sourceTextQuery": "generator suppliers in Alabama"
+    },
+    {
+      "placeId": "ChIJ-RAqGSadj4gRbpyIFrMgmd0",
+      "displayName": "Safford Equipment & Safford Trading Company",
+      "formattedAddress": "22445 AL-22, Safford, AL 36773, USA",
+      "location": {
+        "latitude": 32.2874651,
+        "longitude": -87.3700744
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_suppliers",
+      "sourceTextQuery": "generator suppliers in Alabama"
+    },
+    {
+      "placeId": "ChIJwZmQC5rhiYgR4YwqM2c1kIg",
+      "displayName": "Walley Power Systems LLC",
+      "formattedAddress": "132 Elmore Dr, Arab, AL 35016, USA",
+      "location": {
+        "latitude": 34.3755429,
+        "longitude": -86.5509405
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_suppliers",
+      "sourceTextQuery": "generator suppliers in Alabama"
+    },
+    {
+      "placeId": "ChIJKcNzgvOzsIQRko8EnF92bAA",
+      "displayName": "Power Generator Depot",
+      "formattedAddress": "19224 E Walnut Dr N Ste A, City of Industry, CA 91748, USA",
+      "location": {
+        "latitude": 33.9947753,
+        "longitude": -117.88368029999998
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_suppliers",
+      "sourceTextQuery": "generator suppliers in Alabama"
+    },
+    {
+      "placeId": "ChIJKzar_DgFiYgRd7Vq6t5KKtw",
+      "displayName": "Cummins Sales and Service",
+      "formattedAddress": "2200 Pinson Valley Pkwy, Birmingham, AL 35217, USA",
+      "location": {
+        "latitude": 33.5911683,
+        "longitude": -86.76522709999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_suppliers",
+      "sourceTextQuery": "generator suppliers in Alabama"
+    },
+    {
+      "placeId": "ChIJTw3bA7YliYgRpNabJs19vxA",
+      "displayName": "Swift Industrial Power",
+      "formattedAddress": "200 Yeager Ct, Pelham, AL 35124, USA",
+      "location": {
+        "latitude": 33.2962494,
+        "longitude": -86.80571929999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_suppliers",
+      "sourceTextQuery": "generator suppliers in Alabama"
+    },
+    {
+      "placeId": "ChIJ3528WpyXjYgRVc4C73kfNxw",
+      "displayName": "Generac Dealer/Installer Troy and Central Alabama",
+      "formattedAddress": "5056 Co Rd 45, Troy, AL 36081, USA",
+      "location": {
+        "latitude": 31.890258499999998,
+        "longitude": -85.7688472
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_suppliers",
+      "sourceTextQuery": "generator suppliers in Alabama"
+    },
+    {
+      "placeId": "ChIJYyKIbvpniIgRzp4sEue03QE",
+      "displayName": "Alabama Outdoor Power Equipment",
+      "formattedAddress": "6000 Curry Hwy, Jasper, AL 35503, USA",
+      "location": {
+        "latitude": 33.9507608,
+        "longitude": -87.2140005
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_suppliers",
+      "sourceTextQuery": "generator suppliers in Alabama"
+    },
+    {
+      "placeId": "ChIJVz5NSAZPfYgR0DwY2VWyxYU",
+      "displayName": "Kimbrough's RV & Power",
+      "formattedAddress": "75 AL-157, Tuscumbia, AL 35674, USA",
+      "location": {
+        "latitude": 34.6843025,
+        "longitude": -87.5952066
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_suppliers",
+      "sourceTextQuery": "generator suppliers in Alabama"
+    },
+    {
+      "placeId": "ChIJHY9Sl_iHjogRDoGu6p7ttNY",
+      "displayName": "Jay Industrial Repair",
+      "formattedAddress": "5850 Selma Hwy, Montgomery, AL 36108, USA",
+      "location": {
+        "latitude": 32.305625899999995,
+        "longitude": -86.41226189999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_suppliers",
+      "sourceTextQuery": "generator suppliers in Alabama"
+    },
+    {
+      "placeId": "ChIJV51A7tFm7ogRbqz_rND6-iI",
+      "displayName": "Anderson Power Services",
+      "formattedAddress": "401 Barfield Dr, Valdosta, GA 31602, USA",
+      "location": {
+        "latitude": 30.873782,
+        "longitude": -83.28929529999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_suppliers",
+      "sourceTextQuery": "generator suppliers in Alabama"
+    },
+    {
+      "placeId": "ChIJq9QvI7UFj4gRsdBFEmjP1iM",
+      "displayName": "Rountree Electric Supply Co.",
+      "formattedAddress": "2613 Citizens Pkwy, Selma, AL 36701, USA",
+      "location": {
+        "latitude": 32.436499999999995,
+        "longitude": -87.0235
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_suppliers",
+      "sourceTextQuery": "generator suppliers in Alabama"
+    },
+    {
+      "placeId": "ChIJLWDOM1tSmogR6zFmh6fMrAY",
+      "displayName": "Cummins Sales and Service",
+      "formattedAddress": "1924 East Interstate 65 Service Rd N, Mobile, AL 36617, USA",
+      "location": {
+        "latitude": 30.7278776,
+        "longitude": -88.1191108
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_suppliers",
+      "sourceTextQuery": "generator suppliers in Alabama"
+    },
+    {
+      "placeId": "ChIJ0_wdbT4RmogRK6ukgMtzEmk",
+      "displayName": "Islander Generator LLC",
+      "formattedAddress": "18975 Baldwin County Rd 10, Foley, AL 36535, USA",
+      "location": {
+        "latitude": 30.334165499999997,
+        "longitude": -87.70059739999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_dealers",
+      "sourceTextQuery": "generator dealers in Alabama"
+    },
+    {
+      "placeId": "ChIJWUyFUOsTmogRTNBxa4y_FBg",
+      "displayName": "A-LECTRIC COMPANY & CONTRACTING OF AL",
+      "formattedAddress": "301 NE 1st St Unit 2, Summerdale, AL 36580, USA",
+      "location": {
+        "latitude": 30.489738199999994,
+        "longitude": -87.6994665
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_dealers",
+      "sourceTextQuery": "generator dealers in Alabama"
+    },
+    {
+      "placeId": "ChIJE-R4Su9uYogREIlIhLCeN6w",
+      "displayName": "Northern Tool + Equipment",
+      "formattedAddress": "7252 Governors W, Huntsville, AL 35806, USA",
+      "location": {
+        "latitude": 34.7022531,
+        "longitude": -86.6900768
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_dealers",
+      "sourceTextQuery": "generator dealers in Alabama"
+    },
+    {
+      "placeId": "ChIJsSUMAc1NmogRiDyNND0iIJE",
+      "displayName": "Northern Tool + Equipment",
+      "formattedAddress": "1790 West Interstate 65 Service Rd S, Mobile, AL 36693, USA",
+      "location": {
+        "latitude": 30.652044800000002,
+        "longitude": -88.1253699
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_dealers",
+      "sourceTextQuery": "generator dealers in Alabama"
+    },
+    {
+      "placeId": "ChIJtcXcHgANiYgRoSuZmu5_3Gw",
+      "displayName": "Argo Power Equipment, Inc.",
+      "formattedAddress": "750 Main St U.S. 11 #1, Trussville, AL 35173, USA",
+      "location": {
+        "latitude": 33.702376099999995,
+        "longitude": -86.5197517
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_dealers",
+      "sourceTextQuery": "generator dealers in Alabama"
+    },
+    {
+      "placeId": "ChIJ31pOVMhBmogRuZTnQLuslCk",
+      "displayName": "John Von York Electrical and Generator Professionals",
+      "formattedAddress": "22765 US-98 Ste B-5, Fairhope, AL 36532, USA",
+      "location": {
+        "latitude": 30.556747,
+        "longitude": -87.893948
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_dealers",
+      "sourceTextQuery": "generator dealers in Alabama"
+    },
+    {
+      "placeId": "ChIJ7Z3iilOTkogRTfhnde9gzNo",
+      "displayName": "Anderson Power Services",
+      "formattedAddress": "6178 E U.S. Hwy 84, Cowarts, AL 36321, USA",
+      "location": {
+        "latitude": 31.191710999999998,
+        "longitude": -85.30124099999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_dealers",
+      "sourceTextQuery": "generator dealers in Alabama"
+    },
+    {
+      "placeId": "ChIJnRpbzjm_NmURNJHSkTqVIfQ",
+      "displayName": "Jubilee Generator",
+      "formattedAddress": "9584 Cumbria Drive, Daphne, AL 36526, USA",
+      "location": {
+        "latitude": 30.5724473,
+        "longitude": -87.8580202
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_dealers",
+      "sourceTextQuery": "generator dealers in Alabama"
+    },
+    {
+      "placeId": "ChIJQzLJhR7zjIgR0xqYk_jJ394",
+      "displayName": "Auburn Generator & Starter Services",
+      "formattedAddress": "225 N College St, Auburn, AL 36830, USA",
+      "location": {
+        "latitude": 32.609716899999995,
+        "longitude": -85.4821138
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_dealers",
+      "sourceTextQuery": "generator dealers in Alabama"
+    },
+    {
+      "placeId": "ChIJO5P-mMZNmogR7hL8XyPt3TA",
+      "displayName": "Wilson Dismukes Parts & Equipment (Midtown Mobile)",
+      "formattedAddress": "2646 Government Blvd, Mobile, AL 36606, USA",
+      "location": {
+        "latitude": 30.6679109,
+        "longitude": -88.1051311
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_dealers",
+      "sourceTextQuery": "generator dealers in Alabama"
+    },
+    {
+      "placeId": "ChIJuU0bql1rmogR80Nxj6iux5A",
+      "displayName": "Redline Power Systems",
+      "formattedAddress": "14167A US-90, Loxley, AL 36551, USA",
+      "location": {
+        "latitude": 30.634749799999998,
+        "longitude": -87.78213699999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_dealers",
+      "sourceTextQuery": "generator dealers in Alabama"
+    },
+    {
+      "placeId": "ChIJDUTpNmwqjIgRF9IDWAfsnhY",
+      "displayName": "CTE Outdoor Power",
+      "formattedAddress": "1119 Perry Hill Rd, Montgomery, AL 36109, USA",
+      "location": {
+        "latitude": 32.363929,
+        "longitude": -86.24349819999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_dealers",
+      "sourceTextQuery": "generator dealers in Alabama"
+    },
+    {
+      "placeId": "ChIJBUxHESzWYYgRmcf5aKWO8Hs",
+      "displayName": "Stephens Generator Shop",
+      "formattedAddress": "106 Godfrey Ave NE, Fort Payne, AL 35967, USA",
+      "location": {
+        "latitude": 34.4409774,
+        "longitude": -85.7207591
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_dealers",
+      "sourceTextQuery": "generator dealers in Alabama"
+    },
+    {
+      "placeId": "ChIJy84PjrQ9jogRqa3W0KWkbyA",
+      "displayName": "Greenville Equipment Center",
+      "formattedAddress": "801 E Commerce St, Greenville, AL 36037, USA",
+      "location": {
+        "latitude": 31.8301441,
+        "longitude": -86.61685899999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_dealers",
+      "sourceTextQuery": "generator dealers in Alabama"
+    },
+    {
+      "placeId": "ChIJrVzPTKaTkogRW_1SLbLmiI0",
+      "displayName": "Thompson Power Systems - Dothan",
+      "formattedAddress": "118 Vulcan Way, Dothan, AL 36303, USA",
+      "location": {
+        "latitude": 31.243363199999994,
+        "longitude": -85.37513589999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_dealers",
+      "sourceTextQuery": "generator dealers in Alabama"
+    },
+    {
+      "placeId": "ChIJ7wxdwtyDjogRFjV7WD_IW8c",
+      "displayName": "Capital Tractor, Inc. - Montgomery",
+      "formattedAddress": "1925 N Eastern Blvd, Montgomery, AL 36109, USA",
+      "location": {
+        "latitude": 32.419764199999996,
+        "longitude": -86.229255
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_dealers",
+      "sourceTextQuery": "generator dealers in Alabama"
+    },
+    {
+      "placeId": "ChIJ0R2OaGWym4gRcY2WnJ0Rwuo",
+      "displayName": "Wilson Dismukes Parts & Lawn Equipment West Mobile",
+      "formattedAddress": "10190 Airport Blvd, Mobile, AL 36608, USA",
+      "location": {
+        "latitude": 30.6709455,
+        "longitude": -88.28318829999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_dealers",
+      "sourceTextQuery": "generator dealers in Alabama"
+    },
+    {
+      "placeId": "ChIJwSrdMMkrjIgRN_jsHy4nL6E",
+      "displayName": "Powersports of Montgomery",
+      "formattedAddress": "535 Eastern Boulevard Frontage Rd, Montgomery, AL 36117, USA",
+      "location": {
+        "latitude": 32.3979362,
+        "longitude": -86.2130023
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_dealers",
+      "sourceTextQuery": "generator dealers in Alabama"
+    },
+    {
+      "placeId": "ChIJy3hwicpP4CIRbgnXFvD6UMM",
+      "displayName": "AMSCO Inc",
+      "formattedAddress": "25251 Friendship Rd, Daphne, AL 36526, USA",
+      "location": {
+        "latitude": 30.5932485,
+        "longitude": -87.87793549999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_dealers",
+      "sourceTextQuery": "generator dealers in Alabama"
+    },
+    {
+      "placeId": "ChIJyVCttkqCjogRn5FWQCoTZf0",
+      "displayName": "Sunsouth LLC",
+      "formattedAddress": "1975 Forbes Dr, Montgomery, AL 36110, USA",
+      "location": {
+        "latitude": 32.4143371,
+        "longitude": -86.30057269999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_dealers",
+      "sourceTextQuery": "generator dealers in Alabama"
+    },
+    {
+      "placeId": "ChIJv5VYcbPHjogRYiKAhG7UjSM",
+      "displayName": "Sunsouth LLC",
+      "formattedAddress": "1009 7th St S, Clanton, AL 35045, USA",
+      "location": {
+        "latitude": 32.823718899999996,
+        "longitude": -86.6195903
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_dealers",
+      "sourceTextQuery": "generator dealers in Alabama"
+    },
+    {
+      "placeId": "ChIJ_____78ViYgRhNRvPp5To2I",
+      "displayName": "Skelton's Heating, Cooling & Plumbing",
+      "formattedAddress": "4219 Mountain Top Rd, Birmingham, AL 35242, USA",
+      "location": {
+        "latitude": 33.37863,
+        "longitude": -86.66802059999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_dealers",
+      "sourceTextQuery": "generator dealers in Alabama"
+    },
+    {
+      "placeId": "ChIJ6dSVWnPlkIgRLAkCT4ZL4Hw",
+      "displayName": "Southern Generator - Starter & Alternator Repair, New Sales & Service",
+      "formattedAddress": "5730 Stewart St, Milton, FL 32570, USA",
+      "location": {
+        "latitude": 30.6428032,
+        "longitude": -87.04327219999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_dealers",
+      "sourceTextQuery": "generator dealers in Alabama"
+    },
+    {
+      "placeId": "ChIJZ7JPcGe3m4gRz53jm-raL5c",
+      "displayName": "Danco Services Inc",
+      "formattedAddress": "7451 Jim McNeil Loop Rd Ext, Grand Bay, AL 36541, USA",
+      "location": {
+        "latitude": 30.536996499999997,
+        "longitude": -88.30615829999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_dealers",
+      "sourceTextQuery": "generator dealers in Alabama"
+    },
+    {
+      "placeId": "ChIJk73wmdAqjIgRnu8Uk6sSgG8",
+      "displayName": "Motor Home Specialist Alabama",
+      "formattedAddress": "4504 Troy Hwy, Montgomery, AL 36116, USA",
+      "location": {
+        "latitude": 32.310446999999996,
+        "longitude": -86.222495
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_dealers",
+      "sourceTextQuery": "generator dealers in Alabama"
+    },
+    {
+      "placeId": "ChIJ1Q7v9-RD20MR43KL2OH1czo",
+      "displayName": "THM ELECTRICAL AND MAINTENANCE SERVICES LLC",
+      "formattedAddress": "3514 Martin St S Ste 107, Cropwell, AL 35054, USA",
+      "location": {
+        "latitude": 33.5379222,
+        "longitude": -86.2851833
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_dealers",
+      "sourceTextQuery": "generator dealers in Alabama"
+    },
+    {
+      "placeId": "ChIJ20x3T54pjIgRoujG5_loKDY",
+      "displayName": "Lewis Lawn Equipment",
+      "formattedAddress": "1135 N Eastern Blvd, Montgomery, AL 36117, USA",
+      "location": {
+        "latitude": 32.4093385,
+        "longitude": -86.21754829999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_dealers",
+      "sourceTextQuery": "generator dealers in Alabama"
+    },
+    {
+      "placeId": "ChIJbQ57DS0rjIgRVhrljIdjjQM",
+      "displayName": "Tractor Supply Co.",
+      "formattedAddress": "5310 Troy Hwy, Montgomery, AL 36116, USA",
+      "location": {
+        "latitude": 32.3012398,
+        "longitude": -86.20732319999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_dealers",
+      "sourceTextQuery": "generator dealers in Alabama"
+    },
+    {
+      "placeId": "ChIJ2ynTMwOTkogRoChZWvMbBqM",
+      "displayName": "Johnstone Supply",
+      "formattedAddress": "116 Vulcan Way, Dothan, AL 36303, USA",
+      "location": {
+        "latitude": 31.2440805,
+        "longitude": -85.3759213
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_dealers",
+      "sourceTextQuery": "generator dealers in Alabama"
+    },
+    {
+      "placeId": "ChIJAQDAUeeuiYgRHaick4PLvL8",
+      "displayName": "EPG",
+      "formattedAddress": "2500 AL-160, Warrior, AL 35180, USA",
+      "location": {
+        "latitude": 33.866987,
+        "longitude": -86.7872694
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_dealers",
+      "sourceTextQuery": "generator dealers in Alabama"
+    },
+    {
+      "placeId": "ChIJxdvP-G4PiYgRFsCF0MDT4ks",
+      "displayName": "United Rentals - Power & HVAC",
+      "formattedAddress": "3920 Pinson Valley Pkwy, Birmingham, AL 35217, USA",
+      "location": {
+        "latitude": 33.6347901,
+        "longitude": -86.729073
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_dealers",
+      "sourceTextQuery": "generator dealers in Alabama"
+    },
+    {
+      "placeId": "ChIJU8VBzXspjIgRV5OfRNOHc2E",
+      "displayName": "Grainger Industrial Supply",
+      "formattedAddress": "541 George Todd Dr, Montgomery, AL 36117, USA",
+      "location": {
+        "latitude": 32.3980208,
+        "longitude": -86.2103762
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_dealers",
+      "sourceTextQuery": "generator dealers in Alabama"
+    },
+    {
+      "placeId": "ChIJI6w7C8y0m4gRq-gndXwbDrU",
+      "displayName": "Integrated Power Services (IPS) - Theodore Power Systems (Service Hub)",
+      "formattedAddress": "3816 Abigail Dr, Theodore, AL 36582, USA",
+      "location": {
+        "latitude": 30.5695031,
+        "longitude": -88.12781869999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_dealers",
+      "sourceTextQuery": "generator dealers in Alabama"
+    },
+    {
+      "placeId": "ChIJoSUOb7YjiYgR2CPLYc98UDc",
+      "displayName": "Alabama Rentals",
+      "formattedAddress": "2005 Old Montgomery Hwy, Birmingham, AL 35244, USA",
+      "location": {
+        "latitude": 33.3491603,
+        "longitude": -86.801716
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alabama"
+    },
+    {
+      "placeId": "ChIJq_VIcIRNmogRTT20X3Ri-S4",
+      "displayName": "United Rentals - Power & HVAC",
+      "formattedAddress": "1413 Montlimar Dr, Mobile, AL 36609, USA",
+      "location": {
+        "latitude": 30.660842499999998,
+        "longitude": -88.1319584
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alabama"
+    },
+    {
+      "placeId": "ChIJn0_HhrkbiYgR8svDE3yfM8w",
+      "displayName": "Sunbelt Rentals",
+      "formattedAddress": "2613 2nd Ave S, Birmingham, AL 35233, USA",
+      "location": {
+        "latitude": 33.5148322,
+        "longitude": -86.7940263
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alabama"
+    },
+    {
+      "placeId": "ChIJjfMsi1FKmogRHsgeKeS3TTY",
+      "displayName": "Sunbelt Rentals Power & HVAC",
+      "formattedAddress": "5905 Rangeline Rd, Theodore, AL 36582, USA",
+      "location": {
+        "latitude": 30.568196399999994,
+        "longitude": -88.1301154
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alabama"
+    },
+    {
+      "placeId": "ChIJl2b0VAVskogROb3uJeKzgJ8",
+      "displayName": "Rent Ready Equipment & Sales",
+      "formattedAddress": "1095 Geneva Hwy, Enterprise, AL 36330, USA",
+      "location": {
+        "latitude": 31.298639,
+        "longitude": -85.8582275
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alabama"
+    },
+    {
+      "placeId": "ChIJm6eYmyo_iogRxEHXEpYBnYM",
+      "displayName": "Empower Rental Group",
+      "formattedAddress": "802 W Meighan Blvd, Gadsden, AL 35901, USA",
+      "location": {
+        "latitude": 34.0170143,
+        "longitude": -86.0083169
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alabama"
+    },
+    {
+      "placeId": "ChIJV6Qi_AZNmogRMMkTOktNeek",
+      "displayName": "United Rentals",
+      "formattedAddress": "4226 Halls Mill Rd, Mobile, AL 36693, USA",
+      "location": {
+        "latitude": 30.621086400000003,
+        "longitude": -88.1396314
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alabama"
+    },
+    {
+      "placeId": "ChIJc_yAlvAFiYgR2kE3JLGyqBI",
+      "displayName": "Service First Equipment - Rental Equipment",
+      "formattedAddress": "1940 Pinson Valley Pkwy, Birmingham, AL 35217, USA",
+      "location": {
+        "latitude": 33.587260799999996,
+        "longitude": -86.7685319
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alabama"
+    },
+    {
+      "placeId": "ChIJU_9YPZv_iYgR6YG54IAcEP4",
+      "displayName": "Green Mountain Rental",
+      "formattedAddress": "21232 US-431, Guntersville, AL 35976, USA",
+      "location": {
+        "latitude": 34.4084837,
+        "longitude": -86.27076129999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alabama"
+    },
+    {
+      "placeId": "ChIJxW29eaaGYogR69ivdsAFRvI",
+      "displayName": "Robin Rents",
+      "formattedAddress": "2024 Veterans Dr SE, Decatur, AL 35601, USA",
+      "location": {
+        "latitude": 34.5742111,
+        "longitude": -86.97813409999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alabama"
+    },
+    {
+      "placeId": "ChIJn5QGP2EqiIgRzU_m_g3QGgI",
+      "displayName": "Rent Ready Equipment - Americ Equipment Rental",
+      "formattedAddress": "950 Hwy 31 NW, Hartselle, AL 35640, USA",
+      "location": {
+        "latitude": 34.451164999999996,
+        "longitude": -86.94504239999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alabama"
+    },
+    {
+      "placeId": "ChIJR5RHumwkiYgRuRFmPGb67to",
+      "displayName": "Sunbelt Rentals",
+      "formattedAddress": "160 Commerce Dr, Pelham, AL 35124, USA",
+      "location": {
+        "latitude": 33.293229499999995,
+        "longitude": -86.7995956
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alabama"
+    },
+    {
+      "placeId": "ChIJ5Ytjt6EbiYgROdHxZR9nEno",
+      "displayName": "RentalWorks - Birmingham",
+      "formattedAddress": "910 28th St N, Birmingham, AL 35203, USA",
+      "location": {
+        "latitude": 33.5284808,
+        "longitude": -86.80131039999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alabama"
+    },
+    {
+      "placeId": "ChIJLeFZ9Y0NiYgRblWeHwScWa4",
+      "displayName": "B&G Equipment and Supply",
+      "formattedAddress": "2748 Mary Taylor Rd, Birmingham, AL 35210, USA",
+      "location": {
+        "latitude": 33.5833467,
+        "longitude": -86.63755479999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alabama"
+    },
+    {
+      "placeId": "ChIJg13WCc1sYogRgjIbni3sQFQ",
+      "displayName": "Valley Equipment Rental",
+      "formattedAddress": "3551 Memorial Pkwy SW, Huntsville, AL 35801, USA",
+      "location": {
+        "latitude": 34.695288999999995,
+        "longitude": -86.582432
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alabama"
+    },
+    {
+      "placeId": "ChIJ6dFaa81sYogRVEPQtxSy0XY",
+      "displayName": "Robin Rents",
+      "formattedAddress": "3605 Memorial Pkwy SW, Huntsville, AL 35801, USA",
+      "location": {
+        "latitude": 34.6945121,
+        "longitude": -86.58199169999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alabama"
+    },
+    {
+      "placeId": "ChIJn6oclB0VYogROV6XpUH4sUI",
+      "displayName": "Valley Equipment Rental",
+      "formattedAddress": "6901 Memorial Pkwy NW, Huntsville, AL 35810, USA",
+      "location": {
+        "latitude": 34.7993648,
+        "longitude": -86.575623
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alabama"
+    },
+    {
+      "placeId": "ChIJ_dDT1ohZfYgRfqYsR7bkFWE",
+      "displayName": "Great Southern Equipment Rental, LLC.",
+      "formattedAddress": "14222 Hwy 43, Russellville, AL 35653, USA",
+      "location": {
+        "latitude": 34.4982302,
+        "longitude": -87.7196764
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alabama"
+    },
+    {
+      "placeId": "ChIJg34hlQzdiIgRxbGpGteaBTs",
+      "displayName": "Herc Rentals",
+      "formattedAddress": "806 Labarge Dr, Bessemer, AL 35022, USA",
+      "location": {
+        "latitude": 33.3536879,
+        "longitude": -86.9845753
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alabama"
+    },
+    {
+      "placeId": "ChIJzREkxCEDiogRVxEZ78joZP4",
+      "displayName": "PowerQuip Inc",
+      "formattedAddress": "9290 US-431, Albertville, AL 35950, USA",
+      "location": {
+        "latitude": 34.2889543,
+        "longitude": -86.2375544
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alabama"
+    },
+    {
+      "placeId": "ChIJgaE62HgPiYgRz6ic1bQswNI",
+      "displayName": "Sunbelt Rentals Power & HVAC",
+      "formattedAddress": "3000 Pinson Valley Pkwy, Birmingham, AL 35217, USA",
+      "location": {
+        "latitude": 33.6218532,
+        "longitude": -86.737728
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alabama"
+    },
+    {
+      "placeId": "ChIJhak636gbiYgRQvxW-wKVqqM",
+      "displayName": "Thompson Cat Rentals - Birmingham",
+      "formattedAddress": "3317 Messer Airport Hwy, Birmingham, AL 35222, USA",
+      "location": {
+        "latitude": 33.5267394,
+        "longitude": -86.7884198
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alabama"
+    },
+    {
+      "placeId": "ChIJixWqkrcbiYgRhXBXZwmEZwA",
+      "displayName": "Aabco Rents",
+      "formattedAddress": "2612 7th Ave S, Birmingham, AL 35233, USA",
+      "location": {
+        "latitude": 33.510283199999996,
+        "longitude": -86.79114799999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alabama"
+    },
+    {
+      "placeId": "ChIJO6vIlLstiYgR9ffZw2VOu9Y",
+      "displayName": "United Rentals",
+      "formattedAddress": "360 Limestone Bnd, Calera, AL 35040, USA",
+      "location": {
+        "latitude": 33.155271,
+        "longitude": -86.744868
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alabama"
+    },
+    {
+      "placeId": "ChIJhciwr9BKmogRm-dROSDH_dc",
+      "displayName": "Herc Rentals ProSolutions",
+      "formattedAddress": "3950 Hamilton Blvd, Theodore, AL 36582, USA",
+      "location": {
+        "latitude": 30.5550392,
+        "longitude": -88.1318411
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alabama"
+    },
+    {
+      "placeId": "ChIJl0XgqEh9iYgRYODP3Om2TU0",
+      "displayName": "Rental Men",
+      "formattedAddress": "1405 Martin St S, Pell City, AL 35128, USA",
+      "location": {
+        "latitude": 33.572804,
+        "longitude": -86.27279399999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alabama"
+    },
+    {
+      "placeId": "ChIJu8zFF2_fiIgR0IvpMZJRIH4",
+      "displayName": "United Rentals",
+      "formattedAddress": "6298 Park S Dr, Bessemer, AL 35022, USA",
+      "location": {
+        "latitude": 33.3399882,
+        "longitude": -86.9142725
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alabama"
+    },
+    {
+      "placeId": "ChIJpViNOljLm4gRvlvBHR61MKs",
+      "displayName": "EquipmentShare",
+      "formattedAddress": "8765 Bellingrath Rd, Theodore, AL 36582, USA",
+      "location": {
+        "latitude": 30.5082497,
+        "longitude": -88.16957239999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alabama"
+    },
+    {
+      "placeId": "ChIJI63URLopjIgRFaTpbSeeMGc",
+      "displayName": "United Rentals",
+      "formattedAddress": "2901 Wetumpka Hwy, Montgomery, AL 36110, USA",
+      "location": {
+        "latitude": 32.4224047,
+        "longitude": -86.2291309
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alabama"
+    },
+    {
+      "placeId": "ChIJWW6l6Q0ChogRxAd1wSkAIsM",
+      "displayName": "Sunbelt Rentals",
+      "formattedAddress": "2701 31st St E, Tuscaloosa, AL 35401, USA",
+      "location": {
+        "latitude": 33.1829207,
+        "longitude": -87.55912409999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alabama"
+    },
+    {
+      "placeId": "ChIJmX6QxD1ZiYgRwwPZr2Gj35Q",
+      "displayName": "Sunbelt Rentals",
+      "formattedAddress": "35865 US-280, Sylacauga, AL 35150, USA",
+      "location": {
+        "latitude": 33.2383381,
+        "longitude": -86.3313088
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alabama"
+    },
+    {
+      "placeId": "ChIJS6gdsNgEmogRFmoeAmfCsoU",
+      "displayName": "Gulf Shores Equipment Rental",
+      "formattedAddress": "2317 E 2nd St, Gulf Shores, AL 36542, USA",
+      "location": {
+        "latitude": 30.276289199999997,
+        "longitude": -87.6835249
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alabama"
+    },
+    {
+      "placeId": "ChIJ5Tx03x_GiIgRgpUp3SCWewI",
+      "displayName": "Sibley Equipment Company",
+      "formattedAddress": "28715 AL-5, Woodstock, AL 35188, USA",
+      "location": {
+        "latitude": 33.212251,
+        "longitude": -87.162415
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alabama"
+    },
+    {
+      "placeId": "ChIJqdeQQV6YhYgRI2KFP5uH6-4",
+      "displayName": "Empower Rental Group",
+      "formattedAddress": "276 Buddy Griffith Dr N, Demopolis, AL 36732, USA",
+      "location": {
+        "latitude": 32.4775973,
+        "longitude": -87.8338553
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alabama"
+    },
+    {
+      "placeId": "ChIJz-IRM5ltmogRD8jLjSoKp9I",
+      "displayName": "Robertsdale Power Equipment",
+      "formattedAddress": "22965 AL-59 South, Robertsdale, AL 36567, USA",
+      "location": {
+        "latitude": 30.559832099999998,
+        "longitude": -87.7142598
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alabama"
+    },
+    {
+      "placeId": "ChIJufDJra8_mogR8oi_po2ZI9Q",
+      "displayName": "NES Rents",
+      "formattedAddress": "15655 S Greeno Rd, Fairhope, AL 36532, USA",
+      "location": {
+        "latitude": 30.4530891,
+        "longitude": -87.88667640000001
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alabama"
+    },
+    {
+      "placeId": "ChIJSw6ebhXdiIgReia-s8RiFQs",
+      "displayName": "Herc Rentals ProSolutions",
+      "formattedAddress": "2501 Fivestar Pkwy, Bessemer, AL 35022, USA",
+      "location": {
+        "latitude": 33.3814326,
+        "longitude": -87.0133012
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alabama"
+    },
+    {
+      "placeId": "ChIJ0z-QgcWDt4cRqgpuGOe8LL4",
+      "displayName": "Sunbelt Rentals",
+      "formattedAddress": "1802 M L King Jr Expy, Andalusia, AL 36420, USA",
+      "location": {
+        "latitude": 31.318215199999997,
+        "longitude": -86.44956940000002
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alabama"
+    },
+    {
+      "placeId": "ChIJ90O-fuB4kogRXq1g373Qd3Y",
+      "displayName": "Rental Solutions LLC",
+      "formattedAddress": "7656 US-231, Wetumpka, AL 36092, USA",
+      "location": {
+        "latitude": 32.5460892,
+        "longitude": -86.1901788
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alabama"
+    },
+    {
+      "placeId": "ChIJX3A495Sxi4gRSzsmHhOUq3A",
+      "displayName": "Sunbelt Rentals",
+      "formattedAddress": "60 Airgas Dr, Anniston, AL 36207, USA",
+      "location": {
+        "latitude": 33.6207634,
+        "longitude": -85.8115435
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alabama"
+    },
+    {
+      "placeId": "ChIJsTCG5X4viYgRPGiaiDpQgY0",
+      "displayName": "Thompson Cat Rentals - Alabaster",
+      "formattedAddress": "2070 Corporate Woods Dr, Alabaster, AL 35007, USA",
+      "location": {
+        "latitude": 33.1948268,
+        "longitude": -86.7879725
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alabama"
+    },
+    {
+      "placeId": "ChIJkbJT6GUChogRTN_dciwypRc",
+      "displayName": "Rental Men",
+      "formattedAddress": "1055 Investigator Dornell Cousette St, Tuscaloosa, AL 35401, USA",
+      "location": {
+        "latitude": 33.1800425,
+        "longitude": -87.5536266
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alabama"
+    },
+    {
+      "placeId": "ChIJkw2ka8cNiYgRsCkKuuvDC5A",
+      "displayName": "Compact Power Equipment Rental",
+      "formattedAddress": "1600 Gadsden Hwy, Trussville, AL 35173, USA",
+      "location": {
+        "latitude": 33.602240699999996,
+        "longitude": -86.64214899999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alabama"
+    },
+    {
+      "placeId": "ChIJPz0zsVsviYgRjkB_gVg-BCU",
+      "displayName": "Rental Men",
+      "formattedAddress": "6210 US-31, Calera, AL 35040, USA",
+      "location": {
+        "latitude": 33.132213899999996,
+        "longitude": -86.75236199999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alabama"
+    },
+    {
+      "placeId": "ChIJL-OBJ2oliYgRQE9xWmegfUs",
+      "displayName": "Herc Rentals ProSolutions",
+      "formattedAddress": "1369 McCain Pkwy, Pelham, AL 35124, USA",
+      "location": {
+        "latitude": 33.275689199999995,
+        "longitude": -86.7974737
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alabama"
+    },
+    {
+      "placeId": "ChIJY6KzgahxiYgRwmh52olyDpg",
+      "displayName": "Southern Tool & Equipment Rental",
+      "formattedAddress": "3718 Moody Pkwy, Moody, AL 35004, USA",
+      "location": {
+        "latitude": 33.608346,
+        "longitude": -86.4698401
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alabama"
+    },
+    {
+      "placeId": "ChIJ92H6t9BgiIgRBhNKQVs8mzY",
+      "displayName": "Compact Power Equipment Rental",
+      "formattedAddress": "1808 Hwy 78 E, Jasper, AL 35501, USA",
+      "location": {
+        "latitude": 33.847128,
+        "longitude": -87.2531473
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alabama"
+    },
+    {
+      "placeId": "ChIJ-SXro7ZWmogRnRHH3lJIRWg",
+      "displayName": "American Power Equipment",
+      "formattedAddress": "104 Industrial Pkwy, Saraland, AL 36571, USA",
+      "location": {
+        "latitude": 30.795820599999995,
+        "longitude": -88.0746454
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alabama"
+    },
+    {
+      "placeId": "ChIJX9lZAmgviYgR7AGJs3-aTqg",
+      "displayName": "EquipmentShare",
+      "formattedAddress": "281 Commercial Ct, Alabaster, AL 35007, USA",
+      "location": {
+        "latitude": 33.2016154,
+        "longitude": -86.78268349999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alabama"
+    },
+    {
+      "placeId": "ChIJ3Xvqm2Ibm4gRauxvTtOam6g",
+      "displayName": "Atlas Copco Rental",
+      "formattedAddress": "8170 E Williams St, Citronelle, AL 36522, USA",
+      "location": {
+        "latitude": 31.1001512,
+        "longitude": -88.2369054
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alabama"
+    },
+    {
+      "placeId": "ChIJHfJBXBsEiYgREDvpJCbyTrA",
+      "displayName": "Johnson Power Equipment",
+      "formattedAddress": "1421 Thompson Cir, Gardendale, AL 35071, USA",
+      "location": {
+        "latitude": 33.6602281,
+        "longitude": -86.81195790000001
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alabama"
+    },
+    {
+      "placeId": "ChIJOQDgPTphmogR7WYRTyc3rCE",
+      "displayName": "Bay Electric LLC",
+      "formattedAddress": "1502 US-31, Bay Minette, AL 36507, USA",
+      "location": {
+        "latitude": 30.8589195,
+        "longitude": -87.77750549999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alabama"
+    },
+    {
+      "placeId": "ChIJnb1Xpc5vYogRTWdeEd5SSiY",
+      "displayName": "Ci Power Solutions, LLC",
+      "formattedAddress": "4100 Market St Ste 115, Huntsville, AL 35808, USA",
+      "location": {
+        "latitude": 34.696162199999996,
+        "longitude": -86.6747226
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alabama"
+    },
+    {
+      "placeId": "ChIJnWOcsTjtjIgR7DMCQI5huRY",
+      "displayName": "Utility Gas and Power",
+      "formattedAddress": "2680 Corporate Park Dr, Opelika, AL 36801, USA",
+      "location": {
+        "latitude": 32.618235,
+        "longitude": -85.4160084
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alabama"
+    },
+    {
+      "placeId": "ChIJaysGg84tjIgRB4qWgLZeGx0",
+      "displayName": "Alabama Rural Electric Association",
+      "formattedAddress": "340 Technacenter Dr, Montgomery, AL 36117, USA",
+      "location": {
+        "latitude": 32.3730682,
+        "longitude": -86.1269487
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alabama"
+    },
+    {
+      "placeId": "ChIJJ3D9PdcbiYgRuwIgAEANpZE",
+      "displayName": "Alabama Power Company Corporate Headquarters",
+      "formattedAddress": "600 18th St N, Birmingham, AL 35203, USA",
+      "location": {
+        "latitude": 33.518008099999996,
+        "longitude": -86.8128941
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alabama"
+    },
+    {
+      "placeId": "ChIJaRb-ChKBjogRMVjeEdVPCZA",
+      "displayName": "Energy Southeast (formerly AMEA)",
+      "formattedAddress": "80 Technacenter Dr #200, Montgomery, AL 36117, USA",
+      "location": {
+        "latitude": 32.3692901,
+        "longitude": -86.12735479999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alabama"
+    },
+    {
+      "placeId": "ChIJVVVVVSaRjogRc0S71od2HyA",
+      "displayName": "Central Alabama Electric Cooperative",
+      "formattedAddress": "103 Jesse Samuel Hunt Blvd, Prattville, AL 36066, USA",
+      "location": {
+        "latitude": 32.5649827,
+        "longitude": -86.462048
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alabama"
+    },
+    {
+      "placeId": "ChIJ_5hytXKym4gRxJppREyTaUE",
+      "displayName": "Alabama Power Company",
+      "formattedAddress": "Mobile, AL 36608, USA",
+      "location": {
+        "latitude": 30.6897979,
+        "longitude": -88.22657869999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alabama"
+    },
+    {
+      "placeId": "ChIJASkxzguCjogR1dIil4z2-2g",
+      "displayName": "Alabama Power Company Southern Division Office",
+      "formattedAddress": "200 Dexter Ave, Montgomery, AL 36109, USA",
+      "location": {
+        "latitude": 32.3771048,
+        "longitude": -86.30594119999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alabama"
+    },
+    {
+      "placeId": "ChIJkUHW9Qh-kogRe-G1M3JTY2w",
+      "displayName": "Pea River Electric Co-Op",
+      "formattedAddress": "1311 W Roy Parker Rd, Ozark, AL 36360, USA",
+      "location": {
+        "latitude": 31.4723749,
+        "longitude": -85.6633222
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alabama"
+    },
+    {
+      "placeId": "ChIJozL5oIbAYYgRddaeiwLCwzk",
+      "displayName": "North Alabama Electric Co-Op",
+      "formattedAddress": "41103 US-72, Stevenson, AL 35772, USA",
+      "location": {
+        "latitude": 34.8463205,
+        "longitude": -85.8272657
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alabama"
+    },
+    {
+      "placeId": "ChIJncpZJz8FiYgRH170umc3y_I",
+      "displayName": "South Power Electric, LLC",
+      "formattedAddress": "1712 Decatur Hwy, Fultondale, AL 35068, USA",
+      "location": {
+        "latitude": 33.6119835,
+        "longitude": -86.7978474
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alabama"
+    },
+    {
+      "placeId": "ChIJZ4SxPHPvkYgREB9IY9IIOHw",
+      "displayName": "PowerSouth Energy Co-op Central Generation",
+      "formattedAddress": "28570 US-29, Andalusia, AL 36421, USA",
+      "location": {
+        "latitude": 31.400457199999995,
+        "longitude": -86.47937569999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alabama"
+    },
+    {
+      "placeId": "ChIJb8vOPNwliYgRLCAoqU9L1M4",
+      "displayName": "Alabama Power Co",
+      "formattedAddress": "744 Co Rd 87, Calera, AL 35040, USA",
+      "location": {
+        "latitude": 33.1734917,
+        "longitude": -86.7728358
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alabama"
+    },
+    {
+      "placeId": "ChIJNyJcmJSSjYgRx5v7136HKwQ",
+      "displayName": "South Alabama Electric Co-Op",
+      "formattedAddress": "13192 US-231, Troy, AL 36081, USA",
+      "location": {
+        "latitude": 31.7679826,
+        "longitude": -85.9067924
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alabama"
+    },
+    {
+      "placeId": "ChIJ_XrLPCfGjogRtOFTjoyHgO4",
+      "displayName": "Central Alabama Electric Cooperative",
+      "formattedAddress": "2160 Big M Blvd, Clanton, AL 35046, USA",
+      "location": {
+        "latitude": 32.8066373,
+        "longitude": -86.58101669999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alabama"
+    },
+    {
+      "placeId": "ChIJFVlonEL8rqwRiNURFoaM7ZQ",
+      "displayName": "Spartan Electric, LLC",
+      "formattedAddress": "111 Elk Dr, Arab, AL 35016, USA",
+      "location": {
+        "latitude": 34.367255899999996,
+        "longitude": -86.5366705
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alabama"
+    },
+    {
+      "placeId": "ChIJuX1nU7ekjIgRaBlQ1_gJcfo",
+      "displayName": "Alabama Power",
+      "formattedAddress": "32 Fob James Dr, Valley, AL 36854, USA",
+      "location": {
+        "latitude": 32.81781,
+        "longitude": -85.17429349999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alabama"
+    },
+    {
+      "placeId": "ChIJaRb-ChKBjogRyZW4oDzFero",
+      "displayName": "Electric Cities of Alabama",
+      "formattedAddress": "770 Washington Ave Ste 164, Montgomery, AL 36104, USA",
+      "location": {
+        "latitude": 32.3762115,
+        "longitude": -86.29862059999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alabama"
+    },
+    {
+      "placeId": "ChIJobsn-uyzi4gR6h1QzOceoMU",
+      "displayName": "Alabama Power Company",
+      "formattedAddress": "925 Quintard Ave, Anniston, AL 36201, USA",
+      "location": {
+        "latitude": 33.656784,
+        "longitude": -85.82605009999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alabama"
+    },
+    {
+      "placeId": "ChIJs2-z9_LLiYgRcAfrej-ObOo",
+      "displayName": "Cullman Electric Cooperative",
+      "formattedAddress": "1749 Eva Rd NE, Cullman, AL 35055, USA",
+      "location": {
+        "latitude": 34.1985643,
+        "longitude": -86.8301718
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alabama"
+    },
+    {
+      "placeId": "ChIJ8eINVSqXi4gRBEJSKMHh68M",
+      "displayName": "Alabama Power",
+      "formattedAddress": "85571 AL-9, Ashland, AL 36251, USA",
+      "location": {
+        "latitude": 33.2829408,
+        "longitude": -85.7949244
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alabama"
+    },
+    {
+      "placeId": "ChIJXfo6jbMXiYgRDWEhXQN1fMw",
+      "displayName": "Southern Co Services Inc",
+      "formattedAddress": "3535 Colonnade Pkwy, Birmingham, AL 35243, USA",
+      "location": {
+        "latitude": 33.4371088,
+        "longitude": -86.72951010000001
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alabama"
+    },
+    {
+      "placeId": "ChIJz7WCdIyWhYgR3vzZLEMloeg",
+      "displayName": "Alabama Power Co",
+      "formattedAddress": "801 Steam Plant Rd, Forkland, AL 36740, USA",
+      "location": {
+        "latitude": 32.6043757,
+        "longitude": -87.791698
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alabama"
+    },
+    {
+      "placeId": "ChIJQ7enkvXVyokRiMHkaT1uWT4",
+      "displayName": "Backup Power LLC",
+      "formattedAddress": "681 Jones Mills Stahlstown Rd, Stahlstown, PA 15687, USA",
+      "location": {
+        "latitude": 40.127057799999996,
+        "longitude": -79.3450405
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alabama"
+    },
+    {
+      "placeId": "ChIJ8YEdkhm_jogRd9TxQ5MXAGo",
+      "displayName": "Central Alabama Electric Co-Op",
+      "formattedAddress": "5600 Co Rd 59, Verbena, AL 36091, USA",
+      "location": {
+        "latitude": 32.7326202,
+        "longitude": -86.54982749999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alabama"
+    },
+    {
+      "placeId": "ChIJLyISXPLukYgR4NDGrFTgBhQ",
+      "displayName": "Power South Energy Cooperative",
+      "formattedAddress": "2027 E 3 Notch St, Andalusia, AL 36421, USA",
+      "location": {
+        "latitude": 31.3290702,
+        "longitude": -86.4675659
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alabama"
+    },
+    {
+      "placeId": "ChIJGzEKJVMCjIgR2acTEkiF30c",
+      "displayName": "Central Alabama Electric Co-Op",
+      "formattedAddress": "231 Main St, Rockford, AL 35136, USA",
+      "location": {
+        "latitude": 32.8827348,
+        "longitude": -86.22340609999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alabama"
+    },
+    {
+      "placeId": "ChIJ4Yd0t7h9j4gRWeF2zDbzf3o",
+      "displayName": "Alabama Power",
+      "formattedAddress": "288 Water Ave, Uniontown, AL 36786, USA",
+      "location": {
+        "latitude": 32.4500057,
+        "longitude": -87.51414369999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alabama"
+    },
+    {
+      "placeId": "ChIJEaU2mZnci4gRTd3mrdv6RXo",
+      "displayName": "Coosa Valley Electric Co-Op",
+      "formattedAddress": "69220 AL-77, Talladega, AL 35160, USA",
+      "location": {
+        "latitude": 33.500226,
+        "longitude": -86.12714539999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alabama"
+    },
+    {
+      "placeId": "ChIJ05EoAFAxj4gRwQaqfCY_v8w",
+      "displayName": "Alabama Power",
+      "formattedAddress": "555 Walnut St, Centreville, AL 35042, USA",
+      "location": {
+        "latitude": 32.9449529,
+        "longitude": -87.1457286
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alabama"
+    },
+    {
+      "placeId": "ChIJ__WQNnnmiYgRZJaOOhjFYdE",
+      "displayName": "Arab Electric Cooperative",
+      "formattedAddress": "331 S Brindlee Mountain Pkwy, Arab, AL 35016, USA",
+      "location": {
+        "latitude": 34.31223440000001,
+        "longitude": -86.5019445
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alabama"
+    },
+    {
+      "placeId": "ChIJ-Q-AaZwXiYgRgEVh4I0XnxE",
+      "displayName": "Energy Center",
+      "formattedAddress": "3535 Colonnade Pkwy, Birmingham, AL 35243, USA",
+      "location": {
+        "latitude": 33.436738399999996,
+        "longitude": -86.7280517
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alabama"
+    },
+    {
+      "placeId": "ChIJk6rUVCqDjogRM6ZyqAeiMcY",
+      "displayName": "Alabama Power",
+      "formattedAddress": "1810 Cong W L Dickinson Dr, Montgomery, AL 36109, USA",
+      "location": {
+        "latitude": 32.4087524,
+        "longitude": -86.2577819
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alabama"
+    },
+    {
+      "placeId": "ChIJg8Gm534DhogRZ5uHmgR5Cc0",
+      "displayName": "Alabama Power Crew Headquarters",
+      "formattedAddress": "Tuscaloosa, AL 35406, USA",
+      "location": {
+        "latitude": 33.2316102,
+        "longitude": -87.5597835
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alabama"
+    },
+    {
+      "placeId": "ChIJ_WrtZBgnjIgR2CSQsCVk9us",
+      "displayName": "Central Alabama Electric Co-Op",
+      "formattedAddress": "637 Coosa River Pkwy, Wetumpka, AL 36092, USA",
+      "location": {
+        "latitude": 32.5408842,
+        "longitude": -86.22554769999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alabama"
+    },
+    {
+      "placeId": "ChIJdWDb_ZBoiogR4HYsOocccew",
+      "displayName": "Alabama Power Co",
+      "formattedAddress": "2500 County Rd 20, Leesburg, AL 35983, USA",
+      "location": {
+        "latitude": 34.1323657,
+        "longitude": -85.79386040000001
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alabama"
+    },
+    {
+      "placeId": "ChIJmagmEhKbjIgR1rJ5OvTZ0d4",
+      "displayName": "Tallapoosa River Electric Co-Op",
+      "formattedAddress": "15163 US-431, La Fayette, AL 36862, USA",
+      "location": {
+        "latitude": 32.8771489,
+        "longitude": -85.4084759
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alabama"
+    },
+    {
+      "placeId": "ChIJnWcMae8biYgRkh9BgjtXsrw",
+      "displayName": "Alabama Power - Sub Station",
+      "formattedAddress": "Alabama Power Sub-Station, 13th St S, Birmingham, AL 35294, USA",
+      "location": {
+        "latitude": 33.4992118,
+        "longitude": -86.8084066
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alabama"
+    },
+    {
+      "placeId": "ChIJTZsNiR4tjIgRWL3x0GYALVo",
+      "displayName": "Dixie Electric Cooperative",
+      "formattedAddress": "9100 Atlanta Hwy, Montgomery, AL 36117, USA",
+      "location": {
+        "latitude": 32.3707266,
+        "longitude": -86.14262149999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alabama"
+    },
+    {
+      "placeId": "ChIJ_xKCLKhIfYgRoD1J6K_7G5A",
+      "displayName": "Sheffield City Utilities Department",
+      "formattedAddress": "300 N Nashville Ave, Sheffield, AL 35660, USA",
+      "location": {
+        "latitude": 34.7611055,
+        "longitude": -87.6971942
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alabama"
+    },
+    {
+      "placeId": "ChIJqyWeMjHkh4gRyFiJrdxMTtY",
+      "displayName": "Alabama Power",
+      "formattedAddress": "4007 AL-13, Haleyville, AL 35565, USA",
+      "location": {
+        "latitude": 34.236329399999995,
+        "longitude": -87.6514363
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alabama"
+    },
+    {
+      "placeId": "ChIJzZHsbnaBjogRK56hAOP-thc",
+      "displayName": "Power South Energy Co-Op",
+      "formattedAddress": "770 Washington Ave, Montgomery, AL 36104, USA",
+      "location": {
+        "latitude": 32.3762115,
+        "longitude": -86.2986205
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alabama"
+    },
+    {
+      "placeId": "ChIJVx3duxCLiYgRWuquqktMAOI",
+      "displayName": "Alabama Power Co",
+      "formattedAddress": "Sloan Dr, Walnut Grove, AL 35990, USA",
+      "location": {
+        "latitude": 34.0691762,
+        "longitude": -86.3081658
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alabama"
+    },
+    {
+      "placeId": "ChIJf8fRXYQziogRifuetyKa18U",
+      "displayName": "Alabama Power Co",
+      "formattedAddress": "1021 AL-144, Ohatchee, AL 36271, USA",
+      "location": {
+        "latitude": 33.7842505,
+        "longitude": -86.0194459
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alabama"
+    },
+    {
+      "placeId": "ChIJ18tGqFBhiogRxQyBpqYjX18",
+      "displayName": "Cherokee Electric Co-Op",
+      "formattedAddress": "1550 Clarence E Chesnut Jr Bypass, Centre, AL 35960, USA",
+      "location": {
+        "latitude": 34.1601272,
+        "longitude": -85.70617949999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alabama"
+    },
+    {
+      "placeId": "ChIJezf7aPmpj4gR-HEKIfZ5a3M",
+      "displayName": "Pioneer Electric Co-Op",
+      "formattedAddress": "4075 AL-41, Selma, AL 36701, USA",
+      "location": {
+        "latitude": 32.3130455,
+        "longitude": -86.9860382
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alabama"
+    },
+    {
+      "placeId": "ChIJpe9IYUTFjIgReS06MrdgKXI",
+      "displayName": "Abel Electric Inc & Groups",
+      "formattedAddress": "53 Lee County Rd. 2163, Salem, AL 36874, USA",
+      "location": {
+        "latitude": 32.496801500000004,
+        "longitude": -85.22482839999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alabama"
+    },
+    {
+      "placeId": "ChIJ6c_Pb18qiIgR1QwH38ZGpl8",
+      "displayName": "PowerGrid Services",
+      "formattedAddress": "2350 US-31 nw, Hartselle, AL 35640, USA",
+      "location": {
+        "latitude": 34.4733844,
+        "longitude": -86.9575256
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alabama"
+    },
+    {
+      "placeId": "ChIJYwoh2ByvjYgRaTF5w0I0yto",
+      "displayName": "Alabama Power",
+      "formattedAddress": "206 N Powell St A, Union Springs, AL 36089, USA",
+      "location": {
+        "latitude": 32.1455735,
+        "longitude": -85.7145389
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alabama"
+    },
+    {
+      "placeId": "ChIJAZ4AU54FmogRW6rb9HBgLPg",
+      "displayName": "Electric Power Services and Construction LLC",
+      "formattedAddress": "200 W 36th Ave Ste B, Gulf Shores, AL 36542, USA",
+      "location": {
+        "latitude": 30.297966000000002,
+        "longitude": -87.687422
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alabama"
+    },
+    {
+      "placeId": "ChIJtVLCXS-EYogR7KWYQ1Pd-yc",
+      "displayName": "Decatur Utilities",
+      "formattedAddress": "1002 Central Pkwy SW, Decatur, AL 35601, USA",
+      "location": {
+        "latitude": 34.5931883,
+        "longitude": -86.98771839999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alabama"
+    },
+    {
+      "placeId": "ChIJ3Zl76ZprYogRGG3RV2TpU1I",
+      "displayName": "USC Power Services",
+      "formattedAddress": "25150 Will McComb Dr j, Tanner, AL 35671, USA",
+      "location": {
+        "latitude": 34.636790399999995,
+        "longitude": -86.87701659999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alabama"
+    },
+    {
+      "placeId": "ChIJH4vvJvgaU4gRvGcfR-IPMmI",
+      "displayName": "Canter Power",
+      "formattedAddress": "4322 Piedmont Pkwy, Greensboro, NC 27410, USA",
+      "location": {
+        "latitude": 36.0530105,
+        "longitude": -79.94175299999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alabama"
+    },
+    {
+      "placeId": "ChIJ100MV3Mjk0sR0OAhy20gRME",
+      "displayName": "Specialized Electrical Solutions LLC",
+      "formattedAddress": "2036 Cherokee Rd Ste 31, Alexander City, AL 35010, USA",
+      "location": {
+        "latitude": 32.9196459,
+        "longitude": -85.9499046
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alabama"
+    },
+    {
+      "placeId": "ChIJB1N8jHOGkYgRkr1Scx0t6dA",
+      "displayName": "Alabama Power",
+      "formattedAddress": "1293 5th St, Florala, AL 36442, USA",
+      "location": {
+        "latitude": 31.006972599999997,
+        "longitude": -86.3282323
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alabama"
+    },
+    {
+      "placeId": "ChIJ6cHZlvsbiYgRGZvb_kbOdoU",
+      "displayName": "Alabama power delivery utilities",
+      "formattedAddress": "1241 Reverend Abraham Woods Jr Boulevard, Birmingham, AL 35203, USA",
+      "location": {
+        "latitude": 33.515591799999996,
+        "longitude": -86.8200439
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alabama"
+    },
+    {
+      "placeId": "ChIJo4sEEWzWBAcRv5snXTgvghQ",
+      "displayName": "Professional Systems",
+      "formattedAddress": "216 East Interstate 65 Service Rd N, Mobile, AL 36607, USA",
+      "location": {
+        "latitude": 30.700665800000003,
+        "longitude": -88.1232383
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "emergency_generator",
+      "sourceTextQuery": "emergency generator services in Alabama"
+    },
+    {
+      "placeId": "ChIJMeM7g8ZEYogRfjQ24ILXhWM",
+      "displayName": "American Generators",
+      "formattedAddress": "476 Comet Dr, Toney, AL 35773, USA",
+      "location": {
+        "latitude": 34.9224321,
+        "longitude": -86.7154053
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "emergency_generator",
+      "sourceTextQuery": "emergency generator services in Alabama"
+    },
+    {
+      "placeId": "ChIJ09MI0UB1iYgRepxAcq7R4a4",
+      "displayName": "Premier Generator Services Inc",
+      "formattedAddress": "7541 Misty Ln, Pinson, AL 35126, USA",
+      "location": {
+        "latitude": 33.728809,
+        "longitude": -86.564881
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "emergency_generator",
+      "sourceTextQuery": "emergency generator services in Alabama"
+    },
+    {
+      "placeId": "ChIJYV4jb2PmiYgR1G_6BCY_AGc",
+      "displayName": "Hyatt's Emergency Stand-By Power, LLC",
+      "formattedAddress": "925 4th Ave NW, Arab, AL 35016, USA",
+      "location": {
+        "latitude": 34.32129080000001,
+        "longitude": -86.5113796
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "emergency_generator",
+      "sourceTextQuery": "emergency generator services in Alabama"
+    },
+    {
+      "placeId": "ChIJgXeaQeojiYgRFZ11t2eiIAE",
+      "displayName": "Mister Sparky",
+      "formattedAddress": "1110 Greenwood crossings Ct, Bessemer, AL 35022, USA",
+      "location": {
+        "latitude": 33.340795,
+        "longitude": -86.9279969
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "emergency_generator",
+      "sourceTextQuery": "emergency generator services in Alabama"
+    },
+    {
+      "placeId": "ChIJGRFu1OhuYogR-EABGRkw4Aw",
+      "displayName": "Generator Technology",
+      "formattedAddress": "7250 Governors W, Huntsville, AL 35806, USA",
+      "location": {
+        "latitude": 34.7023157,
+        "longitude": -86.68962920000001
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "emergency_generator",
+      "sourceTextQuery": "emergency generator services in Alabama"
+    },
+    {
+      "placeId": "ChIJJ-2vMxghiYgRL71Pzbar9E8",
+      "displayName": "Capital Comfort Services",
+      "formattedAddress": "2750 Old Rocky Ridge Rd, Birmingham, AL 35216, USA",
+      "location": {
+        "latitude": 33.4052952,
+        "longitude": -86.76491419999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "emergency_generator",
+      "sourceTextQuery": "emergency generator services in Alabama"
+    },
+    {
+      "placeId": "ChIJa-La87jXi4gRG48BMBbONDg",
+      "displayName": "Southern Generator Services",
+      "formattedAddress": "55 Lea St, Riverside, AL 35135, USA",
+      "location": {
+        "latitude": 33.5907871,
+        "longitude": -86.2346177
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "emergency_generator",
+      "sourceTextQuery": "emergency generator services in Alabama"
+    },
+    {
+      "placeId": "ChIJmXVc1nwXiYgRj8YGNKiZMws",
+      "displayName": "Generator Maintenance",
+      "formattedAddress": "3108 Dolly Ridge Dr, Vestavia Hills, AL 35243, USA",
+      "location": {
+        "latitude": 33.4511068,
+        "longitude": -86.7390832
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "emergency_generator",
+      "sourceTextQuery": "emergency generator services in Alabama"
+    },
+    {
+      "placeId": "ChIJI6vIkbcrjIgRy422OOM7UV8",
+      "displayName": "Mr. Electric of Montgomery",
+      "formattedAddress": "741 Oliver Rd, Montgomery, AL 36117, USA",
+      "location": {
+        "latitude": 32.4005043,
+        "longitude": -86.2071354
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "emergency_generator",
+      "sourceTextQuery": "emergency generator services in Alabama"
+    },
+    {
+      "placeId": "ChIJQzOF1q8jiYgRqvZ630-XJak",
+      "displayName": "Advanced Electrical Company",
+      "formattedAddress": "235 Co Rd 361, Pelham, AL 35124, USA",
+      "location": {
+        "latitude": 33.2886758,
+        "longitude": -86.7989542
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "emergency_generator",
+      "sourceTextQuery": "emergency generator services in Alabama"
+    },
+    {
+      "placeId": "ChIJ2xDLfo4ChogRKWPrxJ8nfFQ",
+      "displayName": "Premier Service Company Inc",
+      "formattedAddress": "701 Rice Mine Rd N, Tuscaloosa, AL 35406, USA",
+      "location": {
+        "latitude": 33.2251459,
+        "longitude": -87.5438798
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "emergency_generator",
+      "sourceTextQuery": "emergency generator services in Alabama"
+    },
+    {
+      "placeId": "ChIJq8Fok8Y9jIgRFXylgs9lR-8",
+      "displayName": "Alabama Fire & Equipment Service, LLC",
+      "formattedAddress": "2404 S Ann St, Eclectic, AL 36024, USA",
+      "location": {
+        "latitude": 32.6067088,
+        "longitude": -86.022401
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "emergency_generator",
+      "sourceTextQuery": "emergency generator services in Alabama"
+    },
+    {
+      "placeId": "ChIJBSf1BIzEkIgRvnpC_SbKJ2A",
+      "displayName": "The Generator Guys, Forrest Jordan and Associates",
+      "formattedAddress": "1798 Abercrombie Rd, Gulf Breeze, FL 32563, USA",
+      "location": {
+        "latitude": 30.401275799999997,
+        "longitude": -87.0026594
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "emergency_generator",
+      "sourceTextQuery": "emergency generator services in Alabama"
+    },
+    {
+      "placeId": "ChIJv9Ye-cSzm4gR00ScaKAy9i4",
+      "displayName": "Hansen Super Techs",
+      "formattedAddress": "2609 Cameron St Unit B, Mobile, AL 36607, USA",
+      "location": {
+        "latitude": 30.689524799999997,
+        "longitude": -88.1027675
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "emergency_generator",
+      "sourceTextQuery": "emergency generator services in Alabama"
+    },
+    {
+      "placeId": "ChIJc1eEhavfiIgRVI2IVDrbkTg",
+      "displayName": "Lovelady Electrical Contractors",
+      "formattedAddress": "3691 Pine Ln, Bessemer, AL 35022, USA",
+      "location": {
+        "latitude": 33.3425635,
+        "longitude": -86.9065753
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "emergency_generator",
+      "sourceTextQuery": "emergency generator services in Alabama"
+    },
+    {
+      "placeId": "ChIJafDwQNhNmogRLIfLTFiKlmI",
+      "displayName": "South Alabama Electic",
+      "formattedAddress": "762 Holcombe Ave, Mobile, AL 36606, USA",
+      "location": {
+        "latitude": 30.6653822,
+        "longitude": -88.0913712
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "emergency_generator",
+      "sourceTextQuery": "emergency generator services in Alabama"
+    },
+    {
+      "placeId": "ChIJqWx4qV0dhogRF5l99dJ0D3M",
+      "displayName": "Trinity Electrical Service",
+      "formattedAddress": "8506 Bell Dr, Northport, AL 35473, USA",
+      "location": {
+        "latitude": 33.2765434,
+        "longitude": -87.5589705
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "emergency_generator",
+      "sourceTextQuery": "emergency generator services in Alabama"
+    },
+    {
+      "placeId": "ChIJPWXmwWbdiIgRRZKthqWfw5Y",
+      "displayName": "Aux Home Services",
+      "formattedAddress": "5925 Johns Rd, Bessemer, AL 35023, USA",
+      "location": {
+        "latitude": 33.395934499999996,
+        "longitude": -87.03859059999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "emergency_generator",
+      "sourceTextQuery": "emergency generator services in Alabama"
+    },
+    {
+      "placeId": "ChIJW_vPvyve1IkRn9hGnZ3utYo",
+      "displayName": "Standby Generator Services Inc",
+      "formattedAddress": "785 Westney Rd S, Ajax, ON L1S 7G1, Canada",
+      "location": {
+        "latitude": 43.8300382,
+        "longitude": -79.02403009999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "emergency_generator",
+      "sourceTextQuery": "emergency generator services in Alabama"
+    },
+    {
+      "placeId": "ChIJxf4KJGQChogR9R60_asu-sM",
+      "displayName": "J D Esco Electrical Contractors Inc",
+      "formattedAddress": "3106 Greensboro Ave, Tuscaloosa, AL 35401, USA",
+      "location": {
+        "latitude": 33.18238,
+        "longitude": -87.5543649
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "emergency_generator",
+      "sourceTextQuery": "emergency generator services in Alabama"
+    },
+    {
+      "placeId": "ChIJVfgzELgrjIgRX5OGk1ccc3E",
+      "displayName": "Montgomery Electricians",
+      "formattedAddress": "6012 E Shirley Ln # B, Montgomery, AL 36117, USA",
+      "location": {
+        "latitude": 32.3659343,
+        "longitude": -86.20527009999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "emergency_generator",
+      "sourceTextQuery": "emergency generator services in Alabama"
+    },
+    {
+      "placeId": "ChIJg30YP8iGjogRjv1jgo-wpB0",
+      "displayName": "Dixie Electric, Plumbing & Air",
+      "formattedAddress": "580 Trade Center St, Montgomery, AL 36108, USA",
+      "location": {
+        "latitude": 32.370052699999995,
+        "longitude": -86.3461234
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "emergency_generator",
+      "sourceTextQuery": "emergency generator services in Alabama"
+    },
+    {
+      "placeId": "ChIJZe4oZVkrjIgRDxN7lbYoihA",
+      "displayName": "Strada Services",
+      "formattedAddress": "6331 Atlanta Hwy, Montgomery, AL 36117, USA",
+      "location": {
+        "latitude": 32.3829138,
+        "longitude": -86.18883509999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "emergency_generator",
+      "sourceTextQuery": "emergency generator services in Alabama"
+    },
+    {
+      "placeId": "ChIJm6tQYbgb-0MRM1jgDkLHlnk",
+      "displayName": "Ward Electric",
+      "formattedAddress": "1010 Wildwood Dr, Cecil, AL 36013, USA",
+      "location": {
+        "latitude": 32.291694,
+        "longitude": -86.023718
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "emergency_generator",
+      "sourceTextQuery": "emergency generator services in Alabama"
+    },
+    {
+      "placeId": "ChIJHS6jmnBLmogR5er23DvgDV4",
+      "displayName": "Hansen Electric",
+      "formattedAddress": "5821 Rangeline Rd Ste 107, Theodore, AL 36582, USA",
+      "location": {
+        "latitude": 30.5699877,
+        "longitude": -88.13104450000002
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "emergency_generator",
+      "sourceTextQuery": "emergency generator services in Alabama"
+    },
+    {
+      "placeId": "ChIJvWas6AIdhogRIA5dgbT0a70",
+      "displayName": "Patco Electrical Contractors, Inc.",
+      "formattedAddress": "7400 Charlie Shirley Rd, Northport, AL 35473, USA",
+      "location": {
+        "latitude": 33.2707797,
+        "longitude": -87.5773145
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "emergency_generator",
+      "sourceTextQuery": "emergency generator services in Alabama"
+    },
+    {
+      "placeId": "ChIJM4vuryAtkIgRiVRFzjgTIE4",
+      "displayName": "Crawford Electric LLC",
+      "formattedAddress": "307 Travis Ave, Evergreen, AL 36401, USA",
+      "location": {
+        "latitude": 31.441251200000004,
+        "longitude": -86.9589864
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "emergency_generator",
+      "sourceTextQuery": "emergency generator services in Alabama"
+    },
+    {
+      "placeId": "ChIJfZmtbeJ0jIgRAo7h3DqIq1U",
+      "displayName": "C&T Electric LLC",
+      "formattedAddress": "1876 Airport Blvd, Alexander City, AL 35010, USA",
+      "location": {
+        "latitude": 32.9214073,
+        "longitude": -85.9652796
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "emergency_generator",
+      "sourceTextQuery": "emergency generator services in Alabama"
+    },
+    {
+      "placeId": "ChIJ1_qEjcuEjogRyb7WUj3Mbz0",
+      "displayName": "AirNow Home Services",
+      "formattedAddress": "3481 Main St, Millbrook, AL 36054, USA",
+      "location": {
+        "latitude": 32.4807006,
+        "longitude": -86.3634512
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "emergency_generator",
+      "sourceTextQuery": "emergency generator services in Alabama"
+    },
+    {
+      "placeId": "ChIJAQC0Ime39YgRgDhV9Owm9r8",
+      "displayName": "Southern Power Experts LLC",
+      "formattedAddress": "3575 Millers Pond Way SW, Snellville, GA 30039, USA",
+      "location": {
+        "latitude": 33.8221138,
+        "longitude": -83.99363939999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "emergency_generator",
+      "sourceTextQuery": "emergency generator services in Alabama"
+    },
+    {
+      "placeId": "ChIJLYnC7BBLmogRlHvm-RqS8lw",
+      "displayName": "Taylor Sudden Service",
+      "formattedAddress": "1877 Shelton Beach Rd, Saraland, AL 36571, USA",
+      "location": {
+        "latitude": 30.796349000000003,
+        "longitude": -88.10807799999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "emergency_generator",
+      "sourceTextQuery": "emergency generator services in Alabama"
+    },
+    {
+      "placeId": "ChIJ8z8eqfIt9IgRm0eA6r2aEW0",
+      "displayName": "Georgia Generator Pro",
+      "formattedAddress": "8279 Hazelbrand Rd NE, Covington, GA 30014, USA",
+      "location": {
+        "latitude": 33.6013881,
+        "longitude": -83.83637019999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "emergency_generator",
+      "sourceTextQuery": "emergency generator services in Alabama"
+    },
+    {
+      "placeId": "ChIJTaBFFzyviIgRdw7Jd05XNmY",
+      "displayName": "H & R Electric, LLC",
+      "formattedAddress": "1910 Prude Mill Rd, Cottondale, AL 35453, USA",
+      "location": {
+        "latitude": 33.190139800000004,
+        "longitude": -87.45191299999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "emergency_generator",
+      "sourceTextQuery": "emergency generator services in Alabama"
+    },
+    {
+      "placeId": "ChIJdQkdQgC_kIgRqNnKipxCfqs",
+      "displayName": "Generator Source",
+      "formattedAddress": "1505 North W Street, Pensacola, FL 32505, USA",
+      "location": {
+        "latitude": 30.4284154,
+        "longitude": -87.25007480000001
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "emergency_generator",
+      "sourceTextQuery": "emergency generator services in Alabama"
+    },
+    {
+      "placeId": "ChIJE0rZWBhHjIgRF7I1HImNeNE",
+      "displayName": "University Electric Inc",
+      "formattedAddress": "101 Barnett Blvd, Tallassee, AL 36078, USA",
+      "location": {
+        "latitude": 32.5354429,
+        "longitude": -85.8921013
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "emergency_generator",
+      "sourceTextQuery": "emergency generator services in Alabama"
+    },
+    {
+      "placeId": "ChIJl-cyzepuYogRDCUOIqG8Rdk",
+      "displayName": "Engineered Maintenance Services",
+      "formattedAddress": "7234 Governors W, Huntsville, AL 35806, USA",
+      "location": {
+        "latitude": 34.7030984,
+        "longitude": -86.68799539999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "emergency_generator",
+      "sourceTextQuery": "emergency generator services in Alabama"
+    },
+    {
+      "placeId": "ChIJtdb5mYVsYogRwHElmRNkcOY",
+      "displayName": "Gen-Co, Inc.",
+      "formattedAddress": "3500 8th Ave SW, Huntsville, AL 35805, USA",
+      "location": {
+        "latitude": 34.7173221,
+        "longitude": -86.61381120000001
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "industrial_generator",
+      "sourceTextQuery": "industrial generator providers in Alabama"
+    },
+    {
+      "placeId": "ChIJzVskuk_A9IgR5zZs9ZqJLEs",
+      "displayName": "Perkins Generator Sales and Service",
+      "formattedAddress": "7232 GA-54, Sharpsburg, GA 30277, USA",
+      "location": {
+        "latitude": 33.3572439,
+        "longitude": -84.6360244
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "industrial_generator",
+      "sourceTextQuery": "industrial generator providers in Alabama"
+    },
+    {
+      "placeId": "ChIJPTtzxQesiYgRot3G4dXzQhs",
+      "displayName": "Louis Allis",
+      "formattedAddress": "645 Lester Doss Rd, Warrior, AL 35180, USA",
+      "location": {
+        "latitude": 33.8505556,
+        "longitude": -86.8388889
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "industrial_generator",
+      "sourceTextQuery": "industrial generator providers in Alabama"
+    },
+    {
+      "placeId": "ChIJc2QP_PQbiYgR4OQJICNHoP8",
+      "displayName": "General Machinery",
+      "formattedAddress": "921 1st Ave N, Birmingham, AL 35203, USA",
+      "location": {
+        "latitude": 33.507277699999996,
+        "longitude": -86.81900449999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "industrial_generator",
+      "sourceTextQuery": "industrial generator providers in Alabama"
+    },
+    {
+      "placeId": "ChIJN3J8Nb919YgRXA-Kvc8quJ4",
+      "displayName": "Generator Supercenter of NW Atlanta",
+      "formattedAddress": "1009 Mansell Rd Ste C2, Roswell, GA 30076, USA",
+      "location": {
+        "latitude": 34.041862,
+        "longitude": -84.332695
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "industrial_generator",
+      "sourceTextQuery": "industrial generator providers in Alabama"
+    },
+    {
+      "placeId": "ChIJm5Ey9wo4t4kR678_9KGg3tI",
+      "displayName": "Athlon Generator LLC",
+      "formattedAddress": "645 Lester Doss Rd, Warrior, AL 35180, USA",
+      "location": {
+        "latitude": 33.8503755,
+        "longitude": -86.83905419999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "industrial_generator",
+      "sourceTextQuery": "industrial generator providers in Alabama"
+    },
+    {
+      "placeId": "ChIJxXCuq1QaiYgRISasCWqOyTw",
+      "displayName": "Grainger Industrial Supply",
+      "formattedAddress": "3735 1st Ave N, Birmingham, AL 35222, USA",
+      "location": {
+        "latitude": 33.525608399999996,
+        "longitude": -86.7809489
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "industrial_generator",
+      "sourceTextQuery": "industrial generator providers in Alabama"
+    },
+    {
+      "placeId": "ChIJA4yLq4UFiYgR_4sRiVtEjkU",
+      "displayName": "HGR Industrial Surplus",
+      "formattedAddress": "320 Fleming Rd, Birmingham, AL 35217, USA",
+      "location": {
+        "latitude": 33.617927,
+        "longitude": -86.7434727
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "industrial_generator",
+      "sourceTextQuery": "industrial generator providers in Alabama"
+    },
+    {
+      "placeId": "ChIJC67u9GxctokR7tmwBpDVFRQ",
+      "displayName": "Georator Corporation",
+      "formattedAddress": "645 Lester Doss Rd, Warrior, AL 35180, USA",
+      "location": {
+        "latitude": 33.8503755,
+        "longitude": -86.83905419999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "industrial_generator",
+      "sourceTextQuery": "industrial generator providers in Alabama"
+    },
+    {
+      "placeId": "ChIJE7DmWLOkjIgRY7-58lOfytc",
+      "displayName": "Industrial Service & Supply",
+      "formattedAddress": "6401 25th Ave, Valley, AL 36854, USA",
+      "location": {
+        "latitude": 32.8067275,
+        "longitude": -85.1737718
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "industrial_generator",
+      "sourceTextQuery": "industrial generator providers in Alabama"
+    },
+    {
+      "placeId": "ChIJrdIigmaHjogRtbEykyWkIsg",
+      "displayName": "Hartzell Engine Tech",
+      "formattedAddress": "2900 Selma Hwy, Montgomery, AL 36108, USA",
+      "location": {
+        "latitude": 32.3117125,
+        "longitude": -86.362866
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "industrial_generator",
+      "sourceTextQuery": "industrial generator providers in Alabama"
+    },
+    {
+      "placeId": "ChIJ06JAVG0viYgRLPxh7xRRpms",
+      "displayName": "Thompson Tractor Company - Alabaster",
+      "formattedAddress": "2070 Corporate Woods Dr, Alabaster, AL 35007, USA",
+      "location": {
+        "latitude": 33.19468640000001,
+        "longitude": -86.78781889999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "industrial_generator",
+      "sourceTextQuery": "industrial generator providers in Alabama"
+    },
+    {
+      "placeId": "ChIJlY_yPxWDY4gRnfkm5uyQhqY",
+      "displayName": "Premier Generators",
+      "formattedAddress": "3322 Ambrose Ave, Nashville, TN 37207, USA",
+      "location": {
+        "latitude": 36.2087211,
+        "longitude": -86.7457948
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "industrial_generator",
+      "sourceTextQuery": "industrial generator providers in Alabama"
+    },
+    {
+      "placeId": "ChIJ8ctIQ4hgiIgRFXS7o5SvY1U",
+      "displayName": "TriGreen Equipment",
+      "formattedAddress": "3700 Industrial Pkwy, Jasper, AL 35501, USA",
+      "location": {
+        "latitude": 33.8110686,
+        "longitude": -87.23475479999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "industrial_generator",
+      "sourceTextQuery": "industrial generator providers in Alabama"
+    },
+    {
+      "placeId": "ChIJpUWAJAIpMYgRH_fwZeyVB5E",
+      "displayName": "Backup Power Solutions",
+      "formattedAddress": "1555 Norton St #4241, Akron, OH 44305, USA",
+      "location": {
+        "latitude": 41.064890399999996,
+        "longitude": -81.4723047
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "industrial_generator",
+      "sourceTextQuery": "industrial generator providers in Alabama"
+    },
+    {
+      "placeId": "ChIJ9XGA4VE9iYgRsf5dTqsrQeo",
+      "displayName": "Bob's Power Equipment",
+      "formattedAddress": "4532 Valleydale Rd, Birmingham, AL 35242, USA",
+      "location": {
+        "latitude": 33.3848639,
+        "longitude": -86.7357684
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "industrial_generator",
+      "sourceTextQuery": "industrial generator providers in Alabama"
+    },
+    {
+      "placeId": "ChIJmU1zVqofiYgRDYFYnLeOi9M",
+      "displayName": "Graybar",
+      "formattedAddress": "1040 London Dr, Birmingham, AL 35211, USA",
+      "location": {
+        "latitude": 33.442215,
+        "longitude": -86.8663897
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "industrial_generator",
+      "sourceTextQuery": "industrial generator providers in Alabama"
+    },
+    {
+      "placeId": "ChIJU11D1fEMjIgRZBnjCdWzK14",
+      "displayName": "Agee Electric",
+      "formattedAddress": "3702 Hillcrest Dr, Alexander City, AL 35010, USA",
+      "location": {
+        "latitude": 32.8928654,
+        "longitude": -85.9609673
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "industrial_generator",
+      "sourceTextQuery": "industrial generator providers in Alabama"
+    },
+    {
+      "placeId": "ChIJ080WXIYDhogRw6u8PFJEai8",
+      "displayName": "Thompson Cat Rentals - Tuscaloosa",
+      "formattedAddress": "3550 Joe Mallisham Pkwy, Tuscaloosa, AL 35401, USA",
+      "location": {
+        "latitude": 33.182617199999996,
+        "longitude": -87.6149583
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "industrial_generator",
+      "sourceTextQuery": "industrial generator providers in Alabama"
+    },
+    {
+      "placeId": "ChIJb4e6z2fLmogR87ZSGG1wpAI",
+      "displayName": "Tractor Supply Co.",
+      "formattedAddress": "1115 College Ave, Jackson, AL 36545, USA",
+      "location": {
+        "latitude": 31.522583599999997,
+        "longitude": -87.89634989999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "industrial_generator",
+      "sourceTextQuery": "industrial generator providers in Alabama"
+    },
+    {
+      "placeId": "ChIJV7rSqb3diIgRFHfVufFvloc",
+      "displayName": "Service Experts Birmingham",
+      "formattedAddress": "5529 Eastcliff Industrial Loop, Irondale, AL 35210, USA",
+      "location": {
+        "latitude": 33.5785992,
+        "longitude": -86.63090179999999
+      },
+      "stateCode": "AL",
+      "stateName": "Alabama",
+      "searchCategory": "industrial_generator",
+      "sourceTextQuery": "industrial generator providers in Alabama"
+    },
+    {
+      "placeId": "ChIJWydFKp-XyFYRDwjqme3wWk8",
+      "displayName": "Alaska Diesel Electric",
+      "formattedAddress": "1200 W International Airport Rd, Anchorage, AK 99518, USA",
+      "location": {
+        "latitude": 61.1730441,
+        "longitude": -149.90690949999998
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "generator_suppliers",
+      "sourceTextQuery": "generator suppliers in Alaska"
+    },
+    {
+      "placeId": "ChIJXV69ImKXyFYR1nuGzbdGbRk",
+      "displayName": "MSHS Pacific Power Group",
+      "formattedAddress": "1337 E 73rd Ave, Anchorage, AK 99518, USA",
+      "location": {
+        "latitude": 61.1542185,
+        "longitude": -149.8583219
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "generator_suppliers",
+      "sourceTextQuery": "generator suppliers in Alaska"
+    },
+    {
+      "placeId": "ChIJAQAAAFSWyFYRo7ytK93yZfQ",
+      "displayName": "Equipment Source Inc",
+      "formattedAddress": "5801 Silverado Way, Anchorage, AK 99518, USA",
+      "location": {
+        "latitude": 61.1678645,
+        "longitude": -149.8877675
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "generator_suppliers",
+      "sourceTextQuery": "generator suppliers in Alaska"
+    },
+    {
+      "placeId": "ChIJWeuGxniXyFYREQRLhPQjq_4",
+      "displayName": "Alaska Specialty Equipment • Bailey's Rent All Inc.",
+      "formattedAddress": "6871 Old Seward Hwy, Anchorage, AK 99518, USA",
+      "location": {
+        "latitude": 61.158479899999996,
+        "longitude": -149.86330289999998
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "generator_suppliers",
+      "sourceTextQuery": "generator suppliers in Alaska"
+    },
+    {
+      "placeId": "ChIJOdB99GuWyFYRsEe3cvI3xk4",
+      "displayName": "Alaska Mining & Diving Supply Inc.",
+      "formattedAddress": "3222 Commercial Dr, Anchorage, AK 99501, USA",
+      "location": {
+        "latitude": 61.223917500000006,
+        "longitude": -149.8198607
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "generator_suppliers",
+      "sourceTextQuery": "generator suppliers in Alaska"
+    },
+    {
+      "placeId": "ChIJqze0mGqWyFYR3EW_UN8mGX4",
+      "displayName": "Cummins Sales and Service",
+      "formattedAddress": "2618 Commercial Dr, Anchorage, AK 99501, USA",
+      "location": {
+        "latitude": 61.221086199999995,
+        "longitude": -149.8310376
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "generator_dealers",
+      "sourceTextQuery": "generator dealers in Alaska"
+    },
+    {
+      "placeId": "ChIJn08Umn7eyFYR-97GaLpHybk",
+      "displayName": "Mat-Su Diesel Electric",
+      "formattedAddress": "1300 W Nicola Ave, Wasilla, AK 99654, USA",
+      "location": {
+        "latitude": 61.58085979999999,
+        "longitude": -149.48493399999998
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "generator_dealers",
+      "sourceTextQuery": "generator dealers in Alaska"
+    },
+    {
+      "placeId": "ChIJQ9SmGK1aMlERHqvmnJFXKBQ",
+      "displayName": "Independent Rental",
+      "formattedAddress": "2020 S Cushman St, Fairbanks, AK 99701, USA",
+      "location": {
+        "latitude": 64.8287885,
+        "longitude": -147.71527509999999
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alaska"
+    },
+    {
+      "placeId": "ChIJPbElrxLPyFYRYkKK3hiMApA",
+      "displayName": "Jewell Equipment Rental",
+      "formattedAddress": "9761 W Margin Wy, Wasilla, AK 99623, USA",
+      "location": {
+        "latitude": 61.568835400000005,
+        "longitude": -149.69661969999999
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alaska"
+    },
+    {
+      "placeId": "ChIJC2o8nMaZyFYRaeFXnRl-d5w",
+      "displayName": "United Rentals",
+      "formattedAddress": "9760 Old Seward Hwy, Anchorage, AK 99515, USA",
+      "location": {
+        "latitude": 61.1323641,
+        "longitude": -149.8652605
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alaska"
+    },
+    {
+      "placeId": "ChIJgWizAfodyVYRXuw19RycHSY",
+      "displayName": "Sunbelt Rentals",
+      "formattedAddress": "1111 Glenn Hwy, Palmer, AK 99645, USA",
+      "location": {
+        "latitude": 61.595354199999996,
+        "longitude": -149.1216811
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alaska"
+    },
+    {
+      "placeId": "ChIJY5KyYr-ZyFYRbdd8c1de93I",
+      "displayName": "Airport Equipment Rentals / John Deere Construction",
+      "formattedAddress": "10460 Old Seward Hwy, Anchorage, AK 99515, USA",
+      "location": {
+        "latitude": 61.125942300000006,
+        "longitude": -149.8657892
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alaska"
+    },
+    {
+      "placeId": "ChIJGfnXV2hFMlERKhLyitEiAAs",
+      "displayName": "Rental Zone",
+      "formattedAddress": "1109 Old Steese Hwy, Fairbanks, AK 99701, USA",
+      "location": {
+        "latitude": 64.8538295,
+        "longitude": -147.6859245
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alaska"
+    },
+    {
+      "placeId": "ChIJ703QOmLdyFYRhk9NpsUgyE0",
+      "displayName": "Allen & Sons Equipment Rental",
+      "formattedAddress": "4661 W Sassy Ave, Wasilla, AK 99623, USA",
+      "location": {
+        "latitude": 61.591792,
+        "longitude": -149.568003
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alaska"
+    },
+    {
+      "placeId": "ChIJUftgwzkrz1YRQqYjOyoMttA",
+      "displayName": "Willow Equipment Rental, LLC",
+      "formattedAddress": "23724 W Willow 1st Ave, Willow, AK 99688, USA",
+      "location": {
+        "latitude": 61.74343209999999,
+        "longitude": -150.05086609999998
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alaska"
+    },
+    {
+      "placeId": "ChIJ3wIyBMfdyFYRAcsqg1oC86E",
+      "displayName": "ABC Rentals LLC",
+      "formattedAddress": "2601 S Knik Goose Bay Rd, Wasilla, AK 99654, USA",
+      "location": {
+        "latitude": 61.553928,
+        "longitude": -149.50769560000003
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alaska"
+    },
+    {
+      "placeId": "ChIJa_fe1hLeyFYRPe3EdhV394A",
+      "displayName": "Sunbelt Rentals",
+      "formattedAddress": "450 E Railroad Ave, Wasilla, AK 99654, USA",
+      "location": {
+        "latitude": 61.579989399999995,
+        "longitude": -149.43976039999998
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alaska"
+    },
+    {
+      "placeId": "ChIJNSIYiNjoyFYR_EDTHCcVPYQ",
+      "displayName": "Dakota Diggers, LLC",
+      "formattedAddress": "21065 Bill Stephens Dr, Chugiak, AK 99567, USA",
+      "location": {
+        "latitude": 61.410489,
+        "longitude": -149.443647
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alaska"
+    },
+    {
+      "placeId": "ChIJUz6GmQLbyFYRh09GJ8DmfU0",
+      "displayName": "E Z Rents Inc",
+      "formattedAddress": "1470 S Ridgecrest Rd, Wasilla, AK 99623, USA",
+      "location": {
+        "latitude": 61.56760800000001,
+        "longitude": -149.6931524
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alaska"
+    },
+    {
+      "placeId": "ChIJ8TppK7qtM1ERrtUXsDm5Ds8",
+      "displayName": "North Pole Equipment Rentals",
+      "formattedAddress": "2944 Richardson Hwy Unit A, North Pole, AK 99705, USA",
+      "location": {
+        "latitude": 64.7352698,
+        "longitude": -147.2881242
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alaska"
+    },
+    {
+      "placeId": "ChIJ1XVdp2qWyFYRCGmNJvXBH5s",
+      "displayName": "Totem Equipment & Supply",
+      "formattedAddress": "2536 Commercial Dr, Anchorage, AK 99501, USA",
+      "location": {
+        "latitude": 61.220707100000006,
+        "longitude": -149.8320392
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alaska"
+    },
+    {
+      "placeId": "ChIJvalKoyxixlYR125ouv_rn2M",
+      "displayName": "United Rentals",
+      "formattedAddress": "34504 Bus Park Frontage Rd, Soldotna, AK 99669, USA",
+      "location": {
+        "latitude": 60.48055170000001,
+        "longitude": -151.1503003
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alaska"
+    },
+    {
+      "placeId": "ChIJediRf2J7xlYRPFCRvSgVp4o",
+      "displayName": "Ron's Rent It Center Inc",
+      "formattedAddress": "145 N Willow St, Kenai, AK 99611, USA",
+      "location": {
+        "latitude": 60.56176869999999,
+        "longitude": -151.2488788
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alaska"
+    },
+    {
+      "placeId": "ChIJUaOWMpZaMlERwJHih4QYzGU",
+      "displayName": "Equipment Source Inc",
+      "formattedAddress": "1919 Van Horn Rd, Fairbanks, AK 99701, USA",
+      "location": {
+        "latitude": 64.81261049999999,
+        "longitude": -147.7522524
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alaska"
+    },
+    {
+      "placeId": "ChIJI0Z6QCGWyFYR5ptZSrjwHNM",
+      "displayName": "Craig Taylor Equipment - Anchorage",
+      "formattedAddress": "733 E Whitney Rd, Anchorage, AK 99501, USA",
+      "location": {
+        "latitude": 61.2255902,
+        "longitude": -149.8707583
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alaska"
+    },
+    {
+      "placeId": "ChIJdfiecdBjxlYRLZri7M3L-tg",
+      "displayName": "Sterling Tool & Equipment Rental",
+      "formattedAddress": "34177 Sterling Hwy, Sterling, AK 99672, USA",
+      "location": {
+        "latitude": 60.536083100000006,
+        "longitude": -150.79835459999998
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alaska"
+    },
+    {
+      "placeId": "ChIJ0ytEPwxnxlYRKdS30_IkURY",
+      "displayName": "CBC Rental & Supply LLC",
+      "formattedAddress": "40111 Frontage Rd. Mile, 89.9 Sterling Hwy, Soldotna, AK 99669, USA",
+      "location": {
+        "latitude": 60.506086200000006,
+        "longitude": -150.94410829999998
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alaska"
+    },
+    {
+      "placeId": "ChIJUzmhw56XyFYRnGAdhSzjytM",
+      "displayName": "Construction Machinery Industrial",
+      "formattedAddress": "5400 Homer Dr, Anchorage, AK 99518, USA",
+      "location": {
+        "latitude": 61.1717885,
+        "longitude": -149.85900039999999
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alaska"
+    },
+    {
+      "placeId": "ChIJWZAcq7J331AR2-EamXOW-Ks",
+      "displayName": "Airport Equipment Rentals Inc",
+      "formattedAddress": "Lot 30 Spine Rd, Prudhoe Bay, AK 99734, USA",
+      "location": {
+        "latitude": 70.2282225,
+        "longitude": -148.3906678
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alaska"
+    },
+    {
+      "placeId": "ChIJK_6g9O8mDFQRF0oEI2OExAE",
+      "displayName": "Construction Machinery Industrial",
+      "formattedAddress": "2615 Twentieth Ave, Fairbanks, AK 99709, USA",
+      "location": {
+        "latitude": 64.8294854,
+        "longitude": -147.78361239999998
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alaska"
+    },
+    {
+      "placeId": "ChIJf5MJuEbgAFQRQ9ZYm-A998c",
+      "displayName": "Construction Machinery Industrial",
+      "formattedAddress": "5302 Commercial Blvd, Juneau, AK 99801, USA",
+      "location": {
+        "latitude": 58.35746869999999,
+        "longitude": -134.4828834
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alaska"
+    },
+    {
+      "placeId": "ChIJUfGgRL-bx1YRYZF9JcJJB50",
+      "displayName": "Southcentral Equipment Rental, LLC",
+      "formattedAddress": "1002 3rd Ave, Seward, AK 99664, USA",
+      "location": {
+        "latitude": 60.1125688,
+        "longitude": -149.4417378
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alaska"
+    },
+    {
+      "placeId": "ChIJRyN4ZYveyFYRBjobqmftDjY",
+      "displayName": "South Central Equipment",
+      "formattedAddress": "2460 Church Rd, Wasilla, AK 99654, USA",
+      "location": {
+        "latitude": 61.606921,
+        "longitude": -149.51341349999998
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alaska"
+    },
+    {
+      "placeId": "ChIJnV--9cjiyFYRmaG3saK4Qd8",
+      "displayName": "Paydirt Rentals",
+      "formattedAddress": "3895 S Old Glenn Hwy, Palmer, AK 99645, USA",
+      "location": {
+        "latitude": 61.5378831,
+        "longitude": -149.03592890000002
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alaska"
+    },
+    {
+      "placeId": "ChIJm7Rdz4HeyFYRhSGIwEMtYBA",
+      "displayName": "N C Machinery",
+      "formattedAddress": "2051 W Rupee Cir, Wasilla, AK 99654, USA",
+      "location": {
+        "latitude": 61.58032429999999,
+        "longitude": -149.5027341
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alaska"
+    },
+    {
+      "placeId": "ChIJ1-Mm_4t2IFERgY5LTJE_aeI",
+      "displayName": "NC The Cat Rental Store",
+      "formattedAddress": "Pouch 340039, Prudhoe Bay, AK 99734, USA",
+      "location": {
+        "latitude": 70.25349109999999,
+        "longitude": -148.3467398
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alaska"
+    },
+    {
+      "placeId": "ChIJAdO2on5GDlQRz1c1hkg7qL4",
+      "displayName": "Tyler Rental Inc",
+      "formattedAddress": "400 Port Bagial Blvd, Craig, AK 99921, USA",
+      "location": {
+        "latitude": 55.4764755,
+        "longitude": -133.13570149999998
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alaska"
+    },
+    {
+      "placeId": "ChIJ0eaSL8CZyFYR9mXwC4X_b_c",
+      "displayName": "Alaska Pacific Leasing",
+      "formattedAddress": "9191 Old Seward Hwy Ste 15, Anchorage, AK 99515, USA",
+      "location": {
+        "latitude": 61.137946799999995,
+        "longitude": -149.86249089999998
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alaska"
+    },
+    {
+      "placeId": "ChIJGSggRqJaMlERUN7gDHAsfjQ",
+      "displayName": "Tracer International Alaska Generator",
+      "formattedAddress": "1435 Van Horn Rd, Fairbanks, AK 99701, USA",
+      "location": {
+        "latitude": 64.81185909999999,
+        "longitude": -147.73814769999998
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alaska"
+    },
+    {
+      "placeId": "ChIJpSfaQy23q1cRmpkWkrjzoXI",
+      "displayName": "NC Machinery",
+      "formattedAddress": "1171 Airport Beach Rd, Unalaska, AK 99692, USA",
+      "location": {
+        "latitude": 53.8777445,
+        "longitude": -166.55717629999998
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alaska"
+    },
+    {
+      "placeId": "ChIJlxIrJiceAVQRx1E5g_Q-RRI",
+      "displayName": "N C Machinery",
+      "formattedAddress": "8550 Airport Blvd #8064, Juneau, AK 99801, USA",
+      "location": {
+        "latitude": 58.3599501,
+        "longitude": -134.5728139
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alaska"
+    },
+    {
+      "placeId": "ChIJq3Tt8CV3IFERVdfwYnPI2eo",
+      "displayName": "N.C. Machinery CAT Rental Store",
+      "formattedAddress": "966 NC machinery Way, Prudhoe Bay, AK 99734, USA",
+      "location": {
+        "latitude": 70.2257606,
+        "longitude": -148.39129950000003
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alaska"
+    },
+    {
+      "placeId": "ChIJ7X9cM9taMlERaTDcDtBvJvE",
+      "displayName": "Construction Machinery Industrial",
+      "formattedAddress": "7332 N Tongass Hwy, Ketchikan, AK 99901, USA",
+      "location": {
+        "latitude": 55.410744,
+        "longitude": -131.726675
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alaska"
+    },
+    {
+      "placeId": "ChIJxRx70mB5xlYR4QaALGNbdOM",
+      "displayName": "Magtec Alaska",
+      "formattedAddress": "43385 Kenai Spur Hwy, Kenai, AK 99611, USA",
+      "location": {
+        "latitude": 60.609545000000004,
+        "longitude": -151.33566299999998
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alaska"
+    },
+    {
+      "placeId": "ChIJ5UWf5M1lxlYRWh_OZupdJwg",
+      "displayName": "MWM Equipment Rentals",
+      "formattedAddress": "1331 Chinook Dr, Kenai, AK 99611, USA",
+      "location": {
+        "latitude": 60.5423253,
+        "longitude": -151.08777279999998
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alaska"
+    },
+    {
+      "placeId": "ChIJ4T03T8CXyFYRKrknAKjXE8M",
+      "displayName": "ASRC Energy",
+      "formattedAddress": "3900 C St #701, Anchorage, AK 99503, USA",
+      "location": {
+        "latitude": 61.1850106,
+        "longitude": -149.8880512
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alaska"
+    },
+    {
+      "placeId": "ChIJHW9a_7yXyFYR4G1OWCFUU-Q",
+      "displayName": "Rent-A-Center",
+      "formattedAddress": "4240 Old Seward Hwy #24, Anchorage, AK 99503, USA",
+      "location": {
+        "latitude": 61.1818543,
+        "longitude": -149.8695497
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alaska"
+    },
+    {
+      "placeId": "ChIJyzdwmvvF6lYRiauwqUNkir4",
+      "displayName": "Kodiak Rental Center",
+      "formattedAddress": "201 Center St, Kodiak, AK 99615, USA",
+      "location": {
+        "latitude": 57.78909529999999,
+        "longitude": -152.40551309999998
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alaska"
+    },
+    {
+      "placeId": "ChIJs_RTcZJGtlYR2UEPEbgcTm8",
+      "displayName": "N C Machinery Co",
+      "formattedAddress": "128 Chenega Ave #4, Valdez, AK 99686, USA",
+      "location": {
+        "latitude": 61.129322200000004,
+        "longitude": -146.35365700000003
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alaska"
+    },
+    {
+      "placeId": "ChIJM1Cqi4iXyFYRw8fHPeiYWG0",
+      "displayName": "N C Power Systems",
+      "formattedAddress": "6450 Arctic Blvd, Anchorage, AK 99518, USA",
+      "location": {
+        "latitude": 61.16165720000001,
+        "longitude": -149.893596
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alaska"
+    },
+    {
+      "placeId": "ChIJwXOd8P6XyFYRS5HDUWlm03U",
+      "displayName": "Standby Generator",
+      "formattedAddress": "5011 Spenard Rd, Anchorage, AK 99518, USA",
+      "location": {
+        "latitude": 61.174794199999994,
+        "longitude": -149.9431656
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alaska"
+    },
+    {
+      "placeId": "ChIJq1C6ZQDtNFcRnuKmY4LRPRM",
+      "displayName": "FAA Electric Generator",
+      "formattedAddress": "Shishmaref NDB SHH, 365 Unnamed Road, Shishmaref, AK 99772, USA",
+      "location": {
+        "latitude": 66.2586054,
+        "longitude": -166.05253080000003
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alaska"
+    },
+    {
+      "placeId": "ChIJBY5fXI6Ds1YRwLHwRAQmuqI",
+      "displayName": "Blackburn Cabins",
+      "formattedAddress": "Mile 1 Kennicott Wagon Road, McCarthy, AK 99588, USA",
+      "location": {
+        "latitude": 61.443829900000004,
+        "longitude": -142.8976424
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alaska"
+    },
+    {
+      "placeId": "ChIJAQBAsLJVdFMR0eRcZYhGXOo",
+      "displayName": "Pro Energy",
+      "formattedAddress": "101 Clearskye Way Ste 100, Red Deer, AB T4E 0A1, Canada",
+      "location": {
+        "latitude": 52.2108541,
+        "longitude": -113.7888737
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alaska"
+    },
+    {
+      "placeId": "ChIJYyzcz2lNMlERzT6W_WPlXC4",
+      "displayName": "Hector's Welding",
+      "formattedAddress": "701 Finell Dr, North Pole, AK 99705, USA",
+      "location": {
+        "latitude": 64.7602297,
+        "longitude": -147.361337
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alaska"
+    },
+    {
+      "placeId": "ChIJu-sRNQCVLlcRc8eT-rtG3q8",
+      "displayName": "Shaktoolik School Generator",
+      "formattedAddress": "9R33+PV, Shaktoolik, AK 99771, USA",
+      "location": {
+        "latitude": 64.35355729999999,
+        "longitude": -161.19373690000003
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alaska"
+    },
+    {
+      "placeId": "ChIJsx6s00-5D4gRoKsQDP2BQR8",
+      "displayName": "Wabash Power Equipment Company",
+      "formattedAddress": "444 Carpenter Ave, Wheeling, IL 60090, USA",
+      "location": {
+        "latitude": 42.1308985,
+        "longitude": -87.92350200000001
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "generator_rental",
+      "sourceTextQuery": "generator rental companies in Alaska"
+    },
+    {
+      "placeId": "ChIJfy2NBDngAFQRSoKQnZNIIUE",
+      "displayName": "Alaska Electric Light & Power",
+      "formattedAddress": "5601 Tonsgard Ct, Juneau, AK 99801, USA",
+      "location": {
+        "latitude": 58.3546333,
+        "longitude": -134.4959716
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alaska"
+    },
+    {
+      "placeId": "ChIJ-QfU3NKZyFYRWQcQnFDTH9Y",
+      "displayName": "Renewable Energy Systems",
+      "formattedAddress": "145 W Dimond Blvd, Anchorage, AK 99515, USA",
+      "location": {
+        "latitude": 61.1453026,
+        "longitude": -149.8822652
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alaska"
+    },
+    {
+      "placeId": "ChIJk-bZJzzhyFYRCQU-yZJykB0",
+      "displayName": "Renewable Energy Systems",
+      "formattedAddress": "RES of Alaska, 6390 E Fireweed Rd Suite A, Palmer, AK 99645, USA",
+      "location": {
+        "latitude": 61.562233899999995,
+        "longitude": -149.29080439999998
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alaska"
+    },
+    {
+      "placeId": "ChIJ2eWDfMtaMlERvfaebPN9nbo",
+      "displayName": "Renewable Energy Systems",
+      "formattedAddress": "1698 Airport Way, Fairbanks, AK 99701, USA",
+      "location": {
+        "latitude": 64.8373127,
+        "longitude": -147.75327810000002
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alaska"
+    },
+    {
+      "placeId": "ChIJEQb5mcmXyFYRu-W1OcG9zCE",
+      "displayName": "Susitna Energy Solutions, LLC",
+      "formattedAddress": "1432 Ingra St, Anchorage, AK 99501, USA",
+      "location": {
+        "latitude": 61.20809199999999,
+        "longitude": -149.8676577
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alaska"
+    },
+    {
+      "placeId": "ChIJ_____8KXyFYRPTvJ6qY1NkQ",
+      "displayName": "Alaska Energy Authority",
+      "formattedAddress": "813 W Northern Lights Blvd, Anchorage, AK 99503, USA",
+      "location": {
+        "latitude": 61.195697499999994,
+        "longitude": -149.8987323
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alaska"
+    },
+    {
+      "placeId": "ChIJn0chUGXryFYRiPTX2KuQE0c",
+      "displayName": "907 Electric, Inc.",
+      "formattedAddress": "16946 N Eagle River Loop Rd Ste C, Eagle River, AK 99577, USA",
+      "location": {
+        "latitude": 61.32840919999999,
+        "longitude": -149.5656543
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alaska"
+    },
+    {
+      "placeId": "ChIJj27tVJaXyFYRY-bTPihaSnQ",
+      "displayName": "Alaska Village Electric Co-Op",
+      "formattedAddress": "4831 Eagle St, Anchorage, AK 99503, USA",
+      "location": {
+        "latitude": 61.1768896,
+        "longitude": -149.8749843
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alaska"
+    },
+    {
+      "placeId": "ChIJYS-JewebyFYRBBMeW_9uJQQ",
+      "displayName": "Alaska Solar",
+      "formattedAddress": "601 E 57th Pl Ste 103, Anchorage, AK 99518, USA",
+      "location": {
+        "latitude": 61.168947599999996,
+        "longitude": -149.87237969999998
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alaska"
+    },
+    {
+      "placeId": "ChIJ2eGQqOuXyFYRjneQlkttQB4",
+      "displayName": "Alaska Power Association",
+      "formattedAddress": "703 W Tudor Rd #200, Anchorage, AK 99503, USA",
+      "location": {
+        "latitude": 61.181095500000005,
+        "longitude": -149.89627299999998
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alaska"
+    },
+    {
+      "placeId": "ChIJGQ78zWzjyFYRKjti4XmGOYo",
+      "displayName": "PowerTech LLC",
+      "formattedAddress": "11650 E Palmer-Wasilla Hwy, Palmer, AK 99645, USA",
+      "location": {
+        "latitude": 61.5990368,
+        "longitude": -149.15738109999998
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alaska"
+    },
+    {
+      "placeId": "ChIJ45V0bpev_SURhOyRB6xJqD4",
+      "displayName": "Gomez Energy Services Inc",
+      "formattedAddress": "271 W Redoubt Ave, Soldotna, AK 99669, USA",
+      "location": {
+        "latitude": 60.4875263,
+        "longitude": -151.0846485
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alaska"
+    },
+    {
+      "placeId": "ChIJGW3AccOXyFYRIb4JB38cQ-Y",
+      "displayName": "Electric Power Systems",
+      "formattedAddress": "3305 Arctic Blvd #201, Anchorage, AK 99503, USA",
+      "location": {
+        "latitude": 61.190424699999994,
+        "longitude": -149.8976001
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alaska"
+    },
+    {
+      "placeId": "ChIJ9x-vXq8lDFQRTvsdE8M9jiY",
+      "displayName": "Southeast Alaska Power Agency",
+      "formattedAddress": "55 Don Finney Lane, Ketchikan, AK 99901, USA",
+      "location": {
+        "latitude": 55.3600289,
+        "longitude": -131.7009572
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alaska"
+    },
+    {
+      "placeId": "ChIJX0Y9kubdyFYRQbiq41-fCf4",
+      "displayName": "Electric Power Constructors Inc.",
+      "formattedAddress": "3305 Arctic Blvd #201, Anchorage, AK 99503, USA",
+      "location": {
+        "latitude": 61.1904964,
+        "longitude": -149.8974269
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alaska"
+    },
+    {
+      "placeId": "ChIJJ_G1Ku2XyFYRQZFHT6aPlyE",
+      "displayName": "SwitchBoard Alaska",
+      "formattedAddress": "1411 W 33rd Ave, Anchorage, AK 99503, USA",
+      "location": {
+        "latitude": 61.1907086,
+        "longitude": -149.9107446
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "backup_power",
+      "sourceTextQuery": "backup power providers in Alaska"
+    },
+    {
+      "placeId": "ChIJ_YHIhdSZyFYRDIk7BaOPAD4",
+      "displayName": "Raven Electric Inc",
+      "formattedAddress": "8015 Schoon St, Anchorage, AK 99518, USA",
+      "location": {
+        "latitude": 61.14832500000001,
+        "longitude": -149.8752323
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "emergency_generator",
+      "sourceTextQuery": "emergency generator services in Alaska"
+    },
+    {
+      "placeId": "ChIJW6sbnJnfyFYRbVABOkv0BlE",
+      "displayName": "All Phase Electric, LLC",
+      "formattedAddress": "3383 W Coghlan Cir, Wasilla, AK 99654, USA",
+      "location": {
+        "latitude": 61.58206819999999,
+        "longitude": -149.5353017
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "emergency_generator",
+      "sourceTextQuery": "emergency generator services in Alaska"
+    },
+    {
+      "placeId": "ChIJ-3DmwuiXyFYRGm-LlRE-lac",
+      "displayName": "Supreme Electric",
+      "formattedAddress": "2903 Tanglewood Dr, Anchorage, AK 99517, USA",
+      "location": {
+        "latitude": 61.1756405,
+        "longitude": -149.94096389999999
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "emergency_generator",
+      "sourceTextQuery": "emergency generator services in Alaska"
+    },
+    {
+      "placeId": "ChIJu9AWzFiXyFYRmRdUx4VhpfA",
+      "displayName": "49th State Power",
+      "formattedAddress": "7810 Schoon St, Anchorage, AK 99518, USA",
+      "location": {
+        "latitude": 61.149974,
+        "longitude": -149.8762957
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "emergency_generator",
+      "sourceTextQuery": "emergency generator services in Alaska"
+    },
+    {
+      "placeId": "ChIJCwtxeKxjxlYRSnPXI-jzuuA",
+      "displayName": "Statewide Machinery Inc.",
+      "formattedAddress": "21407 Settlers Dr, Chugiak, AK 99567, USA",
+      "location": {
+        "latitude": 59.042686,
+        "longitude": -158.5039512
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "emergency_generator",
+      "sourceTextQuery": "emergency generator services in Alaska"
+    },
+    {
+      "placeId": "ChIJs14RXryXyFYR6NSbPxNsn7g",
+      "displayName": "Hayden Electric Motors Inc.",
+      "formattedAddress": "4191 Old Seward Hwy, Anchorage, AK 99503, USA",
+      "location": {
+        "latitude": 61.1827236,
+        "longitude": -149.86757409999998
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "emergency_generator",
+      "sourceTextQuery": "emergency generator services in Alaska"
+    },
+    {
+      "placeId": "ChIJsxB6ai6XyFYRNMFXSN_Wf1M",
+      "displayName": "Intel Electric LLC",
+      "formattedAddress": "720 W 58th Ave F, Anchorage, AK 99518, USA",
+      "location": {
+        "latitude": 61.1687064,
+        "longitude": -149.8961559
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "emergency_generator",
+      "sourceTextQuery": "emergency generator services in Alaska"
+    },
+    {
+      "placeId": "ChIJY6mWh0fdyFYRFjlmABhTnwI",
+      "displayName": "Supreme Electric LLC",
+      "formattedAddress": "6841 Weswood Dr, Palmer, AK 99645, USA",
+      "location": {
+        "latitude": 61.597848400000004,
+        "longitude": -149.27830889999998
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "emergency_generator",
+      "sourceTextQuery": "emergency generator services in Alaska"
+    },
+    {
+      "placeId": "ChIJ5wo5bA1QPW4RTditOqgSQ2E",
+      "displayName": "Pacific Electric LLC",
+      "formattedAddress": "680 Falkirk Cir, Wasilla, AK 99654, USA",
+      "location": {
+        "latitude": 61.62262319999999,
+        "longitude": -149.43215709999998
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "emergency_generator",
+      "sourceTextQuery": "emergency generator services in Alaska"
+    },
+    {
+      "placeId": "ChIJ8darS2d5xlYR5E8xpSJbZwk",
+      "displayName": "Superior Electric Motor Services",
+      "formattedAddress": "43215 Kenai Spur Hwy, Kenai, AK 99611, USA",
+      "location": {
+        "latitude": 60.606354700000004,
+        "longitude": -151.335277
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "emergency_generator",
+      "sourceTextQuery": "emergency generator services in Alaska"
+    },
+    {
+      "placeId": "ChIJ7_kG6z6XyFYROGhXBOctAIg",
+      "displayName": "AKE Electric Services LLC",
+      "formattedAddress": "1569 Bragaw St Ste 211, Anchorage, AK 99508, USA",
+      "location": {
+        "latitude": 61.206564799999995,
+        "longitude": -149.8075575
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "emergency_generator",
+      "sourceTextQuery": "emergency generator services in Alaska"
+    },
+    {
+      "placeId": "ChIJ_1ojboWXyFYRI4nETHq9WSk",
+      "displayName": "United Electric Motors",
+      "formattedAddress": "106 E Dowling Rd, Anchorage, AK 99518, USA",
+      "location": {
+        "latitude": 61.16594399999999,
+        "longitude": -149.88135330000003
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "emergency_generator",
+      "sourceTextQuery": "emergency generator services in Alaska"
+    },
+    {
+      "placeId": "ChIJ8U6psMvbyFYRORhoK98Oc3U",
+      "displayName": "Primary Electric",
+      "formattedAddress": "7362 W Parks Hwy Ste 807, Wasilla, AK 99623, USA",
+      "location": {
+        "latitude": 61.581583,
+        "longitude": -149.6350195
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "emergency_generator",
+      "sourceTextQuery": "emergency generator services in Alaska"
+    },
+    {
+      "placeId": "ChIJzy-aLADj0lAR_ISOMMFHrsk",
+      "displayName": "Selawik Electric",
+      "formattedAddress": "JX4M+GX, Selawik, AK 99770, USA",
+      "location": {
+        "latitude": 66.6063188,
+        "longitude": -160.01522029999998
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "emergency_generator",
+      "sourceTextQuery": "emergency generator services in Alaska"
+    },
+    {
+      "placeId": "ChIJ_-j0NABj-lYR0RFJHRGOWEY",
+      "displayName": "Ivanof Bay Electric Plant",
+      "formattedAddress": "WG26+9F, ANCHORAGE, AK 99695, USA",
+      "location": {
+        "latitude": 55.901222499999996,
+        "longitude": -159.4893012
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "emergency_generator",
+      "sourceTextQuery": "emergency generator services in Alaska"
+    },
+    {
+      "placeId": "ChIJdS5oIagHuGIR-JudBqVB_dQ",
+      "displayName": "Mountain State Electrical and Fire Alarm Services LLC",
+      "formattedAddress": "14231 Jarvi Dr, Anchorage, AK 99515, USA",
+      "location": {
+        "latitude": 61.09229800000001,
+        "longitude": -149.84614689999998
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "emergency_generator",
+      "sourceTextQuery": "emergency generator services in Alaska"
+    },
+    {
+      "placeId": "ChIJO-KPKXSXyFYRiozvCgIP6R8",
+      "displayName": "Moore Heating",
+      "formattedAddress": "1801 E Dowling Rd, Anchorage, AK 99507, USA",
+      "location": {
+        "latitude": 61.166733300000004,
+        "longitude": -149.847951
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "emergency_generator",
+      "sourceTextQuery": "emergency generator services in Alaska"
+    },
+    {
+      "placeId": "ChIJ_____z-SyFYR0v3y5KWu2I4",
+      "displayName": "Alaska Electrical Maintenance Services",
+      "formattedAddress": "Anchorage, AK 99505, USA",
+      "location": {
+        "latitude": 61.201098099999996,
+        "longitude": -149.5425156
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "emergency_generator",
+      "sourceTextQuery": "emergency generator services in Alaska"
+    },
+    {
+      "placeId": "ChIJr0Dxl2eJJFcRnq1GNwAHNuA",
+      "displayName": "AVEC Generator Plant (ELECTRIC)",
+      "formattedAddress": "32186, Mountain Village, AK 99632, USA",
+      "location": {
+        "latitude": 62.085398600000005,
+        "longitude": -163.7292932
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "emergency_generator",
+      "sourceTextQuery": "emergency generator services in Alaska"
+    },
+    {
+      "placeId": "ChIJQZiHehxjxlYRGi9DnvklUR8",
+      "displayName": "Big G Electric",
+      "formattedAddress": "42005 Kalifornsky Beach Rd, Soldotna, AK 99669, USA",
+      "location": {
+        "latitude": 60.5085314,
+        "longitude": -151.1680686
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "emergency_generator",
+      "sourceTextQuery": "emergency generator services in Alaska"
+    },
+    {
+      "placeId": "ChIJA8riIQAfNFcRWDwQ4gEqeiQ",
+      "displayName": "Brevig Mission School Generator",
+      "formattedAddress": "2 Mission St, Brevig Mission, AK 99785, USA",
+      "location": {
+        "latitude": 65.3330577,
+        "longitude": -166.48831479999998
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "emergency_generator",
+      "sourceTextQuery": "emergency generator services in Alaska"
+    },
+    {
+      "placeId": "ChIJXXY-fwDxqlcRezZwC3eRjq0",
+      "displayName": "Hydro Generator",
+      "formattedAddress": "89 Boardwalk, Akutan, AK 99553, USA",
+      "location": {
+        "latitude": 54.1351356,
+        "longitude": -165.7705541
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "emergency_generator",
+      "sourceTextQuery": "emergency generator services in Alaska"
+    },
+    {
+      "placeId": "ChIJYW5COY-XyFYR_20jR4_BWSg",
+      "displayName": "GMW Fire Protection",
+      "formattedAddress": "6108 MacKay St, Anchorage, AK 99518, USA",
+      "location": {
+        "latitude": 61.165024100000004,
+        "longitude": -149.8887905
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "emergency_generator",
+      "sourceTextQuery": "emergency generator services in Alaska"
+    },
+    {
+      "placeId": "ChIJ8SpeEwA5LVcRjiiB7rpNQSM",
+      "displayName": "Buckland DOT Generators",
+      "formattedAddress": "XVFC+42, Buckland, AK, USA",
+      "location": {
+        "latitude": 65.9788433,
+        "longitude": -161.1456465
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "emergency_generator",
+      "sourceTextQuery": "emergency generator services in Alaska"
+    },
+    {
+      "placeId": "ChIJ2zxQbQAdNFcRwBlxRCEzsjQ",
+      "displayName": "School Backup Generator",
+      "formattedAddress": "545 Tundra St, Teller, AK 99778, USA",
+      "location": {
+        "latitude": 65.26486899999999,
+        "longitude": -166.36581579999998
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "emergency_generator",
+      "sourceTextQuery": "emergency generator services in Alaska"
+    },
+    {
+      "placeId": "ChIJT1KZicaLNFER4EwmfH-zlWg",
+      "displayName": "P & E Small Engine Repair",
+      "formattedAddress": "2161 Sandland Dr, Delta Junction, AK 99737, USA",
+      "location": {
+        "latitude": 64.0580847,
+        "longitude": -145.4823199
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "emergency_generator",
+      "sourceTextQuery": "emergency generator services in Alaska"
+    },
+    {
+      "placeId": "ChIJsT_2XQAf51YRJ6rQ-6HeAQ4",
+      "displayName": "Clark Point Electric Company",
+      "formattedAddress": "11 Main St, Clark's Point, AK 99569, USA",
+      "location": {
+        "latitude": 58.8345947,
+        "longitude": -158.544465
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "emergency_generator",
+      "sourceTextQuery": "emergency generator services in Alaska"
+    },
+    {
+      "placeId": "ChIJjQOtsdzAYVMRgKJX92Vvxfw",
+      "displayName": "Northwest Generators",
+      "formattedAddress": "6640 N Government Wy A, Coeur d'Alene, ID 83815, USA",
+      "location": {
+        "latitude": 47.7321283,
+        "longitude": -116.78625849999999
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "emergency_generator",
+      "sourceTextQuery": "emergency generator services in Alaska"
+    },
+    {
+      "placeId": "ChIJxwtTn45GtlYRyiL7fswgLZU",
+      "displayName": "N C Power Systems Co",
+      "formattedAddress": "254 Fidalgo St, Valdez, AK 99686, USA",
+      "location": {
+        "latitude": 61.1249668,
+        "longitude": -146.3554833
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "emergency_generator",
+      "sourceTextQuery": "emergency generator services in Alaska"
+    },
+    {
+      "placeId": "ChIJWfyeO4iXyFYRbKuGRb_qTrM",
+      "displayName": "Rural Energy Enterprises",
+      "formattedAddress": "6637 Arctic Spur Rd, Anchorage, AK 99518, USA",
+      "location": {
+        "latitude": 61.160042,
+        "longitude": -149.8951696
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "industrial_generator",
+      "sourceTextQuery": "industrial generator providers in Alaska"
+    },
+    {
+      "placeId": "ChIJQ0LxyT-XyFYR8_O55UItzdQ",
+      "displayName": "Alaska Motorsports & Equipment",
+      "formattedAddress": "3054 Commercial Dr #3017, Anchorage, AK 99501, USA",
+      "location": {
+        "latitude": 61.2238483,
+        "longitude": -149.8235502
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "industrial_generator",
+      "sourceTextQuery": "industrial generator providers in Alaska"
+    },
+    {
+      "placeId": "ChIJuUKG9WR7xlYRksI2nMNCIZU",
+      "displayName": "GLM Turbines",
+      "formattedAddress": "420 N Willow St, Kenai, AK 99611, USA",
+      "location": {
+        "latitude": 60.56637539999999,
+        "longitude": -151.24176
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "industrial_generator",
+      "sourceTextQuery": "industrial generator providers in Alaska"
+    },
+    {
+      "placeId": "ChIJjSE58oibx1YRAP0CA6xjxWI",
+      "displayName": "Seward Heavy Industrial Power",
+      "formattedAddress": "1806 Alameda Rd, Seward, AK 99664, USA",
+      "location": {
+        "latitude": 60.1244969,
+        "longitude": -149.4322592
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "industrial_generator",
+      "sourceTextQuery": "industrial generator providers in Alaska"
+    },
+    {
+      "placeId": "ChIJm7Rdz4HeyFYRue2QU7XtcZs",
+      "displayName": "N C Machinery",
+      "formattedAddress": "6450 Arctic Blvd, Anchorage, AK 99518, USA",
+      "location": {
+        "latitude": 61.1610776,
+        "longitude": -149.8928772
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "industrial_generator",
+      "sourceTextQuery": "industrial generator providers in Alaska"
+    },
+    {
+      "placeId": "ChIJ7Yv5hRuZyFYRXk4Zmtdeeaw",
+      "displayName": "High Standard Power Systems, LLC",
+      "formattedAddress": "7810 Schoon St, Anchorage, AK 99518, USA",
+      "location": {
+        "latitude": 61.149974,
+        "longitude": -149.8762957
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "industrial_generator",
+      "sourceTextQuery": "industrial generator providers in Alaska"
+    },
+    {
+      "placeId": "ChIJVwZlr5CZyFYRSF_hZjui9tY",
+      "displayName": "Engineered Equipment Co-Alaska",
+      "formattedAddress": "12501 Old Seward Hwy Unit a, Anchorage, AK 99515, USA",
+      "location": {
+        "latitude": 61.10745310000001,
+        "longitude": -149.8611087
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "industrial_generator",
+      "sourceTextQuery": "industrial generator providers in Alaska"
+    },
+    {
+      "placeId": "ChIJM-pNfFNvxFAR-n2iasSZd2M",
+      "displayName": "Wainwright Power Plant",
+      "formattedAddress": "121 Summer Rd, Wainwright, AK 99782, USA",
+      "location": {
+        "latitude": 70.6420904,
+        "longitude": -160.0183746
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "industrial_generator",
+      "sourceTextQuery": "industrial generator providers in Alaska"
+    },
+    {
+      "placeId": "ChIJXew1HAZbMlERoZLMRf3xjeg",
+      "displayName": "Alaska PowerCom Supply",
+      "formattedAddress": "1001 Van Horn Rd, Fairbanks, AK 99701, USA",
+      "location": {
+        "latitude": 64.81254400000002,
+        "longitude": -147.7257473
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "industrial_generator",
+      "sourceTextQuery": "industrial generator providers in Alaska"
+    },
+    {
+      "placeId": "ChIJpVf1dWuWyFYR4ZnB4IusfXU",
+      "displayName": "Anchorage Suzuki Arctic Cat",
+      "formattedAddress": "3017 3054 Commercial Dr, Anchorage, AK 99501, USA",
+      "location": {
+        "latitude": 61.223836,
+        "longitude": -149.8236612
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "industrial_generator",
+      "sourceTextQuery": "industrial generator providers in Alaska"
+    },
+    {
+      "placeId": "ChIJMZp2NeZckFQRaFJk0qHLT1c",
+      "displayName": "N C Power Systems",
+      "formattedAddress": "17900 W Valley Hwy, Tukwila, WA 98188, USA",
+      "location": {
+        "latitude": 47.442228199999995,
+        "longitude": -122.2449304
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "industrial_generator",
+      "sourceTextQuery": "industrial generator providers in Alaska"
+    },
+    {
+      "placeId": "ChIJ2VK-1GR7tVYRvQfg7iaYIg0",
+      "displayName": "HAARP Research Facility",
+      "formattedAddress": "11.3 mile, Tok Cutoff, Gakona, AK 99586, USA",
+      "location": {
+        "latitude": 62.39105180000001,
+        "longitude": -145.1317403
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "industrial_generator",
+      "sourceTextQuery": "industrial generator providers in Alaska"
+    },
+    {
+      "placeId": "ChIJg6JJzPPDYVMRshh4FXQytnA",
+      "displayName": "Kilowatts Power Solutions",
+      "formattedAddress": "804 N Lincoln St, Post Falls, ID 83854, USA",
+      "location": {
+        "latitude": 47.715797800000004,
+        "longitude": -116.9400215
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "industrial_generator",
+      "sourceTextQuery": "industrial generator providers in Alaska"
+    },
+    {
+      "placeId": "ChIJjeTxS5RaMlERD7dSvX8TLLA",
+      "displayName": "ABS Alaskan Inc.",
+      "formattedAddress": "2130 Van Horn Rd, Fairbanks, AK 99701, USA",
+      "location": {
+        "latitude": 64.81331,
+        "longitude": -147.76891990000001
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "industrial_generator",
+      "sourceTextQuery": "industrial generator providers in Alaska"
+    },
+    {
+      "placeId": "ChIJo6VjDJynlVQR9VZ_ZFiRvYI",
+      "displayName": "Power Systems West",
+      "formattedAddress": "1805 NW 21st Ave, Portland, OR 97209, USA",
+      "location": {
+        "latitude": 45.535669299999995,
+        "longitude": -122.6949731
+      },
+      "stateCode": "AK",
+      "stateName": "Alaska",
+      "searchCategory": "industrial_generator",
+      "sourceTextQuery": "industrial generator providers in Alaska"
+    }
+  ]
+}
