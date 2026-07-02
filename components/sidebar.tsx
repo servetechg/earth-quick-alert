@@ -5,9 +5,7 @@ import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import {
   LayoutDashboard,
-  AlertCircle,
   Bell,
-  Map,
   Users,
   Brain,
   ClipboardList,
@@ -37,8 +35,6 @@ import { notifyAuthSessionChanged } from '@/lib/sync-client-user-profile'
 
 export const menuItems = [
   { icon: LayoutDashboard, label: 'Dashboard', href: '/admin-dashboard' },
-  // { icon: AlertCircle, label: 'Emergency Events', href: '/emergency-events' },
-  // { icon: Map, label: 'GIS & Mapping', href: '/gis-mapping' },
   { icon: Bell, label: 'Alerts & Communication', href: '/alerts-communication' },
   { icon: ScrollText, label: 'Disaster Surveys', href: '/disaster-surveys' },
   { icon: ClipboardList, label: 'After Action Review', href: '/after-action-review' },
@@ -127,7 +123,7 @@ export function Sidebar({ className }: { className?: string }) {
             menuItems[1],
             { icon: ScrollText, label: 'Disaster Surveys', href: '/disaster-surveys' },
             { icon: Sparkles, label: 'AI Risk Assessment', href: '/ai-risk-assessment' },
-            ...menuItems.slice(2),
+            ...menuItems.slice(3),
           ]
         : isOperationalAdmin
           ? [
@@ -177,7 +173,7 @@ export function Sidebar({ className }: { className?: string }) {
 
               return (
                 <Link
-                  key={item.label}
+                  key={item.href}
                   href={item.href}
                   className={cn(
                     'w-full flex items-center gap-3 px-5 py-3 rounded-xl text-left transition-all duration-200 group',

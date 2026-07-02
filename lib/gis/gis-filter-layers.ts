@@ -136,7 +136,6 @@ export const OPERATIONAL_MAP_LAYERS = [
   { id: 'weather', label: 'Weather Radar', Icon: CloudRain, color: '#3B82F6' },
   { id: 'risk', label: 'Risk Areas', Icon: AlertTriangle, color: '#0EA5E9' },
   { id: 'flood', label: 'Flood Zones', Icon: Waves, color: '#A41E22' },
-  { id: 'power', label: 'Power Outages', Icon: Zap, color: '#EAB308' },
   { id: 'water', label: 'Water Issues', Icon: Droplets, color: '#0EA5E9' },
   { id: 'resources', label: 'Resource Sites', Icon: Boxes, color: '#16A34A' },
   { id: 'incidents', label: 'Incident Reports', Icon: AlertOctagon, color: '#DC2626' },

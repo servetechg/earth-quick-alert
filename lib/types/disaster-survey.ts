@@ -1,15 +1,3 @@
-export const DISASTER_SURVEY_CATEGORY_IDS = [
-    'personal_household',
-    'health_medical',
-    'shelter_lodging',
-    'food_supplies',
-    'pets_livestock',
-    'transportation',
-    'other_assistance',
-] as const;
-
-export type DisasterSurveyCategoryId = (typeof DISASTER_SURVEY_CATEGORY_IDS)[number];
-
 export const DISASTER_IMMEDIATE_NEED_IDS = [
     'rescue_evacuation',
     'lodging_hotel',

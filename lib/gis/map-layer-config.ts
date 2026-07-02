@@ -8,7 +8,7 @@ import {
   CRITICAL_INFRASTRUCTURE_SECTORS,
   type CriticalInfraSectorId,
 } from '@/lib/gis/critical-infrastructure-sectors'
-import { AlertTriangle, Construction, Droplets, FlaskConical, Fuel, Home, Landmark, Pill, Siren } from 'lucide-react'
+import { AlertTriangle, Construction, Droplets, FlaskConical, Fuel, Home, Landmark, Pill, Siren, Zap } from 'lucide-react'
 
 export type { GisFilterLayerDef } from '@/lib/gis/gis-filter-layers'
 
@@ -52,6 +52,15 @@ export const ROAD_CLOSURES_MAP_LAYER: MapLayerDef = {
   Icon: Construction,
   color: '#DC2626',
   markerIcon: 'road_closure',
+}
+
+/** ODIN county-level utility outages (DOE-OE / ORNL). */
+export const POWER_OUTAGES_MAP_LAYER: MapLayerDef = {
+  id: 'power',
+  label: 'Power Outages',
+  Icon: Zap,
+  color: '#22C55E',
+  markerIcon: 'power_outage',
 }
 
 /** Demo — post-disaster zones A/B/C (Arkansas tornado scenario). */
@@ -228,6 +237,7 @@ export function buildDefaultMapLayerState(opts?: {
   defaults[PHARMACIES_MAP_LAYER.id] = false
   defaults[POLICE_STATIONS_MAP_LAYER.id] = false
   defaults[ROAD_CLOSURES_MAP_LAYER.id] = false
+  defaults[POWER_OUTAGES_MAP_LAYER.id] = false
   return defaults
 }
 
@@ -255,5 +265,6 @@ export function buildDemoMapLayerState(opts?: {
     })
   }
   state[ROAD_CLOSURES_MAP_LAYER.id] = true
+  state[POWER_OUTAGES_MAP_LAYER.id] = true
   return state
 }
