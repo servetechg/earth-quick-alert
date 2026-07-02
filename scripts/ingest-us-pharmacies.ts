@@ -6,7 +6,6 @@
  *   npx tsx scripts/ingest-us-pharmacies.ts path/to/custom-pharmacies.json
  */
 import 'dotenv/config';
-import { unlink } from 'node:fs/promises';
 import {
     defaultUsPharmaciesJsonPath,
     ingestUsPharmaciesFromFile,
@@ -17,11 +16,6 @@ async function main() {
     const result = await ingestUsPharmaciesFromFile(filePath);
 
     console.log(JSON.stringify(result, null, 2));
-
-    if (filePath.endsWith('us-pharmacies.json')) {
-        await unlink(filePath);
-        console.log(JSON.stringify({ removedSourceFile: filePath }, null, 2));
-    }
 }
 
 main().catch((err) => {

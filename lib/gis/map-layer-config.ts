@@ -8,7 +8,7 @@ import {
   CRITICAL_INFRASTRUCTURE_SECTORS,
   type CriticalInfraSectorId,
 } from '@/lib/gis/critical-infrastructure-sectors'
-import { AlertTriangle, Construction, Droplets, FlaskConical, Fuel, Home, Landmark, Pill, Siren } from 'lucide-react'
+import { AlertTriangle, Construction, Droplets, FlaskConical, Fuel, Home, Landmark, Pill, Server, Siren, UtensilsCrossed, Users, Zap, Boxes } from 'lucide-react'
 
 export type { GisFilterLayerDef } from '@/lib/gis/gis-filter-layers'
 
@@ -29,7 +29,10 @@ export const GIS_FILTER_MAP_LAYERS: MapLayerDef[] = ALL_GIS_FILTER_LAYERS.map((l
   label: layer.label,
   Icon: layer.Icon,
   color: layer.color,
-  isGooglePlace: layer.fetch.mode !== 'deployment',
+  isGooglePlace:
+    layer.fetch.mode === 'google_nearby' ||
+    layer.fetch.mode === 'google_text' ||
+    layer.fetch.mode === 'google_composite',
   placeType: layer.resultType,
   resultType: layer.resultType,
   markerIcon: layer.markerIcon,
@@ -107,6 +110,51 @@ export const POLICE_STATIONS_MAP_LAYER = {
   markerIcon: 'police',
 } as const
 
+/** Mongo-backed US food distribution / Meals Ready locations. */
+export const MEALS_READY_MAP_LAYER = {
+  id: 'meals_ready',
+  label: 'Meals Ready',
+  Icon: UtensilsCrossed,
+  color: '#D74C30',
+  markerIcon: 'meals',
+} as const
+
+/** Mongo-backed US generator rental / supplier locations. */
+export const GENERATORS_MAP_LAYER = {
+  id: 'generators',
+  label: 'Generators',
+  Icon: Zap,
+  color: '#E5A436',
+  markerIcon: 'generator',
+} as const
+
+/** Mongo-backed US volunteer coordination centers. */
+export const VOLUNTEERS_MAP_LAYER = {
+  id: 'volunteers',
+  label: 'Volunteers',
+  Icon: Users,
+  color: '#5C7E2D',
+  markerIcon: 'volunteers',
+} as const
+
+/** Mongo-backed US emergency resource sites (Google Places text search ingest). */
+export const RESOURCE_SITES_MAP_LAYER = {
+  id: 'resources',
+  label: 'Resource Sites',
+  Icon: Boxes,
+  color: '#16A34A',
+  markerIcon: 'resource',
+} as const
+
+/** Mongo-backed US information technology infrastructure locations. */
+export const IT_INFRASTRUCTURE_MAP_LAYER = {
+  id: 'ci_it',
+  label: 'Information Technology (IT)',
+  Icon: Server,
+  color: '#8B5CF6',
+  markerIcon: 'it',
+} as const
+
 /** HIFLD Next situational facility layers (hospitals, fire/EMS). */
 export { HIFLD_OPERATIONAL_MAP_LAYERS }
 
@@ -116,6 +164,11 @@ export const OPEN_SOURCE_MAP_LAYERS = [
   FUEL_SITES_MAP_LAYER,
   PHARMACIES_MAP_LAYER,
   POLICE_STATIONS_MAP_LAYER,
+  MEALS_READY_MAP_LAYER,
+  GENERATORS_MAP_LAYER,
+  VOLUNTEERS_MAP_LAYER,
+  RESOURCE_SITES_MAP_LAYER,
+  IT_INFRASTRUCTURE_MAP_LAYER,
 ] as const
 
 /** HIFLD Next sectors available on the map (Mongo and/or live fallback). */
@@ -167,6 +220,11 @@ export type InfrastructureClusterMode =
   | 'fuel'
   | 'pharmacies'
   | 'police'
+  | 'meals'
+  | 'generators'
+  | 'volunteers'
+  | 'resources'
+  | 'it'
   | 'chemical'
   | 'financial'
   | 'roads'
@@ -182,6 +240,11 @@ export function resolveInfrastructureClusterMode(
   if (mapLayers.fuel_sites) return 'fuel'
   if (mapLayers.pharmacies) return 'pharmacies'
   if (mapLayers.police) return 'police'
+  if (mapLayers.meals_ready) return 'meals'
+  if (mapLayers.generators) return 'generators'
+  if (mapLayers.volunteers) return 'volunteers'
+  if (mapLayers.resources) return 'resources'
+  if (mapLayers.ci_it) return 'it'
   if (mapLayers.ci_chemical) return 'chemical'
   if (mapLayers.ci_financial) return 'financial'
   if (HIFLD_NEXT_IMPLEMENTED_SECTOR_IDS.some((id) => mapLayers[id])) return 'critical-infra'
@@ -227,6 +290,11 @@ export function buildDefaultMapLayerState(opts?: {
   defaults[FUEL_SITES_MAP_LAYER.id] = false
   defaults[PHARMACIES_MAP_LAYER.id] = false
   defaults[POLICE_STATIONS_MAP_LAYER.id] = false
+  defaults[MEALS_READY_MAP_LAYER.id] = false
+  defaults[GENERATORS_MAP_LAYER.id] = false
+  defaults[VOLUNTEERS_MAP_LAYER.id] = false
+  defaults[RESOURCE_SITES_MAP_LAYER.id] = false
+  defaults[IT_INFRASTRUCTURE_MAP_LAYER.id] = false
   defaults[ROAD_CLOSURES_MAP_LAYER.id] = false
   return defaults
 }

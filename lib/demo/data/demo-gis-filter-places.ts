@@ -115,6 +115,13 @@ const VOLUNTEER_SEEDS: DemoSiteSeed[] = [
   { name: 'Beebe Volunteer Coordination Center', lat: 35.064, lng: -91.887, vicinity: 'Beebe, AR' },
 ]
 
+const IT_SEEDS: DemoSiteSeed[] = [
+  { name: 'Arkansas Department of Information Systems', lat: 34.746, lng: -92.275, vicinity: 'Little Rock, AR' },
+  { name: 'UA Office of Information Technology', lat: 34.739, lng: -92.341, vicinity: 'Little Rock, AR' },
+  { name: 'NLR Technology Operations Center', lat: 34.771, lng: -92.262, vicinity: 'North Little Rock, AR' },
+  { name: 'Beebe County Technology Center', lat: 35.067, lng: -91.891, vicinity: 'Beebe, AR' },
+]
+
 /** Arkansas GIS filter facilities for the Little Rock EF-3 presentation demo. */
 export const DEMO_GIS_FILTER_PLACES: InfrastructurePlaceResult[] = [
   ...seedPlaces(HOSPITAL_SEEDS, 'hospital', 'hosp'),
@@ -126,6 +133,7 @@ export const DEMO_GIS_FILTER_PLACES: InfrastructurePlaceResult[] = [
   ...seedPlaces(POWER_CREW_SEEDS, 'power_crews', 'power'),
   ...seedPlaces(WATER_CREW_SEEDS, 'water_crews', 'water'),
   ...seedPlaces(VOLUNTEER_SEEDS, 'volunteers', 'vol'),
+  ...seedPlaces(IT_SEEDS, 'it_infrastructure', 'it'),
 ]
 
 function pointInBounds(lat: number, lng: number, bounds: MapBounds): boolean {

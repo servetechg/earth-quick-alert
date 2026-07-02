@@ -36,7 +36,8 @@ import {
     SUB_ADMIN_MIN_ZOOM,
     viewportExceedsBounds,
 } from '@/lib/gis/situational-map-utils';
-import { buildLeafletMarkerIcon, chemicalClusterIcon, clusterIcon, criticalInfraClusterIcon, damClusterIcon, financialClusterIcon, fuelClusterIcon, heatIncidentPinIcon, pharmacyClusterIcon, policeClusterIcon, roadClosureClusterIcon, shelterClusterIcon } from '@/lib/gis/situational-map-marker-icons';
+import { buildLeafletMarkerIcon, chemicalClusterIcon, clusterIcon, criticalInfraClusterIcon, damClusterIcon, financialClusterIcon, fuelClusterIcon, generatorClusterIcon, heatIncidentPinIcon, itClusterIcon, mealsClusterIcon, pharmacyClusterIcon, policeClusterIcon, resourceClusterIcon, roadClosureClusterIcon, shelterClusterIcon, volunteerClusterIcon } from '@/lib/gis/situational-map-marker-icons';
+import type { InfrastructureClusterMode } from '@/lib/gis/map-layer-config';
 import type { UnifiedEventHeatPoint } from '@/lib/geo/unified-event-heatmap';
 
 export type {
@@ -235,7 +236,7 @@ function InfrastructureClusterLayer({
     markers: SituationalMapMarker[];
     enabled: boolean;
     onSelect: (m: SituationalMapMarker) => void;
-    clusterMode?: 'default' | 'dams' | 'shelters' | 'fuel' | 'pharmacies' | 'police' | 'chemical' | 'financial' | 'roads' | 'critical-infra';
+    clusterMode?: InfrastructureClusterMode;
 }) {
     const map = useMap();
     const groupRef = useRef<L.MarkerClusterGroup | null>(null);
@@ -253,6 +254,11 @@ function InfrastructureClusterLayer({
         const isFuel = clusterMode === 'fuel';
         const isPharmacies = clusterMode === 'pharmacies';
         const isPolice = clusterMode === 'police';
+        const isMeals = clusterMode === 'meals';
+        const isGenerators = clusterMode === 'generators';
+        const isVolunteers = clusterMode === 'volunteers';
+        const isResources = clusterMode === 'resources';
+        const isIt = clusterMode === 'it';
         const isChemical = clusterMode === 'chemical';
         const isFinancial = clusterMode === 'financial';
         const isCriticalInfra = clusterMode === 'critical-infra';
@@ -263,6 +269,11 @@ function InfrastructureClusterLayer({
             isFuel ||
             isPharmacies ||
             isPolice ||
+            isMeals ||
+            isGenerators ||
+            isVolunteers ||
+            isResources ||
+            isIt ||
             isChemical ||
             isFinancial ||
             isCriticalInfra;
@@ -284,13 +295,23 @@ function InfrastructureClusterLayer({
                       ? (cluster) => pharmacyClusterIcon(cluster.getChildCount())
                       : isPolice
                         ? (cluster) => policeClusterIcon(cluster.getChildCount())
-                        : isChemical
-                          ? (cluster) => chemicalClusterIcon(cluster.getChildCount())
-                          : isFinancial
-                            ? (cluster) => financialClusterIcon(cluster.getChildCount())
-                            : isCriticalInfra
-                              ? (cluster) => criticalInfraClusterIcon(cluster.getChildCount())
-                              : () => clusterIcon(),
+                        : isMeals
+                          ? (cluster) => mealsClusterIcon(cluster.getChildCount())
+                          : isGenerators
+                            ? (cluster) => generatorClusterIcon(cluster.getChildCount())
+                            : isVolunteers
+                              ? (cluster) => volunteerClusterIcon(cluster.getChildCount())
+                              : isResources
+                                ? (cluster) => resourceClusterIcon(cluster.getChildCount())
+                              : isIt
+                                ? (cluster) => itClusterIcon(cluster.getChildCount())
+                                : isChemical
+                                  ? (cluster) => chemicalClusterIcon(cluster.getChildCount())
+                                  : isFinancial
+                                    ? (cluster) => financialClusterIcon(cluster.getChildCount())
+                                    : isCriticalInfra
+                                      ? (cluster) => criticalInfraClusterIcon(cluster.getChildCount())
+                                      : () => clusterIcon(),
         });
 
         for (const marker of markers) {

@@ -428,7 +428,9 @@ export async function fetchGoogleFilterLayerPlaces(
     layers: GisFilterLayerDef[],
     viewportBounds?: MapBounds | null,
 ): Promise<InfrastructurePlaceResult[]> {
-    const googleLayers = layers.filter((l) => l.fetch.mode !== 'deployment')
+    const googleLayers = layers.filter(
+        (l) => l.fetch.mode !== 'deployment' && l.fetch.mode !== 'mongo',
+    )
     if (googleLayers.length === 0) return []
 
     const fetchScope = resolveFetchScope(scope, viewportBounds)
@@ -478,7 +480,9 @@ export async function fetchInfrastructurePlacesForLayers(
     const cachedMem = await cacheGetJson<InfrastructurePlaceResult[]>(memKey)
 
     const byId = new Map<string, InfrastructurePlaceResult>()
-    const googleLayers = layers.filter((l) => l.fetch.mode !== 'deployment')
+    const googleLayers = layers.filter(
+        (l) => l.fetch.mode !== 'deployment' && l.fetch.mode !== 'mongo',
+    )
 
     if (cachedMem?.length) {
         for (const place of cachedMem) byId.set(place.place_id, place)

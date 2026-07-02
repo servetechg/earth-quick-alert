@@ -13,6 +13,7 @@ import ResponderFoodLogisticsDeployment from '@/models/ResponderFoodLogisticsDep
 import ResponderNonprofitDeployment from '@/models/ResponderNonprofitDeployment'
 import mongoose from 'mongoose'
 import { rankPlacesForViewport } from '@/lib/gis/viewport-place-ranking'
+import { fetchMongoGisFilterLayerPlaces } from '@/lib/gis/static-mongo-filter-places-fetch'
 
 type SiteRow = {
     id: string
@@ -133,9 +134,6 @@ async function sitesForDeploymentKind(
 
 function deploymentKindsForLayer(layer: GisFilterLayerDef): DeploymentResourceKind[] {
     if (layer.fetch.mode === 'deployment') return [layer.fetch.deployment]
-    if (layer.id === 'generators') return ['generators']
-    if (layer.id === 'meals_ready') return ['meals_ready']
-    if (layer.id === 'fuel_sites') return ['fuel_sites']
     return []
 }
 
@@ -181,13 +179,16 @@ export async function fetchAllFilterLayerPlaces(
         '@/lib/gis/infrastructure-places-fetch'
     )
 
-    const [googlePlaces, deploymentPlaces] = await Promise.all([
+    const [googlePlaces, deploymentPlaces, mongoPlaces] = await Promise.all([
         fetchInfrastructurePlacesForLayers(scope, layers, opts),
         fetchDeploymentResourcePlaces(scope, layers, opts),
+        fetchMongoGisFilterLayerPlaces(scope, layers, {
+            stateKey: opts?.jurisdiction?.stateCode ?? undefined,
+        }),
     ])
 
     const byId = new Map<string, InfrastructurePlaceResult>()
-    for (const place of [...googlePlaces, ...deploymentPlaces]) {
+    for (const place of [...googlePlaces, ...deploymentPlaces, ...mongoPlaces]) {
         if (!byId.has(place.place_id)) byId.set(place.place_id, place)
     }
 

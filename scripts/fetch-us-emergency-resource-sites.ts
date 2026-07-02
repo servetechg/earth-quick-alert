@@ -1,19 +1,19 @@
 /**
- * Fetch U.S. generator-related locations via Google Places API (New) Text Search.
+ * Fetch U.S. emergency resource site listings via Google Places API (New) Text Search.
  *
  * Usage:
- *   GOOGLE_MAPS_API_KEY=... npx tsx scripts/fetch-us-generator-locations.ts --limit 2
- *   GOOGLE_MAPS_API_KEY=... npx tsx scripts/fetch-us-generator-locations.ts --states AL,AK
- *   GOOGLE_MAPS_API_KEY=... npx tsx scripts/fetch-us-generator-locations.ts --continue
+ *   GOOGLE_MAPS_API_KEY=... npx tsx scripts/fetch-us-emergency-resource-sites.ts --limit 2
+ *   GOOGLE_MAPS_API_KEY=... npx tsx scripts/fetch-us-emergency-resource-sites.ts --states AL,AK
+ *   GOOGLE_MAPS_API_KEY=... npx tsx scripts/fetch-us-emergency-resource-sites.ts --continue
  *
- * Output: data/us-generator-locations.json (single file, append-friendly)
+ * Output: data/us-emergency-resource-sites.json (single file, append-friendly)
  */
 import 'dotenv/config';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 const API_URL = 'https://places.googleapis.com/v1/places:searchText';
-const OUTPUT_PATH = path.join(process.cwd(), 'data', 'us-generator-locations.json');
+const OUTPUT_PATH = path.join(process.cwd(), 'data', 'us-emergency-resource-sites.json');
 const PAGE_SIZE = 20;
 const NEXT_PAGE_DELAY_MS = 2100;
 const REQUEST_DELAY_MS = 500;
@@ -71,16 +71,16 @@ const US_STATES: { code: string; name: string }[] = [
     { code: 'WY', name: 'Wyoming' },
 ];
 
-/** Matches Google Places text search: "generators in Arkansas", etc. */
 const SEARCH_QUERIES: { category: string; template: string }[] = [
-    { category: 'generators', template: 'generators in {stateName}' },
+    { category: 'emergency_resource_center', template: 'Emergency Resource Center in {stateName}' },
+    { category: 'disaster_recovery_center', template: 'Disaster Recovery Center in {stateName}' },
+    { category: 'community_resource_center', template: 'Community Resource Center in {stateName}' },
 ];
 
-/** User cURL fields + id/nextPageToken for dedup and pagination. */
 const FIELD_MASK =
     'places.id,places.displayName,places.formattedAddress,places.location,nextPageToken';
 
-type GeneratorLocationRecord = {
+type EmergencyResourceSiteRecord = {
     placeId: string;
     displayName: string;
     formattedAddress: string;
@@ -88,6 +88,7 @@ type GeneratorLocationRecord = {
         latitude: number;
         longitude: number;
     };
+    state: string;
     stateCode: string;
     stateName: string;
     searchCategory: string;
@@ -108,7 +109,7 @@ type ApiErrorLog = {
 type StateFetchSummary = {
     stateCode: string;
     stateName: string;
-    locationsRetrieved: number;
+    sitesRetrieved: number;
     queriesRun: number;
     pagesFetched: number;
     duplicatesSkipped: number;
@@ -123,6 +124,7 @@ type OutputFile = {
         apiEndpoint: string;
         fieldMask: string;
         searchQueries: typeof SEARCH_QUERIES;
+        deduplication: string;
         statesProcessed: string[];
         statesPending: string[];
         perStateCounts: Record<string, number>;
@@ -130,7 +132,7 @@ type OutputFile = {
         totalApiRequests: number;
         errors: ApiErrorLog[];
     };
-    generatorLocations: GeneratorLocationRecord[];
+    emergencyResourceSites: EmergencyResourceSiteRecord[];
 };
 
 type PlacesSearchResponse = {
@@ -141,6 +143,11 @@ type PlacesSearchResponse = {
         location?: { latitude?: number; longitude?: number };
     }>;
     nextPageToken?: string;
+};
+
+type DedupState = {
+    placeIds: Set<string>;
+    nameLocationKeys: Set<string>;
 };
 
 function sleep(ms: number) {
@@ -187,8 +194,42 @@ function normalizePlaceId(id: string): string {
     return id.startsWith('places/') ? id.slice('places/'.length) : id;
 }
 
+function nameLocationKey(displayName: string, lat: number, lng: number): string {
+    const name = displayName.trim().toLowerCase().replace(/\s+/g, ' ');
+    const roundedLat = Math.round(lat * 10_000) / 10_000;
+    const roundedLng = Math.round(lng * 10_000) / 10_000;
+    return `${name}|${roundedLat}|${roundedLng}`;
+}
+
 function buildTextQuery(template: string, stateName: string): string {
     return template.replace('{stateName}', stateName);
+}
+
+function isDuplicate(record: EmergencyResourceSiteRecord, dedup: DedupState): boolean {
+    if (dedup.placeIds.has(record.placeId)) return true;
+    const key = nameLocationKey(
+        record.displayName,
+        record.location.latitude,
+        record.location.longitude,
+    );
+    return dedup.nameLocationKeys.has(key);
+}
+
+function registerRecord(record: EmergencyResourceSiteRecord, dedup: DedupState): void {
+    dedup.placeIds.add(record.placeId);
+    dedup.nameLocationKeys.add(
+        nameLocationKey(
+            record.displayName,
+            record.location.latitude,
+            record.location.longitude,
+        ),
+    );
+}
+
+function buildDedupStateFromRecords(records: EmergencyResourceSiteRecord[]): DedupState {
+    const dedup: DedupState = { placeIds: new Set(), nameLocationKeys: new Set() };
+    for (const record of records) registerRecord(record, dedup);
+    return dedup;
 }
 
 function mapPlaceToRecord(
@@ -197,7 +238,7 @@ function mapPlaceToRecord(
     stateName: string,
     searchCategory: string,
     sourceTextQuery: string,
-): GeneratorLocationRecord | null {
+): EmergencyResourceSiteRecord | null {
     if (!place.id) return null;
     const lat = place.location?.latitude;
     const lng = place.location?.longitude;
@@ -208,6 +249,7 @@ function mapPlaceToRecord(
         displayName: place.displayName?.text?.trim() || 'Unknown',
         formattedAddress: place.formattedAddress?.trim() || '',
         location: { latitude: lat, longitude: lng },
+        state: stateCode,
         stateCode,
         stateName,
         searchCategory,
@@ -221,14 +263,14 @@ async function searchTextQueryAllPages(
     searchCategory: string,
     stateCode: string,
     stateName: string,
-    seenPlaceIds: Set<string>,
+    dedup: DedupState,
 ): Promise<{
-    records: GeneratorLocationRecord[];
+    records: EmergencyResourceSiteRecord[];
     pagesFetched: number;
     duplicatesSkipped: number;
     errors: ApiErrorLog[];
 }> {
-    const records: GeneratorLocationRecord[] = [];
+    const records: EmergencyResourceSiteRecord[] = [];
     const errors: ApiErrorLog[] = [];
     let page = 1;
     let pagesFetched = 0;
@@ -297,11 +339,11 @@ async function searchTextQueryAllPages(
                 textQuery,
             );
             if (!record) continue;
-            if (seenPlaceIds.has(record.placeId)) {
+            if (isDuplicate(record, dedup)) {
                 duplicatesSkipped += 1;
                 continue;
             }
-            seenPlaceIds.add(record.placeId);
+            registerRecord(record, dedup);
             records.push(record);
         }
 
@@ -315,13 +357,13 @@ async function searchTextQueryAllPages(
     return { records, pagesFetched, duplicatesSkipped, errors };
 }
 
-async function searchGeneratorLocationsForState(
+async function searchEmergencyResourceSitesForState(
     apiKey: string,
     stateCode: string,
     stateName: string,
-    seenPlaceIds: Set<string>,
-): Promise<{ records: GeneratorLocationRecord[]; summary: StateFetchSummary; errors: ApiErrorLog[] }> {
-    const records: GeneratorLocationRecord[] = [];
+    dedup: DedupState,
+): Promise<{ records: EmergencyResourceSiteRecord[]; summary: StateFetchSummary; errors: ApiErrorLog[] }> {
+    const records: EmergencyResourceSiteRecord[] = [];
     const errors: ApiErrorLog[] = [];
     const byCategory: Record<string, number> = {};
     let pagesFetched = 0;
@@ -329,7 +371,7 @@ async function searchGeneratorLocationsForState(
 
     for (const queryDef of SEARCH_QUERIES) {
         const textQuery = buildTextQuery(queryDef.template, stateName);
-        console.log(`[generator-fetch]   query: ${textQuery}`);
+        console.log(`[resource-fetch]   query: ${textQuery}`);
 
         const result = await searchTextQueryAllPages(
             apiKey,
@@ -337,7 +379,7 @@ async function searchGeneratorLocationsForState(
             queryDef.category,
             stateCode,
             stateName,
-            seenPlaceIds,
+            dedup,
         );
 
         records.push(...result.records);
@@ -354,7 +396,7 @@ async function searchGeneratorLocationsForState(
         summary: {
             stateCode,
             stateName,
-            locationsRetrieved: records.length,
+            sitesRetrieved: records.length,
             queriesRun: SEARCH_QUERIES.length,
             pagesFetched,
             duplicatesSkipped,
@@ -382,6 +424,7 @@ function buildEmptyOutput(): OutputFile {
             apiEndpoint: API_URL,
             fieldMask: FIELD_MASK,
             searchQueries: SEARCH_QUERIES,
+            deduplication: 'placeId and normalized displayName + location (4 decimal degrees)',
             statesProcessed: [],
             statesPending: US_STATES.map((s) => s.code),
             perStateCounts: {},
@@ -389,7 +432,7 @@ function buildEmptyOutput(): OutputFile {
             totalApiRequests: 0,
             errors: [],
         },
-        generatorLocations: [],
+        emergencyResourceSites: [],
     };
 }
 
@@ -400,7 +443,7 @@ async function main() {
     let output = continueMode ? await loadExistingOutput() : null;
     if (!output) output = buildEmptyOutput();
 
-    const seenPlaceIds = new Set(output.generatorLocations.map((p) => p.placeId));
+    const dedup = buildDedupStateFromRecords(output.emergencyResourceSites);
     const alreadyProcessed = new Set(output.metadata.statesProcessed);
 
     let statesToProcess = US_STATES.filter((s) => !alreadyProcessed.has(s.code));
@@ -413,28 +456,28 @@ async function main() {
     }
 
     if (statesToProcess.length === 0) {
-        console.log('[generator-fetch] No states to process.');
+        console.log('[resource-fetch] No states to process.');
         return;
     }
 
     console.log(
-        `[generator-fetch] Processing ${statesToProcess.length} state(s): ${statesToProcess.map((s) => s.code).join(', ')}`,
+        `[resource-fetch] Processing ${statesToProcess.length} state(s): ${statesToProcess.map((s) => s.code).join(', ')}`,
     );
 
     const runSummaries: StateFetchSummary[] = [];
     let apiRequestsThisRun = 0;
 
     for (const state of statesToProcess) {
-        console.log(`[generator-fetch] Fetching ${state.name} (${state.code})...`);
+        console.log(`[resource-fetch] Fetching ${state.name} (${state.code})...`);
 
-        const { records, summary, errors } = await searchGeneratorLocationsForState(
+        const { records, summary, errors } = await searchEmergencyResourceSitesForState(
             apiKey,
             state.code,
             state.name,
-            seenPlaceIds,
+            dedup,
         );
 
-        output.generatorLocations.push(...records);
+        output.emergencyResourceSites.push(...records);
         output.metadata.statesProcessed.push(state.code);
         output.metadata.perStateCounts[state.code] =
             (output.metadata.perStateCounts[state.code] ?? 0) + records.length;
@@ -444,22 +487,21 @@ async function main() {
         runSummaries.push(summary);
 
         console.log(
-            `[generator-fetch] ${state.code}: retrieved=${summary.locationsRetrieved} queries=${summary.queriesRun} pages=${summary.pagesFetched} duplicatesSkipped=${summary.duplicatesSkipped} errors=${errors.length}`,
+            `[resource-fetch] ${state.code}: retrieved=${summary.sitesRetrieved} queries=${summary.queriesRun} pages=${summary.pagesFetched} duplicatesSkipped=${summary.duplicatesSkipped} errors=${errors.length}`,
         );
-        console.log(`[generator-fetch] ${state.code} by category:`, summary.byCategory);
+        console.log(`[resource-fetch] ${state.code} by category:`, summary.byCategory);
 
         if (errors.length > 0) {
             for (const err of errors) {
                 console.error(
-                    `[generator-fetch] ERROR ${state.code} [${err.searchCategory}] page ${err.page}: ${err.message}`,
+                    `[resource-fetch] ERROR ${state.code} [${err.searchCategory}] page ${err.page}: ${err.message}`,
                 );
             }
         }
     }
 
     output.metadata.updatedAt = new Date().toISOString();
-    output.metadata.searchQueries = SEARCH_QUERIES;
-    output.metadata.totalRecords = output.generatorLocations.length;
+    output.metadata.totalRecords = output.emergencyResourceSites.length;
     output.metadata.statesPending = US_STATES.map((s) => s.code).filter(
         (code) => !output!.metadata.statesProcessed.includes(code),
     );
@@ -467,16 +509,16 @@ async function main() {
     await mkdir(path.dirname(OUTPUT_PATH), { recursive: true });
     await writeFile(OUTPUT_PATH, `${JSON.stringify(output, null, 2)}\n`, 'utf8');
 
-    const totalThisRun = runSummaries.reduce((sum, s) => sum + s.locationsRetrieved, 0);
+    const totalThisRun = runSummaries.reduce((sum, s) => sum + s.sitesRetrieved, 0);
     const errorsThisRun = runSummaries.reduce(
         (sum, s) => sum + output.metadata.errors.filter((e) => e.stateCode === s.stateCode).length,
         0,
     );
 
-    console.log('\n=== Generator location fetch summary ===');
+    console.log('\n=== Emergency resource site fetch summary ===');
     for (const s of runSummaries) {
         console.log(
-            `  ${s.stateCode} (${s.stateName}): ${s.locationsRetrieved} locations (${s.queriesRun} queries, ${s.pagesFetched} API pages)`,
+            `  ${s.stateCode} (${s.stateName}): ${s.sitesRetrieved} sites (${s.queriesRun} queries, ${s.pagesFetched} API pages)`,
         );
     }
     console.log(`  Total retrieved this run: ${totalThisRun}`);
@@ -489,6 +531,6 @@ async function main() {
 }
 
 main().catch((err) => {
-    console.error('[generator-fetch] failed:', err);
+    console.error('[resource-fetch] failed:', err);
     process.exit(1);
 });
