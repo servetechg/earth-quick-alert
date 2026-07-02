@@ -9,6 +9,7 @@ import {
     Popup,
     Circle,
     Polyline,
+    Polygon,
     useMap,
     useMapEvents,
 } from 'react-leaflet';
@@ -22,6 +23,7 @@ import { IncidentDetailDialog } from '@/components/incident/incident-detail-dial
 import type {
     CoverageCircleSpec,
     MapDisasterZoneCircleSpec,
+    MapPolygonSpec,
     MapPolylineSpec,
     MapStateBounds,
     SituationalMapMarker,
@@ -42,6 +44,7 @@ import type { UnifiedEventHeatPoint } from '@/lib/geo/unified-event-heatmap';
 export type {
     CoverageCircleSpec,
     MapDisasterZoneCircleSpec,
+    MapPolygonSpec,
     MapPolylineSpec,
     MapStateBounds,
     SituationalMapMarker,
@@ -432,6 +435,7 @@ export function SituationalLeafletMap({
     coverageCircle = null,
     lockToCoverage = false,
     polylines = [],
+    polygons = [],
     disasterZoneCircles = [],
     heatIncidents = [],
     heatClickOnly = false,
@@ -445,6 +449,7 @@ export function SituationalLeafletMap({
     const [isMounted, setIsMounted] = useState(false);
     const [selectedMarker, setSelectedMarker] = useState<SituationalMapMarker | null>(null);
     const [selectedRoadClosure, setSelectedRoadClosure] = useState<MapPolylineSpec | null>(null);
+    const [selectedPowerOutage, setSelectedPowerOutage] = useState<MapPolygonSpec | null>(null);
     const [selectedHeatIncident, setSelectedHeatIncident] = useState<UnifiedEventHeatPoint | null>(
         null,
     );
@@ -532,6 +537,17 @@ export function SituationalLeafletMap({
         });
     }, [polylines]);
 
+    const validPolygons = useMemo(() => {
+        return polygons.flatMap((poly, idx) => {
+            const paths = poly.paths
+                .map((path) => path.filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng)))
+                .filter((path) => path.length >= 3);
+            if (paths.length === 0) return [];
+            const key = poly.id ?? `polygon-${idx}`;
+            return [{ ...poly, paths, key }];
+        });
+    }, [polygons]);
+
     const showCoverageCircle =
         coverageCircle != null &&
         Number.isFinite(coverageCircle.center.lat) &&
@@ -541,6 +557,7 @@ export function SituationalLeafletMap({
     const handleInfraSelect = useCallback((m: SituationalMapMarker) => {
         setSelectedHeatIncident(null);
         setSelectedRoadClosure(null);
+        setSelectedPowerOutage(null);
         setSelectedMarker(m);
     }, []);
 
@@ -664,6 +681,31 @@ export function SituationalLeafletMap({
                     </React.Fragment>
                 ))}
 
+                {validPolygons.map((poly) =>
+                    poly.paths.map((path, ringIdx) => (
+                        <Polygon
+                            key={`${poly.key}-${ringIdx}`}
+                            positions={path.map((p) => [p.lat, p.lng] as [number, number])}
+                            pathOptions={{
+                                color: poly.strokeColor ?? '#15803D',
+                                fillColor: poly.fillColor ?? '#22C55E',
+                                fillOpacity: poly.fillOpacity ?? 0.35,
+                                weight: poly.strokeWeight ?? 2,
+                            }}
+                            eventHandlers={{
+                                click: () => {
+                                    if (poly.outage) {
+                                        setSelectedHeatIncident(null);
+                                        setSelectedMarker(null);
+                                        setSelectedRoadClosure(null);
+                                        setSelectedPowerOutage(poly);
+                                    }
+                                },
+                            }}
+                        />
+                    )),
+                )}
+
                 {validPolylines.map((line) => (
                     <Polyline
                         key={line.key}
@@ -762,6 +804,55 @@ export function SituationalLeafletMap({
                     </Marker>
                 )}
             </MapContainer>
+
+            {selectedPowerOutage?.outage && (
+                <div className="absolute left-4 bottom-4 z-[500] max-w-[320px] rounded-xl border border-slate-200 bg-white p-3 shadow-xl">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">
+                        Power Outage
+                    </p>
+                    <div className="font-bold text-base mb-1">{selectedPowerOutage.outage.name}</div>
+                    <p className="text-xs text-slate-600 mb-1">
+                        {selectedPowerOutage.outage.county}, {selectedPowerOutage.outage.state}
+                    </p>
+                    <p className="text-sm font-semibold text-emerald-700 mb-2">
+                        {selectedPowerOutage.outage.metersAffected.toLocaleString()} meters affected
+                    </p>
+                    {selectedPowerOutage.outage.reportedStartTime ? (
+                        <p className="text-xs text-slate-600 mb-1">
+                            Started:{' '}
+                            {new Date(selectedPowerOutage.outage.reportedStartTime).toLocaleString()}
+                        </p>
+                    ) : null}
+                    {selectedPowerOutage.outage.estimatedRestorationTime ? (
+                        <p className="text-xs text-slate-600 mb-1">
+                            Est. restoration:{' '}
+                            {new Date(
+                                selectedPowerOutage.outage.estimatedRestorationTime,
+                            ).toLocaleString()}
+                        </p>
+                    ) : null}
+                    {selectedPowerOutage.outage.communityDescriptor ? (
+                        <p className="text-xs text-slate-500 mb-1">
+                            Community: {selectedPowerOutage.outage.communityDescriptor}
+                        </p>
+                    ) : null}
+                    {selectedPowerOutage.outage.cause ? (
+                        <p className="text-xs text-slate-600 mb-1">
+                            Cause: {selectedPowerOutage.outage.cause}
+                        </p>
+                    ) : null}
+                    {selectedPowerOutage.outage.source ? (
+                        <p className="text-[10px] text-slate-400 mt-2">{selectedPowerOutage.outage.source}</p>
+                    ) : null}
+                    <button
+                        type="button"
+                        className="text-xs font-bold text-slate-500 mt-2"
+                        onClick={() => setSelectedPowerOutage(null)}
+                    >
+                        Close
+                    </button>
+                </div>
+            )}
 
             {selectedRoadClosure?.closure && selectedRoadClosure.path.length >= 2 && (
                 <div className="absolute left-4 bottom-4 z-[500] max-w-[300px] rounded-xl border border-slate-200 bg-white p-3 shadow-xl">

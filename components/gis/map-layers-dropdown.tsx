@@ -17,6 +17,7 @@ import {
   IMPLEMENTED_CRITICAL_INFRA_MAP_SECTORS,
   OPEN_SOURCE_MAP_LAYERS,
   ROAD_CLOSURES_MAP_LAYER,
+  POWER_OUTAGES_MAP_LAYER,
 } from '@/lib/gis/map-layer-config'
 
 interface MapLayersDropdownProps {
@@ -79,6 +80,7 @@ export function MapLayersDropdown({
   const enabledCount = useMemo(() => {
     let count = ALERT_ZONE_MAP_LAYERS.filter((l) => layers[l.id]).length
     if (layers[ROAD_CLOSURES_MAP_LAYER.id]) count += 1
+    if (layers[POWER_OUTAGES_MAP_LAYER.id]) count += 1
     count += OPEN_SOURCE_MAP_LAYERS.filter((l) => layers[l.id]).length
     count += HIFLD_OPERATIONAL_MAP_LAYERS.filter((l) => layers[l.id]).length
     if (showCriticalInfra) {
@@ -141,6 +143,14 @@ export function MapLayersDropdown({
             Icon={ROAD_CLOSURES_MAP_LAYER.Icon}
             checked={!!layers[ROAD_CLOSURES_MAP_LAYER.id]}
             onToggle={() => toggle(ROAD_CLOSURES_MAP_LAYER.id)}
+          />
+          <LayerRow
+            id={POWER_OUTAGES_MAP_LAYER.id}
+            label={POWER_OUTAGES_MAP_LAYER.label}
+            color={POWER_OUTAGES_MAP_LAYER.color}
+            Icon={POWER_OUTAGES_MAP_LAYER.Icon}
+            checked={!!layers[POWER_OUTAGES_MAP_LAYER.id]}
+            onToggle={() => toggle(POWER_OUTAGES_MAP_LAYER.id)}
           />
           {OPEN_SOURCE_MAP_LAYERS.map((layer) => (
             <LayerRow

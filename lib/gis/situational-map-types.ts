@@ -65,6 +65,30 @@ export interface RoadClosureDetail {
     source?: string;
 }
 
+export interface PowerOutageDetail {
+    name: string;
+    county: string;
+    state: string;
+    metersAffected: number;
+    reportedStartTime?: string;
+    estimatedRestorationTime?: string;
+    cause?: string | null;
+    statusKind?: string | null;
+    communityDescriptor?: string;
+    source?: string;
+}
+
+export interface MapPolygonSpec {
+    id: string;
+    paths: { lat: number; lng: number }[][];
+    fillColor?: string;
+    fillOpacity?: number;
+    strokeColor?: string;
+    strokeWeight?: number;
+    label?: string;
+    outage?: PowerOutageDetail;
+}
+
 export interface MapPolylineSpec {
     id?: string;
     path: { lat: number; lng: number }[];
@@ -87,6 +111,7 @@ export interface SituationalMapProps {
     coverageCircle?: CoverageCircleSpec | null;
     lockToCoverage?: boolean;
     polylines?: MapPolylineSpec[];
+    polygons?: MapPolygonSpec[];
     disasterZoneCircles?: MapDisasterZoneCircleSpec[];
     heatIncidents?: UnifiedEventHeatPoint[];
     heatClickOnly?: boolean;

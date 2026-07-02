@@ -534,3 +534,45 @@ export function useRoadClosures(opts: {
         placeholderData: (prev) => prev,
     });
 }
+
+import type { PowerOutagePolygon } from '@/lib/gis/odin/odin-outages-config';
+
+async function fetchPowerOutages(input: {
+    bounds?: MapBoundsPayload;
+    scopeState?: string;
+}): Promise<PowerOutagePolygon[]> {
+    const res = await fetch('/api/admin/power-outages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(input),
+    });
+    if (!res.ok) throw new Error(`power-outages ${res.status}`);
+    const data = await res.json();
+    return Array.isArray(data.outages) ? data.outages : [];
+}
+
+export function usePowerOutages(opts: {
+    enabled: boolean;
+    bounds: MapBoundsPayload | null;
+    scopeState?: string;
+}) {
+    const boundsKey = opts.bounds
+        ? `${opts.bounds.west.toFixed(3)},${opts.bounds.south.toFixed(3)},${opts.bounds.east.toFixed(3)},${opts.bounds.north.toFixed(3)}`
+        : 'none';
+    const scopeKey = opts.scopeState?.trim().toUpperCase() || 'none';
+
+    return useQuery({
+        queryKey: ['power-outages', boundsKey, scopeKey],
+        queryFn: () =>
+            fetchPowerOutages({
+                bounds: opts.bounds ?? undefined,
+                scopeState: opts.scopeState,
+            }),
+        enabled: opts.enabled && Boolean(opts.bounds || opts.scopeState?.trim()),
+        staleTime: 5 * 60_000,
+        gcTime: 60 * 60_000,
+        refetchInterval: 5 * 60_000,
+        placeholderData: (prev) => prev,
+    });
+}

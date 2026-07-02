@@ -31,6 +31,7 @@ import {
 import {
   SituationalLeafletMap,
   type CoverageCircleSpec,
+  type MapPolygonSpec,
   type MapPolylineSpec,
   type MapStateBounds,
   type MapDisasterZoneCircleSpec,
@@ -86,9 +87,14 @@ import {
   useMapLayerPharmacies,
   useMapLayerPoliceStations,
   useMapLayerShelters,
+  usePowerOutages,
   useRoadClosures,
   useSituationalMap,
 } from '@/lib/hooks/admin-map-queries'
+import {
+  ODIN_OUTAGE_FILL_COLOR,
+  ODIN_OUTAGE_STROKE_COLOR,
+} from '@/lib/gis/odin/odin-outages-config'
 import { useDebouncedMapBounds } from '@/lib/hooks/use-debounced-map-bounds'
 import { quantizeLayerFetchBounds } from '@/lib/gis/layers/map-layer-bounds-utils'
 
@@ -274,9 +280,11 @@ export function GISMap({
   const [mapViewportBounds, setMapViewportBounds] = useState<MapStateBounds | null>(null)
   const [tornadoPolylines, setTornadoPolylines] = useState<MapPolylineSpec[]>([])
   const [roadClosurePolylines, setRoadClosurePolylines] = useState<MapPolylineSpec[]>([])
+  const [powerOutagePolygons, setPowerOutagePolygons] = useState<MapPolygonSpec[]>([])
   const [operationalAlertPolylines, setOperationalAlertPolylines] = useState<MapPolylineSpec[]>([])
   const [operationalIncidentMarkers, setOperationalIncidentMarkers] = useState<any[]>([])
   const [isLoadingRoadClosures, setIsLoadingRoadClosures] = useState(false)
+  const [isLoadingPowerOutages, setIsLoadingPowerOutages] = useState(false)
   const [situationalLoading, setSituationalLoading] = useState(false)
   const [mapLayers, setMapLayers] = useState<Record<string, boolean>>(() =>
     buildDefaultMapLayerState({
@@ -990,7 +998,7 @@ export function GISMap({
   })
 
   /** Super-admin: viewport bbox across USA. Sub-admin / scoped state: full state. Sub-admin radius: circle bounds. */
-  const { dams: damsFetchScope, shelters: sheltersFetchScope, fuel_sites: fuelSitesFetchScope, pharmacies: pharmaciesFetchScope, police: policeFetchScope, ci_financial: financialSitesFetchScope, roads: roadsFetchScope } =
+  const { dams: damsFetchScope, shelters: sheltersFetchScope, fuel_sites: fuelSitesFetchScope, pharmacies: pharmaciesFetchScope, police: policeFetchScope, ci_financial: financialSitesFetchScope, roads: roadsFetchScope, power: powerFetchScope } =
     useMemo(() => {
       const ctx = {
         lockToCoverageCircle,
@@ -1011,6 +1019,7 @@ export function GISMap({
         shelters: buildOpenSourceLayerFetchScope(mapLayers.shelters, ctx),
         fuel_sites: buildOpenSourceLayerFetchScope(mapLayers.fuel_sites, ctx),
         roads: buildOpenSourceLayerFetchScope(mapLayers.roads, ctx),
+        power: buildOpenSourceLayerFetchScope(mapLayers.power, ctx),
         pharmacies: buildOpenSourceLayerFetchScope(mapLayers.pharmacies, ctx),
         police: buildOpenSourceLayerFetchScope(mapLayers.police, ctx),
         ci_financial: buildOpenSourceLayerFetchScope(mapLayers.ci_financial, ctx),
@@ -1021,6 +1030,7 @@ export function GISMap({
       mapLayers.shelters,
       mapLayers.fuel_sites,
       mapLayers.roads,
+      mapLayers.power,
       mapLayers.pharmacies,
       mapLayers.police,
       mapLayers.ci_financial,
@@ -1042,6 +1052,12 @@ export function GISMap({
       viewportInUsa,
     bounds: roadsFetchScope?.stateKey ? null : roadsFetchScope?.bounds ?? null,
     scopeState: roadsFetchScope?.stateKey ?? (scopeState?.trim() || undefined),
+  })
+
+  const powerOutagesQuery = usePowerOutages({
+    enabled: Boolean(powerFetchScope) && mapLayers.power && viewportInUsa,
+    bounds: powerFetchScope?.stateKey ? null : powerFetchScope?.bounds ?? null,
+    scopeState: powerFetchScope?.stateKey ?? (scopeState?.trim() || undefined),
   })
 
   const damsLayerQuery = useMapLayerDams({
@@ -1394,15 +1410,73 @@ export function GISMap({
     setIsLoadingRoadClosures(roadClosuresQuery.isFetching)
   }, [roadClosuresQuery.isFetching])
 
+  useEffect(() => {
+    if (!mapLayers.power || !viewportInUsa) {
+      setPowerOutagePolygons([])
+      return
+    }
+
+    const outages = powerOutagesQuery.data ?? []
+    const polygons: MapPolygonSpec[] = []
+
+    for (const outage of outages) {
+      const paths = (outage.paths ?? []).filter((path) => path.length >= 3)
+      if (paths.length === 0) continue
+      if (lockToCoverageCircle && !markerInCoverage(outage.centroid)) continue
+      if (
+        mapViewportBounds &&
+        !markerInLayerViewport(outage.centroid.lat, outage.centroid.lng)
+      ) {
+        continue
+      }
+
+      polygons.push({
+        id: outage.id,
+        paths,
+        fillColor: ODIN_OUTAGE_FILL_COLOR,
+        fillOpacity: 0.35,
+        strokeColor: ODIN_OUTAGE_STROKE_COLOR,
+        strokeWeight: 2,
+        label: outage.name,
+        outage: {
+          name: outage.name,
+          county: outage.county,
+          state: outage.state,
+          metersAffected: outage.metersAffected,
+          reportedStartTime: outage.reportedStartTime,
+          estimatedRestorationTime: outage.estimatedRestorationTime,
+          cause: outage.cause,
+          statusKind: outage.statusKind,
+          communityDescriptor: outage.communityDescriptor,
+          source: outage.source,
+        },
+      })
+    }
+
+    setPowerOutagePolygons(polygons)
+  }, [
+    mapLayers.power,
+    powerOutagesQuery.data,
+    viewportInUsa,
+    mapViewportBounds,
+    markerInLayerViewport,
+    lockToCoverageCircle,
+    markerInCoverage,
+  ])
+
+  useEffect(() => {
+    setIsLoadingPowerOutages(powerOutagesQuery.isFetching)
+  }, [powerOutagesQuery.isFetching])
+
   const operationalAlertLayersKey = useMemo(() => {
     const keys = ['flood'].filter((id) => mapLayers[id])
     return keys.join(',')
   }, [mapLayers.flood])
 
   const operationalIncidentLayersKey = useMemo(() => {
-    const keys = ['power', 'water'].filter((id) => mapLayers[id])
+    const keys = ['water'].filter((id) => mapLayers[id])
     return keys.sort().join(',')
-  }, [mapLayers.power, mapLayers.water])
+  }, [mapLayers.water])
 
   useEffect(() => {
     let cancelled = false
@@ -1547,12 +1621,12 @@ export function GISMap({
               position: pos,
               title: inc.title,
               type: 'incident' as const,
-              category: filter === 'power' ? 'Power Outages' : 'Water Issues',
+              category: 'Water Issues',
               status: inc.status,
               location: inc.location,
               description: inc.description,
-              color: filter === 'power' ? '#EAB308' : '#0EA5E9',
-              icon: filter === 'power' ? 'generator' : 'water_crew',
+              color: '#0EA5E9',
+              icon: 'water_crew',
             })
           }
         }
@@ -2218,6 +2292,7 @@ export function GISMap({
           coverageCircle={showLayersPanel && coverageMeta?.coverageType !== 'state' ? coverageCircle : null}
           lockToCoverage={lockToCoverageCircle}
           polylines={combinedPolylines}
+          polygons={mapLayers.power ? powerOutagePolygons : []}
           disasterZoneCircles={disasterZoneCircles}
           heatIncidents={usesUnifiedHeat ? heatIncidentsForMap : undefined}
           heatClickOnly={usesUnifiedHeat}
@@ -2236,6 +2311,7 @@ export function GISMap({
           (financialSitesLayerQuery.isFetching && !financialSitesLayerQuery.data?.length) ||
           (hifldSitesLayerQuery.isFetching && !hifldSitesLayerQuery.data?.length) ||
           (mapLayers.roads && isLoadingRoadClosures) ||
+          (mapLayers.power && isLoadingPowerOutages) ||
           (GIS_MAP_FILTER_LAYERS_ENABLED && isSearchingInfra)) && (
           <div className="absolute right-4 top-4 bg-white/90 backdrop-blur-md px-4 py-2 rounded-2xl shadow-2xl border border-slate-100 flex items-center gap-2 z-50 animate-in fade-in slide-in-from-top-2 duration-300">
             <Loader2 className="w-4 h-4 text-[#33375D] animate-spin" />
@@ -2256,6 +2332,8 @@ export function GISMap({
                         ? 'Loading Financial Sites…'
                         : isLoadingRoadClosures
                           ? 'Loading Road Closures…'
+                          : isLoadingPowerOutages
+                            ? 'Loading Power Outages…'
                         : 'Locating Facilities…'}
             </span>
           </div>
