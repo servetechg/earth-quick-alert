@@ -9,6 +9,7 @@ import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { CitizenActivityFeedList } from '@/components/citizen-activity/citizen-activity-feed-list'
+import { enrichCitizenActivityItems } from '@/components/citizen-activity/citizen-activity-display'
 import {
     CITIZEN_ACTIVITY_FILTER_LABELS,
     type CitizenActivityFilter,
@@ -68,7 +69,6 @@ export default function CitizenActivityFeedPage() {
                 filter,
                 limit: '100',
             })
-            if (debouncedQuery) params.set('q', debouncedQuery)
             const res = await fetch(`/api/admin/citizen-activity?${params.toString()}`, {
                 cache: 'no-store',
             })
@@ -79,7 +79,7 @@ export default function CitizenActivityFeedPage() {
         } finally {
             setLoading(false)
         }
-    }, [filter, debouncedQuery])
+    }, [filter])
 
     useEffect(() => {
         void loadFeed()
@@ -87,6 +87,23 @@ export default function CitizenActivityFeedPage() {
 
     const stats = payload?.stats
     const items = payload?.items ?? []
+
+    const filteredCount = useMemo(() => {
+        if (!debouncedQuery.trim()) return items.length
+        const q = debouncedQuery.trim().toLowerCase()
+        return enrichCitizenActivityItems(items).filter((entry) =>
+            [
+                entry.title,
+                entry.citizenName,
+                entry.citizenAddress,
+                entry.takeAction,
+                entry.resolutionStatus,
+            ]
+                .join(' ')
+                .toLowerCase()
+                .includes(q),
+        ).length
+    }, [items, debouncedQuery])
 
     const filterButtons = useMemo(
         () =>
@@ -171,7 +188,7 @@ export default function CitizenActivityFeedPage() {
                     <Input
                         value={query}
                         onChange={(e) => setQuery(e.target.value)}
-                        placeholder="Search activity, location, or status…"
+                        placeholder="Search citizen, address, or status…"
                         className="max-w-md rounded-xl border-slate-200"
                     />
                 </div>
@@ -179,9 +196,15 @@ export default function CitizenActivityFeedPage() {
 
             <Card className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                 <div className="mb-4 flex items-center justify-between gap-3">
-                    <h2 className="text-lg font-bold text-slate-900">Recent activity</h2>
+                    <div>
+                        <h2 className="text-lg font-bold text-slate-900">Citizen requests</h2>
+                        <p className="mt-1 text-xs text-slate-500">
+                            Track who requested help, where they are, what Ready2Go did, and whether the case is
+                            completed or still pending.
+                        </p>
+                    </div>
                     <p className="text-xs font-semibold text-slate-500">
-                        {items.length} record{items.length === 1 ? '' : 's'}
+                        {filteredCount} record{filteredCount === 1 ? '' : 's'}
                     </p>
                 </div>
                 {loading ? (
@@ -191,7 +214,7 @@ export default function CitizenActivityFeedPage() {
                         ))}
                     </div>
                 ) : (
-                    <CitizenActivityFeedList items={items} />
+                    <CitizenActivityFeedList items={items} searchQuery={debouncedQuery} />
                 )}
             </Card>
         </AdminPageShell>

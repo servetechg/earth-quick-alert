@@ -1,4 +1,5 @@
 import type { UnifiedEventHeatPoint } from '@/lib/geo/unified-event-heatmap';
+import type { InfrastructureClusterMode } from '@/lib/gis/map-layer-config';
 
 export interface SituationalMapMarker {
     id: string;
@@ -119,7 +120,7 @@ export interface SituationalMapProps {
     onBoundsChanged?: (bounds: MapStateBounds) => void;
     clusterInfrastructure?: boolean;
     /** Use dam-friendly clustering (lower uncluster zoom, count badges). */
-    infrastructureClusterMode?: 'default' | 'dams' | 'shelters' | 'fuel' | 'pharmacies' | 'police' | 'chemical' | 'financial' | 'critical-infra';
+    infrastructureClusterMode?: InfrastructureClusterMode;
     fitStateOnLoad?: boolean;
     allowZoomOut?: boolean;
 }

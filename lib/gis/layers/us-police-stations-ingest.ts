@@ -129,5 +129,5 @@ export async function ingestUsPoliceStationsFromFile(filePath: string): Promise<
 }
 
 export function defaultUsPoliceStationsJsonPath(): string {
-    return path.join(process.cwd(), 'us-police-stations.json');
+    return path.join(process.cwd(), 'data', 'us-police-stations.json');
 }

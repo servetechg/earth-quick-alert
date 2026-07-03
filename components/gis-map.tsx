@@ -56,6 +56,11 @@ import {
   FUEL_SITES_MAP_LAYER,
   PHARMACIES_MAP_LAYER,
   POLICE_STATIONS_MAP_LAYER,
+  MEALS_READY_MAP_LAYER,
+  GENERATORS_MAP_LAYER,
+  VOLUNTEERS_MAP_LAYER,
+  RESOURCE_SITES_MAP_LAYER,
+  IT_INFRASTRUCTURE_MAP_LAYER,
   ROAD_CLOSURES_MAP_LAYER,
   FINANCIAL_SITES_MAP_LAYER,
   HIFLD_NEXT_IMPLEMENTED_SECTOR_IDS,
@@ -86,6 +91,11 @@ import {
   useMapLayerHifldSites,
   useMapLayerPharmacies,
   useMapLayerPoliceStations,
+  useMapLayerFoodDistributionCenters,
+  useMapLayerGeneratorLocations,
+  useMapLayerVolunteerCenters,
+  useMapLayerEmergencyResourceSites,
+  useMapLayerItInfrastructure,
   useMapLayerShelters,
   usePowerOutages,
   useRoadClosures,
@@ -998,7 +1008,7 @@ export function GISMap({
   })
 
   /** Super-admin: viewport bbox across USA. Sub-admin / scoped state: full state. Sub-admin radius: circle bounds. */
-  const { dams: damsFetchScope, shelters: sheltersFetchScope, fuel_sites: fuelSitesFetchScope, pharmacies: pharmaciesFetchScope, police: policeFetchScope, ci_financial: financialSitesFetchScope, roads: roadsFetchScope, power: powerFetchScope } =
+  const { dams: damsFetchScope, shelters: sheltersFetchScope, fuel_sites: fuelSitesFetchScope, pharmacies: pharmaciesFetchScope, police: policeFetchScope, meals_ready: mealsReadyFetchScope, generators: generatorsFetchScope, volunteers: volunteersFetchScope, resources: resourceSitesFetchScope, ci_it: itInfrastructureFetchScope, ci_financial: financialSitesFetchScope, roads: roadsFetchScope, power: powerFetchScope } =
     useMemo(() => {
       const ctx = {
         lockToCoverageCircle,
@@ -1022,6 +1032,11 @@ export function GISMap({
         power: buildOpenSourceLayerFetchScope(mapLayers.power, ctx),
         pharmacies: buildOpenSourceLayerFetchScope(mapLayers.pharmacies, ctx),
         police: buildOpenSourceLayerFetchScope(mapLayers.police, ctx),
+        meals_ready: buildOpenSourceLayerFetchScope(mapLayers.meals_ready, ctx),
+        generators: buildOpenSourceLayerFetchScope(mapLayers.generators, ctx),
+        volunteers: buildOpenSourceLayerFetchScope(mapLayers.volunteers, ctx),
+        resources: buildOpenSourceLayerFetchScope(mapLayers.resources, ctx),
+        ci_it: buildOpenSourceLayerFetchScope(mapLayers.ci_it, ctx),
         ci_financial: buildOpenSourceLayerFetchScope(mapLayers.ci_financial, ctx),
       }
     }, [
@@ -1033,6 +1048,11 @@ export function GISMap({
       mapLayers.power,
       mapLayers.pharmacies,
       mapLayers.police,
+      mapLayers.meals_ready,
+      mapLayers.generators,
+      mapLayers.volunteers,
+      mapLayers.resources,
+      mapLayers.ci_it,
       mapLayers.ci_financial,
       lockToCoverageCircle,
       coverageCircle,
@@ -1107,6 +1127,56 @@ export function GISMap({
       !isDemoSimulation,
     stateKey: policeFetchScope?.stateKey ?? null,
     bounds: policeFetchScope?.stateKey ? null : policeFetchScope?.bounds ?? null,
+  })
+
+  const mealsReadyLayerQuery = useMapLayerFoodDistributionCenters({
+    enabled:
+      OPEN_SOURCE_MAP_LAYERS_ENABLED &&
+      Boolean(mealsReadyFetchScope) &&
+      viewportInUsa &&
+      !isDemoSimulation,
+    stateKey: mealsReadyFetchScope?.stateKey ?? null,
+    bounds: mealsReadyFetchScope?.stateKey ? null : mealsReadyFetchScope?.bounds ?? null,
+  })
+
+  const generatorsLayerQuery = useMapLayerGeneratorLocations({
+    enabled:
+      OPEN_SOURCE_MAP_LAYERS_ENABLED &&
+      Boolean(generatorsFetchScope) &&
+      viewportInUsa &&
+      !isDemoSimulation,
+    stateKey: generatorsFetchScope?.stateKey ?? null,
+    bounds: generatorsFetchScope?.stateKey ? null : generatorsFetchScope?.bounds ?? null,
+  })
+
+  const volunteersLayerQuery = useMapLayerVolunteerCenters({
+    enabled:
+      OPEN_SOURCE_MAP_LAYERS_ENABLED &&
+      Boolean(volunteersFetchScope) &&
+      viewportInUsa &&
+      !isDemoSimulation,
+    stateKey: volunteersFetchScope?.stateKey ?? null,
+    bounds: volunteersFetchScope?.stateKey ? null : volunteersFetchScope?.bounds ?? null,
+  })
+
+  const resourceSitesLayerQuery = useMapLayerEmergencyResourceSites({
+    enabled:
+      OPEN_SOURCE_MAP_LAYERS_ENABLED &&
+      Boolean(resourceSitesFetchScope) &&
+      viewportInUsa &&
+      !isDemoSimulation,
+    stateKey: resourceSitesFetchScope?.stateKey ?? null,
+    bounds: resourceSitesFetchScope?.stateKey ? null : resourceSitesFetchScope?.bounds ?? null,
+  })
+
+  const itInfrastructureLayerQuery = useMapLayerItInfrastructure({
+    enabled:
+      OPEN_SOURCE_MAP_LAYERS_ENABLED &&
+      Boolean(itInfrastructureFetchScope) &&
+      viewportInUsa &&
+      !isDemoSimulation,
+    stateKey: itInfrastructureFetchScope?.stateKey ?? null,
+    bounds: itInfrastructureFetchScope?.stateKey ? null : itInfrastructureFetchScope?.bounds ?? null,
   })
 
   const financialSitesLayerQuery = useMapLayerFinancialSites({
@@ -1823,7 +1893,8 @@ export function GISMap({
   const mapMarkers = useMemo(() => {
     const activeTabMarkers = markers
     const enabledLayerMarkers: any[] = []
-    const showFilterLayers = GIS_MAP_FILTER_LAYERS_ENABLED && (!restrictToUsa || viewportInUsa)
+    const showFilterLayers =
+      (GIS_MAP_FILTER_LAYERS_ENABLED || isDemoSimulation) && (!restrictToUsa || viewportInUsa)
 
     // Unified heat feed: incidents show on heatmap only (click for details), not as blue pins.
     if (showFilterLayers && incidentsVisible && unifiedIncidents.length === 0) {
@@ -2018,6 +2089,116 @@ export function GISMap({
       }
     }
 
+    if (OPEN_SOURCE_MAP_LAYERS_ENABLED && mapLayers.meals_ready && mealsReadyLayerQuery.data?.length) {
+      const skipCoverageFilter = restrictToUsa && !stateBoundsRestriction && !lockToCoverageCircle
+      for (const site of mealsReadyLayerQuery.data) {
+        if (!inUsaView(site.lat, site.lng)) continue
+        if (!skipCoverageFilter && !markerInCoverage({ lat: site.lat, lng: site.lng })) continue
+        if (skipCoverageFilter && !markerInLayerViewport(site.lat, site.lng)) continue
+        const parts: string[] = []
+        if (site.address) parts.push(site.address)
+        enabledLayerMarkers.push({
+          id: site.id,
+          position: { lat: site.lat, lng: site.lng },
+          title: site.title,
+          type: 'infrastructure' as const,
+          category: MEALS_READY_MAP_LAYER.label,
+          location: site.location,
+          description: parts.join(' · ') || site.location,
+          color: MEALS_READY_MAP_LAYER.color,
+          icon: MEALS_READY_MAP_LAYER.markerIcon,
+        })
+      }
+    }
+
+    if (OPEN_SOURCE_MAP_LAYERS_ENABLED && mapLayers.generators && generatorsLayerQuery.data?.length) {
+      const skipCoverageFilter = restrictToUsa && !stateBoundsRestriction && !lockToCoverageCircle
+      for (const site of generatorsLayerQuery.data) {
+        if (!inUsaView(site.lat, site.lng)) continue
+        if (!skipCoverageFilter && !markerInCoverage({ lat: site.lat, lng: site.lng })) continue
+        if (skipCoverageFilter && !markerInLayerViewport(site.lat, site.lng)) continue
+        const parts: string[] = []
+        if (site.address) parts.push(site.address)
+        enabledLayerMarkers.push({
+          id: site.id,
+          position: { lat: site.lat, lng: site.lng },
+          title: site.title,
+          type: 'infrastructure' as const,
+          category: GENERATORS_MAP_LAYER.label,
+          location: site.location,
+          description: parts.join(' · ') || site.location,
+          color: GENERATORS_MAP_LAYER.color,
+          icon: GENERATORS_MAP_LAYER.markerIcon,
+        })
+      }
+    }
+
+    if (OPEN_SOURCE_MAP_LAYERS_ENABLED && mapLayers.volunteers && volunteersLayerQuery.data?.length) {
+      const skipCoverageFilter = restrictToUsa && !stateBoundsRestriction && !lockToCoverageCircle
+      for (const site of volunteersLayerQuery.data) {
+        if (!inUsaView(site.lat, site.lng)) continue
+        if (!skipCoverageFilter && !markerInCoverage({ lat: site.lat, lng: site.lng })) continue
+        if (skipCoverageFilter && !markerInLayerViewport(site.lat, site.lng)) continue
+        const parts: string[] = []
+        if (site.address) parts.push(site.address)
+        enabledLayerMarkers.push({
+          id: site.id,
+          position: { lat: site.lat, lng: site.lng },
+          title: site.title,
+          type: 'infrastructure' as const,
+          category: VOLUNTEERS_MAP_LAYER.label,
+          location: site.location,
+          description: parts.join(' · ') || site.location,
+          color: VOLUNTEERS_MAP_LAYER.color,
+          icon: VOLUNTEERS_MAP_LAYER.markerIcon,
+        })
+      }
+    }
+
+    if (OPEN_SOURCE_MAP_LAYERS_ENABLED && mapLayers.resources && resourceSitesLayerQuery.data?.length) {
+      const skipCoverageFilter = restrictToUsa && !stateBoundsRestriction && !lockToCoverageCircle
+      for (const site of resourceSitesLayerQuery.data) {
+        if (!inUsaView(site.lat, site.lng)) continue
+        if (!skipCoverageFilter && !markerInCoverage({ lat: site.lat, lng: site.lng })) continue
+        if (skipCoverageFilter && !markerInLayerViewport(site.lat, site.lng)) continue
+        const parts: string[] = []
+        if (site.address) parts.push(site.address)
+        enabledLayerMarkers.push({
+          id: site.id,
+          position: { lat: site.lat, lng: site.lng },
+          title: site.title,
+          type: 'infrastructure' as const,
+          category: RESOURCE_SITES_MAP_LAYER.label,
+          location: site.location,
+          description: parts.join(' · ') || site.location,
+          color: RESOURCE_SITES_MAP_LAYER.color,
+          icon: RESOURCE_SITES_MAP_LAYER.markerIcon,
+        })
+      }
+    }
+
+    if (OPEN_SOURCE_MAP_LAYERS_ENABLED && mapLayers.ci_it && itInfrastructureLayerQuery.data?.length) {
+      const skipCoverageFilter = restrictToUsa && !stateBoundsRestriction && !lockToCoverageCircle
+      for (const site of itInfrastructureLayerQuery.data) {
+        if (!inUsaView(site.lat, site.lng)) continue
+        if (!skipCoverageFilter && !markerInCoverage({ lat: site.lat, lng: site.lng })) continue
+        if (skipCoverageFilter && !markerInLayerViewport(site.lat, site.lng)) continue
+        const parts: string[] = []
+        if (site.address) parts.push(site.address)
+        enabledLayerMarkers.push({
+          id: site.id,
+          position: { lat: site.lat, lng: site.lng },
+          title: site.title,
+          type: 'infrastructure' as const,
+          category: IT_INFRASTRUCTURE_MAP_LAYER.label,
+          location: site.location,
+          description: parts.join(' · ') || site.location,
+          color: IT_INFRASTRUCTURE_MAP_LAYER.color,
+          icon: IT_INFRASTRUCTURE_MAP_LAYER.markerIcon,
+        })
+      }
+    }
+
     if (OPEN_SOURCE_MAP_LAYERS_ENABLED && mapLayers.ci_financial && financialSitesLayerQuery.data?.length) {
       const skipCoverageFilter = restrictToUsa && !stateBoundsRestriction && !lockToCoverageCircle
       for (const site of financialSitesLayerQuery.data) {
@@ -2158,6 +2339,11 @@ export function GISMap({
     fuelSitesLayerQuery.data,
     pharmaciesLayerQuery.data,
     policeStationsLayerQuery.data,
+    mealsReadyLayerQuery.data,
+    generatorsLayerQuery.data,
+    volunteersLayerQuery.data,
+    resourceSitesLayerQuery.data,
+    itInfrastructureLayerQuery.data,
     financialSitesLayerQuery.data,
     hifldSitesLayerQuery.data,
     enabledOperationalHifldLayers,
@@ -2308,6 +2494,11 @@ export function GISMap({
           (fuelSitesLayerQuery.isFetching && !fuelSitesLayerQuery.data?.length) ||
           (pharmaciesLayerQuery.isFetching && !pharmaciesLayerQuery.data?.length) ||
           (policeStationsLayerQuery.isFetching && !policeStationsLayerQuery.data?.length) ||
+          (mealsReadyLayerQuery.isFetching && !mealsReadyLayerQuery.data?.length) ||
+          (generatorsLayerQuery.isFetching && !generatorsLayerQuery.data?.length) ||
+          (volunteersLayerQuery.isFetching && !volunteersLayerQuery.data?.length) ||
+          (resourceSitesLayerQuery.isFetching && !resourceSitesLayerQuery.data?.length) ||
+          (itInfrastructureLayerQuery.isFetching && !itInfrastructureLayerQuery.data?.length) ||
           (financialSitesLayerQuery.isFetching && !financialSitesLayerQuery.data?.length) ||
           (hifldSitesLayerQuery.isFetching && !hifldSitesLayerQuery.data?.length) ||
           (mapLayers.roads && isLoadingRoadClosures) ||
@@ -2326,15 +2517,25 @@ export function GISMap({
                       ? 'Loading Pharmacies…'
                       : policeStationsLayerQuery.isFetching && !policeStationsLayerQuery.data?.length
                         ? 'Loading Police Stations…'
-                    : hifldSitesLayerQuery.isFetching && !hifldSitesLayerQuery.data?.length
-                      ? 'Loading Critical Infrastructure…'
-                      : financialSitesLayerQuery.isFetching && !financialSitesLayerQuery.data?.length
-                        ? 'Loading Financial Sites…'
-                        : isLoadingRoadClosures
-                          ? 'Loading Road Closures…'
-                          : isLoadingPowerOutages
-                            ? 'Loading Power Outages…'
-                        : 'Locating Facilities…'}
+                        : mealsReadyLayerQuery.isFetching && !mealsReadyLayerQuery.data?.length
+                          ? 'Loading Meals Ready…'
+                          : generatorsLayerQuery.isFetching && !generatorsLayerQuery.data?.length
+                            ? 'Loading Generators…'
+                            : volunteersLayerQuery.isFetching && !volunteersLayerQuery.data?.length
+                              ? 'Loading Volunteers…'
+                              : resourceSitesLayerQuery.isFetching && !resourceSitesLayerQuery.data?.length
+                                ? 'Loading Resource Sites…'
+                                : itInfrastructureLayerQuery.isFetching && !itInfrastructureLayerQuery.data?.length
+                                  ? 'Loading IT Infrastructure…'
+                                  : hifldSitesLayerQuery.isFetching && !hifldSitesLayerQuery.data?.length
+                                    ? 'Loading Critical Infrastructure…'
+                                    : financialSitesLayerQuery.isFetching && !financialSitesLayerQuery.data?.length
+                                      ? 'Loading Financial Sites…'
+                                      : isLoadingRoadClosures
+                                        ? 'Loading Road Closures…'
+                                        : isLoadingPowerOutages
+                                          ? 'Loading Power Outages…'
+                                          : 'Locating Facilities…'}
             </span>
           </div>
         )}

@@ -8,6 +8,7 @@ import {
   AlertOctagon,
   UtensilsCrossed,
   Users,
+  Server,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -23,6 +24,7 @@ export type GisFilterFetchKind =
       extraNearbyTypes?: string[]
     }
   | { mode: 'deployment'; deployment: DeploymentResourceKind }
+  | { mode: 'mongo' }
 
 export type DeploymentResourceKind =
   | 'power_crews'
@@ -43,14 +45,14 @@ export interface GisFilterLayerDef {
   markerIcon: string
 }
 
-/** Layers backed by Google Places, text search, or responder deployment. */
-export const GOOGLE_GIS_FILTER_LAYERS: GisFilterLayerDef[] = [
+/** Layers backed by Mongo static place datasets (no live Google billing). */
+export const MONGO_GIS_FILTER_LAYERS: GisFilterLayerDef[] = [
   {
     id: 'generators',
     label: 'Generators',
     Icon: Zap,
     color: '#E5A436',
-    fetch: { mode: 'google_text', query: 'generator rental emergency generator supplier' },
+    fetch: { mode: 'mongo' },
     resultType: 'generator',
     markerIcon: 'generator',
   },
@@ -59,11 +61,32 @@ export const GOOGLE_GIS_FILTER_LAYERS: GisFilterLayerDef[] = [
     label: 'Meals Ready',
     Icon: UtensilsCrossed,
     color: '#D74C30',
-    fetch: { mode: 'google_text', query: 'food bank meal distribution emergency feeding' },
+    fetch: { mode: 'mongo' },
     resultType: 'meals_ready',
     markerIcon: 'meals',
   },
+  {
+    id: 'volunteers',
+    label: 'Volunteers',
+    Icon: Users,
+    color: '#5C7E2D',
+    fetch: { mode: 'mongo' },
+    resultType: 'volunteers',
+    markerIcon: 'volunteers',
+  },
+  {
+    id: 'ci_it',
+    label: 'Information Technology (IT)',
+    Icon: Server,
+    color: '#8B5CF6',
+    fetch: { mode: 'mongo' },
+    resultType: 'it_infrastructure',
+    markerIcon: 'it',
+  },
 ]
+
+/** Layers backed by Google Places or text search. */
+export const GOOGLE_GIS_FILTER_LAYERS: GisFilterLayerDef[] = []
 
 export const DEPLOYMENT_GIS_FILTER_LAYERS: GisFilterLayerDef[] = [
   {
@@ -84,18 +107,10 @@ export const DEPLOYMENT_GIS_FILTER_LAYERS: GisFilterLayerDef[] = [
     resultType: 'water_crews',
     markerIcon: 'water_crew',
   },
-  {
-    id: 'volunteers',
-    label: 'Volunteers',
-    Icon: Users,
-    color: '#5C7E2D',
-    fetch: { mode: 'deployment', deployment: 'volunteers' },
-    resultType: 'volunteers',
-    markerIcon: 'volunteers',
-  },
 ]
 
 export const ALL_GIS_FILTER_LAYERS: GisFilterLayerDef[] = [
+  ...MONGO_GIS_FILTER_LAYERS,
   ...GOOGLE_GIS_FILTER_LAYERS,
   ...DEPLOYMENT_GIS_FILTER_LAYERS,
 ]

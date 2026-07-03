@@ -51,45 +51,60 @@ const PIN_COLORS: Record<string, string> = {
     ltblue: '#38bdf8',
 };
 
+const FACILITY_MARKER_SIZE = 36;
+const FACILITY_MARKER_ANCHOR = FACILITY_MARKER_SIZE / 2;
+
+function facilityMarkerIcon(iconUrl: string): L.Icon {
+    return L.icon({
+        iconUrl,
+        iconSize: [FACILITY_MARKER_SIZE, FACILITY_MARKER_SIZE],
+        iconAnchor: [FACILITY_MARKER_ANCHOR, FACILITY_MARKER_ANCHOR],
+        popupAnchor: [0, -FACILITY_MARKER_ANCHOR],
+    });
+}
+
 export function buildLeafletMarkerIcon(marker: SituationalMapMarker): L.DivIcon | L.Icon {
     if (marker.icon === 'dam' || (marker.type === 'infrastructure' && marker.category === 'Dams')) {
-        return L.icon({
-            iconUrl: '/icons/dam-marker.svg',
-            iconSize: [36, 36],
-            iconAnchor: [18, 18],
-            popupAnchor: [0, -18],
-        });
+        return facilityMarkerIcon('/icons/dam-marker.svg');
     }
 
     if (marker.icon === 'shelter' || (marker.type === 'infrastructure' && marker.category === 'Shelters')) {
-        return L.icon({
-            iconUrl: '/icons/shelter-marker.svg',
-            iconSize: [36, 36],
-            iconAnchor: [18, 18],
-            popupAnchor: [0, -18],
-        });
+        return facilityMarkerIcon('/icons/shelter-marker.svg');
     }
 
     if (marker.icon === 'fuel' || (marker.type === 'infrastructure' && marker.category === 'Fuel Sites')) {
-        return L.icon({
-            iconUrl: '/icons/fuel-marker.svg',
-            iconSize: [36, 36],
-            iconAnchor: [18, 18],
-            popupAnchor: [0, -18],
-        });
+        return facilityMarkerIcon('/icons/fuel-marker.svg');
     }
 
     if (marker.icon === 'pharmacy' || (marker.type === 'infrastructure' && marker.category === 'Pharmacies')) {
-        return L.icon({
-            iconUrl: '/icons/pharmacy-marker.svg',
-            iconSize: [36, 36],
-            iconAnchor: [18, 18],
-            popupAnchor: [0, -18],
-        });
+        return facilityMarkerIcon('/icons/pharmacy-marker.svg');
     }
 
     if (marker.icon === 'police' || (marker.type === 'infrastructure' && marker.category === 'Police Stations')) {
         return pinDivIcon('#1E3A8A', '#1e293b');
+    }
+
+    if (marker.icon === 'meals' || (marker.type === 'infrastructure' && marker.category === 'Meals Ready')) {
+        return facilityMarkerIcon('/icons/meals-marker.svg');
+    }
+
+    if (marker.icon === 'generator' || (marker.type === 'infrastructure' && marker.category === 'Generators')) {
+        return facilityMarkerIcon('/icons/generator-marker.svg');
+    }
+
+    if (marker.icon === 'volunteers' || (marker.type === 'infrastructure' && marker.category === 'Volunteers')) {
+        return facilityMarkerIcon('/icons/volunteer-marker.svg');
+    }
+
+    if (marker.icon === 'resource' || (marker.type === 'infrastructure' && marker.category === 'Resource Sites')) {
+        return facilityMarkerIcon('/icons/resource-marker.svg');
+    }
+
+    if (
+        marker.icon === 'it' ||
+        (marker.type === 'infrastructure' && marker.category === 'Information Technology (IT)')
+    ) {
+        return facilityMarkerIcon('/icons/it-marker.svg');
     }
 
     if (
@@ -105,21 +120,11 @@ export function buildLeafletMarkerIcon(marker: SituationalMapMarker): L.DivIcon 
     }
 
     if (marker.icon === 'chemical' || (marker.type === 'infrastructure' && (marker.category === 'Chemical' || marker.category === 'Chemical Sites' || marker.category === 'Chemical Storage & Manufacturing'))) {
-        return L.icon({
-            iconUrl: '/icons/chemical-marker.svg',
-            iconSize: [36, 36],
-            iconAnchor: [18, 18],
-            popupAnchor: [0, -18],
-        });
+        return facilityMarkerIcon('/icons/chemical-marker.svg');
     }
 
     if (marker.icon === 'financial' || (marker.type === 'infrastructure' && (marker.category === 'Financial' || marker.category === 'Financial Sites' || marker.category === 'Financial Services'))) {
-        return L.icon({
-            iconUrl: '/icons/financial-marker.svg',
-            iconSize: [36, 36],
-            iconAnchor: [18, 18],
-            popupAnchor: [0, -18],
-        });
+        return facilityMarkerIcon('/icons/financial-marker.svg');
     }
 
     if (marker.type === 'infrastructure' && marker.glyph) {
@@ -252,6 +257,38 @@ export function policeClusterIcon(count: number): L.DivIcon {
         iconSize: [size, size],
         iconAnchor: [size / 2, size / 2],
     });
+}
+
+function facilityClusterIcon(count: number, background: string, className: string): L.DivIcon {
+    const label = count > 999 ? '999+' : String(count);
+    const size = count > 99 ? 44 : 38;
+    const html = `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${background};border:2.5px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.28);display:flex;align-items:center;justify-content:center;color:#fff;font-family:Arial,sans-serif;font-weight:800;font-size:${count > 99 ? 10 : 12}px;">${label}</div>`;
+    return L.divIcon({
+        className,
+        html,
+        iconSize: [size, size],
+        iconAnchor: [size / 2, size / 2],
+    });
+}
+
+export function mealsClusterIcon(count: number): L.DivIcon {
+    return facilityClusterIcon(count, '#D74C30', 'situational-map-meals-cluster');
+}
+
+export function generatorClusterIcon(count: number): L.DivIcon {
+    return facilityClusterIcon(count, '#E5A436', 'situational-map-generator-cluster');
+}
+
+export function volunteerClusterIcon(count: number): L.DivIcon {
+    return facilityClusterIcon(count, '#5C7E2D', 'situational-map-volunteer-cluster');
+}
+
+export function resourceClusterIcon(count: number): L.DivIcon {
+    return facilityClusterIcon(count, '#16A34A', 'situational-map-resource-cluster');
+}
+
+export function itClusterIcon(count: number): L.DivIcon {
+    return facilityClusterIcon(count, '#8B5CF6', 'situational-map-it-cluster');
 }
 
 /** Purple chemical cluster badge with count — matches chemical-marker.svg. */

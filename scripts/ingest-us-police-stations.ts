@@ -7,7 +7,6 @@
  *   npx tsx scripts/ingest-us-police-stations.ts path/to/custom-police-stations.json
  */
 import 'dotenv/config';
-import { unlink } from 'node:fs/promises';
 import {
     defaultUsPoliceStationsJsonPath,
     ingestUsPoliceStationsFromFile,
@@ -18,11 +17,6 @@ async function main() {
     const result = await ingestUsPoliceStationsFromFile(filePath);
 
     console.log(JSON.stringify(result, null, 2));
-
-    if (filePath.endsWith('us-police-stations.json')) {
-        await unlink(filePath);
-        console.log(JSON.stringify({ removedSourceFile: filePath }, null, 2));
-    }
 }
 
 main().catch((err) => {
