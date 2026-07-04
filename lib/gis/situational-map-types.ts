@@ -1,5 +1,6 @@
 import type { UnifiedEventHeatPoint } from '@/lib/geo/unified-event-heatmap';
 import type { InfrastructureClusterMode } from '@/lib/gis/map-layer-config';
+import type { WeatherRadarMapScope } from '@/lib/gis/weather-radar-config';
 
 export interface SituationalMapMarker {
     id: string;
@@ -119,6 +120,10 @@ export interface SituationalMapProps {
     onHeatIncidentSelect?: (incident: UnifiedEventHeatPoint) => void;
     onBoundsChanged?: (bounds: MapStateBounds) => void;
     clusterInfrastructure?: boolean;
+    /** Show live NEXRAD reflectivity WMS overlay (Filter → Weather Radar). */
+    showWeatherRadar?: boolean;
+    /** Sub-admin / scoped view: clip radar to state bounds or license radius. */
+    weatherRadarScope?: WeatherRadarMapScope | null;
     /** Use dam-friendly clustering (lower uncluster zoom, count badges). */
     infrastructureClusterMode?: InfrastructureClusterMode;
     fitStateOnLoad?: boolean;
