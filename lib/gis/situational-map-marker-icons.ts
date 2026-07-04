@@ -1,5 +1,7 @@
 import L from 'leaflet';
+import type { LucideIcon } from 'lucide-react';
 import type { SituationalMapMarker } from '@/lib/gis/situational-map-types';
+import { lucideGlyphSvg, resolveGlyphIcon } from '@/lib/gis/marker-glyph-icons';
 
 const PIN_W = 28;
 const PIN_H = 42;
@@ -51,85 +53,56 @@ const PIN_COLORS: Record<string, string> = {
     ltblue: '#38bdf8',
 };
 
-const FACILITY_MARKER_SIZE = 36;
-const FACILITY_MARKER_ANCHOR = FACILITY_MARKER_SIZE / 2;
+const GLYPH_MARKER_SIZE = 34;
 
-function facilityMarkerIcon(iconUrl: string): L.Icon {
-    return L.icon({
-        iconUrl,
-        iconSize: [FACILITY_MARKER_SIZE, FACILITY_MARKER_SIZE],
-        iconAnchor: [FACILITY_MARKER_ANCHOR, FACILITY_MARKER_ANCHOR],
-        popupAnchor: [0, -FACILITY_MARKER_ANCHOR],
+/** Marker `icon` ids that represent a facility/category (glyph badge, not a pin). */
+const FACILITY_ICON_IDS = new Set([
+    'dam',
+    'shelter',
+    'fuel',
+    'pharmacy',
+    'police',
+    'meals',
+    'generator',
+    'volunteers',
+    'resource',
+    'it',
+    'chemical',
+    'financial',
+    'road_closure',
+    'power_outage',
+    'hospital',
+    'fire',
+]);
+
+/** Colored circular badge with the category's dropdown lucide glyph (white). */
+function glyphMarkerDivIcon(color: string, Icon: LucideIcon): L.DivIcon {
+    const size = GLYPH_MARKER_SIZE;
+    const glyph = lucideGlyphSvg(Icon, Math.round(size * 0.52));
+    const html = `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${color};border:2.5px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.32);display:flex;align-items:center;justify-content:center;">${glyph}</div>`;
+    return L.divIcon({
+        className: 'situational-map-glyph-marker',
+        html,
+        iconSize: [size, size],
+        iconAnchor: [size / 2, size / 2],
+        popupAnchor: [0, -size / 2],
     });
 }
 
 export function buildLeafletMarkerIcon(marker: SituationalMapMarker): L.DivIcon | L.Icon {
-    if (marker.icon === 'dam' || (marker.type === 'infrastructure' && marker.category === 'Dams')) {
-        return facilityMarkerIcon('/icons/dam-marker.svg');
+    const glyphIcon = resolveGlyphIcon(marker.icon, marker.category);
+    const isFacility =
+        marker.type === 'infrastructure' ||
+        (marker.icon != null && FACILITY_ICON_IDS.has(marker.icon));
+
+    if (glyphIcon && isFacility) {
+        return glyphMarkerDivIcon(marker.color || '#6366F1', glyphIcon);
     }
 
-    if (marker.icon === 'shelter' || (marker.type === 'infrastructure' && marker.category === 'Shelters')) {
-        return facilityMarkerIcon('/icons/shelter-marker.svg');
-    }
-
-    if (marker.icon === 'fuel' || (marker.type === 'infrastructure' && marker.category === 'Fuel Sites')) {
-        return facilityMarkerIcon('/icons/fuel-marker.svg');
-    }
-
-    if (marker.icon === 'pharmacy' || (marker.type === 'infrastructure' && marker.category === 'Pharmacies')) {
-        return facilityMarkerIcon('/icons/pharmacy-marker.svg');
-    }
-
-    if (marker.icon === 'police' || (marker.type === 'infrastructure' && marker.category === 'Police Stations')) {
-        return pinDivIcon('#1E3A8A', '#1e293b');
-    }
-
-    if (marker.icon === 'meals' || (marker.type === 'infrastructure' && marker.category === 'Meals Ready')) {
-        return facilityMarkerIcon('/icons/meals-marker.svg');
-    }
-
-    if (marker.icon === 'generator' || (marker.type === 'infrastructure' && marker.category === 'Generators')) {
-        return facilityMarkerIcon('/icons/generator-marker.svg');
-    }
-
-    if (marker.icon === 'volunteers' || (marker.type === 'infrastructure' && marker.category === 'Volunteers')) {
-        return facilityMarkerIcon('/icons/volunteer-marker.svg');
-    }
-
-    if (marker.icon === 'resource' || (marker.type === 'infrastructure' && marker.category === 'Resource Sites')) {
-        return facilityMarkerIcon('/icons/resource-marker.svg');
-    }
-
-    if (
-        marker.icon === 'it' ||
-        (marker.type === 'infrastructure' && marker.category === 'Information Technology (IT)')
-    ) {
-        return facilityMarkerIcon('/icons/it-marker.svg');
-    }
-
-    if (
-        marker.icon === 'road_closure' ||
-        (marker.type === 'infrastructure' && marker.category === 'Road Closures')
-    ) {
-        return L.divIcon({
-            className: 'situational-map-road-closure-icon',
-            html: glyphSvg('#DC2626', '−', 34),
-            iconSize: [34, 34],
-            iconAnchor: [17, 17],
-        });
-    }
-
-    if (marker.icon === 'chemical' || (marker.type === 'infrastructure' && (marker.category === 'Chemical' || marker.category === 'Chemical Sites' || marker.category === 'Chemical Storage & Manufacturing'))) {
-        return facilityMarkerIcon('/icons/chemical-marker.svg');
-    }
-
-    if (marker.icon === 'financial' || (marker.type === 'infrastructure' && (marker.category === 'Financial' || marker.category === 'Financial Sites' || marker.category === 'Financial Services'))) {
-        return facilityMarkerIcon('/icons/financial-marker.svg');
-    }
-
+    // Fallback for CI sectors that only carry a single-letter glyph.
     if (marker.type === 'infrastructure' && marker.glyph) {
         const bg = marker.color || '#6366F1';
-        const size = 34;
+        const size = GLYPH_MARKER_SIZE;
         return L.divIcon({
             className: 'situational-map-glyph-icon',
             html: glyphSvg(bg, marker.glyph, size),
@@ -166,7 +139,7 @@ export function buildLeafletMarkerIcon(marker: SituationalMapMarker): L.DivIcon 
         return pinDivIcon(marker.color || PIN_COLORS.blue, '#1d4ed8');
     }
 
-    if (marker.icon === 'emergency' || marker.icon === 'hospital') {
+    if (marker.icon === 'emergency') {
         return L.icon({
             iconUrl: '/icons/emergency-service-marker.svg',
             iconSize: [32, 42],
@@ -180,17 +153,33 @@ export function buildLeafletMarkerIcon(marker: SituationalMapMarker): L.DivIcon 
     return pinDivIcon(color);
 }
 
-/** Red road-closure cluster badge with count. */
-export function roadClosureClusterIcon(count: number): L.DivIcon {
+/**
+ * Category cluster badge: colored circle with the dropdown lucide glyph plus a
+ * white count pill (so both the icon and the count stay readable when zoomed).
+ */
+function badgeClusterIcon(
+    count: number,
+    background: string,
+    className: string,
+    iconId: string,
+): L.DivIcon {
     const label = count > 999 ? '999+' : String(count);
-    const size = count > 99 ? 44 : 38;
-    const html = `<div style="width:${size}px;height:${size}px;border-radius:50%;background:#DC2626;border:2.5px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.28);display:flex;align-items:center;justify-content:center;color:#fff;font-family:Arial,sans-serif;font-weight:800;font-size:${count > 99 ? 10 : 12}px;">${label}</div>`;
+    const size = count > 99 ? 46 : 40;
+    const Icon = resolveGlyphIcon(iconId);
+    const glyph = Icon ? lucideGlyphSvg(Icon, Math.round(size * 0.44)) : '';
+    const countBadge = `<span style="position:absolute;bottom:-4px;right:-4px;background:#fff;color:#0f172a;border-radius:9999px;font-family:Arial,sans-serif;font-weight:800;font-size:${count > 99 ? 9 : 10}px;line-height:1;padding:2px 5px;min-width:16px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,0.35);">${label}</span>`;
+    const html = `<div style="position:relative;width:${size}px;height:${size}px;border-radius:50%;background:${background};border:2.5px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.28);display:flex;align-items:center;justify-content:center;">${glyph}${countBadge}</div>`;
     return L.divIcon({
-        className: 'situational-map-road-closure-cluster',
+        className,
         html,
         iconSize: [size, size],
         iconAnchor: [size / 2, size / 2],
     });
+}
+
+/** Red road-closure cluster badge with count. */
+export function roadClosureClusterIcon(count: number): L.DivIcon {
+    return badgeClusterIcon(count, '#DC2626', 'situational-map-road-closure-cluster', 'road_closure');
 }
 
 export function clusterIcon(): L.DivIcon {
@@ -207,140 +196,57 @@ export function clusterIcon(): L.DivIcon {
     });
 }
 
-/** Green shelter cluster badge with count — matches shelter-marker.svg. */
 export function shelterClusterIcon(count: number): L.DivIcon {
-    const label = count > 999 ? '999+' : String(count);
-    const size = count > 99 ? 44 : 38;
-    const html = `<div style="width:${size}px;height:${size}px;border-radius:50%;background:#16A34A;border:2.5px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.28);display:flex;align-items:center;justify-content:center;color:#fff;font-family:Arial,sans-serif;font-weight:800;font-size:${count > 99 ? 10 : 12}px;">${label}</div>`;
-    return L.divIcon({
-        className: 'situational-map-shelter-cluster',
-        html,
-        iconSize: [size, size],
-        iconAnchor: [size / 2, size / 2],
-    });
+    return badgeClusterIcon(count, '#16A34A', 'situational-map-shelter-cluster', 'shelter');
 }
 
-/** Orange fuel cluster badge with count — matches fuel-marker.svg. */
 export function fuelClusterIcon(count: number): L.DivIcon {
-    const label = count > 999 ? '999+' : String(count);
-    const size = count > 99 ? 44 : 38;
-    const html = `<div style="width:${size}px;height:${size}px;border-radius:50%;background:#D74C30;border:2.5px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.28);display:flex;align-items:center;justify-content:center;color:#fff;font-family:Arial,sans-serif;font-weight:800;font-size:${count > 99 ? 10 : 12}px;">${label}</div>`;
-    return L.divIcon({
-        className: 'situational-map-fuel-cluster',
-        html,
-        iconSize: [size, size],
-        iconAnchor: [size / 2, size / 2],
-    });
+    return badgeClusterIcon(count, '#D74C30', 'situational-map-fuel-cluster', 'fuel');
 }
 
-/** Green pharmacy cluster badge with count — matches pharmacy-marker.svg. */
 export function pharmacyClusterIcon(count: number): L.DivIcon {
-    const label = count > 999 ? '999+' : String(count);
-    const size = count > 99 ? 44 : 38;
-    const html = `<div style="width:${size}px;height:${size}px;border-radius:50%;background:#10B981;border:2.5px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.28);display:flex;align-items:center;justify-content:center;color:#fff;font-family:Arial,sans-serif;font-weight:800;font-size:${count > 99 ? 10 : 12}px;">${label}</div>`;
-    return L.divIcon({
-        className: 'situational-map-pharmacy-cluster',
-        html,
-        iconSize: [size, size],
-        iconAnchor: [size / 2, size / 2],
-    });
+    return badgeClusterIcon(count, '#10B981', 'situational-map-pharmacy-cluster', 'pharmacy');
 }
 
-/** Navy police cluster badge with count. */
 export function policeClusterIcon(count: number): L.DivIcon {
-    const label = count > 999 ? '999+' : String(count);
-    const size = count > 99 ? 44 : 38;
-    const html = `<div style="width:${size}px;height:${size}px;border-radius:50%;background:#1E3A8A;border:2.5px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.28);display:flex;align-items:center;justify-content:center;color:#fff;font-family:Arial,sans-serif;font-weight:800;font-size:${count > 99 ? 10 : 12}px;">${label}</div>`;
-    return L.divIcon({
-        className: 'situational-map-police-cluster',
-        html,
-        iconSize: [size, size],
-        iconAnchor: [size / 2, size / 2],
-    });
-}
-
-function facilityClusterIcon(count: number, background: string, className: string): L.DivIcon {
-    const label = count > 999 ? '999+' : String(count);
-    const size = count > 99 ? 44 : 38;
-    const html = `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${background};border:2.5px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.28);display:flex;align-items:center;justify-content:center;color:#fff;font-family:Arial,sans-serif;font-weight:800;font-size:${count > 99 ? 10 : 12}px;">${label}</div>`;
-    return L.divIcon({
-        className,
-        html,
-        iconSize: [size, size],
-        iconAnchor: [size / 2, size / 2],
-    });
+    return badgeClusterIcon(count, '#1E3A8A', 'situational-map-police-cluster', 'police');
 }
 
 export function mealsClusterIcon(count: number): L.DivIcon {
-    return facilityClusterIcon(count, '#D74C30', 'situational-map-meals-cluster');
+    return badgeClusterIcon(count, '#D74C30', 'situational-map-meals-cluster', 'meals');
 }
 
 export function generatorClusterIcon(count: number): L.DivIcon {
-    return facilityClusterIcon(count, '#E5A436', 'situational-map-generator-cluster');
+    return badgeClusterIcon(count, '#E5A436', 'situational-map-generator-cluster', 'generator');
 }
 
 export function volunteerClusterIcon(count: number): L.DivIcon {
-    return facilityClusterIcon(count, '#5C7E2D', 'situational-map-volunteer-cluster');
+    return badgeClusterIcon(count, '#5C7E2D', 'situational-map-volunteer-cluster', 'volunteers');
 }
 
 export function resourceClusterIcon(count: number): L.DivIcon {
-    return facilityClusterIcon(count, '#16A34A', 'situational-map-resource-cluster');
+    return badgeClusterIcon(count, '#16A34A', 'situational-map-resource-cluster', 'resource');
 }
 
 export function itClusterIcon(count: number): L.DivIcon {
-    return facilityClusterIcon(count, '#8B5CF6', 'situational-map-it-cluster');
+    return badgeClusterIcon(count, '#8B5CF6', 'situational-map-it-cluster', 'it');
 }
 
-/** Purple chemical cluster badge with count — matches chemical-marker.svg. */
 export function chemicalClusterIcon(count: number): L.DivIcon {
-    const label = count > 999 ? '999+' : String(count);
-    const size = count > 99 ? 44 : 38;
-    const html = `<div style="width:${size}px;height:${size}px;border-radius:50%;background:#7C3AED;border:2.5px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.28);display:flex;align-items:center;justify-content:center;color:#fff;font-family:Arial,sans-serif;font-weight:800;font-size:${count > 99 ? 10 : 12}px;">${label}</div>`;
-    return L.divIcon({
-        className: 'situational-map-chemical-cluster',
-        html,
-        iconSize: [size, size],
-        iconAnchor: [size / 2, size / 2],
-    });
+    return badgeClusterIcon(count, '#7C3AED', 'situational-map-chemical-cluster', 'chemical');
 }
 
-/** Green financial cluster badge with count — matches financial-marker.svg. */
 export function financialClusterIcon(count: number): L.DivIcon {
-    const label = count > 999 ? '999+' : String(count);
-    const size = count > 99 ? 44 : 38;
-    const html = `<div style="width:${size}px;height:${size}px;border-radius:50%;background:#059669;border:2.5px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.28);display:flex;align-items:center;justify-content:center;color:#fff;font-family:Arial,sans-serif;font-weight:800;font-size:${count > 99 ? 10 : 12}px;">${label}</div>`;
-    return L.divIcon({
-        className: 'situational-map-financial-cluster',
-        html,
-        iconSize: [size, size],
-        iconAnchor: [size / 2, size / 2],
-    });
+    return badgeClusterIcon(count, '#059669', 'situational-map-financial-cluster', 'financial');
 }
 
-/** Red dam cluster badge with count — matches dam-marker.svg. */
 export function damClusterIcon(count: number): L.DivIcon {
-    const label = count > 999 ? '999+' : String(count);
-    const size = count > 99 ? 44 : 38;
-    const html = `<div style="width:${size}px;height:${size}px;border-radius:50%;background:#E32C28;border:2.5px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.28);display:flex;align-items:center;justify-content:center;color:#fff;font-family:Arial,sans-serif;font-weight:800;font-size:${count > 99 ? 10 : 12}px;">${label}</div>`;
-    return L.divIcon({
-        className: 'situational-map-dam-cluster',
-        html,
-        iconSize: [size, size],
-        iconAnchor: [size / 2, size / 2],
-    });
+    return badgeClusterIcon(count, '#E32C28', 'situational-map-dam-cluster', 'dam');
 }
 
 /** Amber cluster badge for HIFLD-backed critical infrastructure sectors. */
 export function criticalInfraClusterIcon(count: number): L.DivIcon {
-    const label = count > 999 ? '999+' : String(count);
-    const size = count > 99 ? 44 : 38;
-    const html = `<div style="width:${size}px;height:${size}px;border-radius:50%;background:#D97706;border:2.5px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.28);display:flex;align-items:center;justify-content:center;color:#fff;font-family:Arial,sans-serif;font-weight:800;font-size:${count > 99 ? 10 : 12}px;">${label}</div>`;
-    return L.divIcon({
-        className: 'situational-map-critical-infra-cluster',
-        html,
-        iconSize: [size, size],
-        iconAnchor: [size / 2, size / 2],
-    });
+    return badgeClusterIcon(count, '#D97706', 'situational-map-critical-infra-cluster', 'critical_infra');
 }
 
 /** Pin for heatmap incident selection popup */
