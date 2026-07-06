@@ -29,6 +29,7 @@ export interface CitizenActivityFeedListProps {
     className?: string
     emptyMessage?: string
     searchQuery?: string
+    onMarkCompleted?: (id: string) => void | Promise<void>
 }
 
 function ResolutionBadge({ status }: { status: CitizenActivityResolutionStatus }) {
@@ -107,7 +108,14 @@ function ActivityCell({
     )
 }
 
-function FeedTableRow({ entry }: { entry: CitizenActivityDisplayRow }) {
+function FeedTableRow({
+    entry,
+    onMarkCompleted,
+}: {
+    entry: CitizenActivityDisplayRow
+    onMarkCompleted?: (id: string) => void | Promise<void>
+}) {
+    const isLiveRecord = Boolean(entry.userId)
     return (
         <tr className="border-b border-slate-100 last:border-0 align-top">
             <td className="py-4 pr-4 min-w-[220px]">
@@ -121,12 +129,13 @@ function FeedTableRow({ entry }: { entry: CitizenActivityDisplayRow }) {
             </td>
             <td className="py-4 pr-4 min-w-[280px]">
                 <p className="text-sm leading-relaxed text-slate-600">{entry.takeAction}</p>
-                {entry.resolutionStatus === 'pending' ? (
+                {entry.resolutionStatus === 'pending' && isLiveRecord && onMarkCompleted ? (
                     <button
                         type="button"
+                        onClick={() => void onMarkCompleted(entry.id)}
                         className="mt-2 rounded-lg bg-[#33375D] px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-white transition-colors hover:bg-[#252847]"
                     >
-                        Take action
+                        Mark completed
                     </button>
                 ) : null}
             </td>
@@ -162,6 +171,7 @@ export function CitizenActivityFeedList({
     className,
     emptyMessage = 'No citizen activity to display.',
     searchQuery = '',
+    onMarkCompleted,
 }: CitizenActivityFeedListProps) {
     const rows = React.useMemo(() => {
         const enriched = enrichCitizenActivityItems(items)
@@ -226,7 +236,7 @@ export function CitizenActivityFeedList({
                 </thead>
                 <tbody>
                     {rows.map((entry) => (
-                        <FeedTableRow key={entry.id} entry={entry} />
+                        <FeedTableRow key={entry.id} entry={entry} onMarkCompleted={onMarkCompleted} />
                     ))}
                 </tbody>
             </table>

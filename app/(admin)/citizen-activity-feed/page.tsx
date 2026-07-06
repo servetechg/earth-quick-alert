@@ -9,10 +9,8 @@ import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { CitizenActivityFeedList } from '@/components/citizen-activity/citizen-activity-feed-list'
-import { enrichCitizenActivityItems } from '@/components/citizen-activity/citizen-activity-display'
 import {
     CITIZEN_ACTIVITY_FILTER_LABELS,
-    type CitizenActivityFilter,
 } from '@/lib/citizen-activity/category-meta'
 import type { CitizenActivityFeedResponse, CitizenActivityFilter as FilterType } from '@/lib/citizen-activity/types'
 import { cn } from '@/lib/utils'
@@ -69,6 +67,7 @@ export default function CitizenActivityFeedPage() {
                 filter,
                 limit: '100',
             })
+            if (debouncedQuery) params.set('q', debouncedQuery)
             const res = await fetch(`/api/admin/citizen-activity?${params.toString()}`, {
                 cache: 'no-store',
             })
@@ -79,7 +78,7 @@ export default function CitizenActivityFeedPage() {
         } finally {
             setLoading(false)
         }
-    }, [filter])
+    }, [filter, debouncedQuery])
 
     useEffect(() => {
         void loadFeed()
@@ -88,28 +87,11 @@ export default function CitizenActivityFeedPage() {
     const stats = payload?.stats
     const items = payload?.items ?? []
 
-    const filteredCount = useMemo(() => {
-        if (!debouncedQuery.trim()) return items.length
-        const q = debouncedQuery.trim().toLowerCase()
-        return enrichCitizenActivityItems(items).filter((entry) =>
-            [
-                entry.title,
-                entry.citizenName,
-                entry.citizenAddress,
-                entry.takeAction,
-                entry.resolutionStatus,
-            ]
-                .join(' ')
-                .toLowerCase()
-                .includes(q),
-        ).length
-    }, [items, debouncedQuery])
-
     const filterButtons = useMemo(
         () =>
             FILTERS.map((key) => ({
                 key,
-                label: CITIZEN_ACTIVITY_FILTER_LABELS[key as CitizenActivityFilter],
+                label: CITIZEN_ACTIVITY_FILTER_LABELS[key],
             })),
         [],
     )
@@ -204,7 +186,7 @@ export default function CitizenActivityFeedPage() {
                         </p>
                     </div>
                     <p className="text-xs font-semibold text-slate-500">
-                        {filteredCount} record{filteredCount === 1 ? '' : 's'}
+                        {items.length} record{items.length === 1 ? '' : 's'}
                     </p>
                 </div>
                 {loading ? (
@@ -214,7 +196,20 @@ export default function CitizenActivityFeedPage() {
                         ))}
                     </div>
                 ) : (
-                    <CitizenActivityFeedList items={items} searchQuery={debouncedQuery} />
+                    <CitizenActivityFeedList
+                        items={items}
+                        onMarkCompleted={async (id) => {
+                            await fetch(`/api/admin/citizen-activity/${id}`, {
+                                method: 'PATCH',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    resolutionStatus: 'completed',
+                                    status: 'Resolved',
+                                }),
+                            })
+                            await loadFeed()
+                        }}
+                    />
                 )}
             </Card>
         </AdminPageShell>

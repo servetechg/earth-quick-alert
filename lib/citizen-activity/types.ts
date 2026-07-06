@@ -28,6 +28,12 @@ export interface CitizenActivityItem {
     priority: CitizenActivityPriority
     status?: string
     source: CitizenActivitySource
+    /** Populated from CitizenActivity records (mobile / web). */
+    citizenName?: string
+    citizenAddress?: string
+    takeAction?: string
+    resolutionStatus?: 'pending' | 'completed'
+    userId?: string
 }
 
 export type CitizenActivityFilter =
@@ -48,5 +54,5 @@ export interface CitizenActivityStats {
 export interface CitizenActivityFeedResponse {
     items: CitizenActivityItem[]
     stats: CitizenActivityStats
-    previewIds: string[]
+    source?: 'live'
 }
