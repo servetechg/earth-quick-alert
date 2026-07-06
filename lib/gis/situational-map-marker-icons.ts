@@ -89,7 +89,26 @@ function glyphMarkerDivIcon(color: string, Icon: LucideIcon): L.DivIcon {
     });
 }
 
+/** "Road closed" sign: red disc with a white horizontal bar (TomTom-style). */
+export function roadClosedIconMarker(size = 26): L.DivIcon {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 26 26">
+  <circle cx="13" cy="13" r="11.5" fill="#E11D1D" stroke="#ffffff" stroke-width="2"/>
+  <rect x="6" y="11" width="14" height="4" rx="2" fill="#ffffff"/>
+</svg>`;
+    return L.divIcon({
+        className: 'situational-map-road-closed',
+        html: `<div style="filter:drop-shadow(0 1px 2px rgba(0,0,0,0.4));line-height:0;">${svg}</div>`,
+        iconSize: [size, size],
+        iconAnchor: [size / 2, size / 2],
+        popupAnchor: [0, -size / 2],
+    });
+}
+
 export function buildLeafletMarkerIcon(marker: SituationalMapMarker): L.DivIcon | L.Icon {
+    if (marker.icon === 'road_closure') {
+        return roadClosedIconMarker();
+    }
+
     const glyphIcon = resolveGlyphIcon(marker.icon, marker.category);
     const isFacility =
         marker.type === 'infrastructure' ||
