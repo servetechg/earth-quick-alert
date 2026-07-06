@@ -1,0 +1,1239 @@
+{
+  "meta": {
+    "generatedAt": "2026-07-03",
+    "filterId": "weather",
+    "filterLabel": "Weather Radar",
+    "mobileFilterId": "weatherRadar",
+    "wms": {
+      "baseUrl": "https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0q.cgi",
+      "layer": "nexrad-n0q-900913",
+      "version": "1.1.1",
+      "srs": "EPSG:3857",
+      "format": "image/png",
+      "transparent": true,
+      "attribution": "NOAA/NWS NEXRAD via Iowa Environmental Mesonet",
+      "refreshIntervalSeconds": 300,
+      "coverageNote": "CONUS NEXRAD composite. Alaska, Hawaii, and Puerto Rico have limited or no coverage."
+    },
+    "getMapTemplate": "https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0q.cgi?service=WMS&request=GetMap&version=1.1.1&layers=nexrad-n0q-900913&styles=&format=image/png&transparent=true&height={width}&width={width}&srs=EPSG:3857&bbox={xmin},{ymin},{xmax},{ymax}"
+  },
+  "nationwide": {
+    "label": "Continental US",
+    "center": {
+      "lat": 39.5,
+      "lng": -98.35
+    },
+    "zoom": 4,
+    "bboxWgs84": {
+      "west": -125,
+      "south": 24,
+      "east": -66,
+      "north": 50
+    },
+    "bboxEpsg3857": {
+      "xmin": -13914936.349159198,
+      "ymin": 2753408.109364978,
+      "xmax": -7347086.392356057,
+      "ymax": 6446275.841017159
+    },
+    "sampleGetMapUrl": "https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0q.cgi?service=WMS&request=GetMap&version=1.1.1&layers=nexrad-n0q-900913&styles=&format=image%2Fpng&transparent=true&height=512&width=512&srs=EPSG%3A3857&bbox=-13914936.349159198%2C2753408.109364978%2C-7347086.392356057%2C6446275.841017159"
+  },
+  "states": {
+    "AL": {
+      "code": "AL",
+      "name": "Alabama",
+      "center": {
+        "lat": 32.615681,
+        "lng": -86.681153
+      },
+      "zoom": 8,
+      "bboxWgs84": {
+        "west": -88.473227,
+        "south": 30.223334,
+        "east": -84.88908,
+        "north": 35.008028
+      },
+      "bboxEpsg3857": {
+        "xmin": -9848794.578477703,
+        "ymin": 3532289.770839215,
+        "xmax": -9449809.159509465,
+        "ymax": 4164972.1707217437
+      },
+      "sampleGetMapUrl": "https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0q.cgi?service=WMS&request=GetMap&version=1.1.1&layers=nexrad-n0q-900913&styles=&format=image%2Fpng&transparent=true&height=512&width=512&srs=EPSG%3A3857&bbox=-9848794.578477703%2C3532289.770839215%2C-9449809.159509465%2C4164972.1707217437",
+      "radarCoverage": "full"
+    },
+    "AK": {
+      "code": "AK",
+      "name": "Alaska",
+      "center": {
+        "lat": 64,
+        "lng": -152
+      },
+      "zoom": 4,
+      "bboxWgs84": {
+        "west": -179.148909,
+        "south": 51.214183,
+        "east": 179.77847,
+        "north": 71.365162
+      },
+      "bboxEpsg3857": {
+        "xmin": -19942765.326050505,
+        "ymin": 6659268.021932722,
+        "xmax": 20012847.73599381,
+        "ymax": 11528300.567757268
+      },
+      "sampleGetMapUrl": "https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0q.cgi?service=WMS&request=GetMap&version=1.1.1&layers=nexrad-n0q-900913&styles=&format=image%2Fpng&transparent=true&height=512&width=512&srs=EPSG%3A3857&bbox=-19942765.326050505%2C6659268.021932722%2C20012847.73599381%2C11528300.567757268",
+      "radarCoverage": "partial"
+    },
+    "AZ": {
+      "code": "AZ",
+      "name": "Arizona",
+      "center": {
+        "lat": 34.168219,
+        "lng": -111.930866
+      },
+      "zoom": 8,
+      "bboxWgs84": {
+        "west": -114.81651,
+        "south": 31.332177,
+        "east": -109.045223,
+        "north": 37.00426
+      },
+      "bboxEpsg3857": {
+        "xmin": -12781315.427860804,
+        "ymin": 3675964.2068210095,
+        "xmax": -12138858.697798962,
+        "ymax": 4439700.592948502
+      },
+      "sampleGetMapUrl": "https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0q.cgi?service=WMS&request=GetMap&version=1.1.1&layers=nexrad-n0q-900913&styles=&format=image%2Fpng&transparent=true&height=512&width=512&srs=EPSG%3A3857&bbox=-12781315.427860804%2C3675964.2068210095%2C-12138858.697798962%2C4439700.592948502",
+      "radarCoverage": "full"
+    },
+    "AR": {
+      "code": "AR",
+      "name": "Arkansas",
+      "center": {
+        "lat": 34.751853,
+        "lng": -92.131157
+      },
+      "zoom": 8,
+      "bboxWgs84": {
+        "west": -94.617919,
+        "south": 33.004106,
+        "east": -89.644395,
+        "north": 36.4996
+      },
+      "bboxEpsg3857": {
+        "xmin": -10532818.562999206,
+        "ymin": 3895848.9789021006,
+        "xmax": -9979168.40387108,
+        "ymax": 4369585.118099881
+      },
+      "sampleGetMapUrl": "https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0q.cgi?service=WMS&request=GetMap&version=1.1.1&layers=nexrad-n0q-900913&styles=&format=image%2Fpng&transparent=true&height=512&width=512&srs=EPSG%3A3857&bbox=-10532818.562999206%2C3895848.9789021006%2C-9979168.40387108%2C4369585.118099881",
+      "radarCoverage": "full"
+    },
+    "CA": {
+      "code": "CA",
+      "name": "California",
+      "center": {
+        "lat": 37.271837,
+        "lng": -119.270401
+      },
+      "zoom": 6,
+      "bboxWgs84": {
+        "west": -124.409591,
+        "south": 32.534156,
+        "east": -114.131211,
+        "north": 42.009518
+      },
+      "bboxEpsg3857": {
+        "xmin": -13849212.319919433,
+        "ymin": 3833632.954306205,
+        "xmax": -12705028.292139662,
+        "ymax": 5162405.30093576
+      },
+      "sampleGetMapUrl": "https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0q.cgi?service=WMS&request=GetMap&version=1.1.1&layers=nexrad-n0q-900913&styles=&format=image%2Fpng&transparent=true&height=512&width=512&srs=EPSG%3A3857&bbox=-13849212.319919433%2C3833632.954306205%2C-12705028.292139662%2C5162405.30093576",
+      "radarCoverage": "full"
+    },
+    "CO": {
+      "code": "CO",
+      "name": "Colorado",
+      "center": {
+        "lat": 38.997935,
+        "lng": -105.550888
+      },
+      "zoom": 7,
+      "bboxWgs84": {
+        "west": -109.060253,
+        "south": 36.992426,
+        "east": -102.041524,
+        "north": 41.003444
+      },
+      "bboxEpsg3857": {
+        "xmin": -12140531.829745587,
+        "ymin": 4438051.121901052,
+        "xmax": -11359210.491449604,
+        "ymax": 5012849.666333813
+      },
+      "sampleGetMapUrl": "https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0q.cgi?service=WMS&request=GetMap&version=1.1.1&layers=nexrad-n0q-900913&styles=&format=image%2Fpng&transparent=true&height=512&width=512&srs=EPSG%3A3857&bbox=-12140531.829745587%2C4438051.121901052%2C-11359210.491449604%2C5012849.666333813",
+      "radarCoverage": "full"
+    },
+    "CT": {
+      "code": "CT",
+      "name": "Connecticut",
+      "center": {
+        "lat": 41.515366,
+        "lng": -72.757385
+      },
+      "zoom": 9,
+      "bboxWgs84": {
+        "west": -73.727775,
+        "south": 40.980144,
+        "east": -71.786994,
+        "north": 42.050587
+      },
+      "bboxEpsg3857": {
+        "xmin": -8207338.370321045,
+        "ymin": 5009413.349382184,
+        "xmax": -7991291.617659786,
+        "ymax": 5168560.14593623
+      },
+      "sampleGetMapUrl": "https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0q.cgi?service=WMS&request=GetMap&version=1.1.1&layers=nexrad-n0q-900913&styles=&format=image%2Fpng&transparent=true&height=512&width=512&srs=EPSG%3A3857&bbox=-8207338.370321045%2C5009413.349382184%2C-7991291.617659786%2C5168560.14593623",
+      "radarCoverage": "full"
+    },
+    "DE": {
+      "code": "DE",
+      "name": "Delaware",
+      "center": {
+        "lat": 39.14501,
+        "lng": -75.418799
+      },
+      "zoom": 10,
+      "bboxWgs84": {
+        "west": -75.788658,
+        "south": 38.451013,
+        "east": -75.048939,
+        "north": 39.839007
+      },
+      "bboxEpsg3857": {
+        "xmin": -8436754.816465558,
+        "ymin": 4643336.211568142,
+        "xmax": -8354409.674055451,
+        "ymax": 4842574.721388783
+      },
+      "sampleGetMapUrl": "https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0q.cgi?service=WMS&request=GetMap&version=1.1.1&layers=nexrad-n0q-900913&styles=&format=image%2Fpng&transparent=true&height=512&width=512&srs=EPSG%3A3857&bbox=-8436754.816465558%2C4643336.211568142%2C-8354409.674055451%2C4842574.721388783",
+      "radarCoverage": "full"
+    },
+    "DC": {
+      "code": "DC",
+      "name": "District of Columbia",
+      "center": {
+        "lat": 38.893377,
+        "lng": -77.014577
+      },
+      "zoom": 10,
+      "bboxWgs84": {
+        "west": -77.119759,
+        "south": 38.791645,
+        "east": -76.909395,
+        "north": 38.99511
+      },
+      "bboxEpsg3857": {
+        "xmin": -8584932.301979978,
+        "ymin": 4691870.298312257,
+        "xmax": -8561514.68861874,
+        "ymax": 4720971.146240939
+      },
+      "sampleGetMapUrl": "https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0q.cgi?service=WMS&request=GetMap&version=1.1.1&layers=nexrad-n0q-900913&styles=&format=image%2Fpng&transparent=true&height=512&width=512&srs=EPSG%3A3857&bbox=-8584932.301979978%2C4691870.298312257%2C-8561514.68861874%2C4720971.146240939",
+      "radarCoverage": "full"
+    },
+    "FL": {
+      "code": "FL",
+      "name": "Florida",
+      "center": {
+        "lat": 27.761992,
+        "lng": -83.83315
+      },
+      "zoom": 7,
+      "bboxWgs84": {
+        "west": -87.634938,
+        "south": 24.523096,
+        "east": -80.031362,
+        "north": 31.000888
+      },
+      "bboxEpsg3857": {
+        "xmin": -9755476.673860101,
+        "ymin": 2817280.4253306687,
+        "xmax": -8909050.465332145,
+        "ymax": 3632864.467625127
+      },
+      "sampleGetMapUrl": "https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0q.cgi?service=WMS&request=GetMap&version=1.1.1&layers=nexrad-n0q-900913&styles=&format=image%2Fpng&transparent=true&height=512&width=512&srs=EPSG%3A3857&bbox=-9755476.673860101%2C2817280.4253306687%2C-8909050.465332145%2C3632864.467625127",
+      "radarCoverage": "full"
+    },
+    "GA": {
+      "code": "GA",
+      "name": "Georgia",
+      "center": {
+        "lat": 32.679255,
+        "lng": -83.222447
+      },
+      "zoom": 8,
+      "bboxWgs84": {
+        "west": -85.605165,
+        "south": 30.357851,
+        "east": -80.839729,
+        "north": 35.000659
+      },
+      "bboxEpsg3857": {
+        "xmin": -9529523.377074165,
+        "ymin": 3549631.687099699,
+        "xmax": -8999037.468146231,
+        "ymax": 4163970.6998926043
+      },
+      "sampleGetMapUrl": "https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0q.cgi?service=WMS&request=GetMap&version=1.1.1&layers=nexrad-n0q-900913&styles=&format=image%2Fpng&transparent=true&height=512&width=512&srs=EPSG%3A3857&bbox=-9529523.377074165%2C3549631.687099699%2C-8999037.468146231%2C4163970.6998926043",
+      "radarCoverage": "full"
+    },
+    "HI": {
+      "code": "HI",
+      "name": "Hawaii",
+      "center": {
+        "lat": 23.656242,
+        "lng": -166.570736
+      },
+      "zoom": 5,
+      "bboxWgs84": {
+        "west": -178.334698,
+        "south": 18.910361,
+        "east": -154.806773,
+        "north": 28.402123
+      },
+      "bboxEpsg3857": {
+        "xmin": -19852127.772132225,
+        "ymin": 2144385.212642953,
+        "xmax": -17233011.14170989,
+        "ymax": 3299767.5507505997
+      },
+      "sampleGetMapUrl": "https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0q.cgi?service=WMS&request=GetMap&version=1.1.1&layers=nexrad-n0q-900913&styles=&format=image%2Fpng&transparent=true&height=512&width=512&srs=EPSG%3A3857&bbox=-19852127.772132225%2C2144385.212642953%2C-17233011.14170989%2C3299767.5507505997",
+      "radarCoverage": "none"
+    },
+    "ID": {
+      "code": "ID",
+      "name": "Idaho",
+      "center": {
+        "lat": 45.494602,
+        "lng": -114.143295
+      },
+      "zoom": 7,
+      "bboxWgs84": {
+        "west": -117.243027,
+        "south": 41.988057,
+        "east": -111.043564,
+        "north": 49.001146
+      },
+      "bboxEpsg3857": {
+        "xmin": -13051434.064702027,
+        "ymin": 5159190.608420384,
+        "xmax": -12361313.000350285,
+        "ymax": 6275055.848466467
+      },
+      "sampleGetMapUrl": "https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0q.cgi?service=WMS&request=GetMap&version=1.1.1&layers=nexrad-n0q-900913&styles=&format=image%2Fpng&transparent=true&height=512&width=512&srs=EPSG%3A3857&bbox=-13051434.064702027%2C5159190.608420384%2C-12361313.000350285%2C6275055.848466467",
+      "radarCoverage": "full"
+    },
+    "IL": {
+      "code": "IL",
+      "name": "Illinois",
+      "center": {
+        "lat": 39.73939,
+        "lng": -89.503918
+      },
+      "zoom": 8,
+      "bboxWgs84": {
+        "west": -91.513079,
+        "south": 36.970298,
+        "east": -87.494756,
+        "north": 42.508481
+      },
+      "bboxEpsg3857": {
+        "xmin": -10187189.355204618,
+        "ymin": 4434967.519736574,
+        "xmax": -9739871.685001718,
+        "ymax": 5237454.393795698
+      },
+      "sampleGetMapUrl": "https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0q.cgi?service=WMS&request=GetMap&version=1.1.1&layers=nexrad-n0q-900913&styles=&format=image%2Fpng&transparent=true&height=512&width=512&srs=EPSG%3A3857&bbox=-10187189.355204618%2C4434967.519736574%2C-9739871.685001718%2C5237454.393795698",
+      "radarCoverage": "full"
+    },
+    "IN": {
+      "code": "IN",
+      "name": "Indiana",
+      "center": {
+        "lat": 39.766167,
+        "lng": -86.44117
+      },
+      "zoom": 8,
+      "bboxWgs84": {
+        "west": -88.09776,
+        "south": 37.771742,
+        "east": -84.784579,
+        "north": 41.760592
+      },
+      "bboxEpsg3857": {
+        "xmin": -9806997.783228025,
+        "ymin": 4547230.606085971,
+        "xmax": -9438176.161402076,
+        "ymax": 5125184.476221095
+      },
+      "sampleGetMapUrl": "https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0q.cgi?service=WMS&request=GetMap&version=1.1.1&layers=nexrad-n0q-900913&styles=&format=image%2Fpng&transparent=true&height=512&width=512&srs=EPSG%3A3857&bbox=-9806997.783228025%2C4547230.606085971%2C-9438176.161402076%2C5125184.476221095",
+      "radarCoverage": "full"
+    },
+    "IA": {
+      "code": "IA",
+      "name": "Iowa",
+      "center": {
+        "lat": 41.938349,
+        "lng": -93.389882
+      },
+      "zoom": 7,
+      "bboxWgs84": {
+        "west": -96.639704,
+        "south": 40.375501,
+        "east": -90.140061,
+        "north": 43.501196
+      },
+      "bboxEpsg3857": {
+        "xmin": -10757882.639692683,
+        "ymin": 4920660.044826591,
+        "xmax": -10034345.69059462,
+        "ymax": 5388572.818633722
+      },
+      "sampleGetMapUrl": "https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0q.cgi?service=WMS&request=GetMap&version=1.1.1&layers=nexrad-n0q-900913&styles=&format=image%2Fpng&transparent=true&height=512&width=512&srs=EPSG%3A3857&bbox=-10757882.639692683%2C4920660.044826591%2C-10034345.69059462%2C5388572.818633722",
+      "radarCoverage": "full"
+    },
+    "KS": {
+      "code": "KS",
+      "name": "Kansas",
+      "center": {
+        "lat": 38.498089,
+        "lng": -98.320078
+      },
+      "zoom": 7,
+      "bboxWgs84": {
+        "west": -102.051744,
+        "south": 36.993016,
+        "east": -94.588413,
+        "north": 40.003162
+      },
+      "bboxEpsg3857": {
+        "xmin": -11360348.176645512,
+        "ymin": 4438133.352420791,
+        "xmax": -10529533.970103858,
+        "ymax": 4866401.783365447
+      },
+      "sampleGetMapUrl": "https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0q.cgi?service=WMS&request=GetMap&version=1.1.1&layers=nexrad-n0q-900913&styles=&format=image%2Fpng&transparent=true&height=512&width=512&srs=EPSG%3A3857&bbox=-11360348.176645512%2C4438133.352420791%2C-10529533.970103858%2C4866401.783365447",
+      "radarCoverage": "full"
+    },
+    "KY": {
+      "code": "KY",
+      "name": "Kentucky",
+      "center": {
+        "lat": 37.822294,
+        "lng": -85.76824
+      },
+      "zoom": 7,
+      "bboxWgs84": {
+        "west": -89.571509,
+        "south": 36.497129,
+        "east": -81.964971,
+        "north": 39.147458
+      },
+      "bboxEpsg3857": {
+        "xmin": -9971054.77146512,
+        "ymin": 4369242.936966091,
+        "xmax": -9124298.834605437,
+        "ymax": 4742815.729938196
+      },
+      "sampleGetMapUrl": "https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0q.cgi?service=WMS&request=GetMap&version=1.1.1&layers=nexrad-n0q-900913&styles=&format=image%2Fpng&transparent=true&height=512&width=512&srs=EPSG%3A3857&bbox=-9971054.77146512%2C4369242.936966091%2C-9124298.834605437%2C4742815.729938196",
+      "radarCoverage": "full"
+    },
+    "LA": {
+      "code": "LA",
+      "name": "Louisiana",
+      "center": {
+        "lat": 30.974033,
+        "lng": -91.430082
+      },
+      "zoom": 8,
+      "bboxWgs84": {
+        "west": -94.043147,
+        "south": 28.928609,
+        "east": -88.817017,
+        "north": 33.019457
+      },
+      "bboxEpsg3857": {
+        "xmin": -10468835.236636974,
+        "ymin": 3366562.694404155,
+        "xmax": -9887065.106217524,
+        "ymax": 3897886.8395806476
+      },
+      "sampleGetMapUrl": "https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0q.cgi?service=WMS&request=GetMap&version=1.1.1&layers=nexrad-n0q-900913&styles=&format=image%2Fpng&transparent=true&height=512&width=512&srs=EPSG%3A3857&bbox=-10468835.236636974%2C3366562.694404155%2C-9887065.106217524%2C3897886.8395806476",
+      "radarCoverage": "full"
+    },
+    "ME": {
+      "code": "ME",
+      "name": "Maine",
+      "center": {
+        "lat": 45.218725,
+        "lng": -69.016909
+      },
+      "zoom": 8,
+      "bboxWgs84": {
+        "west": -71.083924,
+        "south": 42.977764,
+        "east": -66.949895,
+        "north": 47.459686
+      },
+      "bboxEpsg3857": {
+        "xmin": -7913026.223267758,
+        "ymin": 5308587.913214067,
+        "xmax": -7452828.220063133,
+        "ymax": 6017431.981340478
+      },
+      "sampleGetMapUrl": "https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0q.cgi?service=WMS&request=GetMap&version=1.1.1&layers=nexrad-n0q-900913&styles=&format=image%2Fpng&transparent=true&height=512&width=512&srs=EPSG%3A3857&bbox=-7913026.223267758%2C5308587.913214067%2C-7452828.220063133%2C6017431.981340478",
+      "radarCoverage": "full"
+    },
+    "MD": {
+      "code": "MD",
+      "name": "Maryland",
+      "center": {
+        "lat": 38.81738,
+        "lng": -77.268295
+      },
+      "zoom": 8,
+      "bboxWgs84": {
+        "west": -79.487651,
+        "south": 37.911717,
+        "east": -75.048939,
+        "north": 39.723043
+      },
+      "bboxEpsg3857": {
+        "xmin": -8848524.833673444,
+        "ymin": 4566961.881625977,
+        "xmax": -8354409.674055451,
+        "ymax": 4825776.88824217
+      },
+      "sampleGetMapUrl": "https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0q.cgi?service=WMS&request=GetMap&version=1.1.1&layers=nexrad-n0q-900913&styles=&format=image%2Fpng&transparent=true&height=512&width=512&srs=EPSG%3A3857&bbox=-8848524.833673444%2C4566961.881625977%2C-8354409.674055451%2C4825776.88824217",
+      "radarCoverage": "full"
+    },
+    "MA": {
+      "code": "MA",
+      "name": "Massachusetts",
+      "center": {
+        "lat": 42.062276,
+        "lng": -71.718267
+      },
+      "zoom": 8,
+      "bboxWgs84": {
+        "west": -73.508142,
+        "south": 41.237964,
+        "east": -69.928393,
+        "north": 42.886589
+      },
+      "bboxEpsg3857": {
+        "xmin": -8182888.936599648,
+        "ymin": 5047504.915140912,
+        "xmax": -7784393.100751917,
+        "ymax": 5294725.437026729
+      },
+      "sampleGetMapUrl": "https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0q.cgi?service=WMS&request=GetMap&version=1.1.1&layers=nexrad-n0q-900913&styles=&format=image%2Fpng&transparent=true&height=512&width=512&srs=EPSG%3A3857&bbox=-8182888.936599648%2C5047504.915140912%2C-7784393.100751917%2C5294725.437026729",
+      "radarCoverage": "full"
+    },
+    "MI": {
+      "code": "MI",
+      "name": "Michigan",
+      "center": {
+        "lat": 44.967459,
+        "lng": -86.415805
+      },
+      "zoom": 7,
+      "bboxWgs84": {
+        "west": -90.418136,
+        "south": 41.696118,
+        "east": -82.413474,
+        "north": 48.2388
+      },
+      "bboxEpsg3857": {
+        "xmin": -10065300.85799696,
+        "ymin": 5115567.527986058,
+        "xmax": -9174225.960184691,
+        "ymax": 6146674.99379013
+      },
+      "sampleGetMapUrl": "https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0q.cgi?service=WMS&request=GetMap&version=1.1.1&layers=nexrad-n0q-900913&styles=&format=image%2Fpng&transparent=true&height=512&width=512&srs=EPSG%3A3857&bbox=-10065300.85799696%2C5115567.527986058%2C-9174225.960184691%2C6146674.99379013",
+      "radarCoverage": "full"
+    },
+    "MN": {
+      "code": "MN",
+      "name": "Minnesota",
+      "center": {
+        "lat": 46.441857,
+        "lng": -93.365474
+      },
+      "zoom": 7,
+      "bboxWgs84": {
+        "west": -97.239209,
+        "south": 43.499356,
+        "east": -89.491739,
+        "north": 49.384358
+      },
+      "bboxEpsg3857": {
+        "xmin": -10824619.231020706,
+        "ymin": 5388290.4419636885,
+        "xmax": -9962174.81568454,
+        "ymax": 6340332.343706037
+      },
+      "sampleGetMapUrl": "https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0q.cgi?service=WMS&request=GetMap&version=1.1.1&layers=nexrad-n0q-900913&styles=&format=image%2Fpng&transparent=true&height=512&width=512&srs=EPSG%3A3857&bbox=-10824619.231020706%2C5388290.4419636885%2C-9962174.81568454%2C6340332.343706037",
+      "radarCoverage": "full"
+    },
+    "MS": {
+      "code": "MS",
+      "name": "Mississippi",
+      "center": {
+        "lat": 32.584998,
+        "lng": -89.876449
+      },
+      "zoom": 8,
+      "bboxWgs84": {
+        "west": -91.655009,
+        "south": 30.173943,
+        "east": -88.097888,
+        "north": 34.996052
+      },
+      "bboxEpsg3857": {
+        "xmin": -10202988.930532906,
+        "ymin": 3525928.2464669026,
+        "xmax": -9807012.032122847,
+        "ymax": 4163344.6395763704
+      },
+      "sampleGetMapUrl": "https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0q.cgi?service=WMS&request=GetMap&version=1.1.1&layers=nexrad-n0q-900913&styles=&format=image%2Fpng&transparent=true&height=512&width=512&srs=EPSG%3A3857&bbox=-10202988.930532906%2C3525928.2464669026%2C-9807012.032122847%2C4163344.6395763704",
+      "radarCoverage": "full"
+    },
+    "MO": {
+      "code": "MO",
+      "name": "Missouri",
+      "center": {
+        "lat": 38.304661,
+        "lng": -92.436774
+      },
+      "zoom": 7,
+      "bboxWgs84": {
+        "west": -95.774704,
+        "south": 35.995683,
+        "east": -89.098843,
+        "north": 40.61364
+      },
+      "bboxEpsg3857": {
+        "xmin": -10661591.280156503,
+        "ymin": 4300027.375759326,
+        "xmax": -9918437.833029827,
+        "ymax": 4955519.600206778
+      },
+      "sampleGetMapUrl": "https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0q.cgi?service=WMS&request=GetMap&version=1.1.1&layers=nexrad-n0q-900913&styles=&format=image%2Fpng&transparent=true&height=512&width=512&srs=EPSG%3A3857&bbox=-10661591.280156503%2C4300027.375759326%2C-9918437.833029827%2C4955519.600206778",
+      "radarCoverage": "full"
+    },
+    "MT": {
+      "code": "MT",
+      "name": "Montana",
+      "center": {
+        "lat": 46.679806,
+        "lng": -110.04457
+      },
+      "zoom": 6,
+      "bboxWgs84": {
+        "west": -116.050003,
+        "south": 44.358221,
+        "east": -104.039138,
+        "north": 49.00139
+      },
+      "bboxEpsg3857": {
+        "xmin": -12918627.240517871,
+        "ymin": 5521046.097888931,
+        "xmax": -11581583.864731118,
+        "ymax": 6275097.251215429
+      },
+      "sampleGetMapUrl": "https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0q.cgi?service=WMS&request=GetMap&version=1.1.1&layers=nexrad-n0q-900913&styles=&format=image%2Fpng&transparent=true&height=512&width=512&srs=EPSG%3A3857&bbox=-12918627.240517871%2C5521046.097888931%2C-11581583.864731118%2C6275097.251215429",
+      "radarCoverage": "full"
+    },
+    "NE": {
+      "code": "NE",
+      "name": "Nebraska",
+      "center": {
+        "lat": 41.500853,
+        "lng": -99.680902
+      },
+      "zoom": 7,
+      "bboxWgs84": {
+        "west": -104.053514,
+        "south": 39.999998,
+        "east": -95.30829,
+        "north": 43.001708
+      },
+      "bboxEpsg3857": {
+        "xmin": -11583184.193730764,
+        "ymin": 4865941.9888686305,
+        "xmax": -10609670.311177649,
+        "ymax": 5312231.825575027
+      },
+      "sampleGetMapUrl": "https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0q.cgi?service=WMS&request=GetMap&version=1.1.1&layers=nexrad-n0q-900913&styles=&format=image%2Fpng&transparent=true&height=512&width=512&srs=EPSG%3A3857&bbox=-11583184.193730764%2C4865941.9888686305%2C-10609670.311177649%2C5312231.825575027",
+      "radarCoverage": "full"
+    },
+    "NV": {
+      "code": "NV",
+      "name": "Nevada",
+      "center": {
+        "lat": 38.502032,
+        "lng": -117.022697
+      },
+      "zoom": 7,
+      "bboxWgs84": {
+        "west": -120.005746,
+        "south": 35.001857,
+        "east": -114.039648,
+        "north": 42.002207
+      },
+      "bboxEpsg3857": {
+        "xmin": -13358978.536986928,
+        "ymin": 4164133.5058103176,
+        "xmax": -12694835.54560416,
+        "ymax": 5161310.0476796795
+      },
+      "sampleGetMapUrl": "https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0q.cgi?service=WMS&request=GetMap&version=1.1.1&layers=nexrad-n0q-900913&styles=&format=image%2Fpng&transparent=true&height=512&width=512&srs=EPSG%3A3857&bbox=-13358978.536986928%2C4164133.5058103176%2C-12694835.54560416%2C5161310.0476796795",
+      "radarCoverage": "full"
+    },
+    "NH": {
+      "code": "NH",
+      "name": "New Hampshire",
+      "center": {
+        "lat": 44.001233,
+        "lng": -71.583934
+      },
+      "zoom": 9,
+      "bboxWgs84": {
+        "west": -72.557247,
+        "south": 42.69699,
+        "east": -70.610621,
+        "north": 45.305476
+      },
+      "bboxEpsg3857": {
+        "xmin": -8077035.789401778,
+        "ymin": 5265963.775338209,
+        "xmax": -7860338.374316828,
+        "ymax": 5669741.317199063
+      },
+      "sampleGetMapUrl": "https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0q.cgi?service=WMS&request=GetMap&version=1.1.1&layers=nexrad-n0q-900913&styles=&format=image%2Fpng&transparent=true&height=512&width=512&srs=EPSG%3A3857&bbox=-8077035.789401778%2C5265963.775338209%2C-7860338.374316828%2C5669741.317199063",
+      "radarCoverage": "full"
+    },
+    "NJ": {
+      "code": "NJ",
+      "name": "New Jersey",
+      "center": {
+        "lat": 40.142971,
+        "lng": -74.726797
+      },
+      "zoom": 9,
+      "bboxWgs84": {
+        "west": -75.559614,
+        "south": 38.928519,
+        "east": -73.893979,
+        "north": 41.357423
+      },
+      "bboxEpsg3857": {
+        "xmin": -8411257.755016305,
+        "ymin": 4711437.698622952,
+        "xmax": -8225840.114968851,
+        "ymax": 5065205.282179183
+      },
+      "sampleGetMapUrl": "https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0q.cgi?service=WMS&request=GetMap&version=1.1.1&layers=nexrad-n0q-900913&styles=&format=image%2Fpng&transparent=true&height=512&width=512&srs=EPSG%3A3857&bbox=-8411257.755016305%2C4711437.698622952%2C-8225840.114968851%2C5065205.282179183",
+      "radarCoverage": "full"
+    },
+    "NM": {
+      "code": "NM",
+      "name": "New Mexico",
+      "center": {
+        "lat": 34.166266,
+        "lng": -106.026069
+      },
+      "zoom": 7,
+      "bboxWgs84": {
+        "west": -109.050173,
+        "south": 31.332301,
+        "east": -103.001964,
+        "north": 37.000232
+      },
+      "bboxEpsg3857": {
+        "xmin": -12139409.729278393,
+        "ymin": 3675980.3671584837,
+        "xmax": -11466126.183187097,
+        "ymax": 4439139.125108017
+      },
+      "sampleGetMapUrl": "https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0q.cgi?service=WMS&request=GetMap&version=1.1.1&layers=nexrad-n0q-900913&styles=&format=image%2Fpng&transparent=true&height=512&width=512&srs=EPSG%3A3857&bbox=-12139409.729278393%2C3675980.3671584837%2C-11466126.183187097%2C4439139.125108017",
+      "radarCoverage": "full"
+    },
+    "NY": {
+      "code": "NY",
+      "name": "New York",
+      "center": {
+        "lat": 42.755977,
+        "lng": -75.809183
+      },
+      "zoom": 7,
+      "bboxWgs84": {
+        "west": -79.762152,
+        "south": 40.496103,
+        "east": -71.856214,
+        "north": 45.01585
+      },
+      "bboxEpsg3857": {
+        "xmin": -8879082.145215688,
+        "ymin": 4938298.691760865,
+        "xmax": -7998997.152812496,
+        "ymax": 5624017.089533174
+      },
+      "sampleGetMapUrl": "https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0q.cgi?service=WMS&request=GetMap&version=1.1.1&layers=nexrad-n0q-900913&styles=&format=image%2Fpng&transparent=true&height=512&width=512&srs=EPSG%3A3857&bbox=-8879082.145215688%2C4938298.691760865%2C-7998997.152812496%2C5624017.089533174",
+      "radarCoverage": "full"
+    },
+    "NC": {
+      "code": "NC",
+      "name": "North Carolina",
+      "center": {
+        "lat": 35.215216,
+        "lng": -79.891245
+      },
+      "zoom": 7,
+      "bboxWgs84": {
+        "west": -84.321869,
+        "south": 33.842316,
+        "east": -75.460621,
+        "north": 36.588117
+      },
+      "bboxEpsg3857": {
+        "xmin": -9386667.519817121,
+        "ymin": 4007648.5185608855,
+        "xmax": -8400237.904664207,
+        "ymax": 4381850.058903091
+      },
+      "sampleGetMapUrl": "https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0q.cgi?service=WMS&request=GetMap&version=1.1.1&layers=nexrad-n0q-900913&styles=&format=image%2Fpng&transparent=true&height=512&width=512&srs=EPSG%3A3857&bbox=-9386667.519817121%2C4007648.5185608855%2C-8400237.904664207%2C4381850.058903091",
+      "radarCoverage": "full"
+    },
+    "ND": {
+      "code": "ND",
+      "name": "North Dakota",
+      "center": {
+        "lat": 47.467814,
+        "lng": -100.301704
+      },
+      "zoom": 7,
+      "bboxWgs84": {
+        "west": -104.0489,
+        "south": 45.935054,
+        "east": -96.554507,
+        "north": 49.000574
+      },
+      "bboxEpsg3857": {
+        "xmin": -11582670.565600242,
+        "ymin": 5769947.679454533,
+        "xmax": -10748398.553035568,
+        "ymax": 6274958.790358261
+      },
+      "sampleGetMapUrl": "https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0q.cgi?service=WMS&request=GetMap&version=1.1.1&layers=nexrad-n0q-900913&styles=&format=image%2Fpng&transparent=true&height=512&width=512&srs=EPSG%3A3857&bbox=-11582670.565600242%2C5769947.679454533%2C-10748398.553035568%2C6274958.790358261",
+      "radarCoverage": "full"
+    },
+    "OH": {
+      "code": "OH",
+      "name": "Ohio",
+      "center": {
+        "lat": 40.190362,
+        "lng": -82.669426
+      },
+      "zoom": 8,
+      "bboxWgs84": {
+        "west": -84.820159,
+        "south": 38.403202,
+        "east": -80.518693,
+        "north": 41.977523
+      },
+      "bboxEpsg3857": {
+        "xmin": -9442136.908884501,
+        "ymin": 4636542.364296566,
+        "xmax": -8963299.90409992,
+        "ymax": 5157613.092878221
+      },
+      "sampleGetMapUrl": "https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0q.cgi?service=WMS&request=GetMap&version=1.1.1&layers=nexrad-n0q-900913&styles=&format=image%2Fpng&transparent=true&height=512&width=512&srs=EPSG%3A3857&bbox=-9442136.908884501%2C4636542.364296566%2C-8963299.90409992%2C5157613.092878221",
+      "radarCoverage": "full"
+    },
+    "OK": {
+      "code": "OK",
+      "name": "Oklahoma",
+      "center": {
+        "lat": 35.30902,
+        "lng": -98.716613
+      },
+      "zoom": 7,
+      "bboxWgs84": {
+        "west": -103.002565,
+        "south": 33.615833,
+        "east": -94.430662,
+        "north": 37.002206
+      },
+      "bboxEpsg3857": {
+        "xmin": -11466193.086201064,
+        "ymin": 3977333.6957839644,
+        "xmax": -10511973.20911173,
+        "ymax": 4439414.279662507
+      },
+      "sampleGetMapUrl": "https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0q.cgi?service=WMS&request=GetMap&version=1.1.1&layers=nexrad-n0q-900913&styles=&format=image%2Fpng&transparent=true&height=512&width=512&srs=EPSG%3A3857&bbox=-11466193.086201064%2C3977333.6957839644%2C-10511973.20911173%2C4439414.279662507",
+      "radarCoverage": "full"
+    },
+    "OR": {
+      "code": "OR",
+      "name": "Oregon",
+      "center": {
+        "lat": 44.141914,
+        "lng": -120.514874
+      },
+      "zoom": 7,
+      "bboxWgs84": {
+        "west": -124.566244,
+        "south": 41.991794,
+        "east": -116.463504,
+        "north": 46.292035
+      },
+      "bboxEpsg3857": {
+        "xmin": -13866650.852110669,
+        "ymin": 5159750.30429423,
+        "xmax": -12964657.96128038,
+        "ymax": 5827272.177681223
+      },
+      "sampleGetMapUrl": "https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0q.cgi?service=WMS&request=GetMap&version=1.1.1&layers=nexrad-n0q-900913&styles=&format=image%2Fpng&transparent=true&height=512&width=512&srs=EPSG%3A3857&bbox=-13866650.852110669%2C5159750.30429423%2C-12964657.96128038%2C5827272.177681223",
+      "radarCoverage": "full"
+    },
+    "PA": {
+      "code": "PA",
+      "name": "Pennsylvania",
+      "center": {
+        "lat": 40.99483,
+        "lng": -77.604703
+      },
+      "zoom": 8,
+      "bboxWgs84": {
+        "west": -80.519891,
+        "south": 39.7198,
+        "east": -74.689516,
+        "north": 42.26986
+      },
+      "bboxEpsg3857": {
+        "xmin": -8963433.264849892,
+        "ymin": 4825307.533635993,
+        "xmax": -8314398.888716059,
+        "ymax": 5201489.272208657
+      },
+      "sampleGetMapUrl": "https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0q.cgi?service=WMS&request=GetMap&version=1.1.1&layers=nexrad-n0q-900913&styles=&format=image%2Fpng&transparent=true&height=512&width=512&srs=EPSG%3A3857&bbox=-8963433.264849892%2C4825307.533635993%2C-8314398.888716059%2C5201489.272208657",
+      "radarCoverage": "full"
+    },
+    "PR": {
+      "code": "PR",
+      "name": "Puerto Rico",
+      "center": {
+        "lat": 18.199481,
+        "lng": -66.583054
+      },
+      "zoom": 9,
+      "bboxWgs84": {
+        "west": -67.945404,
+        "south": 17.88328,
+        "east": -65.220703,
+        "north": 18.515683
+      },
+      "bboxEpsg3857": {
+        "xmin": -7563647.775023254,
+        "ymin": 2023891.1842748008,
+        "xmax": -7260335.447139331,
+        "ymax": 2097997.580327056
+      },
+      "sampleGetMapUrl": "https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0q.cgi?service=WMS&request=GetMap&version=1.1.1&layers=nexrad-n0q-900913&styles=&format=image%2Fpng&transparent=true&height=512&width=512&srs=EPSG%3A3857&bbox=-7563647.775023254%2C2023891.1842748008%2C-7260335.447139331%2C2097997.580327056",
+      "radarCoverage": "none"
+    },
+    "RI": {
+      "code": "RI",
+      "name": "Rhode Island",
+      "center": {
+        "lat": 41.582568,
+        "lng": -71.491671
+      },
+      "zoom": 10,
+      "bboxWgs84": {
+        "west": -71.862772,
+        "south": 41.146339,
+        "east": -71.12057,
+        "north": 42.018798
+      },
+      "bboxEpsg3857": {
+        "xmin": -7999727.186033119,
+        "ymin": 5033950.6539383605,
+        "xmax": -7917105.637327369,
+        "ymax": 5163795.709332948
+      },
+      "sampleGetMapUrl": "https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0q.cgi?service=WMS&request=GetMap&version=1.1.1&layers=nexrad-n0q-900913&styles=&format=image%2Fpng&transparent=true&height=512&width=512&srs=EPSG%3A3857&bbox=-7999727.186033119%2C5033950.6539383605%2C-7917105.637327369%2C5163795.709332948",
+      "radarCoverage": "full"
+    },
+    "SC": {
+      "code": "SC",
+      "name": "South Carolina",
+      "center": {
+        "lat": 33.625001,
+        "lng": -80.94797
+      },
+      "zoom": 8,
+      "bboxWgs84": {
+        "west": -83.35391,
+        "south": 32.0346,
+        "east": -78.54203,
+        "north": 35.215402
+      },
+      "bboxEpsg3857": {
+        "xmin": -9278914.816828353,
+        "ymin": 3767853.272218784,
+        "xmax": -8743258.785470016,
+        "ymax": 4193192.0807327973
+      },
+      "sampleGetMapUrl": "https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0q.cgi?service=WMS&request=GetMap&version=1.1.1&layers=nexrad-n0q-900913&styles=&format=image%2Fpng&transparent=true&height=512&width=512&srs=EPSG%3A3857&bbox=-9278914.816828353%2C3767853.272218784%2C-8743258.785470016%2C4193192.0807327973",
+      "radarCoverage": "full"
+    },
+    "SD": {
+      "code": "SD",
+      "name": "South Dakota",
+      "center": {
+        "lat": 44.212542,
+        "lng": -100.247143
+      },
+      "zoom": 7,
+      "bboxWgs84": {
+        "west": -104.057698,
+        "south": 42.479635,
+        "east": -96.436589,
+        "north": 45.94545
+      },
+      "bboxEpsg3857": {
+        "xmin": -11583649.954480242,
+        "ymin": 5233099.428772287,
+        "xmax": -10735271.981320208,
+        "ymax": 5771611.84959939
+      },
+      "sampleGetMapUrl": "https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0q.cgi?service=WMS&request=GetMap&version=1.1.1&layers=nexrad-n0q-900913&styles=&format=image%2Fpng&transparent=true&height=512&width=512&srs=EPSG%3A3857&bbox=-11583649.954480242%2C5233099.428772287%2C-10735271.981320208%2C5771611.84959939",
+      "radarCoverage": "full"
+    },
+    "TN": {
+      "code": "TN",
+      "name": "Tennessee",
+      "center": {
+        "lat": 35.830545,
+        "lng": -85.978599
+      },
+      "zoom": 7,
+      "bboxWgs84": {
+        "west": -90.310298,
+        "south": 34.982972,
+        "east": -81.6469,
+        "north": 36.678118
+      },
+      "bboxEpsg3857": {
+        "xmin": -10053296.386748793,
+        "ymin": 4161567.347586772,
+        "xmax": -9088891.33284933,
+        "ymax": 4394335.053646599
+      },
+      "sampleGetMapUrl": "https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0q.cgi?service=WMS&request=GetMap&version=1.1.1&layers=nexrad-n0q-900913&styles=&format=image%2Fpng&transparent=true&height=512&width=512&srs=EPSG%3A3857&bbox=-10053296.386748793%2C4161567.347586772%2C-9088891.33284933%2C4394335.053646599",
+      "radarCoverage": "full"
+    },
+    "TX": {
+      "code": "TX",
+      "name": "Texas",
+      "center": {
+        "lat": 31.169041,
+        "lng": -100.076969
+      },
+      "zoom": 6,
+      "bboxWgs84": {
+        "west": -106.645646,
+        "south": 25.837377,
+        "east": -93.508292,
+        "north": 36.500704
+      },
+      "bboxEpsg3857": {
+        "xmin": -11871739.008039713,
+        "ymin": 2978953.2901324164,
+        "xmax": -10409295.450388737,
+        "ymax": 4369738.002232756
+      },
+      "sampleGetMapUrl": "https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0q.cgi?service=WMS&request=GetMap&version=1.1.1&layers=nexrad-n0q-900913&styles=&format=image%2Fpng&transparent=true&height=512&width=512&srs=EPSG%3A3857&bbox=-11871739.008039713%2C2978953.2901324164%2C-10409295.450388737%2C4369738.002232756",
+      "radarCoverage": "full"
+    },
+    "UT": {
+      "code": "UT",
+      "name": "Utah",
+      "center": {
+        "lat": 39.499768,
+        "lng": -111.54701
+      },
+      "zoom": 8,
+      "bboxWgs84": {
+        "west": -114.052962,
+        "south": 36.997968,
+        "east": -109.041058,
+        "north": 42.001567
+      },
+      "bboxEpsg3857": {
+        "xmin": -12696317.653304579,
+        "ymin": 4438823.556440096,
+        "xmax": -12138395.052119812,
+        "ymax": 5161214.175940457
+      },
+      "sampleGetMapUrl": "https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0q.cgi?service=WMS&request=GetMap&version=1.1.1&layers=nexrad-n0q-900913&styles=&format=image%2Fpng&transparent=true&height=512&width=512&srs=EPSG%3A3857&bbox=-12696317.653304579%2C4438823.556440096%2C-12138395.052119812%2C5161214.175940457",
+      "radarCoverage": "full"
+    },
+    "VT": {
+      "code": "VT",
+      "name": "Vermont",
+      "center": {
+        "lat": 43.871756,
+        "lng": -72.451148
+      },
+      "zoom": 9,
+      "bboxWgs84": {
+        "west": -73.43774,
+        "south": 42.726853,
+        "east": -71.464555,
+        "north": 45.016659
+      },
+      "bboxEpsg3857": {
+        "xmin": -8175051.821808819,
+        "ymin": 5270488.07319144,
+        "xmax": -7955397.872367893,
+        "ymax": 5624144.486172748
+      },
+      "sampleGetMapUrl": "https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0q.cgi?service=WMS&request=GetMap&version=1.1.1&layers=nexrad-n0q-900913&styles=&format=image%2Fpng&transparent=true&height=512&width=512&srs=EPSG%3A3857&bbox=-8175051.821808819%2C5270488.07319144%2C-7955397.872367893%2C5624144.486172748",
+      "radarCoverage": "full"
+    },
+    "VA": {
+      "code": "VA",
+      "name": "Virginia",
+      "center": {
+        "lat": 38.003375,
+        "lng": -79.458831
+      },
+      "zoom": 7,
+      "bboxWgs84": {
+        "west": -83.675395,
+        "south": 36.540738,
+        "east": -75.242266,
+        "north": 39.466012
+      },
+      "bboxEpsg3857": {
+        "xmin": -9314702.36332603,
+        "ymin": 4375283.464516138,
+        "xmax": -8375930.737252042,
+        "ymax": 4788645.331323459
+      },
+      "sampleGetMapUrl": "https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0q.cgi?service=WMS&request=GetMap&version=1.1.1&layers=nexrad-n0q-900913&styles=&format=image%2Fpng&transparent=true&height=512&width=512&srs=EPSG%3A3857&bbox=-9314702.36332603%2C4375283.464516138%2C-8375930.737252042%2C4788645.331323459",
+      "radarCoverage": "full"
+    },
+    "WA": {
+      "code": "WA",
+      "name": "Washington",
+      "center": {
+        "lat": 47.273017,
+        "lng": -120.839529
+      },
+      "zoom": 7,
+      "bboxWgs84": {
+        "west": -124.763068,
+        "south": 45.543541,
+        "east": -116.915989,
+        "north": 49.002494
+      },
+      "bboxEpsg3857": {
+        "xmin": -13888561.199566565,
+        "ymin": 5707500.657079571,
+        "xmax": -13015028.361071974,
+        "ymax": 6275284.584221339
+      },
+      "sampleGetMapUrl": "https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0q.cgi?service=WMS&request=GetMap&version=1.1.1&layers=nexrad-n0q-900913&styles=&format=image%2Fpng&transparent=true&height=512&width=512&srs=EPSG%3A3857&bbox=-13888561.199566565%2C5707500.657079571%2C-13015028.361071974%2C6275284.584221339",
+      "radarCoverage": "full"
+    },
+    "WV": {
+      "code": "WV",
+      "name": "West Virginia",
+      "center": {
+        "lat": 38.920142,
+        "lng": -80.182129
+      },
+      "zoom": 8,
+      "bboxWgs84": {
+        "west": -82.644739,
+        "south": 37.201483,
+        "east": -77.719519,
+        "north": 40.638801
+      },
+      "bboxEpsg3857": {
+        "xmin": -9199970.262222998,
+        "ymin": 4467228.253170688,
+        "xmax": -8651697.279778153,
+        "ymax": 4959209.992678289
+      },
+      "sampleGetMapUrl": "https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0q.cgi?service=WMS&request=GetMap&version=1.1.1&layers=nexrad-n0q-900913&styles=&format=image%2Fpng&transparent=true&height=512&width=512&srs=EPSG%3A3857&bbox=-9199970.262222998%2C4467228.253170688%2C-8651697.279778153%2C4959209.992678289",
+      "radarCoverage": "full"
+    },
+    "WI": {
+      "code": "WI",
+      "name": "Wisconsin",
+      "center": {
+        "lat": 44.786302,
+        "lng": -89.846765
+      },
+      "zoom": 7,
+      "bboxWgs84": {
+        "west": -92.888114,
+        "south": 42.491983,
+        "east": -86.805415,
+        "north": 47.080621
+      },
+      "bboxEpsg3857": {
+        "xmin": -10340257.551227547,
+        "ymin": 5234963.396583738,
+        "xmax": -9663134.59589879,
+        "ymax": 5955243.414290477
+      },
+      "sampleGetMapUrl": "https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0q.cgi?service=WMS&request=GetMap&version=1.1.1&layers=nexrad-n0q-900913&styles=&format=image%2Fpng&transparent=true&height=512&width=512&srs=EPSG%3A3857&bbox=-10340257.551227547%2C5234963.396583738%2C-9663134.59589879%2C5955243.414290477",
+      "radarCoverage": "full"
+    },
+    "WY": {
+      "code": "WY",
+      "name": "Wyoming",
+      "center": {
+        "lat": 43.000325,
+        "lng": -107.554524
+      },
+      "zoom": 7,
+      "bboxWgs84": {
+        "west": -111.056888,
+        "south": 40.994746,
+        "east": -104.05216,
+        "north": 45.005904
+      },
+      "bboxEpsg3857": {
+        "xmin": -12362796.221245615,
+        "ymin": 5011566.730931644,
+        "xmax": -11583033.46714023,
+        "ymax": 5622450.9980515465
+      },
+      "sampleGetMapUrl": "https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0q.cgi?service=WMS&request=GetMap&version=1.1.1&layers=nexrad-n0q-900913&styles=&format=image%2Fpng&transparent=true&height=512&width=512&srs=EPSG%3A3857&bbox=-12362796.221245615%2C5011566.730931644%2C-11583033.46714023%2C5622450.9980515465",
+      "radarCoverage": "full"
+    }
+  }
+}

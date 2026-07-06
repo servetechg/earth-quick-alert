@@ -43,10 +43,15 @@ export const TOP_LEVEL_MAP_LAYERS: MapLayerDef[] = [
   ...GIS_FILTER_MAP_LAYERS,
 ]
 
-/** NWS alert polygon layers shown in the map Filter dropdown (weather radar deferred). */
+/** NWS alert polygon layers + weather radar shown in the map Filter dropdown. */
 export const ALERT_ZONE_MAP_LAYERS: MapLayerDef[] = OPERATIONAL_MAP_LAYERS.filter(
-  (layer) => layer.id === 'risk' || layer.id === 'flood',
+  (layer) => layer.id === 'risk' || layer.id === 'flood' || layer.id === 'weather',
 ).map((layer) => ({ ...layer }))
+
+/** Live NEXRAD reflectivity WMS overlay (Iowa Mesonet). */
+export const WEATHER_RADAR_MAP_LAYER: MapLayerDef = {
+  ...OPERATIONAL_MAP_LAYERS.find((layer) => layer.id === 'weather')!,
+}
 
 /** Real-time DOT work zones (WZDX). */
 export const ROAD_CLOSURES_MAP_LAYER: MapLayerDef = {

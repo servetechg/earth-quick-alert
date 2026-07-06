@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useMemo } from 'react'
+import React, { useCallback, useMemo, useRef } from 'react'
 import { Building2, ChevronDown, Layers } from 'lucide-react'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
@@ -15,6 +15,7 @@ import {
   DISASTER_ZONE_LAYER,
   HIFLD_OPERATIONAL_MAP_LAYERS,
   IMPLEMENTED_CRITICAL_INFRA_MAP_SECTORS,
+  IT_INFRASTRUCTURE_MAP_LAYER,
   OPEN_SOURCE_MAP_LAYERS,
   ROAD_CLOSURES_MAP_LAYER,
   POWER_OUTAGES_MAP_LAYER,
@@ -96,6 +97,25 @@ export function MapLayersDropdown({
     onChange((prev) => ({ ...prev, [id]: !prev[id] }))
   }
 
+  /** Information Technology lives under Critical Infrastructure when that section is shown. */
+  const mapLayerOpenSource = useMemo(
+    () =>
+      showCriticalInfra
+        ? OPEN_SOURCE_MAP_LAYERS.filter((l) => l.id !== IT_INFRASTRUCTURE_MAP_LAYER.id)
+        : OPEN_SOURCE_MAP_LAYERS,
+    [showCriticalInfra],
+  )
+
+  /** Remember the dropdown scroll offset so reopening restores the last position. */
+  const scrollPosRef = useRef(0)
+
+  const restoreScrollRef = useCallback((node: HTMLDivElement | null) => {
+    if (!node) return
+    requestAnimationFrame(() => {
+      node.scrollTop = scrollPosRef.current
+    })
+  }, [])
+
   return (
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
@@ -118,7 +138,11 @@ export function MapLayersDropdown({
       </DropdownMenuTrigger>
 
       <DropdownMenuContent
+        ref={restoreScrollRef}
         align="end"
+        onScroll={(e) => {
+          scrollPosRef.current = e.currentTarget.scrollTop
+        }}
         className="w-72 max-h-[min(70vh,520px)] overflow-y-auto p-3 rounded-2xl border-slate-200 shadow-xl z-500"
       >
         <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1 pb-2 mb-1 border-b border-slate-100">
@@ -152,7 +176,7 @@ export function MapLayersDropdown({
             checked={!!layers[POWER_OUTAGES_MAP_LAYER.id]}
             onToggle={() => toggle(POWER_OUTAGES_MAP_LAYER.id)}
           />
-          {OPEN_SOURCE_MAP_LAYERS.map((layer) => (
+          {mapLayerOpenSource.map((layer) => (
             <LayerRow
               key={layer.id}
               id={layer.id}
@@ -198,6 +222,15 @@ export function MapLayersDropdown({
               </span>
             </div>
             <div className="space-y-0.5 pl-1">
+              <LayerRow
+                id={IT_INFRASTRUCTURE_MAP_LAYER.id}
+                label={IT_INFRASTRUCTURE_MAP_LAYER.label}
+                color={IT_INFRASTRUCTURE_MAP_LAYER.color}
+                Icon={IT_INFRASTRUCTURE_MAP_LAYER.Icon}
+                checked={!!layers[IT_INFRASTRUCTURE_MAP_LAYER.id]}
+                onToggle={() => toggle(IT_INFRASTRUCTURE_MAP_LAYER.id)}
+                compact
+              />
               {IMPLEMENTED_CRITICAL_INFRA_MAP_SECTORS.map((sector) => (
                 <LayerRow
                   key={sector.id}

@@ -105,6 +105,7 @@ import {
   ODIN_OUTAGE_FILL_COLOR,
   ODIN_OUTAGE_STROKE_COLOR,
 } from '@/lib/gis/odin/odin-outages-config'
+import { isWeatherRadarAvailableForScope, type WeatherRadarMapScope } from '@/lib/gis/weather-radar-config'
 import { useDebouncedMapBounds } from '@/lib/hooks/use-debounced-map-bounds'
 import { quantizeLayerFetchBounds } from '@/lib/gis/layers/map-layer-bounds-utils'
 
@@ -1806,6 +1807,57 @@ export function GISMap({
   /** Incident heat — controlled by Risk Areas toggle (default on). */
   const riskHeatEnabled = mapLayers.risk
 
+  const weatherRadarEnabled = useMemo(() => {
+    if (!mapLayers.weather || !viewportInUsa) return false
+    const scopedCode = normalizeStateToUsps(
+      scopeState?.trim() || licensedStateHint?.trim() || '',
+    )
+    return isWeatherRadarAvailableForScope(scopedCode || null)
+  }, [mapLayers.weather, viewportInUsa, scopeState, licensedStateHint])
+
+  const weatherRadarScope = useMemo((): WeatherRadarMapScope | null => {
+    if (!weatherRadarEnabled) return null
+
+    if (lockToCoverageCircle && coverageCircle) {
+      return {
+        mode: 'radius',
+        center: coverageCircle.center,
+        radiusMeters: coverageCircle.radiusMeters,
+        bounds: radiusBounds(
+          coverageCircle.center.lat,
+          coverageCircle.center.lng,
+          coverageCircle.radiusMeters * 1.08,
+        ),
+      }
+    }
+
+    const shouldScopeState =
+      stateScoped ||
+      showLayersPanel ||
+      coverageMeta?.coverageType === 'state' ||
+      Boolean(scopeState?.trim())
+
+    if (shouldScopeState && stateBoundsRestriction) {
+      return { mode: 'state', bounds: stateBoundsRestriction }
+    }
+
+    if (shouldScopeState && mapStateBounds) {
+      return { mode: 'state', bounds: mapStateBounds }
+    }
+
+    return { mode: 'free' }
+  }, [
+    weatherRadarEnabled,
+    lockToCoverageCircle,
+    coverageCircle,
+    stateScoped,
+    showLayersPanel,
+    coverageMeta?.coverageType,
+    scopeState,
+    stateBoundsRestriction,
+    mapStateBounds,
+  ])
+
   const heatPoints = useMemo(() => {
     if (!showHeatmap || !riskHeatEnabled) return []
     if (restrictToUsa && !viewportInUsa) return []
@@ -2473,6 +2525,8 @@ export function GISMap({
           center={mapCenter}
           heatPoints={heatPoints}
           showHeatmap={showHeatmap && riskHeatEnabled}
+          showWeatherRadar={Boolean(weatherRadarScope)}
+          weatherRadarScope={weatherRadarScope}
           stateBounds={mapStateBounds}
           fitStateOnLoad={Boolean(mapStateBounds)}
           coverageCircle={showLayersPanel && coverageMeta?.coverageType !== 'state' ? coverageCircle : null}

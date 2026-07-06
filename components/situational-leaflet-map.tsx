@@ -41,6 +41,11 @@ import {
 import { buildLeafletMarkerIcon, chemicalClusterIcon, clusterIcon, criticalInfraClusterIcon, damClusterIcon, financialClusterIcon, fuelClusterIcon, generatorClusterIcon, heatIncidentPinIcon, itClusterIcon, mealsClusterIcon, pharmacyClusterIcon, policeClusterIcon, resourceClusterIcon, roadClosureClusterIcon, shelterClusterIcon, volunteerClusterIcon } from '@/lib/gis/situational-map-marker-icons';
 import type { InfrastructureClusterMode } from '@/lib/gis/map-layer-config';
 import type { UnifiedEventHeatPoint } from '@/lib/geo/unified-event-heatmap';
+import {
+    NEXRAD_LEAFLET_WMS_OPTIONS,
+    NEXRAD_WMS,
+    type WeatherRadarMapScope,
+} from '@/lib/gis/weather-radar-config';
 
 export type {
     CoverageCircleSpec,
@@ -226,6 +231,114 @@ function HeatmapLayer({
             }
         };
     }, [map, points, show]);
+
+    return null;
+}
+
+const WEATHER_RADAR_PANE = 'weatherRadarPane';
+const WEATHER_RADAR_FREE_SCOPE: WeatherRadarMapScope = { mode: 'free' };
+
+function weatherRadarScopeKey(scope: WeatherRadarMapScope): string {
+    if (scope.mode === 'free') return 'free';
+    if (scope.mode === 'state') {
+        const b = scope.bounds;
+        return `state:${b.west},${b.south},${b.east},${b.north}`;
+    }
+    return `radius:${scope.center.lat},${scope.center.lng},${scope.radiusMeters}`;
+}
+
+function scopeToLeafletBounds(scope: WeatherRadarMapScope): L.LatLngBounds | undefined {
+    if (scope.mode === 'free') return undefined;
+    const { west, south, east, north } = scope.bounds;
+    return L.latLngBounds([south, west], [north, east]);
+}
+
+function applyRadiusClip(
+    map: L.Map,
+    pane: HTMLElement | undefined,
+    scope: WeatherRadarMapScope,
+) {
+    if (!pane) return;
+    if (scope.mode !== 'radius') {
+        pane.style.clipPath = '';
+        (pane.style as CSSStyleDeclaration & { webkitClipPath?: string }).webkitClipPath = '';
+        return;
+    }
+
+    const centerPt = map.latLngToContainerPoint([scope.center.lat, scope.center.lng]);
+    const edgePt = map.latLngToContainerPoint([
+        scope.center.lat + scope.radiusMeters / 111_320,
+        scope.center.lng,
+    ]);
+    const radiusPx = Math.max(0, centerPt.distanceTo(edgePt));
+    const clip = `circle(${radiusPx}px at ${centerPt.x}px ${centerPt.y}px)`;
+    pane.style.clipPath = clip;
+    (pane.style as CSSStyleDeclaration & { webkitClipPath?: string }).webkitClipPath = clip;
+}
+
+function WeatherRadarWmsLayer({
+    show,
+    scope = WEATHER_RADAR_FREE_SCOPE,
+}: {
+    show: boolean;
+    scope?: WeatherRadarMapScope;
+}) {
+    const map = useMap();
+    const layerRef = useRef<L.TileLayer.WMS | null>(null);
+    const scopeKey = weatherRadarScopeKey(scope);
+
+    useEffect(() => {
+        if (layerRef.current) {
+            map.removeLayer(layerRef.current);
+            layerRef.current = null;
+        }
+
+        const pane = map.getPane(WEATHER_RADAR_PANE) ?? (() => {
+            map.createPane(WEATHER_RADAR_PANE);
+            const created = map.getPane(WEATHER_RADAR_PANE);
+            if (created) created.style.zIndex = '250';
+            return created;
+        })();
+
+        if (!show) {
+            applyRadiusClip(map, pane ?? undefined, { mode: 'free' });
+            return;
+        }
+
+        const leafletBounds = scopeToLeafletBounds(scope);
+        const layer = L.tileLayer.wms(NEXRAD_WMS.baseUrl, {
+            ...NEXRAD_LEAFLET_WMS_OPTIONS,
+            uppercase: true,
+            pane: WEATHER_RADAR_PANE,
+            bounds: leafletBounds,
+        });
+        layer.setParams({ _t: Date.now() });
+        layer.addTo(map);
+        layerRef.current = layer;
+
+        const syncClip = () => applyRadiusClip(map, pane ?? undefined, scope);
+        syncClip();
+
+        const refresh = window.setInterval(() => {
+            layer.setParams({ _t: Date.now() });
+        }, NEXRAD_WMS.refreshIntervalMs);
+
+        map.on('move', syncClip);
+        map.on('zoom', syncClip);
+        map.on('resize', syncClip);
+
+        return () => {
+            window.clearInterval(refresh);
+            map.off('move', syncClip);
+            map.off('zoom', syncClip);
+            map.off('resize', syncClip);
+            applyRadiusClip(map, pane ?? undefined, { mode: 'free' });
+            if (layerRef.current) {
+                map.removeLayer(layerRef.current);
+                layerRef.current = null;
+            }
+        };
+    }, [map, show, scope, scopeKey]);
 
     return null;
 }
@@ -463,6 +576,8 @@ export function SituationalLeafletMap({
     onHeatIncidentSelect,
     onBoundsChanged,
     clusterInfrastructure = false,
+    showWeatherRadar = false,
+    weatherRadarScope = null,
     infrastructureClusterMode = 'default',
     fitStateOnLoad = false,
     allowZoomOut = false,
@@ -644,6 +759,10 @@ export function SituationalLeafletMap({
                 style={{ minHeight: 400, height: '100%', width: '100%' }}
             >
                 <TileLayer url={tileUrl} attribution={tileAttribution} />
+                <WeatherRadarWmsLayer
+                    show={showWeatherRadar}
+                    scope={weatherRadarScope ?? WEATHER_RADAR_FREE_SCOPE}
+                />
                 <MapBoundsReporter onBoundsChanged={onBoundsChanged} />
                 <MapRestrictionController
                     stateBounds={stateBounds}
