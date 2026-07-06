@@ -18,7 +18,7 @@ export function CitizenActivityFeed({ className }: CitizenActivityFeedProps) {
         let cancelled = false
         async function load() {
             try {
-                const res = await fetch('/api/admin/citizen-activity?preview=1', { cache: 'no-store' })
+                const res = await fetch('/api/admin/citizen-activity?limit=4', { cache: 'no-store' })
                 const data = await res.json()
                 if (!cancelled && res.ok && Array.isArray(data.items)) {
                     setItems(data.items)
