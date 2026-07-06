@@ -38,7 +38,7 @@ import {
     SUB_ADMIN_MIN_ZOOM,
     viewportExceedsBounds,
 } from '@/lib/gis/situational-map-utils';
-import { buildLeafletMarkerIcon, chemicalClusterIcon, clusterIcon, criticalInfraClusterIcon, damClusterIcon, financialClusterIcon, fuelClusterIcon, generatorClusterIcon, heatIncidentPinIcon, itClusterIcon, mealsClusterIcon, pharmacyClusterIcon, policeClusterIcon, resourceClusterIcon, roadClosureClusterIcon, shelterClusterIcon, volunteerClusterIcon } from '@/lib/gis/situational-map-marker-icons';
+import { buildLeafletMarkerIcon, chemicalClusterIcon, clusterIcon, criticalInfraClusterIcon, damClusterIcon, financialClusterIcon, fuelClusterIcon, generatorClusterIcon, heatIncidentPinIcon, itClusterIcon, mealsClusterIcon, pharmacyClusterIcon, policeClusterIcon, resourceClusterIcon, roadClosureClusterIcon, roadClosedIconMarker, shelterClusterIcon, volunteerClusterIcon } from '@/lib/gis/situational-map-marker-icons';
 import type { InfrastructureClusterMode } from '@/lib/gis/map-layer-config';
 import type { UnifiedEventHeatPoint } from '@/lib/geo/unified-event-heatmap';
 import {
@@ -348,11 +348,14 @@ function InfrastructureClusterLayer({
     enabled,
     onSelect,
     clusterMode = 'default',
+    cluster = true,
 }: {
     markers: SituationalMapMarker[];
     enabled: boolean;
     onSelect: (m: SituationalMapMarker) => void;
     clusterMode?: InfrastructureClusterMode;
+    /** When false, every marker shows individually (no count badges). */
+    cluster?: boolean;
 }) {
     const map = useMap();
     const groupRef = useRef<L.MarkerClusterGroup | null>(null);
@@ -396,10 +399,16 @@ function InfrastructureClusterLayer({
 
         const group = L.markerClusterGroup({
             showCoverageOnHover: false,
-            maxClusterRadius: isFacilities ? 45 : 58,
+            // cluster=false → tiny radius so markers only merge when their icons would
+            // literally overlap, and merges render as a single road-closed sign (never a
+            // count badge). This also keeps performance sane when zoomed out.
+            maxClusterRadius: cluster ? (isFacilities ? 45 : 58) : 16,
             disableClusteringAtZoom: isFacilities ? 7 : 11,
             spiderfyOnMaxZoom: isFacilities,
-            iconCreateFunction: isDams
+            chunkedLoading: true,
+            iconCreateFunction: !cluster
+                ? () => roadClosedIconMarker()
+                : isDams
                 ? (cluster) => damClusterIcon(cluster.getChildCount())
                 : isRoads
                   ? (cluster) => roadClosureClusterIcon(cluster.getChildCount())
@@ -448,7 +457,7 @@ function InfrastructureClusterLayer({
                 groupRef.current = null;
             }
         };
-    }, [map, markers, enabled, onSelect, clusterMode]);
+    }, [map, markers, enabled, onSelect, clusterMode, cluster]);
 
     return null;
 }
@@ -585,6 +594,7 @@ export function SituationalLeafletMap({
     const [isMounted, setIsMounted] = useState(false);
     const [selectedMarker, setSelectedMarker] = useState<SituationalMapMarker | null>(null);
     const [selectedRoadClosure, setSelectedRoadClosure] = useState<MapPolylineSpec | null>(null);
+    const [closureCoordsCopied, setClosureCoordsCopied] = useState(false);
     const [selectedPowerOutage, setSelectedPowerOutage] = useState<MapPolygonSpec | null>(null);
     const [selectedHeatIncident, setSelectedHeatIncident] = useState<UnifiedEventHeatPoint | null>(
         null,
@@ -605,6 +615,19 @@ export function SituationalLeafletMap({
     const handleIncidentDialogOpenChange = useCallback((open: boolean) => {
         setIncidentDialogOpen(open);
         if (!open) setIncidentDialogPayload(null);
+    }, []);
+
+    const copyClosureCoords = useCallback(async (line: MapPolylineSpec) => {
+        const text = line.path
+            .map((p) => `${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}`)
+            .join('\n');
+        try {
+            await navigator.clipboard.writeText(text);
+            setClosureCoordsCopied(true);
+            window.setTimeout(() => setClosureCoordsCopied(false), 1600);
+        } catch {
+            setClosureCoordsCopied(false);
+        }
     }, []);
 
     useEffect(() => {
@@ -646,14 +669,25 @@ export function SituationalLeafletMap({
     );
 
     const renderedMarkers = useMemo(() => {
-        if (!clusterInfrastructure) return validMarkers;
-        return validMarkers.filter((m) => m.type !== 'infrastructure');
+        const base = clusterInfrastructure
+            ? validMarkers.filter((m) => m.type !== 'infrastructure')
+            : validMarkers;
+        // Road closures render in their own dedicated (uncounted) layer.
+        return base.filter((m) => m.icon !== 'road_closure');
     }, [validMarkers, clusterInfrastructure]);
 
     const infrastructureMarkers = useMemo(() => {
         if (!clusterInfrastructure) return [];
-        return validMarkers.filter((m) => m.type === 'infrastructure');
+        // Road closures are shown individually (own layer), never in the counting cluster.
+        return validMarkers.filter(
+            (m) => m.type === 'infrastructure' && m.icon !== 'road_closure',
+        );
     }, [validMarkers, clusterInfrastructure]);
+
+    const roadClosureMarkers = useMemo(
+        () => validMarkers.filter((m) => m.icon === 'road_closure'),
+        [validMarkers],
+    );
 
     const validHeatPoints = useMemo(
         () => heatPoints.filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng)),
@@ -778,6 +812,12 @@ export function SituationalLeafletMap({
                     onSelect={handleInfraSelect}
                     clusterMode={infrastructureClusterMode}
                 />
+                <InfrastructureClusterLayer
+                    markers={roadClosureMarkers}
+                    enabled={roadClosureMarkers.length > 0}
+                    onSelect={handleInfraSelect}
+                    cluster={false}
+                />
                 <MapClickHeatHandler
                     heatClickOnly={heatClickOnly}
                     showHeatmap={showHeatmap}
@@ -860,6 +900,7 @@ export function SituationalLeafletMap({
                                 if (line.closure) {
                                     setSelectedHeatIncident(null);
                                     setSelectedMarker(null);
+                                    setClosureCoordsCopied(false);
                                     setSelectedRoadClosure(line);
                                 }
                             },
@@ -1000,19 +1041,48 @@ export function SituationalLeafletMap({
                         Road Closure
                     </p>
                     <div className="font-bold text-base mb-2">{selectedRoadClosure.closure.roadName}</div>
-                    <p className="text-[10px] font-black uppercase text-red-700 mb-2">
-                        {selectedRoadClosure.closure.status}
-                    </p>
+                    <span className="inline-flex items-center gap-1 rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-white mb-2">
+                        {selectedRoadClosure.closure.status === 'Closed'
+                            ? 'Road Closed'
+                            : selectedRoadClosure.closure.status}
+                    </span>
                     {selectedRoadClosure.closure.reason && (
                         <p className="text-xs text-slate-600 mb-2">{selectedRoadClosure.closure.reason}</p>
                     )}
-                    <button
-                        type="button"
-                        className="text-xs font-bold text-slate-500"
-                        onClick={() => setSelectedRoadClosure(null)}
-                    >
-                        Close
-                    </button>
+                    {(selectedRoadClosure.closure.startLocation ||
+                        selectedRoadClosure.closure.endLocation) && (
+                        <p className="text-[11px] text-slate-500 mb-2">
+                            {selectedRoadClosure.closure.startLocation}
+                            {selectedRoadClosure.closure.endLocation
+                                ? ` → ${selectedRoadClosure.closure.endLocation}`
+                                : ''}
+                        </p>
+                    )}
+                    <p className="text-[10px] text-slate-400 mb-2 tabular-nums">
+                        {selectedRoadClosure.path[0].lat.toFixed(5)},{' '}
+                        {selectedRoadClosure.path[0].lng.toFixed(5)}
+                    </p>
+                    <div className="flex items-center gap-3">
+                        <button
+                            type="button"
+                            className="text-xs font-bold text-blue-600"
+                            onClick={() => copyClosureCoords(selectedRoadClosure)}
+                        >
+                            {closureCoordsCopied ? 'Copied!' : 'Copy coordinates'}
+                        </button>
+                        <button
+                            type="button"
+                            className="text-xs font-bold text-slate-500"
+                            onClick={() => setSelectedRoadClosure(null)}
+                        >
+                            Close
+                        </button>
+                    </div>
+                    {selectedRoadClosure.closure.source && (
+                        <p className="text-[10px] text-slate-400 mt-2">
+                            Source: {selectedRoadClosure.closure.source}
+                        </p>
+                    )}
                 </div>
             )}
 
