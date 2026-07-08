@@ -20,6 +20,10 @@ import {
 import { maybeDemoJurisdictionOverride } from '@/lib/demo/provider';
 import { normalizeStateToUsps } from '@/lib/utils/us-state-usps';
 import { geocodeLocation } from '@/lib/services/location-matching';
+import {
+    notifyAdminsOfCitizenActivity,
+    notifyCitizenOfReportResolution,
+} from '@/lib/services/user-notification-service';
 
 export const MOBILE_REPORT_CATEGORIES = [
     'help_request',
@@ -242,7 +246,12 @@ export async function createCitizenActivityReport(
         source: 'citizen',
     });
 
-    return mapCitizenActivityDocToFeedItem(doc.toObject() as ICitizenActivity);
+    const activityObj = doc.toObject() as ICitizenActivity;
+    void notifyAdminsOfCitizenActivity(activityObj).catch((err) => {
+        console.warn('[citizen-activity] admin notification failed:', err);
+    });
+
+    return mapCitizenActivityDocToFeedItem(activityObj);
 }
 
 export async function createSafeCheckInActivity(
@@ -287,7 +296,14 @@ export async function createSafeCheckInActivity(
         source: 'citizen',
     });
 
-    return mapCitizenActivityDocToFeedItem(doc.toObject() as ICitizenActivity);
+    const activityObj = doc.toObject() as ICitizenActivity;
+    if (!input.isSafe) {
+        void notifyAdminsOfCitizenActivity(activityObj).catch((err) => {
+            console.warn('[citizen-activity] admin notification failed:', err);
+        });
+    }
+
+    return mapCitizenActivityDocToFeedItem(activityObj);
 }
 
 export async function listCitizenActivitiesForUser(userId: string, limit = 20) {
@@ -419,5 +435,12 @@ export async function updateCitizenActivityForAdmin(
 
     const doc = await CitizenActivity.findByIdAndUpdate(activityId, update, { new: true }).lean();
     if (!doc) throw new Error('NOT_FOUND');
+
+    if (patch.resolutionStatus === 'completed') {
+        void notifyCitizenOfReportResolution(doc as ICitizenActivity).catch((err) => {
+            console.warn('[citizen-activity] citizen resolution notification failed:', err);
+        });
+    }
+
     return mapCitizenActivityDocToFeedItem(doc as ICitizenActivity & { _id: { toString(): string } });
 }
