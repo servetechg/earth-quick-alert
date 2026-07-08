@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useMemo } from 'react'
-import { Bell, LogOut, Menu, X, Users, User, Settings, ChevronDown } from 'lucide-react'
+import { LogOut, Menu, User } from 'lucide-react'
 import { Sidebar } from '@/components/sidebar'
 import { UserSidebar } from '@/components/user-sidebar'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
@@ -10,6 +10,7 @@ import { usePathname } from 'next/navigation'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
 import { useUser } from '@/lib/store/user-store'
+import { NotificationBell } from '@/components/notifications/notification-bell'
 
 interface HeaderProps {
   userName?: string
@@ -118,12 +119,7 @@ export function Header({
       <div className="flex items-center gap-2 ">
         {!hideNotificationBell && (
           <div className="flex items-center gap-4 border-r border-slate-100 pr-4 mr-1">
-            <div className="relative p-2 hover:bg-slate-50 rounded-xl transition-colors cursor-pointer group">
-              <Bell fill="#33375D" size={22} className="text-slate-900 transition-colors" />
-              <span className="absolute top-1.5 right-1.5 h-4 w-4 bg-rose-600 text-[9px] font-black text-white flex items-center justify-center rounded-full border-2 border-white">
-                3
-              </span>
-            </div>
+            <NotificationBell />
           </div>
         )}
 

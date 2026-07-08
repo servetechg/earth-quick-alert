@@ -1,7 +1,7 @@
 import connectDB from '@/lib/mongodb';
 import { sendDisasterSurveyInviteEmail } from '@/lib/email/disaster-survey-invite-send';
 import { fetchPopulationAtRiskAlignedEventFeed } from '@/lib/services/alert-communication-aligned-feed';
-import { sendExpoPushNotification } from '@/lib/services/mobile/expo-push-service';
+import { dispatchUserNotification } from '@/lib/services/user-notification-service';
 import {
     buildDisasterSurveyProfileSnapshot,
     normalizeStoredProfileSnapshot,
@@ -170,24 +170,38 @@ async function sendInvitationNotifications(
     invitationId: string,
     campaignId: string,
 ): Promise<{ pushOk: boolean; emailOk: boolean }> {
-    const push = user.expoPushToken.trim()
-        ? await sendExpoPushNotification({
-              to: user.expoPushToken,
-              title: 'Disaster relief survey',
-              body: `You may be eligible for disaster relief. Tap to complete your status survey for ${campaignTitle}.`,
-              data: {
-                  screen: DISASTER_PUSH_SCREEN,
-                  invitationId,
-                  campaignId,
-              },
-          })
-        : { ok: false };
+    const pushBody = `You may be eligible for disaster relief. Tap to complete your status survey for ${campaignTitle}.`;
+
+    const inbox = await dispatchUserNotification({
+        userId: user.id,
+        type: 'disaster_survey',
+        title: 'Disaster relief survey',
+        body: pushBody,
+        priority: 'high',
+        audience: 'citizen',
+        meta: {
+            dedupeKey: `disaster_survey:${invitationId}`,
+            invitationId,
+            campaignId,
+        },
+        push: {
+            title: 'Disaster relief survey',
+            body: pushBody,
+            data: {
+                screen: DISASTER_PUSH_SCREEN,
+                invitationId,
+                campaignId,
+            },
+        },
+    });
+
+    const pushOk = Boolean(inbox) && Boolean(user.expoPushToken.trim());
 
     const emailOk = user.email
         ? await sendDisasterSurveyInviteEmail(user.email, user.firstName || user.name, campaignTitle)
         : false;
 
-    return { pushOk: push.ok, emailOk };
+    return { pushOk, emailOk };
 }
 
 export async function createDisasterSurveyCampaign(input: {
