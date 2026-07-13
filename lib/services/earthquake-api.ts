@@ -1,6 +1,7 @@
 // Earthquake API Service - USGS Earthquake API Integration
 
 import { EarthquakeAlert, AlertSeverity, AlertSource } from '@/lib/types/api-alerts';
+import { resolveUsgsEarthquakeSourceUrl } from '@/lib/services/mobile/alert-source-url';
 
 interface USGSFeature {
     id: string;
@@ -151,6 +152,7 @@ export class EarthquakeAPIService {
             felt: feature.properties.felt,
             significance: feature.properties.sig,
             affectedAreas: [feature.properties.place],
+            sourceUrl: resolveUsgsEarthquakeSourceUrl(feature.id, feature.properties.url),
         };
     }
 

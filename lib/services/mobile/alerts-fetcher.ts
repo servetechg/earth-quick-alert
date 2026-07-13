@@ -12,6 +12,10 @@ import {
     fetchUnifiedEventsForMobileUser,
     unifiedSourceDisplay,
 } from '@/lib/services/mobile/unified-event-mobile-alerts';
+import {
+    resolveLegacyAlertSourceUrl,
+    resolveNwsAlertSourceUrl,
+} from '@/lib/services/mobile/alert-source-url';
 import { buildUserZones, type UserZone } from '@/lib/services/mobile/zone-utils';
 import type { UserProfilePayload } from '@/lib/types/mobile/auth';
 import type { MobileAlertSeverity, MobileWeatherAlert } from '@/lib/types/mobile/alerts';
@@ -31,7 +35,12 @@ type WeatherAlertDoc = {
     zones?: string[];
 };
 
-type UnifiedMobileAlert = Alert & { unifiedSource?: string; sourceDisplay?: string };
+type UnifiedMobileAlert = Alert & {
+    unifiedSource?: string;
+    sourceDisplay?: string;
+    sourceUrl?: string;
+    unifiedProperties?: Record<string, Record<string, unknown>>;
+};
 
 function unique<T>(values: T[]): T[] {
     return Array.from(new Set(values));
@@ -189,7 +198,9 @@ export async function fetchMobileAlertsForUser(
             areaDesc: record.areaDesc,
             zones: record.zones || [],
             event: record.event,
-        } as Alert);
+            sourceUrl: resolveNwsAlertSourceUrl(record.alertId),
+            unifiedSource: 'nws',
+        } as UnifiedMobileAlert);
     }
 
     const earthquakeAlerts: Alert[] = [];
@@ -205,7 +216,16 @@ export async function fetchMobileAlertsForUser(
                     earthquakeAlerts.push({
                         ...alert,
                         affectedAreas: unique([...(alert.affectedAreas || []), location.name]),
-                    });
+                        unifiedSource: 'earthquake',
+                        sourceUrl:
+                            'sourceUrl' in alert && typeof alert.sourceUrl === 'string'
+                                ? alert.sourceUrl
+                                : resolveLegacyAlertSourceUrl({
+                                      id: alert.id,
+                                      source: alert.source,
+                                      unifiedSource: 'earthquake',
+                                  }),
+                    } as UnifiedMobileAlert);
                 } else {
                     existing.affectedAreas = unique([
                         ...(existing.affectedAreas || []),
@@ -306,6 +326,14 @@ export function alertToMobileItem(
         expiresLabel: expiresLabel(expiresAt),
         read: readMap.get(alert.id) === true,
         description: alert.description,
+        sourceUrl:
+            alert.sourceUrl ??
+            resolveLegacyAlertSourceUrl({
+                id: alert.id,
+                source: alert.source,
+                unifiedSource: alert.unifiedSource,
+                properties: alert.unifiedProperties,
+            }),
     };
 }
 
