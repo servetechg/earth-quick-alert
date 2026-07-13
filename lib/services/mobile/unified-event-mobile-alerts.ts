@@ -13,6 +13,7 @@ import {
     resolveUnifiedEventExpiresIso,
     resolveUnifiedEventIssuedIso,
 } from '@/lib/services/mobile/unified-event-timestamps';
+import { resolveUnifiedEventSourceUrl } from '@/lib/services/mobile/alert-source-url';
 
 const SOURCE_LABELS: Record<string, string> = {
     nws: 'NWS',
@@ -81,7 +82,12 @@ function unifiedEventMatchesUser(
     return false;
 }
 
-type UnifiedMobileAlert = Alert & { unifiedSource: string; sourceDisplay?: string };
+type UnifiedMobileAlert = Alert & {
+    unifiedSource: string;
+    sourceDisplay?: string;
+    sourceUrl?: string;
+    unifiedProperties?: Record<string, Record<string, unknown>>;
+};
 
 function unifiedDocToAlert(doc: UnifiedEventDoc): UnifiedMobileAlert {
     const issuedIso = resolveUnifiedEventIssuedIso(doc);
@@ -100,6 +106,8 @@ function unifiedDocToAlert(doc: UnifiedEventDoc): UnifiedMobileAlert {
         areaDesc: doc.location,
         event: doc.name,
         sourceDisplay: sourceLabel(doc.source),
+        sourceUrl: resolveUnifiedEventSourceUrl(doc),
+        unifiedProperties: doc.properties,
     };
 }
 
