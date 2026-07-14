@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongodb';
 import User from '@/models/User';
 import { getSession } from '@/lib/auth';
+import { createSafeCheckInActivity } from '@/lib/services/citizen-activity-service';
 
 // GET: Fetch current user's safety status and family list
 export async function GET() {
@@ -48,6 +49,12 @@ export async function PATCH(req: Request) {
 
         if (!user) {
             return NextResponse.json({ error: 'User not found' }, { status: 404 });
+        }
+
+        try {
+            await createSafeCheckInActivity(session.user.id as string, { isSafe: Boolean(isSafe) });
+        } catch (activityErr) {
+            console.warn('Safe check-in activity log failed:', activityErr);
         }
 
         return NextResponse.json({ success: true, isSafe: user.isSafe });

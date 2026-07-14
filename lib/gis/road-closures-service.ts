@@ -1,32 +1,63 @@
-import connectDB from '@/lib/mongodb'
 import { cacheGetJson, cacheSetJson } from '@/lib/cache/cache-store'
 import {
     boundsFromStateCode,
     type InfrastructureSearchScope,
     type MapBounds,
 } from '@/lib/gis/infrastructure-search-grid'
-import { pointInUsStateBBox } from '@/lib/constants/us-state-bounding-boxes'
+import { pointInUsStateBBox, US_STATE_BBOX } from '@/lib/constants/us-state-bounding-boxes'
 import { calculateDistance } from '@/lib/services/mock-map-service'
 import type { RoadClosureSegment, RoadClosureStatus } from '@/lib/gis/road-closure-types'
-import IncidentReport from '@/models/IncidentReport'
 
-const NWS_BASE = 'https://api.weather.gov'
-const CACHE_TTL_MS = 5 * 60 * 1000
-const ROAD_CLOSURE_PREFIX = 'roads:'
+/**
+ * Real-time road closures via the TomTom Traffic Incident Details API (v5).
+ *
+ * We ONLY request `categoryFilter=8` (road closures) so normal traffic jams are
+ * excluded, and derive the closure status/road name from the incident `events`.
+ * The viewport bounding box is passed straight through from the map, and large
+ * scopes (e.g. a full state) are tiled so a single request never has to cover an
+ * area big enough to time out.
+ */
+const TOMTOM_INCIDENTS_URL =
+    'https://api.tomtom.com/traffic/services/5/incidentDetails'
 
-function nwsHeaders(): HeadersInit {
-    return {
-        Accept: 'application/geo+json',
-        'User-Agent': process.env.NWS_USER_AGENT || 'ready2go-emergency-dashboard (road-closures)',
-    }
-}
+/** Spec fields + a few extras (from/to/roadNumbers) used only for nicer labels. */
+const TOMTOM_FIELDS =
+    '{incidents{type,geometry{type,coordinates},properties{id,iconCategory,magnitudeOfDelay,startTime,endTime,from,to,roadNumbers,events{code,description}}}}'
 
-function configuredSources(): string[] {
-    const raw = process.env.ROAD_CLOSURE_DATA_SOURCES ?? 'nws,osm,reports'
-    return raw
-        .split(',')
-        .map((s) => s.trim().toLowerCase())
-        .filter(Boolean)
+/** iconCategory 8 = Road Closed. */
+const ROAD_CLOSURE_CATEGORY = '8'
+
+const CACHE_TTL_MS = 10 * 60 * 1000
+/** Short TTL for empty results so a transient miss never sticks for 10 minutes. */
+const EMPTY_CACHE_TTL_MS = 60 * 1000
+/** Bump the version suffix to invalidate previously cached results. */
+const ROAD_CLOSURE_PREFIX = 'map-layer:road-closures:v3:'
+
+/**
+ * TomTom rejects any bounding box larger than 10,000 km² with HTTP 400, so every
+ * request must stay under that. We tile into ~90 km cells (≈8,100 km², safely
+ * below the cap).
+ *
+ * - Small viewport (zoomed in): fully cover it with a contiguous grid so the user
+ *   sees every closure in view ("fetch on move" detail).
+ * - Large viewport (zoomed out / national): put one cell over every visible
+ *   state's centre plus an evenly-distributed fill so closures show up across the
+ *   whole country instead of a single central cluster.
+ */
+const MAX_TILE_KM = 90
+const OVERVIEW_TILE_KM = 96
+const KM_PER_DEG_LAT = 110.574
+const KM_PER_DEG_LNG_EQUATOR = 111.32
+/** Above this cell count the viewport is treated as an "overview" (zoomed out). */
+const MAX_DETAIL_TILES = 24
+/** Hard cap on TomTom requests per overview fetch. */
+const MAX_OVERVIEW_TILES = 54
+const TILE_CONCURRENCY = 6
+const REQUEST_TIMEOUT_MS = 12_000
+
+function tomTomKey(): string | null {
+    const key = process.env.TOMTOM_API_KEY?.trim()
+    return key ? key : null
 }
 
 function scopeCacheKey(scope: InfrastructureSearchScope): string {
@@ -38,14 +69,113 @@ function scopeCacheKey(scope: InfrastructureSearchScope): string {
     return `bounds:${b.west.toFixed(2)},${b.south.toFixed(2)},${b.east.toFixed(2)},${b.north.toFixed(2)}`
 }
 
-function pointInScope(
-    lat: number,
-    lng: number,
-    scope: InfrastructureSearchScope,
-): boolean {
-    if (scope.mode === 'state') {
-        return pointInUsStateBBox(lng, lat, scope.stateCode)
+function boundsForScope(scope: InfrastructureSearchScope): MapBounds | null {
+    if (scope.mode === 'state') return boundsFromStateCode(scope.stateCode)
+    if (scope.mode === 'radius') {
+        const latDelta = scope.radiusMile / 69
+        const cosLat = Math.cos((scope.center.lat * Math.PI) / 180)
+        const lngDelta = scope.radiusMile / (69 * Math.max(0.2, Math.abs(cosLat)))
+        return {
+            south: scope.center.lat - latDelta,
+            north: scope.center.lat + latDelta,
+            west: scope.center.lng - lngDelta,
+            east: scope.center.lng + lngDelta,
+        }
     }
+    return scope.bounds
+}
+
+function kmPerDegLng(lat: number): number {
+    return KM_PER_DEG_LNG_EQUATOR * Math.max(0.15, Math.cos((lat * Math.PI) / 180))
+}
+
+/** A square-ish cell of `km` sides centred on a point (stays under the 10,000 km² cap). */
+function cellAround(lat: number, lng: number, km: number): MapBounds {
+    const halfLat = km / 2 / KM_PER_DEG_LAT
+    const halfLng = km / 2 / kmPerDegLng(lat)
+    return {
+        west: lng - halfLng,
+        east: lng + halfLng,
+        south: lat - halfLat,
+        north: lat + halfLat,
+    }
+}
+
+function boundsContainPoint(b: MapBounds, lat: number, lng: number): boolean {
+    return lng >= b.west && lng <= b.east && lat >= b.south && lat <= b.north
+}
+
+/** One cell centred on each US state whose centre lies inside the view. */
+function perStateOverviewCells(b: MapBounds): MapBounds[] {
+    const out: MapBounds[] = []
+    for (const bbox of Object.values(US_STATE_BBOX)) {
+        const [w, s, e, n] = bbox
+        const cLat = (s + n) / 2
+        const cLng = (w + e) / 2
+        if (boundsContainPoint(b, cLat, cLng)) out.push(cellAround(cLat, cLng, OVERVIEW_TILE_KM))
+    }
+    return out
+}
+
+/** `target` cells spread evenly (2D) across the view for density between states. */
+function distributedCells(b: MapBounds, target: number): MapBounds[] {
+    if (target <= 0) return []
+    const midLat = (b.south + b.north) / 2
+    const latSpanKm = (b.north - b.south) * KM_PER_DEG_LAT
+    const lngSpanKm = (b.east - b.west) * kmPerDegLng(midLat)
+    const aspect = lngSpanKm / Math.max(1, latSpanKm)
+    const cols = Math.max(1, Math.round(Math.sqrt(target * aspect)))
+    const rows = Math.max(1, Math.ceil(target / cols))
+
+    const out: MapBounds[] = []
+    for (let i = 0; i < cols; i += 1) {
+        for (let j = 0; j < rows; j += 1) {
+            const cLng = b.west + ((i + 0.5) / cols) * (b.east - b.west)
+            const cLat = b.south + ((j + 0.5) / rows) * (b.north - b.south)
+            out.push(cellAround(cLat, cLng, MAX_TILE_KM))
+        }
+    }
+    return out
+}
+
+/**
+ * Split a bounding box into ~`MAX_TILE_KM` cells (each well under TomTom's 10,000 km²
+ * cap). Small viewports are fully covered; large ones get one cell per visible state
+ * plus distributed fill so closures appear nationwide.
+ */
+function tileBounds(b: MapBounds): MapBounds[] {
+    const lngSpan = b.east - b.west
+    const latSpan = b.south < b.north ? b.north - b.south : 0
+    if (lngSpan <= 0 || latSpan <= 0) return []
+
+    const midLat = (b.south + b.north) / 2
+    const rows = Math.max(1, Math.ceil((latSpan * KM_PER_DEG_LAT) / MAX_TILE_KM))
+    const cols = Math.max(1, Math.ceil((lngSpan * kmPerDegLng(midLat)) / MAX_TILE_KM))
+
+    if (rows * cols <= MAX_DETAIL_TILES) {
+        const dLat = latSpan / rows
+        const dLng = lngSpan / cols
+        const all: MapBounds[] = []
+        for (let i = 0; i < cols; i += 1) {
+            for (let j = 0; j < rows; j += 1) {
+                all.push({
+                    west: b.west + i * dLng,
+                    east: b.west + (i + 1) * dLng,
+                    south: b.south + j * dLat,
+                    north: b.south + (j + 1) * dLat,
+                })
+            }
+        }
+        return all
+    }
+
+    const stateCells = perStateOverviewCells(b)
+    const fill = distributedCells(b, MAX_OVERVIEW_TILES - stateCells.length)
+    return [...stateCells, ...fill].slice(0, MAX_OVERVIEW_TILES)
+}
+
+function pointInScope(lat: number, lng: number, scope: InfrastructureSearchScope): boolean {
+    if (scope.mode === 'state') return pointInUsStateBBox(lng, lat, scope.stateCode)
     if (scope.mode === 'radius') {
         return (
             calculateDistance(lat, lng, scope.center.lat, scope.center.lng) <=
@@ -63,48 +193,23 @@ function pathIntersectsScope(
     return path.some((p) => pointInScope(p.lat, p.lng, scope))
 }
 
-function pathMidpoint(path: { lat: number; lng: number }[]): { lat: number; lng: number } {
-    if (path.length === 0) return { lat: 0, lng: 0 }
-    const mid = path[Math.floor(path.length / 2)]
-    return { lat: mid.lat, lng: mid.lng }
-}
-
 function normalizeStatus(raw: string): RoadClosureStatus {
     const s = raw.toLowerCase()
     if (s.includes('closed') && !s.includes('lane')) return 'Closed'
     if (s.includes('restrict') || s.includes('limited')) return 'Restricted'
     if (s.includes('lane')) return 'Lane Closure'
-    return 'Unknown'
+    // categoryFilter=8 means every incident is a road closure by definition.
+    return 'Closed'
 }
 
-function parseStartEnd(text: string): { start?: string; end?: string } {
-    const between = text.match(/between\s+(.+?)\s+and\s+(.+?)(?:\.|,|$)/i)
-    if (between) return { start: between[1].trim(), end: between[2].trim() }
-    const fromTo = text.match(/from\s+(.+?)\s+to\s+(.+?)(?:\.|,|$)/i)
-    if (fromTo) return { start: fromTo[1].trim(), end: fromTo[2].trim() }
-    return {}
-}
-
-function isRoadClosureAlert(props: Record<string, unknown>): boolean {
-    const event = String(props.event ?? '')
-    if (/road closure|lane closure|bridge closure|street closure|highway closure|traffic/i.test(event)) {
-        return true
-    }
-    const text = `${props.headline ?? ''} ${props.description ?? ''}`.slice(0, 4000)
-    return /road(s)? (is |are )?closed|highway closed|bridge closed|interstate.*closed|detour|impassable|roadway closed|street closed/i.test(
-        text,
-    )
-}
-
-function geoJsonToPaths(geometry: unknown): { lat: number; lng: number }[][] {
+/** GeoJSON geometry -> one or more lat/lng paths (LineString / MultiLineString / Polygon / Point). */
+function geometryToPaths(geometry: unknown): { lat: number; lng: number }[][] {
     if (!geometry || typeof geometry !== 'object') return []
     const g = geometry as { type?: string; coordinates?: unknown }
     const toLatLng = (pt: number[]) => ({ lat: pt[1], lng: pt[0] })
 
     if (g.type === 'LineString' && Array.isArray(g.coordinates)) {
-        const path = (g.coordinates as number[][])
-            .filter((pt) => pt.length >= 2)
-            .map(toLatLng)
+        const path = (g.coordinates as number[][]).filter((pt) => pt.length >= 2).map(toLatLng)
         return path.length >= 2 ? [path] : []
     }
 
@@ -114,300 +219,182 @@ function geoJsonToPaths(geometry: unknown): { lat: number; lng: number }[][] {
             .filter((line) => line.length >= 2)
     }
 
-    if (g.type === 'Polygon' && Array.isArray(g.coordinates?.[0])) {
-        const ring = (g.coordinates[0] as number[][])
+    if (g.type === 'Polygon' && Array.isArray((g.coordinates as unknown[])?.[0])) {
+        const ring = ((g.coordinates as number[][][])[0] ?? [])
             .filter((pt) => pt.length >= 2)
             .map(toLatLng)
-        if (ring.length < 2) return []
-        const open = ring[0].lat === ring[ring.length - 1].lat &&
-            ring[0].lng === ring[ring.length - 1].lng
-            ? ring.slice(0, -1)
-            : ring
-        if (open.length >= 2) return [open]
+        return ring.length >= 2 ? [ring] : []
+    }
+
+    if (g.type === 'Point' && Array.isArray(g.coordinates) && (g.coordinates as number[]).length >= 2) {
+        const [lng, lat] = g.coordinates as number[]
+        // Render a point closure as a short segment so it is visible as a line.
+        const d = 0.0008
+        return [
+            [
+                { lat: lat - d, lng },
+                { lat: lat + d, lng },
+            ],
+        ]
     }
 
     return []
 }
 
-function segmentFromPoint(lat: number, lng: number, label?: string): { lat: number; lng: number }[] {
-    const d = 0.004
-    return [
-        { lat: lat - d, lng },
-        { lat: lat + d, lng },
-    ]
-}
-
-function strokeForStatus(status: RoadClosureStatus): string {
-    if (status === 'Closed') return '#DC2626'
-    if (status === 'Restricted') return '#F59E0B'
-    if (status === 'Lane Closure') return '#EAB308'
-    return '#EF4444'
-}
-
-export function roadClosureStrokeColor(status: RoadClosureStatus): string {
-    return strokeForStatus(status)
-}
-
-async function fetchNwsClosures(scope: InfrastructureSearchScope): Promise<RoadClosureSegment[]> {
-    const area =
-        scope.mode === 'state' && scope.stateCode
-            ? scope.stateCode.toUpperCase()
-            : null
-
-    const url = area
-        ? `${NWS_BASE}/alerts/active?status=actual&area=${encodeURIComponent(area)}`
-        : `${NWS_BASE}/alerts/active?status=actual`
-
-    const res = await fetch(url, { headers: nwsHeaders() })
-    if (!res.ok) return []
-
-    const data = (await res.json()) as { features?: unknown[] }
-    const out: RoadClosureSegment[] = []
-    const seen = new Set<string>()
-
-    for (const feature of data.features ?? []) {
-        const f = feature as {
-            id?: string
-            geometry?: unknown
-            properties?: Record<string, unknown>
-        }
-        const props = f.properties ?? {}
-        if (!isRoadClosureAlert(props)) continue
-
-        const paths = geoJsonToPaths(f.geometry)
-        const event = String(props.event ?? 'Road Closure')
-        const headline = String(props.headline ?? props.event ?? 'Road Closure')
-        const description = String(props.description ?? '')
-        const { start, end } = parseStartEnd(description)
-        const updatedAt =
-            String(props.sent ?? props.effective ?? props.onset ?? new Date().toISOString())
-        const status = normalizeStatus(event)
-        const reason =
-            String(props.description ?? '')
-                .split('\n')[0]
-                ?.slice(0, 280) || undefined
-
-        const roadName =
-            headline.replace(/^.*?\s-\s/, '').slice(0, 120) ||
-            String(props.areaDesc ?? 'Affected roadway')
-
-        if (paths.length === 0) continue
-
-        paths.forEach((path, idx) => {
-            if (!pathIntersectsScope(path, scope)) return
-            const id = String(f.id ?? `nws-${headline}-${idx}`).slice(0, 120)
-            if (seen.has(id)) return
-            seen.add(id)
-            out.push({
-                id,
-                roadName,
-                status,
-                reason,
-                startLocation: start,
-                endLocation: end,
-                updatedAt,
-                source: 'NWS',
-                path,
-            })
-        })
+type TomTomIncident = {
+    type?: string
+    geometry?: { type?: string; coordinates?: unknown }
+    properties?: {
+        id?: string
+        iconCategory?: number
+        magnitudeOfDelay?: number
+        startTime?: string
+        endTime?: string
+        from?: string
+        to?: string
+        roadNumbers?: string[]
+        events?: Array<{ code?: number; description?: string }>
     }
-
-    return out
 }
 
-async function fetchOsmClosures(scope: InfrastructureSearchScope): Promise<RoadClosureSegment[]> {
-    let bounds: MapBounds | null = null
-    if (scope.mode === 'state') bounds = boundsFromStateCode(scope.stateCode)
-    else if (scope.mode === 'radius') {
-        const latDelta = scope.radiusMile / 69
-        const cosLat = Math.cos((scope.center.lat * Math.PI) / 180)
-        const lngDelta = scope.radiusMile / (69 * Math.max(0.2, Math.abs(cosLat)))
-        bounds = {
-            south: scope.center.lat - latDelta,
-            north: scope.center.lat + latDelta,
-            west: scope.center.lng - lngDelta,
-            east: scope.center.lng + lngDelta,
-        }
-    } else bounds = scope.bounds
+function roadNameFor(props: TomTomIncident['properties'], description: string): string {
+    const roads = Array.isArray(props?.roadNumbers)
+        ? props!.roadNumbers.filter(Boolean).join(' / ')
+        : ''
+    if (roads) return roads
+    if (props?.from && props?.to) return `${props.from} → ${props.to}`
+    if (props?.from) return String(props.from)
+    return description || 'Road closure'
+}
 
-    if (!bounds) return []
+function incidentToSegments(
+    incident: TomTomIncident,
+    index: number,
+    scope: InfrastructureSearchScope,
+): RoadClosureSegment[] {
+    const props = incident.properties ?? {}
+    const event = props.events?.[0]
+    const description = String(event?.description ?? 'Closed').trim() || 'Closed'
+    const status = normalizeStatus(description)
+    const roadName = roadNameFor(props, description)
+    const baseId = props.id ? String(props.id) : `tomtom-${index}`
+    const updatedAt = props.startTime ? String(props.startTime) : new Date().toISOString()
 
-    const { south, west, north, east } = bounds
-    const query = `[out:json][timeout:25];
-(
-  way["highway"]["access"="no"](${south},${west},${north},${east});
-  way["highway"]["construction"="yes"](${south},${west},${north},${east});
-  way["highway"]["proposed"](${south},${west},${north},${east});
-);
-out geom;`
-
-    const res = await fetch('https://overpass-api.de/api/interpreter', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: `data=${encodeURIComponent(query)}`,
-    })
-    if (!res.ok) return []
-
-    const data = (await res.json()) as {
-        elements?: Array<{
-            id?: number
-            tags?: Record<string, string>
-            geometry?: Array<{ lat: number; lon: number }>
-        }>
-    }
-
+    const paths = geometryToPaths(incident.geometry)
     const out: RoadClosureSegment[] = []
-    for (const el of data.elements ?? []) {
-        const geom = el.geometry
-        if (!geom || geom.length < 2) continue
-        const path = geom.map((p) => ({ lat: p.lat, lng: p.lon }))
-        if (!pathIntersectsScope(path, scope)) continue
-
-        const tags = el.tags ?? {}
-        const roadName = tags.name || tags.ref || tags['official_name'] || 'Unnamed road'
-        const status = tags.access === 'no' ? 'Closed' : tags.construction === 'yes' ? 'Restricted' : 'Lane Closure'
-
+    paths.forEach((path, pathIdx) => {
+        if (path.length < 2) return
+        if (!pathIntersectsScope(path, scope)) return
         out.push({
-            id: `osm-${el.id}`,
+            id: paths.length > 1 ? `${baseId}-${pathIdx}` : baseId,
             roadName,
-            status: normalizeStatus(status),
-            reason: tags.description || tags.note || tags.construction || undefined,
-            startLocation: tags['addr:street'] || undefined,
-            updatedAt: new Date().toISOString(),
-            source: 'OpenStreetMap',
+            status,
+            reason: description,
+            startLocation: props.from ? String(props.from) : undefined,
+            endLocation: props.to ? String(props.to) : undefined,
+            updatedAt,
+            source: 'TomTom Traffic',
             path,
         })
-    }
-
-    return out
-}
-
-async function fetchReportClosures(scope: InfrastructureSearchScope): Promise<RoadClosureSegment[]> {
-    await connectDB()
-    const out: RoadClosureSegment[] = []
-    const seen = new Set<string>()
-
-    const incidents = await IncidentReport.find({
-        type: 'Road Closure',
-        status: { $ne: 'Resolved' },
     })
-        .select('location lat lng description status updatedAt createdAt')
-        .lean()
-
-    for (const row of incidents) {
-        const lat = typeof row.lat === 'number' ? row.lat : null
-        const lng = typeof row.lng === 'number' ? row.lng : null
-        if (lat == null || lng == null) continue
-        const path = segmentFromPoint(lat, lng, row.location)
-        if (!pathIntersectsScope(path, scope)) continue
-        const id = `incident-${String(row._id)}`
-        if (seen.has(id)) continue
-        seen.add(id)
-        out.push({
-            id,
-            roadName: row.location || 'Reported closure',
-            status: row.status === 'Active' ? 'Closed' : 'Restricted',
-            reason: row.description || undefined,
-            startLocation: row.location,
-            updatedAt: (row.updatedAt ?? row.createdAt ?? new Date()).toISOString(),
-            source: 'Incident Report',
-            path,
-        })
-    }
-
     return out
 }
 
-async function fetchTomTomClosures(scope: InfrastructureSearchScope): Promise<RoadClosureSegment[]> {
-    const key = process.env.TOMTOM_API_KEY?.trim()
-    if (!key || process.env.TRAFFIC_PROVIDER?.toLowerCase() !== 'tomtom') return []
+async function fetchTomTomTile(
+    key: string,
+    bbox: MapBounds,
+    scope: InfrastructureSearchScope,
+    startIndex: number,
+): Promise<RoadClosureSegment[]> {
+    const params = new URLSearchParams({
+        key,
+        bbox: `${bbox.west},${bbox.south},${bbox.east},${bbox.north}`,
+        fields: TOMTOM_FIELDS,
+        language: 'en-US',
+        categoryFilter: ROAD_CLOSURE_CATEGORY,
+        timeValidityFilter: 'present',
+    })
 
-    let bounds: MapBounds | null = null
-    if (scope.mode === 'state') bounds = boundsFromStateCode(scope.stateCode)
-    else if (scope.mode === 'radius') {
-        const latDelta = scope.radiusMile / 69
-        const cosLat = Math.cos((scope.center.lat * Math.PI) / 180)
-        const lngDelta = scope.radiusMile / (69 * Math.max(0.2, Math.abs(cosLat)))
-        bounds = {
-            south: scope.center.lat - latDelta,
-            north: scope.center.lat + latDelta,
-            west: scope.center.lng - lngDelta,
-            east: scope.center.lng + lngDelta,
-        }
-    } else bounds = scope.bounds
-    if (!bounds) return []
-
-    const bbox = `${bounds.west},${bounds.south},${bounds.east},${bounds.north}`
-    const url = `https://api.tomtom.com/traffic/services/5/incidentDetails?key=${encodeURIComponent(key)}&bbox=${bbox}&fields={incidents{type,geometry{type,coordinates},properties{iconCategory,magnitudeOfDelay,events{description,code,descriptionParts}}}}`
-
-    const res = await fetch(url)
+    let res: Response
+    try {
+        res = await fetch(`${TOMTOM_INCIDENTS_URL}?${params.toString()}`, {
+            signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+            headers: { Accept: 'application/json' },
+        })
+    } catch {
+        return []
+    }
     if (!res.ok) return []
 
-    const data = (await res.json()) as {
-        incidents?: Array<{
-            geometry?: { type?: string; coordinates?: number[][] | number[][][] }
-            properties?: {
-                events?: Array<{ description?: string; descriptionParts?: { value?: string }[] }>
-            }
-        }>
+    let data: { incidents?: TomTomIncident[] }
+    try {
+        data = (await res.json()) as { incidents?: TomTomIncident[] }
+    } catch {
+        return []
     }
 
+    const incidents = Array.isArray(data.incidents) ? data.incidents : []
     const out: RoadClosureSegment[] = []
-    for (const inc of data.incidents ?? []) {
-        const paths = geoJsonToPaths(inc.geometry)
-        const event = inc.properties?.events?.[0]
-        const desc =
-            event?.description ||
-            event?.descriptionParts?.map((p) => p.value).filter(Boolean).join(' ') ||
-            'Traffic incident'
-        const status = /closed/i.test(desc) ? 'Closed' : 'Restricted'
-
-        for (const path of paths.length ? paths : []) {
-            if (!pathIntersectsScope(path, scope)) continue
-            out.push({
-                id: `tomtom-${out.length}-${pathMidpoint(path).lat.toFixed(4)}`,
-                roadName: desc.slice(0, 120),
-                status: normalizeStatus(status),
-                reason: desc,
-                updatedAt: new Date().toISOString(),
-                source: 'TomTom Traffic',
-                path,
-            })
-        }
-    }
+    incidents.forEach((incident, i) => {
+        out.push(...incidentToSegments(incident, startIndex + i, scope))
+    })
     return out
+}
+
+async function runBatched<T, R>(
+    items: T[],
+    concurrency: number,
+    worker: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+    const results: R[] = []
+    for (let i = 0; i < items.length; i += concurrency) {
+        const slice = items.slice(i, i + concurrency)
+        const settled = await Promise.all(
+            slice.map((item, j) => worker(item, i + j)),
+        )
+        results.push(...settled)
+    }
+    return results
 }
 
 export async function fetchRoadClosures(
     scope: InfrastructureSearchScope,
 ): Promise<{ closures: RoadClosureSegment[]; sources: string[]; fetchedAt: string }> {
-    const key = `${ROAD_CLOSURE_PREFIX}${scopeCacheKey(scope)}`
-    const cached = await cacheGetJson<RoadClosureSegment[]>(key)
-    if (cached) {
-        return {
-            closures: cached,
-            sources: configuredSources(),
-            fetchedAt: new Date().toISOString(),
-        }
+    const sources = ['TomTom Traffic']
+    const key = tomTomKey()
+    if (!key) {
+        return { closures: [], sources, fetchedAt: new Date().toISOString() }
     }
 
-    const sources = configuredSources()
-    const batches: RoadClosureSegment[][] = []
+    const cacheKey = `${ROAD_CLOSURE_PREFIX}${scopeCacheKey(scope)}`
+    const cached = await cacheGetJson<RoadClosureSegment[]>(cacheKey)
+    if (cached) {
+        return { closures: cached, sources, fetchedAt: new Date().toISOString() }
+    }
 
-    if (sources.includes('nws')) batches.push(await fetchNwsClosures(scope))
-    if (sources.includes('osm')) batches.push(await fetchOsmClosures(scope))
-    if (sources.includes('reports')) batches.push(await fetchReportClosures(scope))
-    if (sources.includes('tomtom')) batches.push(await fetchTomTomClosures(scope))
+    const bounds = boundsForScope(scope)
+    if (!bounds) {
+        return { closures: [], sources, fetchedAt: new Date().toISOString() }
+    }
+
+    const tiles = tileBounds(bounds)
+    const batches = await runBatched(tiles, TILE_CONCURRENCY, (tile, i) =>
+        fetchTomTomTile(key, tile, scope, i * 1000),
+    )
 
     const byId = new Map<string, RoadClosureSegment>()
     for (const batch of batches) {
-        for (const closure of batch) {
-            if (!byId.has(closure.id)) byId.set(closure.id, closure)
+        for (const segment of batch) {
+            if (!byId.has(segment.id)) byId.set(segment.id, segment)
         }
     }
 
     const closures = [...byId.values()]
-    await cacheSetJson(key, closures, CACHE_TTL_MS)
+    await cacheSetJson(
+        cacheKey,
+        closures,
+        closures.length > 0 ? CACHE_TTL_MS : EMPTY_CACHE_TTL_MS,
+    )
 
     return { closures, sources, fetchedAt: new Date().toISOString() }
 }

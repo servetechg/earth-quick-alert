@@ -13,6 +13,8 @@ export type MobileWeatherAlert = {
     expiresLabel: string;
     read: boolean;
     description?: string;
+    /** Official source page (NWS, USGS, etc.) */
+    sourceUrl?: string;
 };
 
 export type MobileAlertsListResponse = {

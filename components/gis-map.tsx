@@ -31,6 +31,7 @@ import {
 import {
   SituationalLeafletMap,
   type CoverageCircleSpec,
+  type MapPolygonSpec,
   type MapPolylineSpec,
   type MapStateBounds,
   type MapDisasterZoneCircleSpec,
@@ -39,7 +40,6 @@ import type { UnifiedEventHeatPoint } from '@/lib/geo/unified-event-heatmap'
 import { cn } from '@/lib/utils'
 import { getUsStateBbox, pointInUsStateBBox } from '@/lib/constants/us-state-bounding-boxes'
 import { normalizeStateToUsps } from '@/lib/utils/us-state-usps'
-import { intersectBounds } from '@/lib/gis/infrastructure-search-grid'
 import { radiusBounds } from '@/lib/gis/geojson-map-utils'
 import { CONUS_MAP_BOUNDS, clampBoundsToUsa, viewportCenterInUsa, pointInUsaBounds } from '@/lib/constants/usa-map-bounds'
 import { ShieldCheck, Truck, Siren, Building2, MapPin } from 'lucide-react'
@@ -54,15 +54,31 @@ import {
   buildDemoMapLayerState,
   DAMS_MAP_LAYER,
   FUEL_SITES_MAP_LAYER,
+  PHARMACIES_MAP_LAYER,
+  POLICE_STATIONS_MAP_LAYER,
+  MEALS_READY_MAP_LAYER,
+  GENERATORS_MAP_LAYER,
+  VOLUNTEERS_MAP_LAYER,
+  RESOURCE_SITES_MAP_LAYER,
+  IT_INFRASTRUCTURE_MAP_LAYER,
+  ROAD_CLOSURES_MAP_LAYER,
+  FINANCIAL_SITES_MAP_LAYER,
+  HIFLD_NEXT_IMPLEMENTED_SECTOR_IDS,
+  HIFLD_OPERATIONAL_MAP_LAYERS,
   SHELTERS_MAP_LAYER,
+  criticalInfraSectorMarkerIcon,
+  resolveInfrastructureClusterMode,
 } from '@/lib/gis/map-layer-config'
+import {
+  enabledHifldOperationalLayers,
+  hifldSectorsForOperationalLayers,
+} from '@/lib/gis/hifld-operational-layers'
 import { gisFilterLayerByResultType, gisFilterLayerById } from '@/lib/gis/gis-filter-layers'
 import type { GisFilterLayerDef } from '@/lib/gis/gis-filter-layers'
 import { filterDemoGisFilterPlaces, pointInPaddedBounds } from '@/lib/demo/data/demo-gis-filter-places'
-import { DEMO_CRITICAL_INFRA_MARKERS } from '@/lib/demo/critical-infrastructure-markers'
 import { rankPlacesForViewport } from '@/lib/gis/viewport-place-ranking'
 import type { InfrastructurePlaceResult } from '@/lib/gis/infrastructure-places-fetch'
-import { CRITICAL_INFRASTRUCTURE_SECTORS, criticalSectorById } from '@/lib/gis/critical-infrastructure-sectors'
+import { criticalSectorById } from '@/lib/gis/critical-infrastructure-sectors'
 import {
   disasterZonesToMapCircles,
   zoneLabelPosition,
@@ -70,11 +86,26 @@ import {
 import {
   useInfrastructurePlaces,
   useMapLayerDams,
+  useMapLayerFinancialSites,
   useMapLayerFuelSites,
+  useMapLayerHifldSites,
+  useMapLayerPharmacies,
+  useMapLayerPoliceStations,
+  useMapLayerFoodDistributionCenters,
+  useMapLayerGeneratorLocations,
+  useMapLayerVolunteerCenters,
+  useMapLayerEmergencyResourceSites,
+  useMapLayerItInfrastructure,
   useMapLayerShelters,
+  usePowerOutages,
   useRoadClosures,
   useSituationalMap,
 } from '@/lib/hooks/admin-map-queries'
+import {
+  ODIN_OUTAGE_FILL_COLOR,
+  ODIN_OUTAGE_STROKE_COLOR,
+} from '@/lib/gis/odin/odin-outages-config'
+import { isWeatherRadarAvailableForScope, type WeatherRadarMapScope } from '@/lib/gis/weather-radar-config'
 import { useDebouncedMapBounds } from '@/lib/hooks/use-debounced-map-bounds'
 import { quantizeLayerFetchBounds } from '@/lib/gis/layers/map-layer-bounds-utils'
 
@@ -86,7 +117,7 @@ const SUB_ADMIN_GIS_TABS: GisMapTab[] = ['Citizens', 'Responders']
 /** GIS filter/layers UI + Google Places layer fetches disabled (free OSM map only). */
 const GIS_MAP_FILTER_LAYERS_ENABLED = false
 
-/** Open-source map layers (NID dams, FEMA shelters, NREL fuel sites) — no Google / HIFLD. */
+/** Open-source map layers (NID dams, FEMA shelters, NREL fuel, EPA chemical, FDIC financial). */
 const OPEN_SOURCE_MAP_LAYERS_ENABLED = true
 
 function centerOfBounds(bounds: MapStateBounds): { lat: number; lng: number } {
@@ -260,9 +291,11 @@ export function GISMap({
   const [mapViewportBounds, setMapViewportBounds] = useState<MapStateBounds | null>(null)
   const [tornadoPolylines, setTornadoPolylines] = useState<MapPolylineSpec[]>([])
   const [roadClosurePolylines, setRoadClosurePolylines] = useState<MapPolylineSpec[]>([])
+  const [powerOutagePolygons, setPowerOutagePolygons] = useState<MapPolygonSpec[]>([])
   const [operationalAlertPolylines, setOperationalAlertPolylines] = useState<MapPolylineSpec[]>([])
   const [operationalIncidentMarkers, setOperationalIncidentMarkers] = useState<any[]>([])
   const [isLoadingRoadClosures, setIsLoadingRoadClosures] = useState(false)
+  const [isLoadingPowerOutages, setIsLoadingPowerOutages] = useState(false)
   const [situationalLoading, setSituationalLoading] = useState(false)
   const [mapLayers, setMapLayers] = useState<Record<string, boolean>>(() =>
     buildDefaultMapLayerState({
@@ -273,8 +306,6 @@ export function GISMap({
   const [demoModeActive, setDemoModeActive] = useState(false)
   const [scenarioDemo, setScenarioDemo] = useState(false)
   const [tornadoPathPoints, setTornadoPathPoints] = useState<{ lat: number; lng: number }[]>([])
-  const [criticalInfraMarkers, setCriticalInfraMarkers] = useState<any[]>([])
-  const [isLoadingCriticalInfra, setIsLoadingCriticalInfra] = useState(false)
 
   const infraCacheRef = React.useRef<Map<string, any>>(new Map())
   const infraScopeKeyRef = React.useRef<string>('')
@@ -977,22 +1008,8 @@ export function GISMap({
     scopeState: scopeState?.trim() || undefined,
   })
 
-  const roadFetchBounds = useMemo(
-    () =>
-      clampFetchBounds(
-        mapViewportBounds ?? stateBoundsRestriction ?? mapStateBounds ?? null,
-      ),
-    [mapViewportBounds, stateBoundsRestriction, mapStateBounds, clampFetchBounds],
-  )
-
-  const roadClosuresQuery = useRoadClosures({
-    enabled: GIS_MAP_FILTER_LAYERS_ENABLED && mapLayers.roads && viewportInUsa,
-    bounds: roadFetchBounds,
-    scopeState: scopeState?.trim() || undefined,
-  })
-
   /** Super-admin: viewport bbox across USA. Sub-admin / scoped state: full state. Sub-admin radius: circle bounds. */
-  const { dams: damsFetchScope, shelters: sheltersFetchScope, fuel_sites: fuelSitesFetchScope } =
+  const { dams: damsFetchScope, shelters: sheltersFetchScope, fuel_sites: fuelSitesFetchScope, pharmacies: pharmaciesFetchScope, police: policeFetchScope, meals_ready: mealsReadyFetchScope, generators: generatorsFetchScope, volunteers: volunteersFetchScope, resources: resourceSitesFetchScope, ci_it: itInfrastructureFetchScope, ci_financial: financialSitesFetchScope, roads: roadsFetchScope, power: powerFetchScope } =
     useMemo(() => {
       const ctx = {
         lockToCoverageCircle,
@@ -1006,14 +1023,38 @@ export function GISMap({
         focusState,
       }
       return {
-        dams: buildOpenSourceLayerFetchScope(mapLayers.dams, ctx),
+        dams: buildOpenSourceLayerFetchScope(
+          showCriticalInfraLayers && mapLayers.ci_dams,
+          ctx,
+        ),
         shelters: buildOpenSourceLayerFetchScope(mapLayers.shelters, ctx),
         fuel_sites: buildOpenSourceLayerFetchScope(mapLayers.fuel_sites, ctx),
+        roads: buildOpenSourceLayerFetchScope(mapLayers.roads, ctx),
+        power: buildOpenSourceLayerFetchScope(mapLayers.power, ctx),
+        pharmacies: buildOpenSourceLayerFetchScope(mapLayers.pharmacies, ctx),
+        police: buildOpenSourceLayerFetchScope(mapLayers.police, ctx),
+        meals_ready: buildOpenSourceLayerFetchScope(mapLayers.meals_ready, ctx),
+        generators: buildOpenSourceLayerFetchScope(mapLayers.generators, ctx),
+        volunteers: buildOpenSourceLayerFetchScope(mapLayers.volunteers, ctx),
+        resources: buildOpenSourceLayerFetchScope(mapLayers.resources, ctx),
+        ci_it: buildOpenSourceLayerFetchScope(mapLayers.ci_it, ctx),
+        ci_financial: buildOpenSourceLayerFetchScope(mapLayers.ci_financial, ctx),
       }
     }, [
-      mapLayers.dams,
+      showCriticalInfraLayers,
+      mapLayers.ci_dams,
       mapLayers.shelters,
       mapLayers.fuel_sites,
+      mapLayers.roads,
+      mapLayers.power,
+      mapLayers.pharmacies,
+      mapLayers.police,
+      mapLayers.meals_ready,
+      mapLayers.generators,
+      mapLayers.volunteers,
+      mapLayers.resources,
+      mapLayers.ci_it,
+      mapLayers.ci_financial,
       lockToCoverageCircle,
       coverageCircle,
       damsStateKey,
@@ -1025,12 +1066,26 @@ export function GISMap({
       focusState,
     ])
 
+  const roadClosuresQuery = useRoadClosures({
+    enabled:
+      Boolean(roadsFetchScope) &&
+      mapLayers.roads &&
+      viewportInUsa,
+    bounds: roadsFetchScope?.stateKey ? null : roadsFetchScope?.bounds ?? null,
+    scopeState: roadsFetchScope?.stateKey ?? (scopeState?.trim() || undefined),
+  })
+
+  const powerOutagesQuery = usePowerOutages({
+    enabled: Boolean(powerFetchScope) && mapLayers.power && viewportInUsa,
+    bounds: powerFetchScope?.stateKey ? null : powerFetchScope?.bounds ?? null,
+    scopeState: powerFetchScope?.stateKey ?? (scopeState?.trim() || undefined),
+  })
+
   const damsLayerQuery = useMapLayerDams({
     enabled:
       OPEN_SOURCE_MAP_LAYERS_ENABLED &&
       Boolean(damsFetchScope) &&
-      viewportInUsa &&
-      !isDemoSimulation,
+      viewportInUsa,
     stateKey: damsFetchScope?.stateKey ?? null,
     bounds: damsFetchScope?.stateKey ? null : damsFetchScope?.bounds ?? null,
   })
@@ -1053,6 +1108,145 @@ export function GISMap({
       !isDemoSimulation,
     stateKey: fuelSitesFetchScope?.stateKey ?? null,
     bounds: fuelSitesFetchScope?.stateKey ? null : fuelSitesFetchScope?.bounds ?? null,
+  })
+
+  const pharmaciesLayerQuery = useMapLayerPharmacies({
+    enabled:
+      OPEN_SOURCE_MAP_LAYERS_ENABLED &&
+      Boolean(pharmaciesFetchScope) &&
+      viewportInUsa &&
+      !isDemoSimulation,
+    stateKey: pharmaciesFetchScope?.stateKey ?? null,
+    bounds: pharmaciesFetchScope?.stateKey ? null : pharmaciesFetchScope?.bounds ?? null,
+  })
+
+  const policeStationsLayerQuery = useMapLayerPoliceStations({
+    enabled:
+      OPEN_SOURCE_MAP_LAYERS_ENABLED &&
+      Boolean(policeFetchScope) &&
+      viewportInUsa &&
+      !isDemoSimulation,
+    stateKey: policeFetchScope?.stateKey ?? null,
+    bounds: policeFetchScope?.stateKey ? null : policeFetchScope?.bounds ?? null,
+  })
+
+  const mealsReadyLayerQuery = useMapLayerFoodDistributionCenters({
+    enabled:
+      OPEN_SOURCE_MAP_LAYERS_ENABLED &&
+      Boolean(mealsReadyFetchScope) &&
+      viewportInUsa &&
+      !isDemoSimulation,
+    stateKey: mealsReadyFetchScope?.stateKey ?? null,
+    bounds: mealsReadyFetchScope?.stateKey ? null : mealsReadyFetchScope?.bounds ?? null,
+  })
+
+  const generatorsLayerQuery = useMapLayerGeneratorLocations({
+    enabled:
+      OPEN_SOURCE_MAP_LAYERS_ENABLED &&
+      Boolean(generatorsFetchScope) &&
+      viewportInUsa &&
+      !isDemoSimulation,
+    stateKey: generatorsFetchScope?.stateKey ?? null,
+    bounds: generatorsFetchScope?.stateKey ? null : generatorsFetchScope?.bounds ?? null,
+  })
+
+  const volunteersLayerQuery = useMapLayerVolunteerCenters({
+    enabled:
+      OPEN_SOURCE_MAP_LAYERS_ENABLED &&
+      Boolean(volunteersFetchScope) &&
+      viewportInUsa &&
+      !isDemoSimulation,
+    stateKey: volunteersFetchScope?.stateKey ?? null,
+    bounds: volunteersFetchScope?.stateKey ? null : volunteersFetchScope?.bounds ?? null,
+  })
+
+  const resourceSitesLayerQuery = useMapLayerEmergencyResourceSites({
+    enabled:
+      OPEN_SOURCE_MAP_LAYERS_ENABLED &&
+      Boolean(resourceSitesFetchScope) &&
+      viewportInUsa &&
+      !isDemoSimulation,
+    stateKey: resourceSitesFetchScope?.stateKey ?? null,
+    bounds: resourceSitesFetchScope?.stateKey ? null : resourceSitesFetchScope?.bounds ?? null,
+  })
+
+  const itInfrastructureLayerQuery = useMapLayerItInfrastructure({
+    enabled:
+      OPEN_SOURCE_MAP_LAYERS_ENABLED &&
+      Boolean(itInfrastructureFetchScope) &&
+      viewportInUsa &&
+      !isDemoSimulation,
+    stateKey: itInfrastructureFetchScope?.stateKey ?? null,
+    bounds: itInfrastructureFetchScope?.stateKey ? null : itInfrastructureFetchScope?.bounds ?? null,
+  })
+
+  const financialSitesLayerQuery = useMapLayerFinancialSites({
+    enabled:
+      OPEN_SOURCE_MAP_LAYERS_ENABLED &&
+      Boolean(financialSitesFetchScope) &&
+      viewportInUsa &&
+      !isDemoSimulation,
+    stateKey: financialSitesFetchScope?.stateKey ?? null,
+    bounds: financialSitesFetchScope?.stateKey ? null : financialSitesFetchScope?.bounds ?? null,
+  })
+
+  const enabledOperationalHifldLayers = useMemo(
+    () => enabledHifldOperationalLayers(mapLayers),
+    [mapLayers],
+  )
+
+  const enabledHifldMongoSectors = useMemo(() => {
+    if (!showCriticalInfraLayers) return [] as (typeof HIFLD_NEXT_IMPLEMENTED_SECTOR_IDS)[number][]
+    return HIFLD_NEXT_IMPLEMENTED_SECTOR_IDS.filter((id) => mapLayers[id])
+  }, [showCriticalInfraLayers, mapLayers])
+
+  const hifldSectorsForQuery = useMemo(() => {
+    const sectors = new Set<(typeof HIFLD_NEXT_IMPLEMENTED_SECTOR_IDS)[number]>()
+    for (const sectorId of enabledHifldMongoSectors) {
+      sectors.add(sectorId)
+    }
+    for (const sectorId of hifldSectorsForOperationalLayers(mapLayers)) {
+      sectors.add(sectorId)
+    }
+    return [...sectors]
+  }, [enabledHifldMongoSectors, mapLayers])
+
+  const hifldSitesFetchScope = useMemo(() => {
+    if (hifldSectorsForQuery.length === 0) return null
+    const ctx = {
+      lockToCoverageCircle,
+      coverageCircle,
+      stateScoped,
+      stateBoundsRestriction,
+      licensedStateKey: damsStateKey,
+      restrictToUsa,
+      fetchBounds: openSourceLayerFetchBounds,
+      scopeState,
+      focusState,
+    }
+    return buildOpenSourceLayerFetchScope(true, ctx)
+  }, [
+    hifldSectorsForQuery.length,
+    lockToCoverageCircle,
+    coverageCircle,
+    damsStateKey,
+    stateScoped,
+    stateBoundsRestriction,
+    restrictToUsa,
+    openSourceLayerFetchBounds,
+    scopeState,
+    focusState,
+  ])
+
+  const hifldSitesLayerQuery = useMapLayerHifldSites({
+    enabled:
+      OPEN_SOURCE_MAP_LAYERS_ENABLED &&
+      hifldSectorsForQuery.length > 0 &&
+      Boolean(hifldSitesFetchScope) &&
+      viewportInUsa,
+    sectors: hifldSectorsForQuery,
+    stateKey: hifldSitesFetchScope?.stateKey ?? null,
+    bounds: hifldSitesFetchScope?.stateKey ? null : hifldSitesFetchScope?.bounds ?? null,
   })
 
   const infraFetchScopeKey = useMemo(() => {
@@ -1089,7 +1283,6 @@ export function GISMap({
     setCacheTrigger((t) => t + 1)
     if (!isDemoSimulation) {
       demoLayersInitializedRef.current = false
-      setCriticalInfraMarkers([])
     }
   }, [isDemoSimulation])
 
@@ -1210,7 +1403,7 @@ export function GISMap({
 
   useEffect(() => {
     if (!mapLayers.roads || !viewportInUsa) {
-      if (!viewportInUsa) setRoadClosurePolylines([])
+      setRoadClosurePolylines([])
       return
     }
 
@@ -1228,6 +1421,14 @@ export function GISMap({
         restrictToUsa &&
         !path.some((p: { lat?: number; lng?: number }) =>
           inUsaView(p.lat as number, p.lng as number),
+        )
+      ) {
+        continue
+      }
+      if (
+        mapViewportBounds &&
+        !path.some((p: { lat?: number; lng?: number }) =>
+          markerInLayerViewport(p.lat as number, p.lng as number),
         )
       ) {
         continue
@@ -1266,27 +1467,93 @@ export function GISMap({
     }
 
     setRoadClosurePolylines(polylines)
-  }, [mapLayers.roads, roadClosuresQuery.data, restrictToUsa, inUsaView, viewportInUsa])
+  }, [
+    mapLayers.roads,
+    roadClosuresQuery.data,
+    restrictToUsa,
+    inUsaView,
+    viewportInUsa,
+    mapViewportBounds,
+    markerInLayerViewport,
+  ])
 
   useEffect(() => {
     setIsLoadingRoadClosures(roadClosuresQuery.isFetching)
   }, [roadClosuresQuery.isFetching])
 
+  useEffect(() => {
+    if (!mapLayers.power || !viewportInUsa) {
+      setPowerOutagePolygons([])
+      return
+    }
+
+    const outages = powerOutagesQuery.data ?? []
+    const polygons: MapPolygonSpec[] = []
+
+    for (const outage of outages) {
+      const paths = (outage.paths ?? []).filter((path) => path.length >= 3)
+      if (paths.length === 0) continue
+      if (lockToCoverageCircle && !markerInCoverage(outage.centroid)) continue
+      if (
+        mapViewportBounds &&
+        !markerInLayerViewport(outage.centroid.lat, outage.centroid.lng)
+      ) {
+        continue
+      }
+
+      polygons.push({
+        id: outage.id,
+        paths,
+        fillColor: ODIN_OUTAGE_FILL_COLOR,
+        fillOpacity: 0.35,
+        strokeColor: ODIN_OUTAGE_STROKE_COLOR,
+        strokeWeight: 2,
+        label: outage.name,
+        outage: {
+          name: outage.name,
+          county: outage.county,
+          state: outage.state,
+          metersAffected: outage.metersAffected,
+          reportedStartTime: outage.reportedStartTime,
+          estimatedRestorationTime: outage.estimatedRestorationTime,
+          cause: outage.cause,
+          statusKind: outage.statusKind,
+          communityDescriptor: outage.communityDescriptor,
+          source: outage.source,
+        },
+      })
+    }
+
+    setPowerOutagePolygons(polygons)
+  }, [
+    mapLayers.power,
+    powerOutagesQuery.data,
+    viewportInUsa,
+    mapViewportBounds,
+    markerInLayerViewport,
+    lockToCoverageCircle,
+    markerInCoverage,
+  ])
+
+  useEffect(() => {
+    setIsLoadingPowerOutages(powerOutagesQuery.isFetching)
+  }, [powerOutagesQuery.isFetching])
+
   const operationalAlertLayersKey = useMemo(() => {
-    const keys = ['weather', 'risk', 'flood'].filter((id) => mapLayers[id])
-    return keys.sort().join(',')
-  }, [mapLayers.weather, mapLayers.risk, mapLayers.flood])
+    const keys = ['flood'].filter((id) => mapLayers[id])
+    return keys.join(',')
+  }, [mapLayers.flood])
 
   const operationalIncidentLayersKey = useMemo(() => {
-    const keys = ['power', 'water'].filter((id) => mapLayers[id])
+    const keys = ['water'].filter((id) => mapLayers[id])
     return keys.sort().join(',')
-  }, [mapLayers.power, mapLayers.water])
+  }, [mapLayers.water])
 
   useEffect(() => {
     let cancelled = false
 
     if (!operationalAlertLayersKey || !viewportInUsa) {
-      if (!viewportInUsa) setOperationalAlertPolylines([])
+      setOperationalAlertPolylines([])
       return
     }
 
@@ -1425,12 +1692,12 @@ export function GISMap({
               position: pos,
               title: inc.title,
               type: 'incident' as const,
-              category: filter === 'power' ? 'Power Outages' : 'Water Issues',
+              category: 'Water Issues',
               status: inc.status,
               location: inc.location,
               description: inc.description,
-              color: filter === 'power' ? '#EAB308' : '#0EA5E9',
-              icon: filter === 'power' ? 'generator' : 'water_crew',
+              color: '#0EA5E9',
+              icon: 'water_crew',
             })
           }
         }
@@ -1461,165 +1728,14 @@ export function GISMap({
   ])
 
   const combinedPolylines = useMemo(
-    () =>
-      viewportInUsa
-        ? [...tornadoPolylines, ...roadClosurePolylines, ...operationalAlertPolylines]
-        : [...tornadoPolylines],
-    [tornadoPolylines, roadClosurePolylines, operationalAlertPolylines, viewportInUsa],
+    () => {
+      const visibleRoadClosures = mapLayers.roads ? roadClosurePolylines : []
+      return viewportInUsa
+        ? [...tornadoPolylines, ...visibleRoadClosures, ...operationalAlertPolylines]
+        : [...tornadoPolylines]
+    },
+    [tornadoPolylines, roadClosurePolylines, operationalAlertPolylines, viewportInUsa, mapLayers.roads],
   )
-
-  const enabledCriticalSectors = useMemo(() => {
-    if (!showCriticalInfraLayers) return [] as string[]
-    return CRITICAL_INFRASTRUCTURE_SECTORS.filter((s) => mapLayers[s.id]).map((s) => s.id)
-  }, [showCriticalInfraLayers, mapLayers])
-
-  /** Super-admin: viewport BBOX. Sub-admin radius license: lat/lng/radius circle. */
-  const ciFetchScope = useMemo(() => {
-    if (isDemoSimulation) {
-      const ar = getUsStateBbox('AR')
-      if (ar) {
-        const [west, south, east, north] = ar
-        return {
-          mode: 'bounds' as const,
-          bounds: { west, south, east, north },
-          key: 'demo-ar-state',
-        }
-      }
-    }
-
-    if (
-      lockToCoverageCircle &&
-      coverageCircle &&
-      coverageMeta?.coverageType === 'radius'
-    ) {
-      return {
-        mode: 'radius' as const,
-        lat: coverageCircle.center.lat,
-        lng: coverageCircle.center.lng,
-        radius: coverageCircle.radiusMeters,
-        key: `radius:${coverageCircle.center.lat.toFixed(3)},${coverageCircle.center.lng.toFixed(3)}:${Math.round(coverageCircle.radiusMeters)}`,
-      }
-    }
-
-    let bounds: MapStateBounds | null = mapViewportBounds
-    if (bounds && stateBoundsRestriction) {
-      bounds = intersectBounds(bounds, stateBoundsRestriction) ?? stateBoundsRestriction
-    } else if (!bounds) {
-      bounds = stateBoundsRestriction
-    }
-    if (restrictToUsa) {
-      if (mapViewportBounds && !viewportCenterInUsa(mapViewportBounds)) {
-        return null
-      }
-      if (bounds) {
-        bounds = clampBoundsToUsa(bounds)
-        if (!bounds) return null
-      } else {
-        bounds = CONUS_MAP_BOUNDS
-      }
-    }
-
-    if (!bounds) return null
-
-    return {
-      mode: 'bounds' as const,
-      bounds,
-      key: `bbox:${bounds.west.toFixed(1)},${bounds.south.toFixed(1)},${bounds.east.toFixed(1)},${bounds.north.toFixed(1)}`,
-    }
-  }, [
-    isDemoSimulation,
-    lockToCoverageCircle,
-    coverageCircle,
-    coverageMeta?.coverageType,
-    mapViewportBounds,
-    stateBoundsRestriction,
-    restrictToUsa,
-  ])
-
-  useEffect(() => {
-    if (
-      !GIS_MAP_FILTER_LAYERS_ENABLED ||
-      !showCriticalInfraLayers ||
-      enabledCriticalSectors.length === 0 ||
-      !ciFetchScope
-    ) {
-      setCriticalInfraMarkers([])
-      return
-    }
-
-    if (!viewportInUsa) {
-      setCriticalInfraMarkers([])
-      return
-    }
-
-    let cancelled = false
-    const controller = new AbortController()
-
-    async function fetchCriticalInfra() {
-      setIsLoadingCriticalInfra(true)
-      try {
-        if (isDemoSimulation) {
-          const markers = DEMO_CRITICAL_INFRA_MARKERS.filter((m) =>
-            enabledCriticalSectors.includes(m.sectorId),
-          )
-          if (!cancelled) setCriticalInfraMarkers(markers)
-          return
-        }
-
-        const body: Record<string, unknown> = {
-          sectors: enabledCriticalSectors,
-        }
-
-        if (ciFetchScope!.mode === 'bounds') {
-          body.bounds = ciFetchScope!.bounds
-        } else {
-          body.lat = ciFetchScope!.lat
-          body.lng = ciFetchScope!.lng
-          body.radius = ciFetchScope!.radius
-        }
-
-        const res = await fetch('/api/admin/critical-infrastructure', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify(body),
-          signal: controller.signal,
-        })
-
-        if (!res.ok || cancelled) return
-
-        const data = await res.json()
-        if (!cancelled && Array.isArray(data.markers)) {
-          const markers = restrictToUsa
-            ? data.markers.filter(
-                (m: { lat?: number; lng?: number }) =>
-                  Number.isFinite(m.lat) &&
-                  Number.isFinite(m.lng) &&
-                  inUsaView(m.lat as number, m.lng as number),
-              )
-            : data.markers
-          setCriticalInfraMarkers(markers)
-        }
-      } catch (error) {
-        if (cancelled || (error instanceof DOMException && error.name === 'AbortError')) {
-          return
-        }
-        if (!cancelled) setCriticalInfraMarkers([])
-      } finally {
-        if (!cancelled) setIsLoadingCriticalInfra(false)
-      }
-    }
-
-    const timer = window.setTimeout(() => {
-      void fetchCriticalInfra()
-    }, 800)
-
-    return () => {
-      cancelled = true
-      controller.abort()
-      window.clearTimeout(timer)
-    }
-  }, [showCriticalInfraLayers, enabledCriticalSectors.join(','), ciFetchScope?.key, restrictToUsa, inUsaView, viewportInUsa, isDemoSimulation])
 
   const markers = useMemo(() => {
     let currentFiltered: any[] = []
@@ -1686,11 +1802,64 @@ export function GISMap({
     inUsaView,
   ])
 
-  /** Operational dashboards always show incidents/heatmap; Filter checkbox is optional elsewhere. */
+  /** Operational incident pins (separate from heat). */
   const incidentsVisible = unifiedMapFeed || stateScoped || mapLayers.incidents
+  /** Incident heat — controlled by Risk Areas toggle (default on). */
+  const riskHeatEnabled = mapLayers.risk
+
+  const weatherRadarEnabled = useMemo(() => {
+    if (!mapLayers.weather || !viewportInUsa) return false
+    const scopedCode = normalizeStateToUsps(
+      scopeState?.trim() || licensedStateHint?.trim() || '',
+    )
+    return isWeatherRadarAvailableForScope(scopedCode || null)
+  }, [mapLayers.weather, viewportInUsa, scopeState, licensedStateHint])
+
+  const weatherRadarScope = useMemo((): WeatherRadarMapScope | null => {
+    if (!weatherRadarEnabled) return null
+
+    if (lockToCoverageCircle && coverageCircle) {
+      return {
+        mode: 'radius',
+        center: coverageCircle.center,
+        radiusMeters: coverageCircle.radiusMeters,
+        bounds: radiusBounds(
+          coverageCircle.center.lat,
+          coverageCircle.center.lng,
+          coverageCircle.radiusMeters * 1.08,
+        ),
+      }
+    }
+
+    const shouldScopeState =
+      stateScoped ||
+      showLayersPanel ||
+      coverageMeta?.coverageType === 'state' ||
+      Boolean(scopeState?.trim())
+
+    if (shouldScopeState && stateBoundsRestriction) {
+      return { mode: 'state', bounds: stateBoundsRestriction }
+    }
+
+    if (shouldScopeState && mapStateBounds) {
+      return { mode: 'state', bounds: mapStateBounds }
+    }
+
+    return { mode: 'free' }
+  }, [
+    weatherRadarEnabled,
+    lockToCoverageCircle,
+    coverageCircle,
+    stateScoped,
+    showLayersPanel,
+    coverageMeta?.coverageType,
+    scopeState,
+    stateBoundsRestriction,
+    mapStateBounds,
+  ])
 
   const heatPoints = useMemo(() => {
-    if (!showHeatmap || !incidentsVisible) return []
+    if (!showHeatmap || !riskHeatEnabled) return []
     if (restrictToUsa && !viewportInUsa) return []
 
     const inCoverage = (lat: number, lng: number) => {
@@ -1730,7 +1899,7 @@ export function GISMap({
     return base.slice(0, 24)
   }, [
     showHeatmap,
-    incidentsVisible,
+    riskHeatEnabled,
     unifiedIncidents,
     impactedUsers,
     responders,
@@ -1776,7 +1945,8 @@ export function GISMap({
   const mapMarkers = useMemo(() => {
     const activeTabMarkers = markers
     const enabledLayerMarkers: any[] = []
-    const showFilterLayers = GIS_MAP_FILTER_LAYERS_ENABLED && (!restrictToUsa || viewportInUsa)
+    const showFilterLayers =
+      (GIS_MAP_FILTER_LAYERS_ENABLED || isDemoSimulation) && (!restrictToUsa || viewportInUsa)
 
     // Unified heat feed: incidents show on heatmap only (click for details), not as blue pins.
     if (showFilterLayers && incidentsVisible && unifiedIncidents.length === 0) {
@@ -1829,40 +1999,13 @@ export function GISMap({
     })
     }
 
-    // 3. CISA critical infrastructure (Dashboard A + B)
-    if (showFilterLayers && showCriticalInfraLayers) {
-      CRITICAL_INFRASTRUCTURE_SECTORS.forEach((sector) => {
-        if (mapLayers[sector.id]) {
-          const sectorMarkers = criticalInfraMarkers
-            .filter((m) => m.sectorId === sector.id)
-            .filter((m) => inUsaView(m.lat, m.lng))
-            .filter((m) => markerInCoverage({ lat: m.lat, lng: m.lng }))
-            .map((m) => {
-              const sector = criticalSectorById(m.sectorId)
-              return {
-                id: m.id,
-                position: { lat: m.lat, lng: m.lng },
-                title: m.title,
-                type: 'infrastructure' as const,
-                category: sector?.label ?? m.sectorId,
-                status: m.status,
-                location: m.location,
-                description: m.description,
-                color: sector?.color ?? '#6366F1',
-                glyph: sector?.markerGlyph,
-              }
-            })
-          enabledLayerMarkers.push(...sectorMarkers)
-        }
-      })
-    }
-
     if (showFilterLayers && operationalIncidentMarkers.length > 0) {
       enabledLayerMarkers.push(...operationalIncidentMarkers)
     }
 
-    if (OPEN_SOURCE_MAP_LAYERS_ENABLED && mapLayers.dams && damsLayerQuery.data?.length) {
+    if (OPEN_SOURCE_MAP_LAYERS_ENABLED && mapLayers.ci_dams && damsLayerQuery.data?.length) {
       const skipCoverageFilter = restrictToUsa && !stateBoundsRestriction && !lockToCoverageCircle
+      const damSector = criticalSectorById('ci_dams')
       for (const dam of damsLayerQuery.data) {
         if (!inUsaView(dam.lat, dam.lng)) continue
         if (!skipCoverageFilter && !markerInCoverage({ lat: dam.lat, lng: dam.lng })) continue
@@ -1875,13 +2018,13 @@ export function GISMap({
           position: { lat: dam.lat, lng: dam.lng },
           title: dam.title,
           type: 'infrastructure' as const,
-          category: DAMS_MAP_LAYER.label,
+          category: damSector?.label ?? DAMS_MAP_LAYER.label,
           status: `${dam.hazardClass} hazard`,
           location: dam.location,
           description: parts.join(' · '),
-        color: DAMS_MAP_LAYER.color,
-        icon: DAMS_MAP_LAYER.markerIcon,
-      })
+          color: damSector?.color ?? DAMS_MAP_LAYER.color,
+          icon: DAMS_MAP_LAYER.markerIcon,
+        })
       }
     }
 
@@ -1954,6 +2097,280 @@ export function GISMap({
       }
     }
 
+    if (OPEN_SOURCE_MAP_LAYERS_ENABLED && mapLayers.pharmacies && pharmaciesLayerQuery.data?.length) {
+      const skipCoverageFilter = restrictToUsa && !stateBoundsRestriction && !lockToCoverageCircle
+      for (const site of pharmaciesLayerQuery.data) {
+        if (!inUsaView(site.lat, site.lng)) continue
+        if (!skipCoverageFilter && !markerInCoverage({ lat: site.lat, lng: site.lng })) continue
+        if (skipCoverageFilter && !markerInLayerViewport(site.lat, site.lng)) continue
+        const parts: string[] = []
+        if (site.address) parts.push(site.address)
+        enabledLayerMarkers.push({
+          id: site.id,
+          position: { lat: site.lat, lng: site.lng },
+          title: site.title,
+          type: 'infrastructure' as const,
+          category: PHARMACIES_MAP_LAYER.label,
+          location: site.location,
+          description: parts.join(' · ') || site.location,
+          color: PHARMACIES_MAP_LAYER.color,
+          icon: PHARMACIES_MAP_LAYER.markerIcon,
+        })
+      }
+    }
+
+    if (OPEN_SOURCE_MAP_LAYERS_ENABLED && mapLayers.police && policeStationsLayerQuery.data?.length) {
+      const skipCoverageFilter = restrictToUsa && !stateBoundsRestriction && !lockToCoverageCircle
+      for (const site of policeStationsLayerQuery.data) {
+        if (!inUsaView(site.lat, site.lng)) continue
+        if (!skipCoverageFilter && !markerInCoverage({ lat: site.lat, lng: site.lng })) continue
+        if (skipCoverageFilter && !markerInLayerViewport(site.lat, site.lng)) continue
+        const parts: string[] = []
+        if (site.address) parts.push(site.address)
+        enabledLayerMarkers.push({
+          id: site.id,
+          position: { lat: site.lat, lng: site.lng },
+          title: site.title,
+          type: 'infrastructure' as const,
+          category: POLICE_STATIONS_MAP_LAYER.label,
+          location: site.location,
+          description: parts.join(' · ') || site.location,
+          color: POLICE_STATIONS_MAP_LAYER.color,
+          icon: POLICE_STATIONS_MAP_LAYER.markerIcon,
+        })
+      }
+    }
+
+    if (OPEN_SOURCE_MAP_LAYERS_ENABLED && mapLayers.meals_ready && mealsReadyLayerQuery.data?.length) {
+      const skipCoverageFilter = restrictToUsa && !stateBoundsRestriction && !lockToCoverageCircle
+      for (const site of mealsReadyLayerQuery.data) {
+        if (!inUsaView(site.lat, site.lng)) continue
+        if (!skipCoverageFilter && !markerInCoverage({ lat: site.lat, lng: site.lng })) continue
+        if (skipCoverageFilter && !markerInLayerViewport(site.lat, site.lng)) continue
+        const parts: string[] = []
+        if (site.address) parts.push(site.address)
+        enabledLayerMarkers.push({
+          id: site.id,
+          position: { lat: site.lat, lng: site.lng },
+          title: site.title,
+          type: 'infrastructure' as const,
+          category: MEALS_READY_MAP_LAYER.label,
+          location: site.location,
+          description: parts.join(' · ') || site.location,
+          color: MEALS_READY_MAP_LAYER.color,
+          icon: MEALS_READY_MAP_LAYER.markerIcon,
+        })
+      }
+    }
+
+    if (OPEN_SOURCE_MAP_LAYERS_ENABLED && mapLayers.generators && generatorsLayerQuery.data?.length) {
+      const skipCoverageFilter = restrictToUsa && !stateBoundsRestriction && !lockToCoverageCircle
+      for (const site of generatorsLayerQuery.data) {
+        if (!inUsaView(site.lat, site.lng)) continue
+        if (!skipCoverageFilter && !markerInCoverage({ lat: site.lat, lng: site.lng })) continue
+        if (skipCoverageFilter && !markerInLayerViewport(site.lat, site.lng)) continue
+        const parts: string[] = []
+        if (site.address) parts.push(site.address)
+        enabledLayerMarkers.push({
+          id: site.id,
+          position: { lat: site.lat, lng: site.lng },
+          title: site.title,
+          type: 'infrastructure' as const,
+          category: GENERATORS_MAP_LAYER.label,
+          location: site.location,
+          description: parts.join(' · ') || site.location,
+          color: GENERATORS_MAP_LAYER.color,
+          icon: GENERATORS_MAP_LAYER.markerIcon,
+        })
+      }
+    }
+
+    if (OPEN_SOURCE_MAP_LAYERS_ENABLED && mapLayers.volunteers && volunteersLayerQuery.data?.length) {
+      const skipCoverageFilter = restrictToUsa && !stateBoundsRestriction && !lockToCoverageCircle
+      for (const site of volunteersLayerQuery.data) {
+        if (!inUsaView(site.lat, site.lng)) continue
+        if (!skipCoverageFilter && !markerInCoverage({ lat: site.lat, lng: site.lng })) continue
+        if (skipCoverageFilter && !markerInLayerViewport(site.lat, site.lng)) continue
+        const parts: string[] = []
+        if (site.address) parts.push(site.address)
+        enabledLayerMarkers.push({
+          id: site.id,
+          position: { lat: site.lat, lng: site.lng },
+          title: site.title,
+          type: 'infrastructure' as const,
+          category: VOLUNTEERS_MAP_LAYER.label,
+          location: site.location,
+          description: parts.join(' · ') || site.location,
+          color: VOLUNTEERS_MAP_LAYER.color,
+          icon: VOLUNTEERS_MAP_LAYER.markerIcon,
+        })
+      }
+    }
+
+    if (OPEN_SOURCE_MAP_LAYERS_ENABLED && mapLayers.resources && resourceSitesLayerQuery.data?.length) {
+      const skipCoverageFilter = restrictToUsa && !stateBoundsRestriction && !lockToCoverageCircle
+      for (const site of resourceSitesLayerQuery.data) {
+        if (!inUsaView(site.lat, site.lng)) continue
+        if (!skipCoverageFilter && !markerInCoverage({ lat: site.lat, lng: site.lng })) continue
+        if (skipCoverageFilter && !markerInLayerViewport(site.lat, site.lng)) continue
+        const parts: string[] = []
+        if (site.address) parts.push(site.address)
+        enabledLayerMarkers.push({
+          id: site.id,
+          position: { lat: site.lat, lng: site.lng },
+          title: site.title,
+          type: 'infrastructure' as const,
+          category: RESOURCE_SITES_MAP_LAYER.label,
+          location: site.location,
+          description: parts.join(' · ') || site.location,
+          color: RESOURCE_SITES_MAP_LAYER.color,
+          icon: RESOURCE_SITES_MAP_LAYER.markerIcon,
+        })
+      }
+    }
+
+    if (OPEN_SOURCE_MAP_LAYERS_ENABLED && mapLayers.ci_it && itInfrastructureLayerQuery.data?.length) {
+      const skipCoverageFilter = restrictToUsa && !stateBoundsRestriction && !lockToCoverageCircle
+      for (const site of itInfrastructureLayerQuery.data) {
+        if (!inUsaView(site.lat, site.lng)) continue
+        if (!skipCoverageFilter && !markerInCoverage({ lat: site.lat, lng: site.lng })) continue
+        if (skipCoverageFilter && !markerInLayerViewport(site.lat, site.lng)) continue
+        const parts: string[] = []
+        if (site.address) parts.push(site.address)
+        enabledLayerMarkers.push({
+          id: site.id,
+          position: { lat: site.lat, lng: site.lng },
+          title: site.title,
+          type: 'infrastructure' as const,
+          category: IT_INFRASTRUCTURE_MAP_LAYER.label,
+          location: site.location,
+          description: parts.join(' · ') || site.location,
+          color: IT_INFRASTRUCTURE_MAP_LAYER.color,
+          icon: IT_INFRASTRUCTURE_MAP_LAYER.markerIcon,
+        })
+      }
+    }
+
+    if (OPEN_SOURCE_MAP_LAYERS_ENABLED && mapLayers.ci_financial && financialSitesLayerQuery.data?.length) {
+      const skipCoverageFilter = restrictToUsa && !stateBoundsRestriction && !lockToCoverageCircle
+      for (const site of financialSitesLayerQuery.data) {
+        if (!inUsaView(site.lat, site.lng)) continue
+        if (!skipCoverageFilter && !markerInCoverage({ lat: site.lat, lng: site.lng })) continue
+        if (skipCoverageFilter && !markerInLayerViewport(site.lat, site.lng)) continue
+        const parts = [`FDIC ID: ${site.locationId}`]
+        if (site.address) parts.push(site.address)
+        if (site.zip) parts.push(site.zip)
+        enabledLayerMarkers.push({
+          id: site.id,
+          position: { lat: site.lat, lng: site.lng },
+          title: site.title,
+          type: 'infrastructure' as const,
+          category: FINANCIAL_SITES_MAP_LAYER.label,
+          status: 'Bank Branch',
+          location: site.location,
+          description: parts.join(' · '),
+          color: FINANCIAL_SITES_MAP_LAYER.color,
+          icon: FINANCIAL_SITES_MAP_LAYER.markerIcon,
+        })
+      }
+    }
+
+    const renderedHifldSiteIds = new Set<string>()
+
+    if (OPEN_SOURCE_MAP_LAYERS_ENABLED && enabledOperationalHifldLayers.length > 0 && hifldSitesLayerQuery.data?.length) {
+      const skipCoverageFilter = restrictToUsa && !stateBoundsRestriction && !lockToCoverageCircle
+      for (const layerDef of enabledOperationalHifldLayers) {
+        const datasetSet = new Set(layerDef.datasetSlugs)
+        for (const site of hifldSitesLayerQuery.data) {
+          if (site.sectorId !== layerDef.sectorId) continue
+          if (site.datasetSlug && !datasetSet.has(site.datasetSlug)) continue
+          if (!inUsaView(site.lat, site.lng)) continue
+          if (!skipCoverageFilter && !markerInCoverage({ lat: site.lat, lng: site.lng })) continue
+          if (skipCoverageFilter && !markerInLayerViewport(site.lat, site.lng)) continue
+          if (renderedHifldSiteIds.has(site.id)) continue
+          renderedHifldSiteIds.add(site.id)
+          const parts = [site.status]
+          if (site.address) parts.push(site.address)
+          if (site.city) parts.push(site.city)
+          if (site.zip) parts.push(site.zip)
+          enabledLayerMarkers.push({
+            id: site.id,
+            position: { lat: site.lat, lng: site.lng },
+            title: site.title,
+            type: 'infrastructure' as const,
+            category: layerDef.label,
+            status: site.status,
+            location: site.location,
+            description: parts.join(' · '),
+            color: layerDef.color,
+            icon: layerDef.markerIcon,
+          })
+        }
+      }
+    }
+
+    if (OPEN_SOURCE_MAP_LAYERS_ENABLED && hifldSitesLayerQuery.data?.length) {
+      const skipCoverageFilter = restrictToUsa && !stateBoundsRestriction && !lockToCoverageCircle
+      for (const site of hifldSitesLayerQuery.data) {
+        if (!showCriticalInfraLayers || !mapLayers[site.sectorId]) continue
+        if (renderedHifldSiteIds.has(site.id)) continue
+        if (!inUsaView(site.lat, site.lng)) continue
+        if (!skipCoverageFilter && !markerInCoverage({ lat: site.lat, lng: site.lng })) continue
+        if (skipCoverageFilter && !markerInLayerViewport(site.lat, site.lng)) continue
+        renderedHifldSiteIds.add(site.id)
+        const sectorDef = criticalSectorById(site.sectorId)
+        const markerIcon = criticalInfraSectorMarkerIcon(site.sectorId)
+        const parts = [site.status]
+        if (site.address) parts.push(site.address)
+        if (site.city) parts.push(site.city)
+        if (site.zip) parts.push(site.zip)
+        enabledLayerMarkers.push({
+          id: site.id,
+          position: { lat: site.lat, lng: site.lng },
+          title: site.title,
+          type: 'infrastructure' as const,
+          category: sectorDef?.label ?? site.sectorId,
+          status: site.status,
+          location: site.location,
+          description: parts.join(' · '),
+          color: sectorDef?.color ?? '#6366F1',
+          ...(markerIcon ? { icon: markerIcon } : { glyph: sectorDef?.markerGlyph }),
+        })
+      }
+    }
+
+    if (OPEN_SOURCE_MAP_LAYERS_ENABLED && mapLayers.roads && roadClosuresQuery.data?.length) {
+      const skipCoverageFilter = restrictToUsa && !stateBoundsRestriction && !lockToCoverageCircle
+      for (const closure of roadClosuresQuery.data) {
+        const path = Array.isArray(closure.path)
+          ? closure.path.filter(
+              (p: { lat?: number; lng?: number }) =>
+                Number.isFinite(p.lat) && Number.isFinite(p.lng),
+            )
+          : []
+        if (path.length < 2) continue
+        const mid = path[Math.floor(path.length / 2)]!
+        if (!inUsaView(mid.lat, mid.lng)) continue
+        if (!skipCoverageFilter && !markerInCoverage({ lat: mid.lat, lng: mid.lng })) continue
+        if (skipCoverageFilter && !markerInLayerViewport(mid.lat, mid.lng)) continue
+        const parts = [closure.status]
+        if (closure.reason) parts.push(closure.reason)
+        if (closure.source) parts.push(`Source: ${closure.source}`)
+        enabledLayerMarkers.push({
+          id: `road-closure-marker-${closure.id}`,
+          position: { lat: mid.lat, lng: mid.lng },
+          title: closure.roadName,
+          type: 'infrastructure' as const,
+          category: ROAD_CLOSURES_MAP_LAYER.label,
+          status: closure.status,
+          location: closure.startLocation ?? closure.roadName,
+          description: parts.join(' · '),
+          color: ROAD_CLOSURES_MAP_LAYER.color,
+          icon: ROAD_CLOSURES_MAP_LAYER.markerIcon,
+        })
+      }
+    }
+
     return [...activeTabMarkers, ...enabledLayerMarkers]
   }, [
     markers,
@@ -1961,8 +2378,6 @@ export function GISMap({
     situationalMarkers,
     cacheTrigger,
     markerInCoverage,
-    showCriticalInfraLayers,
-    criticalInfraMarkers,
     unifiedIncidents,
     incidentsVisible,
     viewportRankBounds,
@@ -1974,7 +2389,19 @@ export function GISMap({
     damsLayerQuery.data,
     sheltersLayerQuery.data,
     fuelSitesLayerQuery.data,
+    pharmaciesLayerQuery.data,
+    policeStationsLayerQuery.data,
+    mealsReadyLayerQuery.data,
+    generatorsLayerQuery.data,
+    volunteersLayerQuery.data,
+    resourceSitesLayerQuery.data,
+    itInfrastructureLayerQuery.data,
+    financialSitesLayerQuery.data,
+    hifldSitesLayerQuery.data,
+    enabledOperationalHifldLayers,
+    showCriticalInfraLayers,
     markerInLayerViewport,
+    roadClosuresQuery.data,
   ])
 
   const disasterZonesVisible = useMemo(() => {
@@ -2009,15 +2436,17 @@ export function GISMap({
   }, [disasterZonesVisible, tornadoPathPoints])
 
   const heatIncidentsForMap = useMemo(() => {
+    if (!riskHeatEnabled) return undefined
     if (unifiedIncidents.length === 0) return undefined
     if (restrictToUsa && !viewportInUsa) return []
     if (restrictToUsa) {
       return unifiedIncidents.filter((inc) => pointInUsaBounds(inc.lat, inc.lng))
     }
     return unifiedIncidents
-  }, [unifiedIncidents, restrictToUsa, viewportInUsa])
+  }, [unifiedIncidents, restrictToUsa, viewportInUsa, riskHeatEnabled])
 
   const displayHeatCount = useMemo(() => {
+    if (!riskHeatEnabled) return 0
     if (restrictToUsa && !viewportInUsa) return 0
     if (unifiedIncidents.length > 0) {
       return incidentsVisible ? incidentHeatCount : 0
@@ -2032,7 +2461,7 @@ export function GISMap({
     heatPoints.length,
   ])
 
-  const usesUnifiedHeat = unifiedIncidents.length > 0
+  const usesUnifiedHeat = unifiedIncidents.length > 0 && riskHeatEnabled
 
   return (
     <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm h-[700px] flex flex-col">
@@ -2077,7 +2506,12 @@ export function GISMap({
               </button>
             ))}
             {openSourceLayersUiActive && (
-              <MapLayersDropdown layers={mapLayers} onChange={setMapLayers} />
+              <MapLayersDropdown
+                layers={mapLayers}
+                onChange={setMapLayers}
+                showCriticalInfra={showCriticalInfraLayers}
+                showDisasterZones={showDisasterZones}
+              />
             )}
           </div>
         )}
@@ -2090,35 +2524,40 @@ export function GISMap({
           zoom={mapZoom}
           center={mapCenter}
           heatPoints={heatPoints}
-          showHeatmap={showHeatmap}
+          showHeatmap={showHeatmap && riskHeatEnabled}
+          showWeatherRadar={Boolean(weatherRadarScope)}
+          weatherRadarScope={weatherRadarScope}
           stateBounds={mapStateBounds}
           fitStateOnLoad={Boolean(mapStateBounds)}
           coverageCircle={showLayersPanel && coverageMeta?.coverageType !== 'state' ? coverageCircle : null}
           lockToCoverage={lockToCoverageCircle}
           polylines={combinedPolylines}
+          polygons={mapLayers.power ? powerOutagePolygons : []}
           disasterZoneCircles={disasterZoneCircles}
           heatIncidents={usesUnifiedHeat ? heatIncidentsForMap : undefined}
           heatClickOnly={usesUnifiedHeat}
           onHeatIncidentSelect={isDemoSimulation ? handleHeatIncidentSelect : undefined}
           onBoundsChanged={interactiveMapLayersActive ? handleMapBoundsChange : undefined}
           clusterInfrastructure={interactiveMapLayersActive && !isDemoSimulation}
-          infrastructureClusterMode={
-            mapLayers.dams
-              ? 'dams'
-              : mapLayers.shelters
-                ? 'shelters'
-                : mapLayers.fuel_sites
-                  ? 'fuel'
-                  : 'default'
-          }
+          infrastructureClusterMode={resolveInfrastructureClusterMode(mapLayers)}
           allowZoomOut={stateScoped}
         />
 
         {((damsLayerQuery.isFetching && !damsLayerQuery.data?.length) ||
           (sheltersLayerQuery.isFetching && !sheltersLayerQuery.data?.length) ||
           (fuelSitesLayerQuery.isFetching && !fuelSitesLayerQuery.data?.length) ||
-          (GIS_MAP_FILTER_LAYERS_ENABLED &&
-            (isSearchingInfra || isLoadingCriticalInfra || isLoadingRoadClosures))) && (
+          (pharmaciesLayerQuery.isFetching && !pharmaciesLayerQuery.data?.length) ||
+          (policeStationsLayerQuery.isFetching && !policeStationsLayerQuery.data?.length) ||
+          (mealsReadyLayerQuery.isFetching && !mealsReadyLayerQuery.data?.length) ||
+          (generatorsLayerQuery.isFetching && !generatorsLayerQuery.data?.length) ||
+          (volunteersLayerQuery.isFetching && !volunteersLayerQuery.data?.length) ||
+          (resourceSitesLayerQuery.isFetching && !resourceSitesLayerQuery.data?.length) ||
+          (itInfrastructureLayerQuery.isFetching && !itInfrastructureLayerQuery.data?.length) ||
+          (financialSitesLayerQuery.isFetching && !financialSitesLayerQuery.data?.length) ||
+          (hifldSitesLayerQuery.isFetching && !hifldSitesLayerQuery.data?.length) ||
+          (mapLayers.roads && isLoadingRoadClosures) ||
+          (mapLayers.power && isLoadingPowerOutages) ||
+          (GIS_MAP_FILTER_LAYERS_ENABLED && isSearchingInfra)) && (
           <div className="absolute right-4 top-4 bg-white/90 backdrop-blur-md px-4 py-2 rounded-2xl shadow-2xl border border-slate-100 flex items-center gap-2 z-50 animate-in fade-in slide-in-from-top-2 duration-300">
             <Loader2 className="w-4 h-4 text-[#33375D] animate-spin" />
             <span className="text-[10px] font-black uppercase tracking-widest text-slate-600">
@@ -2128,7 +2567,29 @@ export function GISMap({
                   ? 'Loading Shelters…'
                   : fuelSitesLayerQuery.isFetching && !fuelSitesLayerQuery.data?.length
                     ? 'Loading Fuel Sites…'
-                    : 'Locating Facilities…'}
+                    : pharmaciesLayerQuery.isFetching && !pharmaciesLayerQuery.data?.length
+                      ? 'Loading Pharmacies…'
+                      : policeStationsLayerQuery.isFetching && !policeStationsLayerQuery.data?.length
+                        ? 'Loading Police Stations…'
+                        : mealsReadyLayerQuery.isFetching && !mealsReadyLayerQuery.data?.length
+                          ? 'Loading Meals Ready…'
+                          : generatorsLayerQuery.isFetching && !generatorsLayerQuery.data?.length
+                            ? 'Loading Generators…'
+                            : volunteersLayerQuery.isFetching && !volunteersLayerQuery.data?.length
+                              ? 'Loading Volunteers…'
+                              : resourceSitesLayerQuery.isFetching && !resourceSitesLayerQuery.data?.length
+                                ? 'Loading Resource Sites…'
+                                : itInfrastructureLayerQuery.isFetching && !itInfrastructureLayerQuery.data?.length
+                                  ? 'Loading IT Infrastructure…'
+                                  : hifldSitesLayerQuery.isFetching && !hifldSitesLayerQuery.data?.length
+                                    ? 'Loading Critical Infrastructure…'
+                                    : financialSitesLayerQuery.isFetching && !financialSitesLayerQuery.data?.length
+                                      ? 'Loading Financial Sites…'
+                                      : isLoadingRoadClosures
+                                        ? 'Loading Road Closures…'
+                                        : isLoadingPowerOutages
+                                          ? 'Loading Power Outages…'
+                                          : 'Locating Facilities…'}
             </span>
           </div>
         )}

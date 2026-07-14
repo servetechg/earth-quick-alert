@@ -1,4 +1,6 @@
 import type { UnifiedEventHeatPoint } from '@/lib/geo/unified-event-heatmap';
+import type { InfrastructureClusterMode } from '@/lib/gis/map-layer-config';
+import type { WeatherRadarMapScope } from '@/lib/gis/weather-radar-config';
 
 export interface SituationalMapMarker {
     id: string;
@@ -65,6 +67,30 @@ export interface RoadClosureDetail {
     source?: string;
 }
 
+export interface PowerOutageDetail {
+    name: string;
+    county: string;
+    state: string;
+    metersAffected: number;
+    reportedStartTime?: string;
+    estimatedRestorationTime?: string;
+    cause?: string | null;
+    statusKind?: string | null;
+    communityDescriptor?: string;
+    source?: string;
+}
+
+export interface MapPolygonSpec {
+    id: string;
+    paths: { lat: number; lng: number }[][];
+    fillColor?: string;
+    fillOpacity?: number;
+    strokeColor?: string;
+    strokeWeight?: number;
+    label?: string;
+    outage?: PowerOutageDetail;
+}
+
 export interface MapPolylineSpec {
     id?: string;
     path: { lat: number; lng: number }[];
@@ -87,14 +113,19 @@ export interface SituationalMapProps {
     coverageCircle?: CoverageCircleSpec | null;
     lockToCoverage?: boolean;
     polylines?: MapPolylineSpec[];
+    polygons?: MapPolygonSpec[];
     disasterZoneCircles?: MapDisasterZoneCircleSpec[];
     heatIncidents?: UnifiedEventHeatPoint[];
     heatClickOnly?: boolean;
     onHeatIncidentSelect?: (incident: UnifiedEventHeatPoint) => void;
     onBoundsChanged?: (bounds: MapStateBounds) => void;
     clusterInfrastructure?: boolean;
+    /** Show live NEXRAD reflectivity WMS overlay (Filter → Weather Radar). */
+    showWeatherRadar?: boolean;
+    /** Sub-admin / scoped view: clip radar to state bounds or license radius. */
+    weatherRadarScope?: WeatherRadarMapScope | null;
     /** Use dam-friendly clustering (lower uncluster zoom, count badges). */
-    infrastructureClusterMode?: 'default' | 'dams' | 'shelters' | 'fuel';
+    infrastructureClusterMode?: InfrastructureClusterMode;
     fitStateOnLoad?: boolean;
     allowZoomOut?: boolean;
 }

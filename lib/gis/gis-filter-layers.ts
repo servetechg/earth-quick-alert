@@ -2,19 +2,13 @@ import {
   CloudRain,
   AlertTriangle,
   Waves,
-  Home as HomeIcon,
-  PlusSquare,
-  Construction,
   Zap,
   Droplets,
   Boxes,
   AlertOctagon,
-  Flame,
-  Siren,
-  Pill,
-  Fuel,
   UtensilsCrossed,
   Users,
+  Server,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -30,6 +24,7 @@ export type GisFilterFetchKind =
       extraNearbyTypes?: string[]
     }
   | { mode: 'deployment'; deployment: DeploymentResourceKind }
+  | { mode: 'mongo' }
 
 export type DeploymentResourceKind =
   | 'power_crews'
@@ -50,63 +45,14 @@ export interface GisFilterLayerDef {
   markerIcon: string
 }
 
-/** Layers backed by Google Places (nearby or text search). */
-export const GOOGLE_GIS_FILTER_LAYERS: GisFilterLayerDef[] = [
-  {
-    id: 'hospitals',
-    label: 'Hospitals',
-    Icon: PlusSquare,
-    color: '#22A9A1',
-    fetch: { mode: 'google_nearby', placeType: 'hospital' },
-    resultType: 'hospital',
-    markerIcon: 'hospital',
-  },
-  {
-    id: 'pharmacy',
-    label: 'Pharmacies',
-    Icon: Pill,
-    color: '#10B981',
-    fetch: { mode: 'google_nearby', placeType: 'pharmacy' },
-    resultType: 'pharmacy',
-    markerIcon: 'pharmacy',
-  },
-  {
-    id: 'police',
-    label: 'Police Stations',
-    Icon: Siren,
-    color: '#1E3A8A',
-    fetch: { mode: 'google_nearby', placeType: 'police' },
-    resultType: 'police',
-    markerIcon: 'police',
-  },
-  {
-    id: 'fire_station',
-    label: 'Emergency Service Providers / Fire Stations',
-    Icon: Flame,
-    color: '#EF4444',
-    fetch: {
-      mode: 'google_composite',
-      placeType: 'fire_station',
-      textQuery: 'fire station fire department ambulance emergency medical services EMS paramedic',
-    },
-    resultType: 'fire_station',
-    markerIcon: 'fire',
-  },
-  {
-    id: 'fuel_sites',
-    label: 'Fuel Sites',
-    Icon: Fuel,
-    color: '#D74C30',
-    fetch: { mode: 'google_nearby', placeType: 'gas_station' },
-    resultType: 'gas_station',
-    markerIcon: 'fuel',
-  },
+/** Layers backed by Mongo static place datasets (no live Google billing). */
+export const MONGO_GIS_FILTER_LAYERS: GisFilterLayerDef[] = [
   {
     id: 'generators',
     label: 'Generators',
     Icon: Zap,
     color: '#E5A436',
-    fetch: { mode: 'google_text', query: 'generator rental emergency generator supplier' },
+    fetch: { mode: 'mongo' },
     resultType: 'generator',
     markerIcon: 'generator',
   },
@@ -115,24 +61,32 @@ export const GOOGLE_GIS_FILTER_LAYERS: GisFilterLayerDef[] = [
     label: 'Meals Ready',
     Icon: UtensilsCrossed,
     color: '#D74C30',
-    fetch: { mode: 'google_text', query: 'food bank meal distribution emergency feeding' },
+    fetch: { mode: 'mongo' },
     resultType: 'meals_ready',
     markerIcon: 'meals',
   },
   {
-    id: 'shelters',
-    label: 'Shelters',
-    Icon: HomeIcon,
-    color: '#16A34A',
-    fetch: {
-      mode: 'google_composite',
-      placeType: 'community_center',
-      textQuery: 'emergency shelter evacuation center disaster shelter red cross',
-    },
-    resultType: 'shelter',
-    markerIcon: 'shelter',
+    id: 'volunteers',
+    label: 'Volunteers',
+    Icon: Users,
+    color: '#5C7E2D',
+    fetch: { mode: 'mongo' },
+    resultType: 'volunteers',
+    markerIcon: 'volunteers',
+  },
+  {
+    id: 'ci_it',
+    label: 'Information Technology (IT)',
+    Icon: Server,
+    color: '#8B5CF6',
+    fetch: { mode: 'mongo' },
+    resultType: 'it_infrastructure',
+    markerIcon: 'it',
   },
 ]
+
+/** Layers backed by Google Places or text search. */
+export const GOOGLE_GIS_FILTER_LAYERS: GisFilterLayerDef[] = []
 
 export const DEPLOYMENT_GIS_FILTER_LAYERS: GisFilterLayerDef[] = [
   {
@@ -153,18 +107,10 @@ export const DEPLOYMENT_GIS_FILTER_LAYERS: GisFilterLayerDef[] = [
     resultType: 'water_crews',
     markerIcon: 'water_crew',
   },
-  {
-    id: 'volunteers',
-    label: 'Volunteers',
-    Icon: Users,
-    color: '#5C7E2D',
-    fetch: { mode: 'deployment', deployment: 'volunteers' },
-    resultType: 'volunteers',
-    markerIcon: 'volunteers',
-  },
 ]
 
 export const ALL_GIS_FILTER_LAYERS: GisFilterLayerDef[] = [
+  ...MONGO_GIS_FILTER_LAYERS,
   ...GOOGLE_GIS_FILTER_LAYERS,
   ...DEPLOYMENT_GIS_FILTER_LAYERS,
 ]
@@ -205,8 +151,6 @@ export const OPERATIONAL_MAP_LAYERS = [
   { id: 'weather', label: 'Weather Radar', Icon: CloudRain, color: '#3B82F6' },
   { id: 'risk', label: 'Risk Areas', Icon: AlertTriangle, color: '#0EA5E9' },
   { id: 'flood', label: 'Flood Zones', Icon: Waves, color: '#A41E22' },
-  { id: 'roads', label: 'Road Closures', Icon: Construction, color: '#DC2626' },
-  { id: 'power', label: 'Power Outages', Icon: Zap, color: '#EAB308' },
   { id: 'water', label: 'Water Issues', Icon: Droplets, color: '#0EA5E9' },
   { id: 'resources', label: 'Resource Sites', Icon: Boxes, color: '#16A34A' },
   { id: 'incidents', label: 'Incident Reports', Icon: AlertOctagon, color: '#DC2626' },

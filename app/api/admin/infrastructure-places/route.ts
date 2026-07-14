@@ -179,7 +179,7 @@ export async function POST(req: Request) {
 
         if (!scope) {
             if (isSuperAdminNationwideView(role)) {
-                return NextResponse.json({ results: [], count: 0, source: 'google_places_and_deployments' });
+                return NextResponse.json({ results: [], count: 0, source: 'mongo_static_places_and_deployments' });
             }
             return NextResponse.json(
                 { error: 'Could not resolve search scope for license' },
@@ -199,7 +199,7 @@ export async function POST(req: Request) {
         return NextResponse.json({
             results,
             count: results.length,
-            source: 'google_places_and_deployments',
+            source: 'mongo_static_places_and_deployments',
             ranked: scope.mode === 'bounds' ? 'viewport' : 'comprehensive',
             scope: scope.mode,
             coverage:

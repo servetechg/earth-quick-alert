@@ -428,7 +428,9 @@ export async function fetchGoogleFilterLayerPlaces(
     layers: GisFilterLayerDef[],
     viewportBounds?: MapBounds | null,
 ): Promise<InfrastructurePlaceResult[]> {
-    const googleLayers = layers.filter((l) => l.fetch.mode !== 'deployment')
+    const googleLayers = layers.filter(
+        (l) => l.fetch.mode !== 'deployment' && l.fetch.mode !== 'mongo',
+    )
     if (googleLayers.length === 0) return []
 
     const fetchScope = resolveFetchScope(scope, viewportBounds)
@@ -478,7 +480,9 @@ export async function fetchInfrastructurePlacesForLayers(
     const cachedMem = await cacheGetJson<InfrastructurePlaceResult[]>(memKey)
 
     const byId = new Map<string, InfrastructurePlaceResult>()
-    const googleLayers = layers.filter((l) => l.fetch.mode !== 'deployment')
+    const googleLayers = layers.filter(
+        (l) => l.fetch.mode !== 'deployment' && l.fetch.mode !== 'mongo',
+    )
 
     if (cachedMem?.length) {
         for (const place of cachedMem) byId.set(place.place_id, place)
@@ -511,19 +515,6 @@ export async function fetchInfrastructurePlacesForLayers(
     }
 
     return filterPlacesByBounds(allResults, opts?.viewportBounds)
-}
-
-/** @deprecated use fetchInfrastructurePlacesForLayers */
-export async function fetchInfrastructurePlaces(
-    scope: InfrastructureSearchScope,
-    types: string[],
-    opts?: { viewportBounds?: MapBounds | null },
-): Promise<InfrastructurePlaceResult[]> {
-    const { GOOGLE_GIS_FILTER_LAYERS } = await import('@/lib/gis/gis-filter-layers')
-    const layers = GOOGLE_GIS_FILTER_LAYERS.filter((l) =>
-        l.fetch.mode === 'google_nearby' ? types.includes(l.fetch.placeType) : types.includes(l.resultType),
-    )
-    return fetchInfrastructurePlacesForLayers(scope, layers, opts)
 }
 
 export { boundsFromStateCode, PLACES_SEARCH_RADIUS_M }

@@ -71,6 +71,8 @@ export interface EarthquakeAlert extends BaseAlert {
     tsunami?: boolean;
     felt?: number;
     significance?: number;
+    /** USGS event page URL when available */
+    sourceUrl?: string;
 }
 
 export interface AdminAlert extends BaseAlert {
