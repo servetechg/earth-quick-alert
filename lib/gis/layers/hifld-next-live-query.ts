@@ -27,6 +27,7 @@ function toHifldSiteMapMarker(site: HifldNextNormalizedSite): HifldSiteMapMarker
         address: site.address.trim(),
         zip: site.zip.trim(),
         status: site.status.trim() || 'Active',
+        phone: String(site.phone ?? '').trim(),
         location: city ? `${city}, ${stateKey}` : stateKey,
     };
 }

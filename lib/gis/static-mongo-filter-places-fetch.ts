@@ -48,6 +48,7 @@ function toInfrastructurePlace(marker: StaticPlaceMapMarker, layer: GisFilterLay
         lat: marker.lat,
         lng: marker.lng,
         vicinity: marker.location || marker.address || marker.stateKey,
+        phone: marker.phone || undefined,
     };
 }
 

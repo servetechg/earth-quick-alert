@@ -73,12 +73,13 @@ const US_STATES: { code: string; name: string }[] = [
 
 /** User cURL fields + id/nextPageToken for dedup and pagination. */
 const FIELD_MASK =
-    'places.id,places.displayName,places.formattedAddress,places.location,nextPageToken';
+    'places.id,places.displayName,places.formattedAddress,places.location,places.nationalPhoneNumber,places.internationalPhoneNumber,nextPageToken';
 
 type PoliceStationRecord = {
     placeId: string;
     displayName: string;
     formattedAddress: string;
+    phone: string;
     location: {
         latitude: number;
         longitude: number;
@@ -127,6 +128,8 @@ type PlacesSearchResponse = {
         id?: string;
         displayName?: { text?: string; languageCode?: string };
         formattedAddress?: string;
+        nationalPhoneNumber?: string;
+        internationalPhoneNumber?: string;
         location?: { latitude?: number; longitude?: number };
     }>;
     nextPageToken?: string;
@@ -190,6 +193,10 @@ function mapPlaceToRecord(
         placeId: normalizePlaceId(place.id),
         displayName: place.displayName?.text?.trim() || 'Unknown',
         formattedAddress: place.formattedAddress?.trim() || '',
+        phone:
+            place.nationalPhoneNumber?.trim() ||
+            place.internationalPhoneNumber?.trim() ||
+            '',
         location: { latitude: lat, longitude: lng },
         stateCode,
         stateName,

@@ -7,6 +7,7 @@ const MapLayerVolunteerCenterSchema = new Schema(
         stateKey: { type: String, required: true, index: true },
         state: { type: String, default: '' },
         address: { type: String, default: '' },
+        phone: { type: String, default: '' },
         lat: { type: Number, required: true },
         lng: { type: Number, required: true },
         location: {
