@@ -66,6 +66,7 @@ export async function ingestHifldNextDataset(
                         address: normalized.address,
                         zip: normalized.zip,
                         status: normalized.status,
+                        phone: normalized.phone,
                         datasetSlug: normalized.datasetSlug,
                         lat: normalized.lat,
                         lng: normalized.lng,

@@ -26,6 +26,59 @@ function pickField(props: Record<string, unknown>, fields: string[]): string {
     return '';
 }
 
+const PHONE_FIELDS = [
+    'TELEPHONE',
+    'PHONE',
+    'PHONE_NUMBER',
+    'PHONENUMBER',
+    'TEL',
+    'PHONE_NO',
+    'FACILITY_PHONE',
+    'CONTACT_PHONE',
+    'MAIN_PHONE',
+    'ORG_PHONE',
+    'ORG_MAIN_PHONE',
+    'BUSINESS_PHONE',
+    'PHONE1',
+    'PHONE_NBR',
+];
+
+function normalizePhoneWithCountryCode(raw: string): string {
+    const trimmed = raw.trim();
+    if (!trimmed) return '';
+    if (trimmed.startsWith('+')) {
+        return trimmed.replace(/^\+(\d+)\s*/, '+$1 ').replace(/\s+/g, ' ').trim();
+    }
+    const digits = trimmed.replace(/\D/g, '');
+    if (digits.length === 11 && digits.startsWith('1')) {
+        return `+1 ${digits.slice(1, 4)}-${digits.slice(4, 7)}-${digits.slice(7)}`;
+    }
+    if (digits.length === 10) {
+        return `+1 ${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
+    }
+    if (/^\(?\d{3}\)?/.test(trimmed)) {
+        return `+1 ${trimmed}`;
+    }
+    return trimmed;
+}
+
+function pickPhone(props: Record<string, unknown>): string {
+    const lowerMap = new Map<string, unknown>();
+    for (const [key, value] of Object.entries(props)) {
+        lowerMap.set(key.toLowerCase(), value);
+    }
+    for (const field of PHONE_FIELDS) {
+        const val = cleanText(lowerMap.get(field.toLowerCase()));
+        if (val) return normalizePhoneWithCountryCode(val);
+    }
+    for (const [key, value] of lowerMap) {
+        if (!key.includes('phone') && !key.includes('telephone') && key !== 'tel') continue;
+        const val = cleanText(value);
+        if (val) return normalizePhoneWithCountryCode(val);
+    }
+    return '';
+}
+
 function parseCoord(raw: unknown): number | null {
     if (raw == null) return null;
     const s = typeof raw === 'number' ? String(raw) : String(raw).trim();
@@ -310,6 +363,7 @@ export function normalizeHifldNextFeature(
         address: pickField(props, addressFields),
         zip: pickField(props, zipFields).slice(0, 10),
         status: pickField(props, statusFields) || 'Active',
+        phone: pickPhone(props),
         datasetSlug: dataset.slug,
         properties: props,
     };

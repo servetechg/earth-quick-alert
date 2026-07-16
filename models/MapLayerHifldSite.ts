@@ -11,6 +11,7 @@ const MapLayerHifldSiteSchema = new Schema(
         address: { type: String, default: '' },
         zip: { type: String, default: '' },
         status: { type: String, default: '' },
+        phone: { type: String, default: '' },
         datasetSlug: { type: String, default: '' },
         lat: { type: Number, required: true },
         lng: { type: Number, required: true },

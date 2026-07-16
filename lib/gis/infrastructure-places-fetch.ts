@@ -28,6 +28,7 @@ export type InfrastructurePlaceResult = {
     lat: number
     lng: number
     vicinity: string
+    phone?: string
     rating?: number
     user_ratings_total?: number
 }

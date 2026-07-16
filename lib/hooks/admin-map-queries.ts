@@ -286,6 +286,7 @@ export type PharmacyMapMarkerPayload = {
     lng: number;
     stateKey: string;
     address: string;
+    phone: string;
     location: string;
 };
 
@@ -341,6 +342,7 @@ export type PoliceStationMapMarkerPayload = {
     lng: number;
     stateKey: string;
     address: string;
+    phone: string;
     location: string;
 };
 
@@ -396,6 +398,7 @@ export type StaticPlaceMapMarkerPayload = {
     lng: number;
     stateKey: string;
     address: string;
+    phone: string;
     location: string;
 };
 
