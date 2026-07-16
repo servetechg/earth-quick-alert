@@ -38,6 +38,9 @@ export function normalizeStaticGooglePlaceRow(row: StaticGooglePlaceSourceRow): 
             stateKey,
             state: cleanText(row.stateName) || stateKey,
             address: cleanText(row.formattedAddress),
+            phone: cleanText(
+                row.phone || row.nationalPhoneNumber || row.internationalPhoneNumber,
+            ),
             lat,
             lng,
             location: { type: 'Point', coordinates: [lng, lat] },

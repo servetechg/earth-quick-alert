@@ -7,6 +7,7 @@ export interface PoliceStationMapMarker {
     lng: number;
     stateKey: string;
     address: string;
+    phone: string;
     location: string;
 }
 
@@ -15,6 +16,9 @@ export interface UsPoliceStationSourceRow {
     placeId: string;
     displayName: string;
     formattedAddress?: string;
+    phone?: string;
+    nationalPhoneNumber?: string;
+    internationalPhoneNumber?: string;
     location?: { latitude?: number; longitude?: number };
     stateCode?: string;
     stateName?: string;

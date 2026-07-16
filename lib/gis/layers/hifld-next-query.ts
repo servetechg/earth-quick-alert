@@ -25,7 +25,7 @@ const MAX_MARKERS_BBOX = 1_500;
 const MAX_MARKERS_WIDE_SAMPLE = 2_000;
 
 const HIFLD_SELECT =
-    'facilityId sectorId name lat lng stateKey city address zip status datasetSlug';
+    'facilityId sectorId name lat lng stateKey city address zip status phone datasetSlug';
 
 type HifldSiteDoc = {
     facilityId: string;
@@ -38,6 +38,7 @@ type HifldSiteDoc = {
     address?: string;
     zip?: string;
     status?: string;
+    phone?: string;
     datasetSlug?: string;
 };
 
@@ -58,6 +59,7 @@ function toHifldSiteMapMarker(doc: HifldSiteDoc): HifldSiteMapMarker {
         address,
         zip: String(doc.zip ?? '').trim(),
         status: String(doc.status ?? '').trim() || 'Active',
+        phone: String(doc.phone ?? '').trim(),
         location: city ? `${city}, ${stateKey}` : stateKey,
         datasetSlug: String(doc.datasetSlug ?? '').trim() || undefined,
     };

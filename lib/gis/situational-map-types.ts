@@ -28,6 +28,8 @@ export interface SituationalMapMarker {
     glyph?: string;
     category?: string;
     location?: string;
+    /** Phone for map popup (shown on its own "Phone Number:" line). */
+    phone?: string;
     riskReportHref?: string;
     incidentId?: string;
 }

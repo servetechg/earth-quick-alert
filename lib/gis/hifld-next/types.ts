@@ -42,6 +42,7 @@ export interface HifldNextNormalizedSite {
     address: string;
     zip: string;
     status: string;
+    phone: string;
     datasetSlug: string;
     properties: Record<string, unknown>;
 }
@@ -58,6 +59,7 @@ export interface HifldSiteMapMarker {
     address: string;
     zip: string;
     status: string;
+    phone: string;
     location: string;
     datasetSlug?: string;
 }

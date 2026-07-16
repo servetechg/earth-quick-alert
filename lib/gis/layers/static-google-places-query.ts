@@ -16,7 +16,7 @@ const BBOX_CACHE_TTL_MS = 30 * 60 * 1000;
 const MAX_MARKERS_BBOX = 1_500;
 const MAX_MARKERS_WIDE_SAMPLE = 2_000;
 
-const DOC_SELECT = 'placeId name lat lng stateKey address';
+const DOC_SELECT = 'placeId name lat lng stateKey address phone';
 
 type StaticPlaceDoc = {
     placeId: string;
@@ -25,6 +25,7 @@ type StaticPlaceDoc = {
     lng: number;
     stateKey: string;
     address?: string;
+    phone?: string;
 };
 
 export type StaticPlacesQueryApi = {
@@ -42,6 +43,7 @@ export type StaticPlacesQueryApi = {
 function toMarker(idPrefix: string, doc: StaticPlaceDoc): StaticPlaceMapMarker {
     const stateKey = String(doc.stateKey ?? '').trim().toUpperCase();
     const address = String(doc.address ?? '').trim();
+    const phone = String(doc.phone ?? '').trim();
 
     return {
         id: `${idPrefix}:${doc.placeId}`,
@@ -51,6 +53,7 @@ function toMarker(idPrefix: string, doc: StaticPlaceDoc): StaticPlaceMapMarker {
         lng: doc.lng,
         stateKey,
         address,
+        phone,
         location: address || stateKey,
     };
 }

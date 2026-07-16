@@ -515,6 +515,14 @@ function MarkerPopupContent({
                     <span className="font-semibold">Location:</span> {marker.location}
                 </p>
             )}
+            {marker.phone && (
+                <p className="text-xs text-slate-500 mb-1">
+                    <span className="font-semibold">Phone Number:</span>{' '}
+                    <a href={`tel:${marker.phone.replace(/[^\d+]/g, '')}`} className="hover:underline">
+                        {marker.phone}
+                    </a>
+                </p>
+            )}
             {(marker.status || marker.isSafe != null) && (
                 <p
                     className={`text-[10px] font-black uppercase inline-block px-2 py-0.5 rounded ${

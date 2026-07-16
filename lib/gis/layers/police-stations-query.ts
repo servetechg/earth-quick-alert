@@ -17,7 +17,7 @@ const BBOX_CACHE_TTL_MS = 30 * 60 * 1000;
 const MAX_MARKERS_BBOX = 1_500;
 const MAX_MARKERS_WIDE_SAMPLE = 2_000;
 
-const POLICE_SELECT = 'placeId name lat lng stateKey address';
+const POLICE_SELECT = 'placeId name lat lng stateKey address phone';
 
 type PoliceDoc = {
     placeId: string;
@@ -26,11 +26,13 @@ type PoliceDoc = {
     lng: number;
     stateKey: string;
     address?: string;
+    phone?: string;
 };
 
 function toPoliceStationMapMarker(doc: PoliceDoc): PoliceStationMapMarker {
     const stateKey = String(doc.stateKey ?? '').trim().toUpperCase();
     const address = String(doc.address ?? '').trim();
+    const phone = String(doc.phone ?? '').trim();
 
     return {
         id: `police:${doc.placeId}`,
@@ -40,6 +42,7 @@ function toPoliceStationMapMarker(doc: PoliceDoc): PoliceStationMapMarker {
         lng: doc.lng,
         stateKey,
         address,
+        phone,
         location: address || stateKey,
     };
 }
