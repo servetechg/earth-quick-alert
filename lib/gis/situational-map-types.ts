@@ -120,7 +120,7 @@ export interface SituationalMapProps {
     heatIncidents?: UnifiedEventHeatPoint[];
     heatClickOnly?: boolean;
     onHeatIncidentSelect?: (incident: UnifiedEventHeatPoint) => void;
-    onBoundsChanged?: (bounds: MapStateBounds) => void;
+    onBoundsChanged?: (bounds: MapStateBounds, zoom?: number) => void;
     clusterInfrastructure?: boolean;
     /** Show live NEXRAD reflectivity WMS overlay (Filter → Weather Radar). */
     showWeatherRadar?: boolean;
@@ -130,6 +130,8 @@ export interface SituationalMapProps {
     infrastructureClusterMode?: InfrastructureClusterMode;
     fitStateOnLoad?: boolean;
     allowZoomOut?: boolean;
+    /** Show compact loading badge under Map/Satellite when layers or map data are fetching. */
+    layersLoading?: boolean;
 }
 
 /** @deprecated use SituationalMapMarker */

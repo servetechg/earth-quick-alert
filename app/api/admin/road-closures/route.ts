@@ -114,7 +114,7 @@ export async function POST(req: Request) {
             )
         }
 
-        const { closures, sources, fetchedAt } = await fetchRoadClosures(scope)
+        const { closures, sources, fetchedAt, warning } = await fetchRoadClosures(scope)
 
         return NextResponse.json({
             closures,
@@ -122,6 +122,7 @@ export async function POST(req: Request) {
             sources,
             fetchedAt,
             scope: scope.mode,
+            ...(warning ? { warning } : {}),
         })
     } catch (error) {
         console.error('road-closures error:', error)

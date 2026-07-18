@@ -71,7 +71,10 @@ function buildScopedCitizenQuery(
     return base;
 }
 
-export async function fetchScopedCitizenMarkers(subAdminUserId: string): Promise<GisMapMarkerDto[]> {
+export async function fetchScopedCitizenMarkers(
+    subAdminUserId: string,
+    opts?: { allowGeocode?: boolean }
+): Promise<GisMapMarkerDto[]> {
     const jurisdiction = await resolveSubAdminJurisdiction(subAdminUserId);
     if (!jurisdiction) return [];
 
@@ -80,6 +83,7 @@ export async function fetchScopedCitizenMarkers(subAdminUserId: string): Promise
 
     const stateRaw = typeof subAdmin.state === 'string' ? subAdmin.state.trim() : '';
     const licenseId = subAdmin.licenseId;
+    const allowGeocode = opts?.allowGeocode === true;
 
     const query = buildScopedCitizenQuery(
         subAdminUserId,
@@ -93,25 +97,23 @@ export async function fetchScopedCitizenMarkers(subAdminUserId: string): Promise
         .limit(500)
         .lean();
 
+    const geocoded = allowGeocode
+        ? await geocodeUsersMissingCoords(users, citizenLocationStr, 40)
+        : new Map<string, { lat: number; lng: number }>();
+
     const markers: GisMapMarkerDto[] = [];
     const seen = new Set<string>();
-    let geocodeBudget = 60;
 
     for (const u of users) {
         const id = String(u._id);
         if (seen.has(id)) continue;
 
-        const locationStr =
-            (typeof u.location === 'string' && u.location.trim()) ||
-            [u.city, u.state, u.zipcode].filter(Boolean).join(', ');
+        const locationStr = citizenLocationStr(u);
 
-        let coords: { lat: number; lng: number } | null = null;
-        if (typeof u.lat === 'number' && typeof u.lng === 'number') {
-            coords = { lat: u.lat, lng: u.lng };
-        } else if (geocodeBudget > 0) {
-            coords = await resolveCoords(null, null, locationStr);
-            if (coords) geocodeBudget -= 1;
-        }
+        const coords =
+            typeof u.lat === 'number' && typeof u.lng === 'number'
+                ? { lat: u.lat, lng: u.lng }
+                : geocoded.get(id) ?? null;
         if (!coords) continue;
         if (!coordinatesInJurisdiction(coords.lat, coords.lng, jurisdiction)) continue;
 
@@ -158,7 +160,48 @@ async function resolveCoords(
     return { lat: geo.lat, lng: geo.lon };
 }
 
-export async function fetchScopedResponderMarkers(subAdminUserId: string): Promise<GisMapMarkerDto[]> {
+const GEOCODE_CONCURRENCY = 5;
+
+/** Parallel Nominatim lookups; persist coords on User so later map loads stay fast. */
+async function geocodeUsersMissingCoords<T extends { _id: unknown; lat?: number | null; lng?: number | null }>(
+    users: T[],
+    getQuery: (user: T) => string,
+    budget: number,
+): Promise<Map<string, { lat: number; lng: number }>> {
+    const resolved = new Map<string, { lat: number; lng: number }>();
+    if (budget <= 0) return resolved;
+
+    const pending: { id: string; query: string }[] = [];
+    for (const user of users) {
+        if (pending.length >= budget) break;
+        if (typeof user.lat === 'number' && typeof user.lng === 'number') continue;
+        const query = getQuery(user).trim();
+        if (!query) continue;
+        pending.push({ id: String(user._id), query });
+    }
+
+    for (let i = 0; i < pending.length; i += GEOCODE_CONCURRENCY) {
+        const batch = pending.slice(i, i + GEOCODE_CONCURRENCY);
+        await Promise.all(
+            batch.map(async ({ id, query }) => {
+                const coords = await resolveCoords(null, null, query);
+                if (!coords) return;
+                resolved.set(id, coords);
+                void User.updateOne(
+                    { _id: id },
+                    { $set: { lat: coords.lat, lng: coords.lng } },
+                ).catch(() => undefined);
+            }),
+        );
+    }
+
+    return resolved;
+}
+
+export async function fetchScopedResponderMarkers(
+    subAdminUserId: string,
+    opts?: { allowGeocode?: boolean }
+): Promise<GisMapMarkerDto[]> {
     const jurisdiction = await resolveSubAdminJurisdiction(subAdminUserId);
     const subAdmin = await User.findById(subAdminUserId)
         .select('state city licenseId')
@@ -168,6 +211,7 @@ export async function fetchScopedResponderMarkers(subAdminUserId: string): Promi
     const stateRaw = typeof subAdmin.state === 'string' ? subAdmin.state.trim() : '';
     const stateCode = normalizeStateToUsps(stateRaw);
     const licenseId = subAdmin.licenseId;
+    const allowGeocode = opts?.allowGeocode === true;
 
     const andParts: Record<string, unknown>[] = [{ role: 'responder' }];
     const scopeOr: Record<string, unknown>[] = [];
@@ -203,7 +247,7 @@ export async function fetchScopedResponderMarkers(subAdminUserId: string): Promi
 
     const markers: GisMapMarkerDto[] = [];
     const seen = new Set<string>();
-    let geocodeBudget = 30;
+    let geocodeBudget = allowGeocode ? 30 : 0;
 
     const pushMarker = async (
         id: string,
@@ -314,9 +358,22 @@ function userMatchesStateFilter(
     return stateRegex(stateRaw).test(st);
 }
 
+function citizenLocationStr(u: {
+    location?: string | null;
+    city?: string | null;
+    state?: string | null;
+    zipcode?: string | null;
+}): string {
+    return (
+        (typeof u.location === 'string' && u.location.trim()) ||
+        [u.city, u.state, u.zipcode].filter(Boolean).join(', ')
+    );
+}
+
 /** Super-admin: approved citizens from `User` (not legacy seed collections). */
 export async function fetchNationwideCitizenMarkers(opts?: {
     stateRaw?: string;
+    allowGeocode?: boolean;
 }): Promise<GisMapMarkerDto[]> {
     const users = await User.find({
         role: { $in: [...CITIZEN_ROLES] },
@@ -326,28 +383,24 @@ export async function fetchNationwideCitizenMarkers(opts?: {
         .limit(500)
         .lean();
 
+    const filtered = users.filter((u) => userMatchesStateFilter(u, opts?.stateRaw));
+    const geocoded = opts?.allowGeocode
+        ? await geocodeUsersMissingCoords(filtered, citizenLocationStr, 40)
+        : new Map<string, { lat: number; lng: number }>();
+
     const markers: GisMapMarkerDto[] = [];
-    let geocodeBudget = 60;
-
-    for (const u of users) {
-        if (!userMatchesStateFilter(u, opts?.stateRaw)) continue;
-
-        const locationStr =
-            (typeof u.location === 'string' && u.location.trim()) ||
-            [u.city, u.state, u.zipcode].filter(Boolean).join(', ');
-
-        let coords: { lat: number; lng: number } | null = null;
-        if (typeof u.lat === 'number' && typeof u.lng === 'number') {
-            coords = { lat: u.lat, lng: u.lng };
-        } else if (geocodeBudget > 0) {
-            coords = await resolveCoords(null, null, locationStr);
-            if (coords) geocodeBudget -= 1;
-        }
+    for (const u of filtered) {
+        const id = String(u._id);
+        const locationStr = citizenLocationStr(u);
+        const coords =
+            typeof u.lat === 'number' && typeof u.lng === 'number'
+                ? { lat: u.lat, lng: u.lng }
+                : geocoded.get(id) ?? null;
         if (!coords) continue;
 
         const isSafe = u.isSafe !== false;
         markers.push({
-            id: String(u._id),
+            id,
             lat: coords.lat,
             lng: coords.lng,
             title: String(u.name || 'Citizen'),
@@ -367,36 +420,36 @@ export async function fetchNationwideCitizenMarkers(opts?: {
 /** Super-admin: responder accounts from `User` (not legacy `Responder` seed rows). */
 export async function fetchNationwideResponderMarkers(opts?: {
     stateRaw?: string;
+    allowGeocode?: boolean;
 }): Promise<GisMapMarkerDto[]> {
     const responderUsers = await User.find({ role: 'responder' })
         .select('name location city state lat lng responderVertical responderFunction')
         .limit(300)
         .lean();
 
+    const filtered = responderUsers.filter((u) => userMatchesStateFilter(u, opts?.stateRaw));
+    const locationOf = (u: (typeof filtered)[number]) =>
+        (typeof u.location === 'string' && u.location.trim()) ||
+        [u.city, u.state].filter(Boolean).join(', ');
+    const geocoded = opts?.allowGeocode
+        ? await geocodeUsersMissingCoords(filtered, locationOf, 30)
+        : new Map<string, { lat: number; lng: number }>();
+
     const markers: GisMapMarkerDto[] = [];
-    let geocodeBudget = 40;
-
-    for (const u of responderUsers) {
-        if (!userMatchesStateFilter(u, opts?.stateRaw)) continue;
-
+    for (const u of filtered) {
+        const id = String(u._id);
         const unitType =
             String(u.responderVertical || u.responderFunction || 'Responder').replace(/_/g, ' ');
-        const locationStr =
-            (typeof u.location === 'string' && u.location.trim()) ||
-            [u.city, u.state].filter(Boolean).join(', ');
-
-        let coords: { lat: number; lng: number } | null = null;
-        if (typeof u.lat === 'number' && typeof u.lng === 'number') {
-            coords = { lat: u.lat, lng: u.lng };
-        } else if (geocodeBudget > 0) {
-            coords = await resolveCoords(null, null, locationStr);
-            if (coords) geocodeBudget -= 1;
-        }
+        const locationStr = locationOf(u);
+        const coords =
+            typeof u.lat === 'number' && typeof u.lng === 'number'
+                ? { lat: u.lat, lng: u.lng }
+                : geocoded.get(id) ?? null;
         if (!coords) continue;
 
         const visuals = responderVisuals(unitType);
         markers.push({
-            id: String(u._id),
+            id,
             lat: coords.lat,
             lng: coords.lng,
             title: String(u.name || 'Responder'),
@@ -415,30 +468,32 @@ export async function fetchNationwideResponderMarkers(opts?: {
 /** Super-admin Leaders tab: sub-admin accounts with map positions. */
 export async function fetchSubAdminLeaderMarkers(opts?: {
     stateRaw?: string;
+    allowGeocode?: boolean;
 }): Promise<GisMapMarkerDto[]> {
     const admins = await User.find({ role: 'sub-admin' })
         .select('name city state country lat lng email')
         .limit(200)
         .lean();
 
+    const filtered = admins.filter((u) => userMatchesStateFilter(u, opts?.stateRaw));
+    const locationOf = (u: (typeof filtered)[number]) =>
+        [u.city, u.state, u.country || 'USA'].filter(Boolean).join(', ');
+    const geocoded = opts?.allowGeocode
+        ? await geocodeUsersMissingCoords(filtered, locationOf, 20)
+        : new Map<string, { lat: number; lng: number }>();
+
     const markers: GisMapMarkerDto[] = [];
-    let geocodeBudget = 30;
-
-    for (const u of admins) {
-        if (!userMatchesStateFilter(u, opts?.stateRaw)) continue;
-
-        const locationStr = [u.city, u.state, u.country || 'USA'].filter(Boolean).join(', ');
-        let coords: { lat: number; lng: number } | null = null;
-        if (typeof u.lat === 'number' && typeof u.lng === 'number') {
-            coords = { lat: u.lat, lng: u.lng };
-        } else if (geocodeBudget > 0) {
-            coords = await resolveCoords(null, null, locationStr);
-            if (coords) geocodeBudget -= 1;
-        }
+    for (const u of filtered) {
+        const id = String(u._id);
+        const locationStr = locationOf(u);
+        const coords =
+            typeof u.lat === 'number' && typeof u.lng === 'number'
+                ? { lat: u.lat, lng: u.lng }
+                : geocoded.get(id) ?? null;
         if (!coords) continue;
 
         markers.push({
-            id: String(u._id),
+            id,
             lat: coords.lat,
             lng: coords.lng,
             title: String(u.name || 'Sub-Admin'),

@@ -64,7 +64,9 @@ export async function queryPoliceStationsByState(
 
     if (!opts?.force) {
         const hit = await cacheGetJson<PoliceStationMapMarker[]>(cacheKey);
-        if (hit) return { markers: hit, cached: true };
+        if (Array.isArray(hit) && hit.length > 0) {
+            return { markers: hit, cached: true };
+        }
     }
 
     await connectDB();
@@ -73,7 +75,9 @@ export async function queryPoliceStationsByState(
         .lean<PoliceDoc[]>();
 
     const markers = docs.map(toPoliceStationMapMarker);
-    await cacheSetJson(cacheKey, markers, STATE_CACHE_TTL_MS);
+    if (markers.length > 0) {
+        await cacheSetJson(cacheKey, markers, STATE_CACHE_TTL_MS);
+    }
     return { markers, cached: false };
 }
 
