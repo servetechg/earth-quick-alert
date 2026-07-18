@@ -9,13 +9,11 @@ import { calculateDistance } from '@/lib/services/mock-map-service'
 import type { RoadClosureSegment, RoadClosureStatus } from '@/lib/gis/road-closure-types'
 
 /**
- * Real-time road closures via the TomTom Traffic Incident Details API (v5).
+ * Real-time **road closures only** via the TomTom Incident Details API (v5).
  *
- * We ONLY request `categoryFilter=8` (road closures) so normal traffic jams are
- * excluded, and derive the closure status/road name from the incident `events`.
- * The viewport bounding box is passed straight through from the map, and large
- * scopes (e.g. a full state) are tiled so a single request never has to cover an
- * area big enough to time out.
+ * Explicitly excludes traffic jams and every other incident type:
+ * Accident, Fog, Rain, Ice, Jam (6), LaneClosed (7), RoadWorks, Wind, Flooding, etc.
+ * Server filter: categoryFilter=8 (RoadClosed). Client re-checks iconCategory === 8.
  */
 const TOMTOM_INCIDENTS_URL =
     'https://api.tomtom.com/traffic/services/5/incidentDetails'
@@ -24,14 +22,15 @@ const TOMTOM_INCIDENTS_URL =
 const TOMTOM_FIELDS =
     '{incidents{type,geometry{type,coordinates},properties{id,iconCategory,magnitudeOfDelay,startTime,endTime,from,to,roadNumbers,events{code,description}}}}'
 
-/** iconCategory 8 = Road Closed. */
-const ROAD_CLOSURE_CATEGORY = '8'
+/** TomTom iconCategory 8 = RoadClosed. Never request 6 (Jam) or 7 (LaneClosed). */
+const ROAD_CLOSED_ICON_CATEGORY = 8
+const ROAD_CLOSURE_CATEGORY_FILTER = '8'
 
 const CACHE_TTL_MS = 10 * 60 * 1000
 /** Short TTL for empty results so a transient miss never sticks for 10 minutes. */
 const EMPTY_CACHE_TTL_MS = 60 * 1000
-/** Bump the version suffix to invalidate previously cached results. */
-const ROAD_CLOSURE_PREFIX = 'map-layer:road-closures:v3:'
+/** Bump when provider/fallback rules change. */
+const ROAD_CLOSURE_PREFIX = 'map-layer:road-closures:v6:'
 
 /**
  * TomTom rejects any bounding box larger than 10,000 km² with HTTP 400, so every
@@ -51,8 +50,8 @@ const KM_PER_DEG_LNG_EQUATOR = 111.32
 /** Above this cell count the viewport is treated as an "overview" (zoomed out). */
 const MAX_DETAIL_TILES = 24
 /** Hard cap on TomTom requests per overview fetch. */
-const MAX_OVERVIEW_TILES = 54
-const TILE_CONCURRENCY = 6
+const MAX_OVERVIEW_TILES = 72
+const TILE_CONCURRENCY = 8
 const REQUEST_TIMEOUT_MS = 12_000
 
 function tomTomKey(): string | null {
@@ -140,8 +139,8 @@ function distributedCells(b: MapBounds, target: number): MapBounds[] {
 
 /**
  * Split a bounding box into ~`MAX_TILE_KM` cells (each well under TomTom's 10,000 km²
- * cap). Small viewports are fully covered; large ones get one cell per visible state
- * plus distributed fill so closures appear nationwide.
+ * cap). Small viewports are fully covered; large ones use an even lattice so metros
+ * like Denver are not missed (state centroids alone skip many cities).
  */
 function tileBounds(b: MapBounds): MapBounds[] {
     const lngSpan = b.east - b.west
@@ -169,9 +168,19 @@ function tileBounds(b: MapBounds): MapBounds[] {
         return all
     }
 
-    const stateCells = perStateOverviewCells(b)
-    const fill = distributedCells(b, MAX_OVERVIEW_TILES - stateCells.length)
-    return [...stateCells, ...fill].slice(0, MAX_OVERVIEW_TILES)
+    // Even coverage across the viewport (not state-center samples that miss Denver, etc.).
+    const stateHint = perStateOverviewCells(b).slice(0, 16)
+    const fill = distributedCells(b, Math.max(24, MAX_OVERVIEW_TILES - stateHint.length))
+    const seen = new Set<string>()
+    const out: MapBounds[] = []
+    for (const cell of [...fill, ...stateHint]) {
+        const key = `${cell.west.toFixed(2)},${cell.south.toFixed(2)}`
+        if (seen.has(key)) continue
+        seen.add(key)
+        out.push(cell)
+        if (out.length >= MAX_OVERVIEW_TILES) break
+    }
+    return out
 }
 
 function pointInScope(lat: number, lng: number, scope: InfrastructureSearchScope): boolean {
@@ -198,8 +207,44 @@ function normalizeStatus(raw: string): RoadClosureStatus {
     if (s.includes('closed') && !s.includes('lane')) return 'Closed'
     if (s.includes('restrict') || s.includes('limited')) return 'Restricted'
     if (s.includes('lane')) return 'Lane Closure'
-    // categoryFilter=8 means every incident is a road closure by definition.
+    // iconCategory 8 = RoadClosed — default label for true full closures.
     return 'Closed'
+}
+
+/** Reject jams / delays / works text that slipped past the category filter. */
+function looksLikeNonClosureTraffic(description: string): boolean {
+    const s = description.toLowerCase()
+    // Any explicit closure wording → keep (even if accident/works is mentioned).
+    if (/\b(closed|closure|impassable|blocked)\b/.test(s)) return false
+    return (
+        /\b(traffic\s*jam|slow\s*traffic|heavy\s*traffic|congestion|queue|standstill)\b/.test(s) ||
+        /\b(delay|delays)\b/.test(s) ||
+        /\b(road\s*works|construction|maintenance)\b/.test(s) ||
+        /\b(accident|collision|crash)\b/.test(s) ||
+        /\b(broken\s*down|disabled\s*vehicle)\b/.test(s)
+    )
+}
+
+function isActivePresentIncident(props: TomTomIncident['properties']): boolean {
+    const end = props?.endTime ? Date.parse(String(props.endTime)) : NaN
+    if (Number.isFinite(end) && end < Date.now()) return false
+    return true
+}
+
+/**
+ * Strict gate: only TomTom RoadClosed (8). Drops Jam(6), LaneClosed(7), RoadWorks(9), etc.
+ */
+function isStrictRoadClosure(incident: TomTomIncident): boolean {
+    const props = incident.properties ?? {}
+    const category = Number(props.iconCategory)
+    if (category !== ROAD_CLOSED_ICON_CATEGORY) return false
+    if (!isActivePresentIncident(props)) return false
+
+    const events = Array.isArray(props.events) ? props.events : []
+    const description = String(events[0]?.description ?? '').trim()
+    if (description && looksLikeNonClosureTraffic(description)) return false
+
+    return true
 }
 
 /** GeoJSON geometry -> one or more lat/lng paths (LineString / MultiLineString / Polygon / Point). */
@@ -253,7 +298,7 @@ type TomTomIncident = {
         from?: string
         to?: string
         roadNumbers?: string[]
-        events?: Array<{ code?: number; description?: string }>
+        events?: Array<{ code?: number; description?: string; iconCategory?: number }>
     }
 }
 
@@ -272,10 +317,15 @@ function incidentToSegments(
     index: number,
     scope: InfrastructureSearchScope,
 ): RoadClosureSegment[] {
+    if (!isStrictRoadClosure(incident)) return []
+
     const props = incident.properties ?? {}
     const event = props.events?.[0]
-    const description = String(event?.description ?? 'Closed').trim() || 'Closed'
+    const description = String(event?.description ?? 'Road closed').trim() || 'Road closed'
     const status = normalizeStatus(description)
+    // Never surface jam-like statuses from a RoadClosed incident.
+    const closureStatus: RoadClosureStatus =
+        status === 'Lane Closure' || status === 'Restricted' ? status : 'Closed'
     const roadName = roadNameFor(props, description)
     const baseId = props.id ? String(props.id) : `tomtom-${index}`
     const updatedAt = props.startTime ? String(props.startTime) : new Date().toISOString()
@@ -288,12 +338,12 @@ function incidentToSegments(
         out.push({
             id: paths.length > 1 ? `${baseId}-${pathIdx}` : baseId,
             roadName,
-            status,
+            status: closureStatus,
             reason: description,
             startLocation: props.from ? String(props.from) : undefined,
             endLocation: props.to ? String(props.to) : undefined,
             updatedAt,
-            source: 'TomTom Traffic',
+            source: 'TomTom Road Closures',
             path,
         })
     })
@@ -305,13 +355,14 @@ async function fetchTomTomTile(
     bbox: MapBounds,
     scope: InfrastructureSearchScope,
     startIndex: number,
-): Promise<RoadClosureSegment[]> {
+): Promise<{ segments: RoadClosureSegment[]; httpStatus: number | null }> {
     const params = new URLSearchParams({
         key,
         bbox: `${bbox.west},${bbox.south},${bbox.east},${bbox.north}`,
         fields: TOMTOM_FIELDS,
         language: 'en-US',
-        categoryFilter: ROAD_CLOSURE_CATEGORY,
+        // RoadClosed only — never Jam(6), LaneClosed(7), RoadWorks(9), etc.
+        categoryFilter: ROAD_CLOSURE_CATEGORY_FILTER,
         timeValidityFilter: 'present',
     })
 
@@ -321,24 +372,30 @@ async function fetchTomTomTile(
             signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
             headers: { Accept: 'application/json' },
         })
-    } catch {
-        return []
+    } catch (err) {
+        console.warn('[road-closures] TomTom tile request failed:', err)
+        return { segments: [], httpStatus: null }
     }
-    if (!res.ok) return []
+    if (!res.ok) {
+        console.warn(
+            `[road-closures] TomTom HTTP ${res.status} for bbox=${bbox.west.toFixed(2)},${bbox.south.toFixed(2)},${bbox.east.toFixed(2)},${bbox.north.toFixed(2)}`,
+        )
+        return { segments: [], httpStatus: res.status }
+    }
 
     let data: { incidents?: TomTomIncident[] }
     try {
         data = (await res.json()) as { incidents?: TomTomIncident[] }
     } catch {
-        return []
+        return { segments: [], httpStatus: res.status }
     }
 
     const incidents = Array.isArray(data.incidents) ? data.incidents : []
-    const out: RoadClosureSegment[] = []
+    const segments: RoadClosureSegment[] = []
     incidents.forEach((incident, i) => {
-        out.push(...incidentToSegments(incident, startIndex + i, scope))
+        segments.push(...incidentToSegments(incident, startIndex + i, scope))
     })
-    return out
+    return { segments, httpStatus: res.status }
 }
 
 async function runBatched<T, R>(
@@ -357,44 +414,129 @@ async function runBatched<T, R>(
     return results
 }
 
+function isFullRoadClosure(segment: RoadClosureSegment): boolean {
+    return segment.status === 'Closed'
+}
+
 export async function fetchRoadClosures(
     scope: InfrastructureSearchScope,
-): Promise<{ closures: RoadClosureSegment[]; sources: string[]; fetchedAt: string }> {
-    const sources = ['TomTom Traffic']
-    const key = tomTomKey()
-    if (!key) {
-        return { closures: [], sources, fetchedAt: new Date().toISOString() }
-    }
+): Promise<{
+    closures: RoadClosureSegment[]
+    sources: string[]
+    fetchedAt: string
+    warning?: string
+}> {
+    const sources: string[] = []
+    const byId = new Map<string, RoadClosureSegment>()
+    let warning: string | undefined
 
     const cacheKey = `${ROAD_CLOSURE_PREFIX}${scopeCacheKey(scope)}`
-    const cached = await cacheGetJson<RoadClosureSegment[]>(cacheKey)
+    const cached = await cacheGetJson<
+        | RoadClosureSegment[]
+        | { closures: RoadClosureSegment[]; sources: string[]; warning?: string }
+    >(cacheKey)
     if (cached) {
-        return { closures: cached, sources, fetchedAt: new Date().toISOString() }
+        if (Array.isArray(cached)) {
+            return {
+                closures: cached,
+                sources: ['cached'],
+                fetchedAt: new Date().toISOString(),
+            }
+        }
+        if (Array.isArray(cached.closures)) {
+            return {
+                closures: cached.closures,
+                sources: cached.sources?.length ? cached.sources : ['cached'],
+                fetchedAt: new Date().toISOString(),
+                warning: cached.warning,
+            }
+        }
     }
 
-    const bounds = boundsForScope(scope)
-    if (!bounds) {
-        return { closures: [], sources, fetchedAt: new Date().toISOString() }
+    const key = tomTomKey()
+    let tomtomOk = false
+    let tomtomStatus: number | null = null
+
+    if (!key) {
+        warning = 'TOMTOM_API_KEY is not set. Using DOT WZDX feeds where configured.'
+    } else {
+        const bounds = boundsForScope(scope)
+        if (bounds) {
+            const tiles = tileBounds(bounds)
+            const batches = await runBatched(tiles, TILE_CONCURRENCY, (tile, i) =>
+                fetchTomTomTile(key, tile, scope, i * 1000),
+            )
+            let anySuccess = false
+            for (const batch of batches) {
+                if (batch.httpStatus === 200) anySuccess = true
+                if (batch.httpStatus != null && batch.httpStatus >= 400) {
+                    tomtomStatus = batch.httpStatus
+                }
+                for (const segment of batch.segments) {
+                    if (!byId.has(segment.id)) byId.set(segment.id, segment)
+                }
+            }
+            tomtomOk = anySuccess
+            if (tomtomOk) {
+                sources.push('TomTom Road Closures')
+            } else if (tomtomStatus === 403) {
+                warning =
+                    'TomTom Traffic API returned 403 Forbidden (key invalid, expired, or Traffic Incidents not enabled). Falling back to DOT WZDX.'
+            } else if (tomtomStatus) {
+                warning = `TomTom Traffic API returned HTTP ${tomtomStatus}. Falling back to DOT WZDX.`
+            } else {
+                warning = 'TomTom Traffic API unreachable. Falling back to DOT WZDX.'
+            }
+        }
     }
 
-    const tiles = tileBounds(bounds)
-    const batches = await runBatched(tiles, TILE_CONCURRENCY, (tile, i) =>
-        fetchTomTomTile(key, tile, scope, i * 1000),
-    )
-
-    const byId = new Map<string, RoadClosureSegment>()
-    for (const batch of batches) {
-        for (const segment of batch) {
-            if (!byId.has(segment.id)) byId.set(segment.id, segment)
+    // DOT WZDX — full road closures only (not jams / lane-only when status isn't Closed).
+    try {
+        const { fetchWzdxClosures } = await import('@/lib/gis/wzdx/wzdx-road-closures')
+        const wzdx = await fetchWzdxClosures(scope)
+        let added = 0
+        for (const segment of wzdx) {
+            if (!isFullRoadClosure(segment)) continue
+            if (!pathIntersectsScope(segment.path, scope)) continue
+            if (byId.has(segment.id)) continue
+            byId.set(segment.id, segment)
+            added += 1
+        }
+        if (added > 0) {
+            if (!sources.includes('WZDX (DOT)')) sources.push('WZDX (DOT)')
+        }
+        if (!tomtomOk && added === 0) {
+            warning = [
+                warning,
+                'No WZDX full closures in this view (state feed may need an API key, e.g. TXDOT_WZDX_API_KEY for Texas).',
+            ]
+                .filter(Boolean)
+                .join(' ')
+        }
+    } catch (err) {
+        console.warn('[road-closures] WZDX fallback failed:', err)
+        if (!tomtomOk) {
+            warning = [warning, 'WZDX fallback also failed.'].filter(Boolean).join(' ')
         }
     }
 
     const closures = [...byId.values()]
-    await cacheSetJson(
-        cacheKey,
-        closures,
-        closures.length > 0 ? CACHE_TTL_MS : EMPTY_CACHE_TTL_MS,
-    )
+    if (sources.length === 0) sources.push('none')
 
-    return { closures, sources, fetchedAt: new Date().toISOString() }
+    // Never cache auth failures as a long-lived empty map.
+    const ttl =
+        closures.length > 0
+            ? CACHE_TTL_MS
+            : tomtomStatus === 403
+              ? 30_000
+              : EMPTY_CACHE_TTL_MS
+
+    await cacheSetJson(cacheKey, { closures, sources, warning }, ttl)
+
+    return {
+        closures,
+        sources,
+        fetchedAt: new Date().toISOString(),
+        warning,
+    }
 }

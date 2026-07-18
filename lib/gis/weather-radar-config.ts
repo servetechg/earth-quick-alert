@@ -234,4 +234,20 @@ export const NEXRAD_LEAFLET_WMS_OPTIONS = {
   version: NEXRAD_WMS.version,
   attribution: NEXRAD_WMS.attribution,
   opacity: 0.65,
+  tileSize: 256,
+  /** On HiDPI, Leaflet doubles GetMap width/height for the same bbox. */
+  detectRetina: true,
+  className: 'weather-radar-tile',
+  keepBuffer: 2,
+}
+
+/**
+ * WMS GetMap pixel size per Leaflet tile (CSS px × scale).
+ * Always ≥2× so radar is never upscaled from a soft 256px image.
+ */
+export function nexradWmsTilePixelSize(): number {
+  if (typeof window === 'undefined') return 512
+  const dpr = window.devicePixelRatio || 1
+  const scale = dpr > 1.5 ? 3 : 2
+  return 256 * scale
 }

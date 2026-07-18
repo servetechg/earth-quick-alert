@@ -85,38 +85,113 @@ export default function SuperAdminDashboard() {
     fetchData()
   }, [])
 
-  const allSubAdmins = Array.from(
-    new Set(
-      [
-        ...subAdminUsers.map((u: any) => (u.name || u.email || '').trim()).filter(Boolean),
-        ...activeEmergencies.map((e: any) => e.subAdminName),
-        ...alertsSent.map((e: any) => e.subAdminName),
-        ...impactedUsers.map((e: any) => e.subAdminName),
-        ...eocStatus.map((e: any) => e.subAdminName),
-      ].filter(Boolean)
+  const subAdminOptions = React.useMemo(() => {
+    const byId = new Map<
+      string,
+      { value: string; label: string; state?: string; name?: string; email?: string }
+    >()
+
+    for (const u of subAdminUsers as Array<{
+      _id?: string
+      id?: string
+      name?: string
+      email?: string
+      state?: string
+    }>) {
+      const id = String(u._id || u.id || '').trim()
+      if (!id) continue
+      const label = (u.name || u.email || 'Sub-Admin').trim()
+      byId.set(id, {
+        value: id,
+        label,
+        state: typeof u.state === 'string' ? u.state.trim() || undefined : undefined,
+        name: typeof u.name === 'string' ? u.name.trim() : undefined,
+        email: typeof u.email === 'string' ? u.email.trim() : undefined,
+      })
+    }
+
+    const knownLabels = new Set(
+      [...byId.values()].flatMap((o) => [o.label, o.name, o.email].filter(Boolean) as string[]),
     )
-  ).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
+
+    const metricNames = [
+      ...activeEmergencies.map((e: any) => e.subAdminName),
+      ...alertsSent.map((e: any) => e.subAdminName),
+      ...impactedUsers.map((e: any) => e.subAdminName),
+      ...eocStatus.map((e: any) => e.subAdminName),
+    ]
+      .map((n) => (typeof n === 'string' ? n.trim() : ''))
+      .filter(Boolean)
+
+    for (const name of metricNames) {
+      if (knownLabels.has(name)) continue
+      const match = [...byId.values()].find(
+        (o) =>
+          o.label.toLowerCase() === name.toLowerCase() ||
+          o.name?.toLowerCase() === name.toLowerCase() ||
+          o.email?.toLowerCase() === name.toLowerCase(),
+      )
+      if (match) continue
+      byId.set(`name:${name}`, {
+        value: `name:${name}`,
+        label: name,
+      })
+    }
+
+    return [...byId.values()].sort((a, b) =>
+      a.label.localeCompare(b.label, undefined, { sensitivity: 'base' }),
+    )
+  }, [subAdminUsers, activeEmergencies, alertsSent, impactedUsers, eocStatus])
+
+  const selectedSubAdminOption =
+    selectedLocation === 'All'
+      ? undefined
+      : subAdminOptions.find((o) => o.value === selectedLocation)
+
+  const selectedSubAdmin =
+    selectedLocation !== 'All' && !selectedLocation.startsWith('name:')
+      ? (subAdminUsers as Array<{ _id?: string; id?: string; name?: string; email?: string; state?: string }>).find(
+          (u) => String(u._id || u.id) === selectedLocation,
+        )
+      : selectedSubAdminOption
+        ? (subAdminUsers as Array<{ _id?: string; id?: string; name?: string; email?: string; state?: string }>).find(
+            (u) =>
+              (u.name && u.name === selectedSubAdminOption.name) ||
+              (u.email && u.email === selectedSubAdminOption.email) ||
+              (u.name && u.name === selectedSubAdminOption.label),
+          )
+        : undefined
+
+  const scopedMapState =
+    selectedLocation === 'All'
+      ? undefined
+      : (selectedSubAdminOption?.state ||
+          (typeof selectedSubAdmin?.state === 'string'
+            ? selectedSubAdmin.state.trim()
+            : undefined) ||
+          undefined)
 
   const subAdminKeysForFilter =
     selectedLocation === 'All'
       ? null
       : (() => {
-          const u = subAdminUsers.find(
-            (x: any) =>
-              (typeof x.name === 'string' && x.name === selectedLocation) ||
-              (typeof x.email === 'string' && x.email === selectedLocation)
-          )
-          if (u) {
-            return [u.name, u.email].filter((k): k is string => Boolean(k && String(k).trim()))
-          }
-          return [selectedLocation]
+          const keys = [
+            selectedSubAdminOption?.name,
+            selectedSubAdminOption?.email,
+            selectedSubAdminOption?.label,
+            typeof selectedSubAdmin?.name === 'string' ? selectedSubAdmin.name : undefined,
+            typeof selectedSubAdmin?.email === 'string' ? selectedSubAdmin.email : undefined,
+          ].filter((k): k is string => Boolean(k && String(k).trim()))
+          return keys.length > 0 ? keys : [selectedLocation.replace(/^name:/, '')]
         })()
 
   const rowMatchesSelectedSubAdmin = (e: { subAdminName?: string }) => {
     if (selectedLocation === 'All') return true
     const name = e?.subAdminName
     if (!name) return false
-    return subAdminKeysForFilter!.includes(name)
+    return subAdminKeysForFilter!.some(
+      (k) => k === name || k.toLowerCase() === String(name).toLowerCase(),
+    )
   }
 
   const filteredActive = selectedLocation === 'All'
@@ -135,16 +210,9 @@ export default function SuperAdminDashboard() {
     ? eocStatus
     : eocStatus.filter((e: any) => rowMatchesSelectedSubAdmin(e))
 
-  const selectedSubAdmin =
-    selectedLocation !== 'All'
-      ? subAdminUsers.find(
-          (u: any) =>
-            (typeof u.name === 'string' && u.name === selectedLocation) ||
-            (typeof u.email === 'string' && u.email === selectedLocation)
-        )
-      : undefined
-
-  const selectedAdminCoords = selectedSubAdmin
+  const selectedAdminCoords = selectedSubAdmin as
+    | { lat?: number; lng?: number; name?: string; state?: string }
+    | undefined
 
   return (
     <AdminPageShell className="selection:bg-[#33375D]/15">
@@ -191,8 +259,11 @@ export default function SuperAdminDashboard() {
                 className="w-full h-14 pl-12 pr-10 bg-slate-50 border border-slate-200 rounded-2xl text-slate-900 font-black text-xs uppercase tracking-widest appearance-none focus:outline-none focus:ring-4 focus:ring-red-500/5 focus:border-[#DC2626] transition-all cursor-pointer hover:bg-white"
               >
                 <option value="All">All admins</option>
-                {allSubAdmins.map(admin => (
-                  <option key={admin} value={admin}>{admin}</option>
+                {subAdminOptions.map((admin) => (
+                  <option key={admin.value} value={admin.value}>
+                    {admin.label}
+                    {admin.state ? ` · ${admin.state}` : ''}
+                  </option>
                 ))}
               </select>
               <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none group-hover:text-[#DC2626] transition-colors" size={18} />
@@ -308,18 +379,12 @@ export default function SuperAdminDashboard() {
             <GISMap
               key={selectedLocation}
               selectedLocation={
-                selectedLocation === 'All' ? 'All' : selectedSubAdmin?.name || selectedLocation
+                selectedLocation === 'All'
+                  ? 'All'
+                  : selectedSubAdminOption?.label || selectedLocation
               }
-              focusState={
-                selectedLocation === 'All' || !selectedSubAdmin?.state
-                  ? undefined
-                  : String(selectedSubAdmin.state).trim() || undefined
-              }
-              scopeState={
-                selectedLocation === 'All' || !selectedSubAdmin?.state
-                  ? undefined
-                  : String(selectedSubAdmin.state).trim() || undefined
-              }
+              focusState={scopedMapState}
+              scopeState={scopedMapState}
               unifiedMapFeed
               showLayersPanel
               showCriticalInfraLayers

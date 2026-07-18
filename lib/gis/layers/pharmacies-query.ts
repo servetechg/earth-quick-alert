@@ -64,14 +64,21 @@ export async function queryPharmaciesByState(
 
     if (!opts?.force) {
         const hit = await cacheGetJson<PharmacyMapMarker[]>(cacheKey);
-        if (hit) return { markers: hit, cached: true };
+        // Empty arrays are truthy — never treat a poisoned empty cache as a hit.
+        if (Array.isArray(hit) && hit.length > 0) {
+            return { markers: hit, cached: true };
+        }
     }
 
     await connectDB();
     const docs = await MapLayerPharmacy.find({ stateKey: usps }).select(PHARMACY_SELECT).lean<PharmacyDoc[]>();
 
     const markers = docs.map(toPharmacyMapMarker);
-    await cacheSetJson(cacheKey, markers, STATE_CACHE_TTL_MS);
+    if (markers.length > 0) {
+        await cacheSetJson(cacheKey, markers, STATE_CACHE_TTL_MS);
+    } else {
+        await cacheDelByPrefix(`map-layer:pharmacies:state:${usps}`);
+    }
     return { markers, cached: false };
 }
 
@@ -84,7 +91,9 @@ async function queryPharmaciesByBoundsSampled(
 
     if (!opts?.force) {
         const hit = await cacheGetJson<PharmacyMapMarker[]>(cacheKey);
-        if (hit) return { markers: hit, cached: true };
+        if (Array.isArray(hit) && hit.length > 0) {
+            return { markers: hit, cached: true };
+        }
     }
 
     const { perCell, rows, cells } = buildViewportGrid(bounds, limit);
@@ -134,7 +143,9 @@ export async function queryPharmaciesByBounds(
 
     if (!opts?.force) {
         const hit = await cacheGetJson<PharmacyMapMarker[]>(cacheKey);
-        if (hit) return { markers: hit.slice(0, limit), cached: true };
+        if (Array.isArray(hit) && hit.length > 0) {
+            return { markers: hit.slice(0, limit), cached: true };
+        }
     }
 
     await connectDB();

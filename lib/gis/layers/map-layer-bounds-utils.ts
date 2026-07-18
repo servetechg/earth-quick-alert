@@ -8,9 +8,19 @@ export function boundsSpan(bounds: MapBounds): { latSpan: number; lngSpan: numbe
     };
 }
 
-export function isWideLayerViewport(bounds: MapBounds): boolean {
+/** Roughly continental USA — not a single-state / regional frame. */
+export function isConusSizedViewport(bounds: MapBounds): boolean {
     const { latSpan, lngSpan } = boundsSpan(bounds);
-    return latSpan > 4 || lngSpan > 6;
+    return latSpan > 18 || lngSpan > 35;
+}
+
+/**
+ * Whether layer APIs should use sparse nationwide sampling.
+ * Only continental frames — state/regional views (Montana, license radius, etc.)
+ * must use dense bbox queries so super-admin matches sub-admin density.
+ */
+export function isWideLayerViewport(bounds: MapBounds): boolean {
+    return isConusSizedViewport(bounds);
 }
 
 export function isConusFetchBounds(bounds: MapBounds): boolean {
@@ -24,11 +34,15 @@ export function isConusFetchBounds(bounds: MapBounds): boolean {
 
 /** Stable fetch bounds — reduces refetch churn while panning. */
 export function quantizeLayerFetchBounds(bounds: MapBounds, zoom: number): MapBounds {
-    if (isWideLayerViewport(bounds) || zoom <= 7) {
+    // Only collapse to full CONUS when the *bounds* are continental.
+    if (isConusSizedViewport(bounds)) {
         return { ...CONUS_MAP_BOUNDS };
     }
 
-    const step = zoom <= 9 ? 1 : zoom <= 11 ? 0.5 : 0.25;
+    // Fine steps so pan/zoom always refreshes the visible shelter set (Google Maps–like).
+    // Coarse 1–2° snapping previously kept a stale bbox and left the new center empty.
+    const step =
+        zoom <= 5 ? 1 : zoom <= 7 ? 0.5 : zoom <= 9 ? 0.25 : zoom <= 11 ? 0.1 : 0.05;
     const snap = (n: number) => Math.floor(n / step) * step;
     const snapUp = (n: number) => Math.ceil(n / step) * step;
 
@@ -70,8 +84,9 @@ export function buildViewportGrid(
     limit: number,
 ): { perCell: number; rows: number; cols: number; cells: GridCellSpec[] } {
     const { latSpan, lngSpan } = boundsSpan(bounds);
-    const cols = Math.max(4, Math.min(24, Math.ceil(lngSpan / 2)));
-    const rows = Math.max(4, Math.min(16, Math.ceil(latSpan / 2)));
+    // ~1° cells so multi-state views sample the map center as densely as the edges.
+    const cols = Math.max(4, Math.min(24, Math.ceil(lngSpan / 1)));
+    const rows = Math.max(4, Math.min(16, Math.ceil(latSpan / 1)));
     const perCell = Math.max(1, Math.ceil(limit / (cols * rows)));
     const cellW = lngSpan / cols;
     const cellH = latSpan / rows;

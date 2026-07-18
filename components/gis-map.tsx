@@ -14,7 +14,6 @@ import {
   ChevronLeft,
   AlertTriangle,
   Navigation,
-  Loader2,
   Globe,
   Settings,
   Radar,
@@ -38,7 +37,7 @@ import {
 } from '@/components/situational-leaflet-map'
 import type { UnifiedEventHeatPoint } from '@/lib/geo/unified-event-heatmap'
 import { cn } from '@/lib/utils'
-import { getUsStateBbox, pointInUsStateBBox } from '@/lib/constants/us-state-bounding-boxes'
+import { getUsStateBbox, pointInUsStateBBox, inferUspsStateFromLatLng } from '@/lib/constants/us-state-bounding-boxes'
 import { normalizeStateToUsps } from '@/lib/utils/us-state-usps'
 import { radiusBounds } from '@/lib/gis/geojson-map-utils'
 import { CONUS_MAP_BOUNDS, clampBoundsToUsa, viewportCenterInUsa, pointInUsaBounds } from '@/lib/constants/usa-map-bounds'
@@ -100,6 +99,7 @@ import {
   usePowerOutages,
   useRoadClosures,
   useSituationalMap,
+  useSituationalMapMarkerEnrich,
 } from '@/lib/hooks/admin-map-queries'
 import {
   ODIN_OUTAGE_FILL_COLOR,
@@ -107,7 +107,7 @@ import {
 } from '@/lib/gis/odin/odin-outages-config'
 import { isWeatherRadarAvailableForScope, type WeatherRadarMapScope } from '@/lib/gis/weather-radar-config'
 import { useDebouncedMapBounds } from '@/lib/hooks/use-debounced-map-bounds'
-import { quantizeLayerFetchBounds } from '@/lib/gis/layers/map-layer-bounds-utils'
+import { quantizeLayerFetchBounds, isConusSizedViewport } from '@/lib/gis/layers/map-layer-bounds-utils'
 
 type GisMapTab = 'Citizens' | 'Responders' | 'Leaders'
 
@@ -152,6 +152,8 @@ function buildOpenSourceLayerFetchScope(
     stateScoped: boolean
     stateBoundsRestriction: MapStateBounds | null
     licensedStateKey: string | null
+    /** When nationwide super-admin is zoomed into a state, load that full state (parity with sub-admin). */
+    viewportStateKey?: string | null
     restrictToUsa: boolean
     fetchBounds: MapStateBounds | null
     scopeState?: string
@@ -169,6 +171,7 @@ function buildOpenSourceLayerFetchScope(
     return { bounds }
   }
 
+  // Sub-admin / explicit state drill-down: full state dataset.
   const stateScopedView = Boolean(opts.stateScoped || opts.stateBoundsRestriction)
   const hasStateScope = Boolean(
     opts.licensedStateKey &&
@@ -179,11 +182,23 @@ function buildOpenSourceLayerFetchScope(
     return { stateKey: opts.licensedStateKey }
   }
 
+  // Nationwide city/regional zoom (e.g. Amarillo): dense geo query of the visible
+  // viewport — guarantees local FEMA shelters appear (DB has them; CONUS sample does not).
+  if (opts.fetchBounds && !isConusSizedViewport(opts.fetchBounds)) {
+    return { bounds: opts.fetchBounds }
+  }
+
+  // Broader state overview without tight bounds: full state key.
+  if (opts.viewportStateKey) {
+    return { stateKey: opts.viewportStateKey }
+  }
+
+  if (opts.licensedStateKey) return { stateKey: opts.licensedStateKey }
+
   if (opts.restrictToUsa && opts.fetchBounds) {
     return { bounds: opts.fetchBounds }
   }
 
-  if (opts.licensedStateKey) return { stateKey: opts.licensedStateKey }
   if (opts.fetchBounds) return { bounds: opts.fetchBounds }
   return null
 }
@@ -317,7 +332,8 @@ export function GISMap({
     if (fromProps) return fromProps
     if (apiCoverageState?.trim()) return apiCoverageState.trim()
     if (coverageMeta?.stateCode?.trim()) return coverageMeta.stateCode.trim()
-    if (stateScoped || showLayersPanel) {
+    // Sub-admin only: fall back to profile/localStorage state. Never for nationwide super-admin.
+    if (stateScoped) {
       return readScopedStateHint(focusState, scopeState)
     }
     return undefined
@@ -327,7 +343,6 @@ export function GISMap({
     apiCoverageState,
     coverageMeta?.stateCode,
     stateScoped,
-    showLayersPanel,
   ])
 
   const damsStateKey = useMemo(() => {
@@ -344,6 +359,26 @@ export function GISMap({
 
   /** Super-admin nationwide (no state drill-down): USA-only data and map pan limit. */
   const restrictToUsa = unifiedMapFeed && !stateScoped && !stateBoundsRestriction
+
+  /**
+   * Nationwide super-admin zoomed into a state (e.g. Montana): load that full state
+   * for shelters/CIS/etc. so density matches the Montana sub-admin dashboard.
+   * Uses live viewport bounds (not React mapZoom) — zoom state often stays stale at 4.
+   */
+  const viewportStateKey = useMemo((): string | null => {
+    if (!restrictToUsa) return null
+    if (damsStateKey) return null
+    if (!mapViewportBounds) return null
+    const latSpan = mapViewportBounds.north - mapViewportBounds.south
+    const lngSpan = mapViewportBounds.east - mapViewportBounds.west
+    // Continental overview keeps nationwide sampling.
+    if (latSpan > 18 || lngSpan > 35) return null
+    const lat = (mapViewportBounds.south + mapViewportBounds.north) / 2
+    const lng = (mapViewportBounds.west + mapViewportBounds.east) / 2
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null
+    if (!pointInUsaBounds(lat, lng)) return null
+    return inferUspsStateFromLatLng(lat, lng)
+  }, [restrictToUsa, damsStateKey, mapViewportBounds])
 
   const clampFetchBounds = useCallback(
     (bounds: MapStateBounds | null): MapStateBounds | null => {
@@ -491,13 +526,23 @@ export function GISMap({
     enabled: situationalEnabled,
     scopeState,
   })
+  const markerEnrichQuery = useSituationalMapMarkerEnrich({
+    enabled: situationalEnabled && situationalQuery.isSuccess,
+    scopeState,
+  })
 
   useEffect(() => {
-    setSituationalLoading(situationalQuery.isFetching)
+    setSituationalLoading(situationalQuery.isFetching || markerEnrichQuery.isFetching)
     if (situationalQuery.isSuccess && (unifiedMapFeed || stateScoped)) {
       setIsLoading(false)
     }
-  }, [situationalQuery.isFetching, situationalQuery.isSuccess, unifiedMapFeed, stateScoped])
+  }, [
+    situationalQuery.isFetching,
+    situationalQuery.isSuccess,
+    markerEnrichQuery.isFetching,
+    unifiedMapFeed,
+    stateScoped,
+  ])
 
   useEffect(() => {
     const data = situationalQuery.data
@@ -736,6 +781,102 @@ export function GISMap({
     focusState,
   ])
 
+  // Second pass: geocode users without stored lat/lng so Citizens/Responders/Leaders pins appear.
+  useEffect(() => {
+    const data = markerEnrichQuery.data
+    if (!data || !situationalEnabled) return
+    if (!(stateScoped || unifiedMapFeed)) return
+
+    const usaOnly = <T extends { lat: number; lng: number }>(rows: T[] | undefined): T[] =>
+      restrictToUsa
+        ? (rows ?? []).filter((row) => pointInUsaBounds(row.lat, row.lng))
+        : (rows ?? [])
+
+    if (Array.isArray(data.citizens)) {
+      setImpactedUsers(
+        usaOnly(
+          data.citizens as Array<{
+            id: string
+            lat: number
+            lng: number
+            title: string
+            isSafe?: boolean
+            status?: string
+            location?: string
+            description?: string
+          }>,
+        ).map((c) => ({
+          id: c.id,
+          position: { lat: c.lat, lng: c.lng },
+          title: c.title,
+          type: 'user',
+          isSafe: c.isSafe,
+          status: c.status,
+          location: c.location,
+          description: c.description,
+        })),
+      )
+    }
+
+    if (Array.isArray(data.responders)) {
+      setResponders(
+        usaOnly(
+          data.responders as Array<{
+            id: string
+            lat: number
+            lng: number
+            title: string
+            status?: string
+            location?: string
+            description?: string
+            color?: string
+            icon?: string
+          }>,
+        ).map((r) => ({
+          id: r.id,
+          position: { lat: r.lat, lng: r.lng },
+          title: r.title,
+          type: 'responder',
+          status: r.status,
+          location: r.location,
+          description: r.description,
+          color: r.color,
+          icon: r.icon,
+        })),
+      )
+    }
+
+    if (unifiedMapFeed && Array.isArray(data.leaders)) {
+      setSubAdmins(
+        usaOnly(
+          data.leaders as Array<{
+            id: string
+            lat: number
+            lng: number
+            title: string
+            status?: string
+            location?: string
+            description?: string
+          }>,
+        ).map((l) => ({
+          id: l.id,
+          position: { lat: l.lat, lng: l.lng },
+          title: l.title,
+          type: 'admin',
+          status: l.status,
+          location: l.location,
+          description: l.description,
+        })),
+      )
+    }
+  }, [
+    markerEnrichQuery.data,
+    situationalEnabled,
+    stateScoped,
+    unifiedMapFeed,
+    restrictToUsa,
+  ])
+
   useEffect(() => {
     if (stateScoped || unifiedMapFeed) return
 
@@ -970,7 +1111,7 @@ export function GISMap({
     isDemoSimulation,
   ])
 
-  const debouncedViewportBounds = useDebouncedMapBounds(mapViewportBounds, 350)
+  const debouncedViewportBounds = useDebouncedMapBounds(mapViewportBounds, 250)
 
   /** Quantized + debounced bounds for open-source layer API fetches (dams, shelters, fuel). */
   const openSourceLayerFetchBounds = useMemo((): MapStateBounds | null => {
@@ -980,7 +1121,7 @@ export function GISMap({
     let bounds: MapStateBounds | null = null
     if (debouncedViewportBounds) {
       bounds = quantizeLayerFetchBounds(debouncedViewportBounds, mapZoom)
-    } else if (mapZoom <= 7) {
+    } else if (mapZoom <= 5) {
       bounds = CONUS_MAP_BOUNDS
     } else {
       return null
@@ -1017,6 +1158,7 @@ export function GISMap({
         stateScoped,
         stateBoundsRestriction,
         licensedStateKey: damsStateKey,
+        viewportStateKey,
         restrictToUsa,
         fetchBounds: openSourceLayerFetchBounds,
         scopeState,
@@ -1058,6 +1200,7 @@ export function GISMap({
       lockToCoverageCircle,
       coverageCircle,
       damsStateKey,
+      viewportStateKey,
       stateScoped,
       stateBoundsRestriction,
       restrictToUsa,
@@ -1219,6 +1362,7 @@ export function GISMap({
       stateScoped,
       stateBoundsRestriction,
       licensedStateKey: damsStateKey,
+      viewportStateKey,
       restrictToUsa,
       fetchBounds: openSourceLayerFetchBounds,
       scopeState,
@@ -1230,6 +1374,7 @@ export function GISMap({
     lockToCoverageCircle,
     coverageCircle,
     damsStateKey,
+    viewportStateKey,
     stateScoped,
     stateBoundsRestriction,
     restrictToUsa,
@@ -1257,7 +1402,10 @@ export function GISMap({
     return `pending|${infraTypesKey}`
   }, [infraTypesKey, infraFetchBounds])
 
-  const handleMapBoundsChange = useCallback((bounds: MapStateBounds) => {
+  const handleMapBoundsChange = useCallback((bounds: MapStateBounds, zoom?: number) => {
+    if (typeof zoom === 'number' && Number.isFinite(zoom)) {
+      setMapZoom((prev) => (Math.abs(prev - zoom) < 0.05 ? prev : zoom))
+    }
     setMapViewportBounds((prev) => {
       if (!prev) return bounds
       const delta =
@@ -1408,7 +1556,7 @@ export function GISMap({
       return
     }
 
-    const closures = roadClosuresQuery.data ?? []
+    const closures = roadClosuresQuery.data?.closures ?? []
     const polylines: MapPolylineSpec[] = []
     for (const raw of closures) {
       const path = Array.isArray(raw.path)
@@ -1949,6 +2097,20 @@ export function GISMap({
     const showFilterLayers =
       (GIS_MAP_FILTER_LAYERS_ENABLED || isDemoSimulation) && (!restrictToUsa || viewportInUsa)
 
+    // Nationwide city/regional zoom already queried by viewport — show all returned pins.
+    // Exception: sub-admin license radius — fetch uses a square bbox around the circle, so
+    // we must still clip to the circle (otherwise Missoula/Cody etc. leak outside the ring).
+    const regionalBoundsFetch =
+      Boolean(openSourceLayerFetchBounds) &&
+      !isConusSizedViewport(openSourceLayerFetchBounds)
+    const skipCoverageFilter =
+      restrictToUsa &&
+      !stateBoundsRestriction &&
+      !lockToCoverageCircle &&
+      !viewportStateKey &&
+      !regionalBoundsFetch
+    const trustViewportLayerMarkers = regionalBoundsFetch && !lockToCoverageCircle
+
     // Unified heat feed: incidents show on heatmap only (click for details), not as blue pins.
     if (showFilterLayers && incidentsVisible && unifiedIncidents.length === 0) {
       enabledLayerMarkers.push(...situationalMarkers)
@@ -2005,7 +2167,6 @@ export function GISMap({
     }
 
     if (OPEN_SOURCE_MAP_LAYERS_ENABLED && mapLayers.ci_dams && damsLayerQuery.data?.length) {
-      const skipCoverageFilter = restrictToUsa && !stateBoundsRestriction && !lockToCoverageCircle
       const damSector = criticalSectorById('ci_dams')
       for (const dam of damsLayerQuery.data) {
         if (!inUsaView(dam.lat, dam.lng)) continue
@@ -2030,11 +2191,13 @@ export function GISMap({
     }
 
     if (OPEN_SOURCE_MAP_LAYERS_ENABLED && mapLayers.shelters && sheltersLayerQuery.data?.length) {
-      const skipCoverageFilter = restrictToUsa && !stateBoundsRestriction && !lockToCoverageCircle
       for (const shelter of sheltersLayerQuery.data) {
         if (!inUsaView(shelter.lat, shelter.lng)) continue
-        if (!skipCoverageFilter && !markerInCoverage({ lat: shelter.lat, lng: shelter.lng })) continue
-        if (skipCoverageFilter && !markerInLayerViewport(shelter.lat, shelter.lng)) continue
+        // Always honor license radius / state coverage (square bbox fetch can include outside points).
+        if (!markerInCoverage({ lat: shelter.lat, lng: shelter.lng })) continue
+        if (trustViewportLayerMarkers || skipCoverageFilter) {
+          if (!markerInLayerViewport(shelter.lat, shelter.lng)) continue
+        }
         const parts = [
           `Status: ${shelter.status}`,
           `Usage: ${shelter.facilityUsage}`,
@@ -2071,7 +2234,6 @@ export function GISMap({
     }
 
     if (OPEN_SOURCE_MAP_LAYERS_ENABLED && mapLayers.fuel_sites && fuelSitesLayerQuery.data?.length) {
-      const skipCoverageFilter = restrictToUsa && !stateBoundsRestriction && !lockToCoverageCircle
       for (const site of fuelSitesLayerQuery.data) {
         if (!inUsaView(site.lat, site.lng)) continue
         if (!skipCoverageFilter && !markerInCoverage({ lat: site.lat, lng: site.lng })) continue
@@ -2100,7 +2262,6 @@ export function GISMap({
     }
 
     if (OPEN_SOURCE_MAP_LAYERS_ENABLED && mapLayers.pharmacies && pharmaciesLayerQuery.data?.length) {
-      const skipCoverageFilter = restrictToUsa && !stateBoundsRestriction && !lockToCoverageCircle
       for (const site of pharmaciesLayerQuery.data) {
         if (!inUsaView(site.lat, site.lng)) continue
         if (!skipCoverageFilter && !markerInCoverage({ lat: site.lat, lng: site.lng })) continue
@@ -2123,7 +2284,6 @@ export function GISMap({
     }
 
     if (OPEN_SOURCE_MAP_LAYERS_ENABLED && mapLayers.police && policeStationsLayerQuery.data?.length) {
-      const skipCoverageFilter = restrictToUsa && !stateBoundsRestriction && !lockToCoverageCircle
       for (const site of policeStationsLayerQuery.data) {
         if (!inUsaView(site.lat, site.lng)) continue
         if (!skipCoverageFilter && !markerInCoverage({ lat: site.lat, lng: site.lng })) continue
@@ -2146,7 +2306,6 @@ export function GISMap({
     }
 
     if (OPEN_SOURCE_MAP_LAYERS_ENABLED && mapLayers.meals_ready && mealsReadyLayerQuery.data?.length) {
-      const skipCoverageFilter = restrictToUsa && !stateBoundsRestriction && !lockToCoverageCircle
       for (const site of mealsReadyLayerQuery.data) {
         if (!inUsaView(site.lat, site.lng)) continue
         if (!skipCoverageFilter && !markerInCoverage({ lat: site.lat, lng: site.lng })) continue
@@ -2169,7 +2328,6 @@ export function GISMap({
     }
 
     if (OPEN_SOURCE_MAP_LAYERS_ENABLED && mapLayers.generators && generatorsLayerQuery.data?.length) {
-      const skipCoverageFilter = restrictToUsa && !stateBoundsRestriction && !lockToCoverageCircle
       for (const site of generatorsLayerQuery.data) {
         if (!inUsaView(site.lat, site.lng)) continue
         if (!skipCoverageFilter && !markerInCoverage({ lat: site.lat, lng: site.lng })) continue
@@ -2192,7 +2350,6 @@ export function GISMap({
     }
 
     if (OPEN_SOURCE_MAP_LAYERS_ENABLED && mapLayers.volunteers && volunteersLayerQuery.data?.length) {
-      const skipCoverageFilter = restrictToUsa && !stateBoundsRestriction && !lockToCoverageCircle
       for (const site of volunteersLayerQuery.data) {
         if (!inUsaView(site.lat, site.lng)) continue
         if (!skipCoverageFilter && !markerInCoverage({ lat: site.lat, lng: site.lng })) continue
@@ -2215,7 +2372,6 @@ export function GISMap({
     }
 
     if (OPEN_SOURCE_MAP_LAYERS_ENABLED && mapLayers.resources && resourceSitesLayerQuery.data?.length) {
-      const skipCoverageFilter = restrictToUsa && !stateBoundsRestriction && !lockToCoverageCircle
       for (const site of resourceSitesLayerQuery.data) {
         if (!inUsaView(site.lat, site.lng)) continue
         if (!skipCoverageFilter && !markerInCoverage({ lat: site.lat, lng: site.lng })) continue
@@ -2238,7 +2394,6 @@ export function GISMap({
     }
 
     if (OPEN_SOURCE_MAP_LAYERS_ENABLED && mapLayers.ci_it && itInfrastructureLayerQuery.data?.length) {
-      const skipCoverageFilter = restrictToUsa && !stateBoundsRestriction && !lockToCoverageCircle
       for (const site of itInfrastructureLayerQuery.data) {
         if (!inUsaView(site.lat, site.lng)) continue
         if (!skipCoverageFilter && !markerInCoverage({ lat: site.lat, lng: site.lng })) continue
@@ -2261,7 +2416,6 @@ export function GISMap({
     }
 
     if (OPEN_SOURCE_MAP_LAYERS_ENABLED && mapLayers.ci_financial && financialSitesLayerQuery.data?.length) {
-      const skipCoverageFilter = restrictToUsa && !stateBoundsRestriction && !lockToCoverageCircle
       for (const site of financialSitesLayerQuery.data) {
         if (!inUsaView(site.lat, site.lng)) continue
         if (!skipCoverageFilter && !markerInCoverage({ lat: site.lat, lng: site.lng })) continue
@@ -2287,7 +2441,6 @@ export function GISMap({
     const renderedHifldSiteIds = new Set<string>()
 
     if (OPEN_SOURCE_MAP_LAYERS_ENABLED && enabledOperationalHifldLayers.length > 0 && hifldSitesLayerQuery.data?.length) {
-      const skipCoverageFilter = restrictToUsa && !stateBoundsRestriction && !lockToCoverageCircle
       for (const layerDef of enabledOperationalHifldLayers) {
         const datasetSet = new Set(layerDef.datasetSlugs)
         for (const site of hifldSitesLayerQuery.data) {
@@ -2320,7 +2473,6 @@ export function GISMap({
     }
 
     if (OPEN_SOURCE_MAP_LAYERS_ENABLED && hifldSitesLayerQuery.data?.length) {
-      const skipCoverageFilter = restrictToUsa && !stateBoundsRestriction && !lockToCoverageCircle
       for (const site of hifldSitesLayerQuery.data) {
         if (!showCriticalInfraLayers || !mapLayers[site.sectorId]) continue
         if (renderedHifldSiteIds.has(site.id)) continue
@@ -2350,9 +2502,8 @@ export function GISMap({
       }
     }
 
-    if (OPEN_SOURCE_MAP_LAYERS_ENABLED && mapLayers.roads && roadClosuresQuery.data?.length) {
-      const skipCoverageFilter = restrictToUsa && !stateBoundsRestriction && !lockToCoverageCircle
-      for (const closure of roadClosuresQuery.data) {
+    if (OPEN_SOURCE_MAP_LAYERS_ENABLED && mapLayers.roads && roadClosuresQuery.data?.closures?.length) {
+      for (const closure of roadClosuresQuery.data.closures) {
         const path = Array.isArray(closure.path)
           ? closure.path.filter(
               (p: { lat?: number; lng?: number }) =>
@@ -2413,6 +2564,10 @@ export function GISMap({
     showCriticalInfraLayers,
     markerInLayerViewport,
     roadClosuresQuery.data,
+    viewportStateKey,
+    stateBoundsRestriction,
+    lockToCoverageCircle,
+    openSourceLayerFetchBounds,
   ])
 
   const disasterZonesVisible = useMemo(() => {
@@ -2427,6 +2582,47 @@ export function GISMap({
     demoModeActive,
     showDisasterZones,
     tornadoPathPoints.length,
+  ])
+
+  /** Compact badge under Map/Satellite — only when a checked filter layer is fetching. */
+  const mapLayersLoading = useMemo(() => {
+    if (GIS_MAP_FILTER_LAYERS_ENABLED && isSearchingInfra) return true
+    if (mapLayers.roads && isLoadingRoadClosures) return true
+    if (mapLayers.power && isLoadingPowerOutages) return true
+    if (!OPEN_SOURCE_MAP_LAYERS_ENABLED) return false
+
+    return (
+      (mapLayers.ci_dams && damsLayerQuery.isFetching) ||
+      (mapLayers.shelters && sheltersLayerQuery.isFetching) ||
+      (mapLayers.fuel_sites && fuelSitesLayerQuery.isFetching) ||
+      (mapLayers.pharmacies && pharmaciesLayerQuery.isFetching) ||
+      (mapLayers.police && policeStationsLayerQuery.isFetching) ||
+      (mapLayers.meals_ready && mealsReadyLayerQuery.isFetching) ||
+      (mapLayers.generators && generatorsLayerQuery.isFetching) ||
+      (mapLayers.volunteers && volunteersLayerQuery.isFetching) ||
+      (mapLayers.resources && resourceSitesLayerQuery.isFetching) ||
+      (mapLayers.ci_it && itInfrastructureLayerQuery.isFetching) ||
+      (mapLayers.ci_financial && financialSitesLayerQuery.isFetching) ||
+      (hifldSectorsForQuery.length > 0 && hifldSitesLayerQuery.isFetching)
+    )
+  }, [
+    isSearchingInfra,
+    isLoadingRoadClosures,
+    isLoadingPowerOutages,
+    mapLayers,
+    hifldSectorsForQuery.length,
+    damsLayerQuery.isFetching,
+    sheltersLayerQuery.isFetching,
+    fuelSitesLayerQuery.isFetching,
+    pharmaciesLayerQuery.isFetching,
+    policeStationsLayerQuery.isFetching,
+    mealsReadyLayerQuery.isFetching,
+    generatorsLayerQuery.isFetching,
+    volunteersLayerQuery.isFetching,
+    resourceSitesLayerQuery.isFetching,
+    itInfrastructureLayerQuery.isFetching,
+    financialSitesLayerQuery.isFetching,
+    hifldSitesLayerQuery.isFetching,
   ])
 
   const disasterZoneCircles = useMemo((): MapDisasterZoneCircleSpec[] => {
@@ -2529,6 +2725,15 @@ export function GISMap({
       </div>
 
       <div className="flex-1 flex flex-col min-h-0">
+        {mapLayers.roads && roadClosuresQuery.data?.warning && (
+          <div
+            className="mx-1 mb-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] leading-snug text-amber-900"
+            role="status"
+          >
+            <span className="font-bold">Road Closures: </span>
+            {roadClosuresQuery.data.warning}
+          </div>
+        )}
         <div className="flex-1 relative min-h-0">
         <SituationalLeafletMap
           markers={mapMarkers}
@@ -2552,58 +2757,8 @@ export function GISMap({
           clusterInfrastructure={interactiveMapLayersActive && !isDemoSimulation}
           infrastructureClusterMode={resolveInfrastructureClusterMode(mapLayers)}
           allowZoomOut={stateScoped}
+          layersLoading={mapLayersLoading}
         />
-
-        {((damsLayerQuery.isFetching && !damsLayerQuery.data?.length) ||
-          (sheltersLayerQuery.isFetching && !sheltersLayerQuery.data?.length) ||
-          (fuelSitesLayerQuery.isFetching && !fuelSitesLayerQuery.data?.length) ||
-          (pharmaciesLayerQuery.isFetching && !pharmaciesLayerQuery.data?.length) ||
-          (policeStationsLayerQuery.isFetching && !policeStationsLayerQuery.data?.length) ||
-          (mealsReadyLayerQuery.isFetching && !mealsReadyLayerQuery.data?.length) ||
-          (generatorsLayerQuery.isFetching && !generatorsLayerQuery.data?.length) ||
-          (volunteersLayerQuery.isFetching && !volunteersLayerQuery.data?.length) ||
-          (resourceSitesLayerQuery.isFetching && !resourceSitesLayerQuery.data?.length) ||
-          (itInfrastructureLayerQuery.isFetching && !itInfrastructureLayerQuery.data?.length) ||
-          (financialSitesLayerQuery.isFetching && !financialSitesLayerQuery.data?.length) ||
-          (hifldSitesLayerQuery.isFetching && !hifldSitesLayerQuery.data?.length) ||
-          (mapLayers.roads && isLoadingRoadClosures) ||
-          (mapLayers.power && isLoadingPowerOutages) ||
-          (GIS_MAP_FILTER_LAYERS_ENABLED && isSearchingInfra)) && (
-          <div className="absolute right-4 top-4 bg-white/90 backdrop-blur-md px-4 py-2 rounded-2xl shadow-2xl border border-slate-100 flex items-center gap-2 z-50 animate-in fade-in slide-in-from-top-2 duration-300">
-            <Loader2 className="w-4 h-4 text-[#33375D] animate-spin" />
-            <span className="text-[10px] font-black uppercase tracking-widest text-slate-600">
-              {damsLayerQuery.isFetching && !damsLayerQuery.data?.length
-                ? 'Loading Dams…'
-                : sheltersLayerQuery.isFetching && !sheltersLayerQuery.data?.length
-                  ? 'Loading Shelters…'
-                  : fuelSitesLayerQuery.isFetching && !fuelSitesLayerQuery.data?.length
-                    ? 'Loading Fuel Sites…'
-                    : pharmaciesLayerQuery.isFetching && !pharmaciesLayerQuery.data?.length
-                      ? 'Loading Pharmacies…'
-                      : policeStationsLayerQuery.isFetching && !policeStationsLayerQuery.data?.length
-                        ? 'Loading Police Stations…'
-                        : mealsReadyLayerQuery.isFetching && !mealsReadyLayerQuery.data?.length
-                          ? 'Loading Meals Ready…'
-                          : generatorsLayerQuery.isFetching && !generatorsLayerQuery.data?.length
-                            ? 'Loading Generators…'
-                            : volunteersLayerQuery.isFetching && !volunteersLayerQuery.data?.length
-                              ? 'Loading Volunteers…'
-                              : resourceSitesLayerQuery.isFetching && !resourceSitesLayerQuery.data?.length
-                                ? 'Loading Resource Sites…'
-                                : itInfrastructureLayerQuery.isFetching && !itInfrastructureLayerQuery.data?.length
-                                  ? 'Loading IT Infrastructure…'
-                                  : hifldSitesLayerQuery.isFetching && !hifldSitesLayerQuery.data?.length
-                                    ? 'Loading Critical Infrastructure…'
-                                    : financialSitesLayerQuery.isFetching && !financialSitesLayerQuery.data?.length
-                                      ? 'Loading Financial Sites…'
-                                      : isLoadingRoadClosures
-                                        ? 'Loading Road Closures…'
-                                        : isLoadingPowerOutages
-                                          ? 'Loading Power Outages…'
-                                          : 'Locating Facilities…'}
-            </span>
-          </div>
-        )}
         </div>
       </div>
     </div>

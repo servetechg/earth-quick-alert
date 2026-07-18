@@ -67,9 +67,17 @@ export type SituationalMapData = {
     tornadoPath?: { coordinates?: unknown[] };
 };
 
-async function fetchSituationalMap(scopeState?: string): Promise<SituationalMapData> {
-    const qs = scopeState?.trim() ? `?scopeState=${encodeURIComponent(scopeState.trim())}` : '';
-    const res = await fetch(`/api/admin/situational-map${qs}`, { credentials: 'include' });
+async function fetchSituationalMap(
+    scopeState?: string,
+    opts?: { geocodeMarkers?: boolean },
+): Promise<SituationalMapData> {
+    const params = new URLSearchParams();
+    if (scopeState?.trim()) params.set('scopeState', scopeState.trim());
+    if (opts?.geocodeMarkers) params.set('geocodeMarkers', '1');
+    const qs = params.toString();
+    const res = await fetch(`/api/admin/situational-map${qs ? `?${qs}` : ''}`, {
+        credentials: 'include',
+    });
     if (!res.ok) throw new Error(`situational-map ${res.status}`);
     return res.json();
 }
@@ -81,6 +89,20 @@ export function useSituationalMap(opts: { enabled: boolean; scopeState?: string 
         enabled: opts.enabled,
         staleTime: 60_000,
         refetchInterval: 60_000,
+    });
+}
+
+/** Second-pass marker enrichment (geocode users missing lat/lng; does not block heatmap). */
+export function useSituationalMapMarkerEnrich(opts: {
+    enabled: boolean;
+    scopeState?: string;
+}) {
+    return useQuery({
+        queryKey: ['situational-map-markers', opts.scopeState ?? ''],
+        queryFn: () => fetchSituationalMap(opts.scopeState, { geocodeMarkers: true }),
+        enabled: opts.enabled,
+        staleTime: 5 * 60_000,
+        gcTime: 30 * 60_000,
     });
 }
 
@@ -585,7 +607,7 @@ export function useMapLayerHifldSites(opts: {
 async function fetchRoadClosures(input: {
     bounds?: MapBoundsPayload;
     scopeState?: string;
-}): Promise<RoadClosurePayload[]> {
+}): Promise<{ closures: RoadClosurePayload[]; warning?: string; count: number }> {
     const res = await fetch('/api/admin/road-closures', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -594,7 +616,11 @@ async function fetchRoadClosures(input: {
     });
     if (!res.ok) throw new Error(`road-closures ${res.status}`);
     const data = await res.json();
-    return Array.isArray(data.closures) ? data.closures : [];
+    return {
+        closures: Array.isArray(data.closures) ? data.closures : [],
+        warning: typeof data.warning === 'string' ? data.warning : undefined,
+        count: Number(data.count) || 0,
+    };
 }
 
 export function useRoadClosures(opts: {
@@ -619,6 +645,7 @@ export function useRoadClosures(opts: {
         gcTime: 60 * 60_000,
         refetchInterval: 10 * 60_000,
         placeholderData: (prev) => prev,
+        select: (data) => data,
     });
 }
 

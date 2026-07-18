@@ -21,19 +21,35 @@ export function parseMapBounds(raw: unknown): MapBounds | null {
 }
 
 export function boundsFromQuery(url: URL): MapBounds | null {
-  const west = Number(url.searchParams.get('west'))
-  const south = Number(url.searchParams.get('south'))
-  const east = Number(url.searchParams.get('east'))
-  const north = Number(url.searchParams.get('north'))
-  if ([west, south, east, north].every(Number.isFinite) && east > west && north > south) {
-    return { west, south, east, north }
+  const westRaw = url.searchParams.get('west')
+  const southRaw = url.searchParams.get('south')
+  const eastRaw = url.searchParams.get('east')
+  const northRaw = url.searchParams.get('north')
+
+  // Require explicit params — Number(null) === 0 and would invent a bogus bbox.
+  if (westRaw != null && southRaw != null && eastRaw != null && northRaw != null) {
+    const west = Number(westRaw)
+    const south = Number(southRaw)
+    const east = Number(eastRaw)
+    const north = Number(northRaw)
+    if (
+      [west, south, east, north].every(Number.isFinite) &&
+      east > west &&
+      north > south
+    ) {
+      return { west, south, east, north }
+    }
   }
 
-  const lat = Number(url.searchParams.get('lat'))
-  const lng = Number(url.searchParams.get('lng'))
-  const radius = Number(url.searchParams.get('radius')) || 35_000
-  if (Number.isFinite(lat) && Number.isFinite(lng)) {
-    return radiusBounds(lat, lng, radius)
+  const latRaw = url.searchParams.get('lat')
+  const lngRaw = url.searchParams.get('lng')
+  if (latRaw != null && lngRaw != null) {
+    const lat = Number(latRaw)
+    const lng = Number(lngRaw)
+    const radius = Number(url.searchParams.get('radius')) || 35_000
+    if (Number.isFinite(lat) && Number.isFinite(lng)) {
+      return radiusBounds(lat, lng, radius)
+    }
   }
 
   return null

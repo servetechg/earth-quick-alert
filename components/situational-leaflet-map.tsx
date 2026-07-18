@@ -44,8 +44,10 @@ import type { UnifiedEventHeatPoint } from '@/lib/geo/unified-event-heatmap';
 import {
     NEXRAD_LEAFLET_WMS_OPTIONS,
     NEXRAD_WMS,
+    nexradWmsTilePixelSize,
     type WeatherRadarMapScope,
 } from '@/lib/gis/weather-radar-config';
+import { WeatherRadarLegend } from '@/components/weather-radar-legend';
 
 export type {
     CoverageCircleSpec,
@@ -80,13 +82,17 @@ function isHelpStatus(status?: string, isSafe?: boolean): boolean {
     return s === 'help' || s === 'needs_assistance' || s === 'danger';
 }
 
-function MapBoundsReporter({ onBoundsChanged }: { onBoundsChanged?: (b: MapStateBounds) => void }) {
+function MapBoundsReporter({
+    onBoundsChanged,
+}: {
+    onBoundsChanged?: (b: MapStateBounds, zoom?: number) => void;
+}) {
     const map = useMap();
     useEffect(() => {
         if (!onBoundsChanged) return;
         const emit = () => {
             const b = map.getBounds();
-            if (b) onBoundsChanged(leafletBoundsToMapState(b));
+            if (b) onBoundsChanged(leafletBoundsToMapState(b), map.getZoom());
         };
         emit();
         map.on('moveend', emit);
@@ -253,6 +259,14 @@ function scopeToLeafletBounds(scope: WeatherRadarMapScope): L.LatLngBounds | und
     return L.latLngBounds([south, west], [north, east]);
 }
 
+/**
+ * Clip the radar pane to the license radius in the pane's local pixel space.
+ *
+ * The weather pane lives under `.leaflet-map-pane`, which Leaflet CSS-translates
+ * while panning. Using raw `latLngToContainerPoint` for `clip-path` double-counts
+ * that transform and makes the radar drift outside the coverage circle after pan.
+ * Subtract the map-pane offset so the clip stays locked to the same lat/lng as `L.Circle`.
+ */
 function applyRadiusClip(
     map: L.Map,
     pane: HTMLElement | undefined,
@@ -265,13 +279,21 @@ function applyRadiusClip(
         return;
     }
 
-    const centerPt = map.latLngToContainerPoint([scope.center.lat, scope.center.lng]);
-    const edgePt = map.latLngToContainerPoint([
-        scope.center.lat + scope.radiusMeters / 111_320,
-        scope.center.lng,
-    ]);
-    const radiusPx = Math.max(0, centerPt.distanceTo(edgePt));
-    const clip = `circle(${radiusPx}px at ${centerPt.x}px ${centerPt.y}px)`;
+    const center = L.latLng(scope.center.lat, scope.center.lng);
+    // Match Leaflet Circle: geodesic meters → screen pixels at current zoom.
+    const earthCircumference = 40_075_016.686;
+    const metersPerPixel =
+        (earthCircumference * Math.cos((center.lat * Math.PI) / 180)) /
+        Math.pow(2, map.getZoom() + 8);
+    const radiusPx = Math.max(1, scope.radiusMeters / Math.max(metersPerPixel, 1e-6));
+
+    const centerContainer = map.latLngToContainerPoint(center);
+    const mapPaneEl = map.getPane('mapPane');
+    const mapPanePos = mapPaneEl ? L.DomUtil.getPosition(mapPaneEl) : L.point(0, 0);
+    const x = centerContainer.x - mapPanePos.x;
+    const y = centerContainer.y - mapPanePos.y;
+
+    const clip = `circle(${radiusPx}px at ${x}px ${y}px)`;
     pane.style.clipPath = clip;
     (pane.style as CSSStyleDeclaration & { webkitClipPath?: string }).webkitClipPath = clip;
 }
@@ -296,7 +318,11 @@ function WeatherRadarWmsLayer({
         const pane = map.getPane(WEATHER_RADAR_PANE) ?? (() => {
             map.createPane(WEATHER_RADAR_PANE);
             const created = map.getPane(WEATHER_RADAR_PANE);
-            if (created) created.style.zIndex = '250';
+            if (created) {
+                created.style.zIndex = '250';
+                // Smooth browser downscale of higher-res WMS tiles (avoid crisp-edges/pixelated).
+                created.style.setProperty('image-rendering', 'auto');
+            }
             return created;
         })();
 
@@ -311,27 +337,53 @@ function WeatherRadarWmsLayer({
             uppercase: true,
             pane: WEATHER_RADAR_PANE,
             bounds: leafletBounds,
+            updateWhenIdle: false,
+            updateWhenZooming: true,
         });
+        // Force 2×–3× GetMap resolution for every display (same layer / bbox / colors).
+        const wmsPx = nexradWmsTilePixelSize();
+        layer.wmsParams.width = wmsPx;
+        layer.wmsParams.height = wmsPx;
         layer.setParams({ _t: Date.now() });
         layer.addTo(map);
         layerRef.current = layer;
+
+        // Ensure tile <img> elements use smooth interpolation when scaled to the map.
+        const applyTileSmoothing = () => {
+            const imgs = pane?.querySelectorAll('img.weather-radar-tile, img.leaflet-tile');
+            imgs?.forEach((img) => {
+                const el = img as HTMLImageElement;
+                el.style.imageRendering = 'auto';
+                el.decoding = 'async';
+            });
+        };
+        layer.on('load', applyTileSmoothing);
+        applyTileSmoothing();
 
         const syncClip = () => applyRadiusClip(map, pane ?? undefined, scope);
         syncClip();
 
         const refresh = window.setInterval(() => {
             layer.setParams({ _t: Date.now() });
+            syncClip();
         }, NEXRAD_WMS.refreshIntervalMs);
 
         map.on('move', syncClip);
+        map.on('moveend', syncClip);
         map.on('zoom', syncClip);
+        map.on('zoomend', syncClip);
         map.on('resize', syncClip);
+        map.on('viewreset', syncClip);
 
         return () => {
             window.clearInterval(refresh);
+            layer.off('load', applyTileSmoothing);
             map.off('move', syncClip);
+            map.off('moveend', syncClip);
             map.off('zoom', syncClip);
+            map.off('zoomend', syncClip);
             map.off('resize', syncClip);
+            map.off('viewreset', syncClip);
             applyRadiusClip(map, pane ?? undefined, { mode: 'free' });
             if (layerRef.current) {
                 map.removeLayer(layerRef.current);
@@ -399,12 +451,18 @@ function InfrastructureClusterLayer({
 
         const group = L.markerClusterGroup({
             showCoverageOnHover: false,
-            // cluster=false → tiny radius so markers only merge when their icons would
-            // literally overlap, and merges render as a single road-closed sign (never a
-            // count badge). This also keeps performance sane when zoomed out.
-            maxClusterRadius: cluster ? (isFacilities ? 45 : 58) : 16,
-            disableClusteringAtZoom: isFacilities ? 7 : 11,
-            spiderfyOnMaxZoom: isFacilities,
+            // cluster=false → tiny radius so markers only merge when icons overlap.
+            // Road closures: wide radius at national zoom so count badges stay visible
+            // (e.g. Denver) instead of vanishing until the user zooms in.
+            maxClusterRadius: !cluster
+                ? 16
+                : isRoads
+                  ? 80
+                  : isFacilities
+                    ? 45
+                    : 58,
+            disableClusteringAtZoom: isRoads ? 10 : isFacilities ? 9 : 11,
+            spiderfyOnMaxZoom: isFacilities || isRoads,
             chunkedLoading: true,
             iconCreateFunction: !cluster
                 ? () => roadClosedIconMarker()
@@ -598,6 +656,7 @@ export function SituationalLeafletMap({
     infrastructureClusterMode = 'default',
     fitStateOnLoad = false,
     allowZoomOut = false,
+    layersLoading = false,
 }: SituationalMapProps) {
     const [isMounted, setIsMounted] = useState(false);
     const [selectedMarker, setSelectedMarker] = useState<SituationalMapMarker | null>(null);
@@ -680,13 +739,13 @@ export function SituationalLeafletMap({
         const base = clusterInfrastructure
             ? validMarkers.filter((m) => m.type !== 'infrastructure')
             : validMarkers;
-        // Road closures render in their own dedicated (uncounted) layer.
+        // Road closures render in their own clustered layer (count badges when zoomed out).
         return base.filter((m) => m.icon !== 'road_closure');
     }, [validMarkers, clusterInfrastructure]);
 
     const infrastructureMarkers = useMemo(() => {
         if (!clusterInfrastructure) return [];
-        // Road closures are shown individually (own layer), never in the counting cluster.
+        // Road closures have a dedicated clustered layer — keep them out of the generic group.
         return validMarkers.filter(
             (m) => m.type === 'infrastructure' && m.icon !== 'road_closure',
         );
@@ -768,30 +827,50 @@ export function SituationalLeafletMap({
     return (
         <>
         <div className="w-full h-full min-h-[400px] rounded-xl overflow-hidden shadow-inner border border-slate-200 relative">
-            <div className="absolute right-3 top-3 z-[500] flex gap-1">
-                <button
-                    type="button"
-                    onClick={() => setMapVariant('standard')}
-                    className={`rounded-lg px-2.5 py-1 text-[10px] font-black uppercase tracking-wider shadow-md border ${
-                        mapVariant === 'standard'
-                            ? 'bg-white text-[#33375D] border-slate-200'
-                            : 'bg-white/80 text-slate-400 border-slate-100'
-                    }`}
-                >
-                    Map
-                </button>
-                <button
-                    type="button"
-                    onClick={() => setMapVariant('satellite')}
-                    className={`rounded-lg px-2.5 py-1 text-[10px] font-black uppercase tracking-wider shadow-md border ${
-                        mapVariant === 'satellite'
-                            ? 'bg-white text-[#33375D] border-slate-200'
-                            : 'bg-white/80 text-slate-400 border-slate-100'
-                    }`}
-                >
-                    Satellite
-                </button>
+            <div className="absolute right-3 top-3 z-[500] flex flex-col items-end gap-1.5">
+                <div className="flex gap-1">
+                    <button
+                        type="button"
+                        onClick={() => setMapVariant('standard')}
+                        className={`rounded-lg px-2.5 py-1 text-[10px] font-black uppercase tracking-wider shadow-md border ${
+                            mapVariant === 'standard'
+                                ? 'bg-white text-[#33375D] border-slate-200'
+                                : 'bg-white/80 text-slate-400 border-slate-100'
+                        }`}
+                    >
+                        Map
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setMapVariant('satellite')}
+                        className={`rounded-lg px-2.5 py-1 text-[10px] font-black uppercase tracking-wider shadow-md border ${
+                            mapVariant === 'satellite'
+                                ? 'bg-white text-[#33375D] border-slate-200'
+                                : 'bg-white/80 text-slate-400 border-slate-100'
+                        }`}
+                    >
+                        Satellite
+                    </button>
+                </div>
+                {layersLoading && (
+                    <div
+                        className="inline-flex items-center gap-1.5 rounded-full border border-slate-200/90 bg-white/95 px-2.5 py-1 shadow-md backdrop-blur-sm animate-in fade-in zoom-in-95 duration-200"
+                        role="status"
+                        aria-live="polite"
+                        aria-label="Loading map data"
+                    >
+                        <span
+                            className="h-3 w-3 shrink-0 rounded-full border-2 border-slate-300 border-t-[#33375D] animate-spin"
+                            aria-hidden
+                        />
+                        <span className="text-[9px] font-black uppercase tracking-wider text-slate-600 whitespace-nowrap">
+                            Loading data
+                        </span>
+                    </div>
+                )}
             </div>
+
+            <WeatherRadarLegend visible={showWeatherRadar} />
 
             <MapContainer
                 center={[mapCenter.lat, mapCenter.lng]}
@@ -824,7 +903,8 @@ export function SituationalLeafletMap({
                     markers={roadClosureMarkers}
                     enabled={roadClosureMarkers.length > 0}
                     onSelect={handleInfraSelect}
-                    cluster={false}
+                    clusterMode="roads"
+                    cluster
                 />
                 <MapClickHeatHandler
                     heatClickOnly={heatClickOnly}

@@ -76,3 +76,24 @@ export function pointInUsStateBBox(lon: number, lat: number, usps: string): bool
     const [west, south, east, north] = b;
     return lon >= west && lon <= east && lat >= south && lat <= north;
 }
+
+function bboxArea(b: readonly [number, number, number, number]): number {
+    const [west, south, east, north] = b;
+    return Math.max(0, east - west) * Math.max(0, north - south);
+}
+
+/**
+ * Resolve USPS state for a map point. Prefer the smallest matching envelope
+ * when borders overlap (e.g. DC inside MD).
+ */
+export function inferUspsStateFromLatLng(lat: number, lng: number): string | null {
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+    const matches: string[] = [];
+    for (const code of Object.keys(US_STATE_BBOX)) {
+        if (pointInUsStateBBox(lng, lat, code)) matches.push(code);
+    }
+    if (matches.length === 0) return null;
+    if (matches.length === 1) return matches[0]!;
+    matches.sort((a, b) => bboxArea(US_STATE_BBOX[a]!) - bboxArea(US_STATE_BBOX[b]!));
+    return matches[0]!;
+}

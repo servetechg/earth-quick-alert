@@ -165,7 +165,7 @@ const UserSchema = new Schema({
     },
     requestedLicenseType: {
         type: String,
-        enum: ['state', 'radius'],
+        enum: ['state', 'radius', 'county'],
         default: 'radius',
     },
     requestedOrgName: {

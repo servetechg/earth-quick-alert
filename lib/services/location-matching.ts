@@ -44,6 +44,9 @@ export function splitAreaDescription(areaDesc: string | undefined): string[] {
         .filter(Boolean);
 }
 
+const GEOCODE_TIMEOUT_MS = 2_500;
+const geocodeCache = new Map<string, NamedCoordinates | null>();
+
 export async function geocodeLocation(location: string): Promise<NamedCoordinates | null> {
     const trimmed = (location || '').trim();
     if (!trimmed) return null;
@@ -53,26 +56,48 @@ export async function geocodeLocation(location: string): Promise<NamedCoordinate
         return { ...parsed, name: trimmed };
     }
 
+    const cacheKey = normalizeAreaText(trimmed);
+    if (cacheKey && geocodeCache.has(cacheKey)) {
+        return geocodeCache.get(cacheKey) ?? null;
+    }
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), GEOCODE_TIMEOUT_MS);
+
     try {
         const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(trimmed)}`;
         const response = await fetch(url, {
             headers: { Accept: 'application/json', 'User-Agent': 'EmergencyDashboard/1.0 (info@servetechglobal.com)' },
             next: { revalidate: 60 * 60 },
+            signal: controller.signal,
         });
 
-        if (!response.ok) return null;
+        if (!response.ok) {
+            if (cacheKey) geocodeCache.set(cacheKey, null);
+            return null;
+        }
         const data = await response.json();
         const result = Array.isArray(data) ? data[0] : undefined;
-        if (!result || result.lat == null || result.lon == null) return null;
+        if (!result || result.lat == null || result.lon == null) {
+            if (cacheKey) geocodeCache.set(cacheKey, null);
+            return null;
+        }
 
-        return {
+        const resolved: NamedCoordinates = {
             lat: Number(result.lat),
             lon: Number(result.lon),
             name: trimmed,
         };
+        if (cacheKey) geocodeCache.set(cacheKey, resolved);
+        return resolved;
     } catch (error) {
-        console.error(`Failed to geocode location: ${trimmed}`, error);
+        if ((error as Error)?.name !== 'AbortError') {
+            console.error(`Failed to geocode location: ${trimmed}`, error);
+        }
+        if (cacheKey) geocodeCache.set(cacheKey, null);
         return null;
+    } finally {
+        clearTimeout(timer);
     }
 }
 
