@@ -2,6 +2,7 @@ import { weatherAPI } from '@/lib/services/weather-api';
 import { geocodeLocation } from '@/lib/services/location-matching';
 import { formatProfileAddress } from '@/lib/services/mobile/zone-utils';
 import { loadUserProfile } from '@/lib/services/mobile/auth-service';
+import { NWS_WEATHER_ALERT_TYPES } from '@/lib/constants/nws-weather-alert-types';
 import UserProfile from '@/models/UserProfile';
 import connectDB from '@/lib/mongodb';
 import type { UserProfilePayload } from '@/lib/types/mobile/auth';
@@ -11,16 +12,24 @@ import type {
     MobileWeatherSnapshot,
 } from '@/lib/types/mobile/weather';
 
-const DEFAULT_WEATHER_PREFS: { id: string; label: string }[] = [
-    { id: 'flood-watch', label: 'Flood Watch' },
-    { id: 'flood-warning', label: 'Flood Warning' },
-    { id: 'tornado-watch', label: 'Tornado Watch' },
-    { id: 'tornado-warning', label: 'Tornado Warning' },
-    { id: 'severe-thunderstorm', label: 'Severe Thunderstorm' },
-    { id: 'winter-storm', label: 'Winter Storm' },
-    { id: 'heat-advisory', label: 'Heat Advisory' },
-    { id: 'air-quality', label: 'Air Quality' },
-];
+/** Legacy kebab-case ids from the first mobile stub list → current snake_case catalog ids. */
+const LEGACY_PREF_ID_MAP: Record<string, string> = {
+    'flood-watch': 'flood_watch',
+    'flood-warning': 'flood_warning',
+    'tornado-watch': 'tornado_watch',
+    'tornado-warning': 'tornado_warning',
+    'severe-thunderstorm': 'severe_thunderstorm_warning',
+    'winter-storm': 'winter_storm_warning',
+    'winter-weather': 'winter_weather_advisory',
+    'wind-advisory': 'wind_advisory',
+    'heat-advisory': 'heat_advisory',
+    'air-quality': 'air_quality_alert',
+};
+
+function normalizePrefId(id: string): string {
+    const trimmed = id.trim();
+    return LEGACY_PREF_ID_MAP[trimmed] ?? trimmed;
+}
 
 function locationLabelFromProfile(profile: UserProfilePayload | null): string {
     const addr = profile?.address;
@@ -95,10 +104,17 @@ export async function getMobileWeatherPreferences(
     await connectDB();
     const doc = await UserProfile.findOne({ userId }).select('weatherPreferences').lean();
     const saved = doc?.weatherPreferences ?? [];
-    const savedMap = new Map(saved.map((p) => [p.id, p.enabled]));
-    return DEFAULT_WEATHER_PREFS.map((p) => ({
+    const savedMap = new Map<string, boolean>();
+    for (const p of saved) {
+        savedMap.set(normalizePrefId(p.id), Boolean(p.enabled));
+    }
+
+    return NWS_WEATHER_ALERT_TYPES.map((p) => ({
         id: p.id,
-        label: p.label,
+        label: p.name,
+        description: p.description,
+        category: p.category,
+        severity: p.severity,
         enabled: savedMap.has(p.id) ? Boolean(savedMap.get(p.id)) : true,
     }));
 }
@@ -108,10 +124,20 @@ export async function updateMobileWeatherPreferences(
     preferences: { id: string; enabled: boolean }[],
 ): Promise<MobileWeatherPreference[]> {
     await connectDB();
-    const allowed = new Set(DEFAULT_WEATHER_PREFS.map((p) => p.id));
-    const normalized = preferences
-        .filter((p) => allowed.has(p.id))
-        .map((p) => ({ id: p.id, enabled: Boolean(p.enabled) }));
+    const allowed = new Set(NWS_WEATHER_ALERT_TYPES.map((p) => p.id));
+    const byId = new Map<string, boolean>();
+    for (const p of preferences) {
+        const id = normalizePrefId(p.id);
+        if (!allowed.has(id)) continue;
+        byId.set(id, Boolean(p.enabled));
+    }
+
+    // Persist full catalog so new types stay present with previous/default enabled state.
+    const existing = await getMobileWeatherPreferences(userId);
+    const normalized = existing.map((p) => ({
+        id: p.id,
+        enabled: byId.has(p.id) ? Boolean(byId.get(p.id)) : p.enabled,
+    }));
 
     await UserProfile.findOneAndUpdate(
         { userId },
@@ -119,10 +145,5 @@ export async function updateMobileWeatherPreferences(
         { upsert: false },
     );
 
-    const labelMap = new Map(DEFAULT_WEATHER_PREFS.map((p) => [p.id, p.label]));
-    return normalized.map((p) => ({
-        id: p.id,
-        label: labelMap.get(p.id) ?? p.id,
-        enabled: p.enabled,
-    }));
+    return getMobileWeatherPreferences(userId);
 }
