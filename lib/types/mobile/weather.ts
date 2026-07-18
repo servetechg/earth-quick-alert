@@ -20,4 +20,7 @@ export type MobileWeatherPreference = {
     id: string;
     label: string;
     enabled: boolean;
+    description?: string;
+    category?: string;
+    severity?: string;
 };
