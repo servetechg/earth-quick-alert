@@ -55,8 +55,14 @@ const LicenseSchema = new Schema({
     },
     coverageType: {
         type: String,
-        enum: ['state', 'radius'],
+        enum: ['state', 'radius', 'county'],
         default: 'radius',
+    },
+    /** County name when coverageType is `county` (e.g. "Desha"). */
+    coverageCounty: {
+        type: String,
+        default: '',
+        trim: true,
     },
 }, {
     timestamps: true,

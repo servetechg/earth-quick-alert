@@ -104,14 +104,18 @@ export async function queryFuelSitesByState(
 
     if (!opts?.force) {
         const hit = await cacheGetJson<FuelSiteMapMarker[]>(cacheKey);
-        if (hit) return { markers: hit, cached: true };
+        if (Array.isArray(hit) && hit.length > 0) {
+            return { markers: hit, cached: true };
+        }
     }
 
     await connectDB();
     const docs = await MapLayerFuelSite.find({ stateKey: usps }).select(FUEL_SELECT).lean<FuelSiteDoc[]>();
 
     const markers = docs.map(toFuelSiteMapMarker);
-    await cacheSetJson(cacheKey, markers, STATE_CACHE_TTL_MS);
+    if (markers.length > 0) {
+        await cacheSetJson(cacheKey, markers, STATE_CACHE_TTL_MS);
+    }
     return { markers, cached: false };
 }
 

@@ -65,6 +65,53 @@ function mapLeadersToClient(rows: Awaited<ReturnType<typeof fetchSubAdminLeaderM
     }));
 }
 
+async function loadEntityMarkers(input: {
+    role: string;
+    userId: string;
+    scopeState?: string;
+    allowGeocode: boolean;
+    usaOnlyNationwide: boolean;
+}) {
+    const { role, userId, scopeState, allowGeocode, usaOnlyNationwide } = input;
+
+    const [citizenRows, responderRows, leaderRows] = await Promise.all([
+        role === 'sub-admin'
+            ? fetchScopedCitizenMarkers(userId, { allowGeocode })
+            : role === 'super-admin'
+              ? fetchNationwideCitizenMarkers({ stateRaw: scopeState, allowGeocode })
+              : Promise.resolve([]),
+        role === 'sub-admin'
+            ? fetchScopedResponderMarkers(userId, { allowGeocode })
+            : role === 'super-admin'
+              ? fetchNationwideResponderMarkers({ stateRaw: scopeState, allowGeocode })
+              : Promise.resolve([]),
+        role === 'super-admin'
+            ? fetchSubAdminLeaderMarkers({ stateRaw: scopeState, allowGeocode })
+            : Promise.resolve([]),
+    ]);
+
+    let citizens: ReturnType<typeof mapCitizensToClient> = [];
+    let responders: ReturnType<typeof mapRespondersToClient> = [];
+    let leaders: ReturnType<typeof mapLeadersToClient> = [];
+
+    if (role === 'sub-admin') {
+        citizens = mapCitizensToClient(citizenRows);
+        responders = mapRespondersToClient(responderRows);
+    } else if (role === 'super-admin') {
+        citizens = mapCitizensToClient(
+            usaOnlyNationwide ? filterLatLngInUsa(citizenRows) : citizenRows,
+        );
+        responders = mapRespondersToClient(
+            usaOnlyNationwide ? filterLatLngInUsa(responderRows) : responderRows,
+        );
+        leaders = mapLeadersToClient(
+            usaOnlyNationwide ? filterLatLngInUsa(leaderRows) : leaderRows,
+        );
+    }
+
+    return { citizens, responders, leaders };
+}
+
 export async function GET(req: Request) {
     try {
         await connectDB();
@@ -75,13 +122,27 @@ export async function GET(req: Request) {
 
         const role = String(session.user.role ?? '').toLowerCase();
         const userId = session.user.id as string;
-        const scopeState = new URL(req.url).searchParams.get('scopeState')?.trim() || undefined;
+        const url = new URL(req.url);
+        const scopeState = url.searchParams.get('scopeState')?.trim() || undefined;
+        const geocodeMarkers = url.searchParams.get('geocodeMarkers') === '1';
+        const usaOnlyNationwide = isSuperAdminNationwideView(role, scopeState);
 
         const demoCtx = await resolveDemoSessionContext(userId, session.user.email as string);
         if (demoCtx && role === 'sub-admin') {
             const demo = getDemoSituationalMapPayload();
+            if (geocodeMarkers) {
+                return NextResponse.json({
+                    citizens: demo.citizens,
+                    responders: demo.responders,
+                    leaders: [],
+                    demo: true,
+                    markersOnly: true,
+                });
+            }
             const stats = alignedIncidentStatsFromCards(demo.alignedRows);
-            const incidents = await resolveHeatPointsFromAlignedRows(demo.alignedRows);
+            const incidents = await resolveHeatPointsFromAlignedRows(demo.alignedRows, {
+                maxGeocode: 0,
+            });
             return NextResponse.json({
                 incidents,
                 alignedEventCount: stats.alignedEventCount,
@@ -101,46 +162,41 @@ export async function GET(req: Request) {
             });
         }
 
+        // Enrich pass: geocode users missing lat/lng without blocking the heatmap response.
+        if (geocodeMarkers) {
+            const entities = await loadEntityMarkers({
+                role,
+                userId,
+                scopeState,
+                allowGeocode: true,
+                usaOnlyNationwide,
+            });
+            return NextResponse.json({
+                ...entities,
+                markersOnly: true,
+            });
+        }
+
         const rows = await fetchAlignedUnifiedEventFeed({ userId, role });
         const stats = alignedIncidentStatsFromCards(rows as Record<string, unknown>[]);
-        let incidents = await resolveHeatPointsFromAlignedRows(rows as Record<string, unknown>[]);
 
-        let citizens: ReturnType<typeof mapCitizensToClient> = [];
-        let responders: ReturnType<typeof mapRespondersToClient> = [];
-        let leaders: ReturnType<typeof mapLeadersToClient> = [];
+        // Fast path: heat + markers that already have stored coordinates.
+        const [rawIncidents, entities] = await Promise.all([
+            resolveHeatPointsFromAlignedRows(rows as Record<string, unknown>[], {
+                maxGeocode: 0,
+            }),
+            loadEntityMarkers({
+                role,
+                userId,
+                scopeState,
+                allowGeocode: false,
+                usaOnlyNationwide,
+            }),
+        ]);
 
-        const usaOnlyNationwide = isSuperAdminNationwideView(role, scopeState);
-        if (usaOnlyNationwide) {
-            incidents = filterLatLngInUsa(incidents);
-        }
-
-        if (role === 'sub-admin') {
-            const [citizenRows, responderRows] = await Promise.all([
-                fetchScopedCitizenMarkers(userId),
-                fetchScopedResponderMarkers(userId),
-            ]);
-            citizens = mapCitizensToClient(citizenRows);
-            responders = mapRespondersToClient(responderRows);
-        } else if (role === 'super-admin') {
-            const [citizenRows, responderRows, leaderRows] = await Promise.all([
-                fetchNationwideCitizenMarkers({ stateRaw: scopeState }),
-                fetchNationwideResponderMarkers({ stateRaw: scopeState }),
-                fetchSubAdminLeaderMarkers({ stateRaw: scopeState }),
-            ]);
-            citizens = mapCitizensToClient(
-                usaOnlyNationwide
-                    ? filterLatLngInUsa(citizenRows)
-                    : citizenRows,
-            );
-            responders = mapRespondersToClient(
-                usaOnlyNationwide
-                    ? filterLatLngInUsa(responderRows)
-                    : responderRows,
-            );
-            leaders = mapLeadersToClient(
-                usaOnlyNationwide ? filterLatLngInUsa(leaderRows) : leaderRows,
-            );
-        }
+        const incidents = usaOnlyNationwide
+            ? filterLatLngInUsa(rawIncidents)
+            : rawIncidents;
 
         let coverage: {
             center: { lat: number; lng: number };
@@ -177,9 +233,9 @@ export async function GET(req: Request) {
             heatPointCount: incidents.length,
             majorIncidents: stats.major_incidents,
             minorIncidents: stats.minor_incidents,
-            citizens,
-            responders,
-            leaders,
+            citizens: entities.citizens,
+            responders: entities.responders,
+            leaders: entities.leaders,
             coverage,
             scope: role === 'sub-admin' ? 'jurisdiction' : 'nationwide',
         });

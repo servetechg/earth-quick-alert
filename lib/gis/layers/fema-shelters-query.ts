@@ -10,17 +10,23 @@ import {
 
 import {
     bboxCacheKey as layerBboxCacheKey,
+    boundsSpan,
     buildViewportGrid,
     cellGeoFilter,
-    isWideLayerViewport,
+    isConusSizedViewport,
     wideSampleCacheKey,
 } from '@/lib/gis/layers/map-layer-bounds-utils';
 
 const LAYER = 'shelters';
 const STATE_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
-const BBOX_CACHE_TTL_MS = 30 * 60 * 1000;
-const MAX_MARKERS_BBOX = 1_500;
-const MAX_MARKERS_WIDE_SAMPLE = 2_000;
+const BBOX_CACHE_TTL_MS = 15 * 60 * 1000;
+/** City / county zoom — return every shelter in the box. */
+const MAX_MARKERS_COMPLETE = 8_000;
+/** Regional viewport — uniform grid so the center is never empty. */
+const MAX_MARKERS_UNIFORM = 5_000;
+/** Continental overview sample. */
+const MAX_MARKERS_CONUS = 2_500;
+const GRID_QUERY_CONCURRENCY = 12;
 
 const SHELTER_SELECT =
     'shelterId name lat lng stateKey county address city zip shelterStatusCode facilityUsageCode evacuationCapacity postImpactCapacity wheelchairAccessible organizationName organizationPhone';
@@ -86,6 +92,26 @@ function toShelterMapMarker(doc: ShelterDoc): ShelterMapMarker {
     };
 }
 
+function latLngBboxFilter(bounds: MapBounds, stateKey?: string): Record<string, unknown> {
+    const filter: Record<string, unknown> = {
+        lat: { $gte: bounds.south, $lte: bounds.north },
+        lng: { $gte: bounds.west, $lte: bounds.east },
+    };
+    if (stateKey) filter.stateKey = stateKey.trim().toUpperCase();
+    return filter;
+}
+
+function dedupeMarkers(docs: ShelterDoc[]): ShelterMapMarker[] {
+    const seen = new Set<string>();
+    const markers: ShelterMapMarker[] = [];
+    for (const doc of docs) {
+        if (seen.has(doc.shelterId)) continue;
+        seen.add(doc.shelterId);
+        markers.push(toShelterMapMarker(doc));
+    }
+    return markers;
+}
+
 export async function invalidateSheltersLayerCache(stateKey?: string): Promise<void> {
     if (stateKey) {
         await cacheDelByPrefix(`map-layer:shelters:state:${stateKey.trim().toUpperCase()}`);
@@ -114,48 +140,67 @@ export async function querySheltersByState(
     return { markers, cached: false };
 }
 
-async function querySheltersByBoundsSampled(
+/**
+ * Every shelter inside the viewport box (lat/lng). Used for city/county zoom
+ * so the visible area never has spatial holes from an unordered .limit().
+ */
+async function querySheltersByBoundsComplete(
     bounds: MapBounds,
     opts?: { stateKey?: string; force?: boolean; limit?: number },
 ): Promise<{ markers: ShelterMapMarker[]; cached: boolean }> {
-    const limit = Math.min(Math.max(opts?.limit ?? MAX_MARKERS_WIDE_SAMPLE, 1), MAX_MARKERS_WIDE_SAMPLE);
-    const cacheKey = wideSampleCacheKey(LAYER, bounds, limit);
+    const limit = Math.min(Math.max(opts?.limit ?? MAX_MARKERS_COMPLETE, 1), MAX_MARKERS_COMPLETE);
+    const cacheKey = `${layerBboxCacheKey(LAYER, bounds)}:complete:v5:${limit}:${opts?.stateKey ?? ''}`;
 
     if (!opts?.force) {
         const hit = await cacheGetJson<ShelterMapMarker[]>(cacheKey);
         if (hit) return { markers: hit, cached: true };
     }
 
-    const { perCell, rows, cells } = buildViewportGrid(bounds, limit);
-    const markers: ShelterMapMarker[] = [];
-    const seen = new Set<string>();
+    await connectDB();
+    const docs = await MapLayerShelter.find(latLngBboxFilter(bounds, opts?.stateKey))
+        .select(SHELTER_SELECT)
+        .limit(limit)
+        .lean<ShelterDoc[]>();
 
+    const markers = dedupeMarkers(docs);
+    await cacheSetJson(cacheKey, markers, BBOX_CACHE_TTL_MS);
+    return { markers, cached: false };
+}
+
+/**
+ * Uniform grid over the full viewport — every cell is queried (no early exit).
+ * Prevents "markers on left/right, empty center" from unordered global limits.
+ */
+async function querySheltersByBoundsUniform(
+    bounds: MapBounds,
+    opts?: { stateKey?: string; force?: boolean; limit?: number },
+): Promise<{ markers: ShelterMapMarker[]; cached: boolean }> {
+    const limit = Math.min(Math.max(opts?.limit ?? MAX_MARKERS_UNIFORM, 1), MAX_MARKERS_UNIFORM);
+    const cacheKey = `${wideSampleCacheKey(LAYER, bounds, limit)}:uniform:v5:${opts?.stateKey ?? ''}`;
+
+    if (!opts?.force) {
+        const hit = await cacheGetJson<ShelterMapMarker[]>(cacheKey);
+        if (hit) return { markers: hit, cached: true };
+    }
+
+    const { perCell, cells } = buildViewportGrid(bounds, limit);
     await connectDB();
 
-    for (let row = 0; row < rows; row++) {
-        if (markers.length >= limit) break;
-
-        const rowCells = cells.filter((c) => c.row === row);
-        const rowResults = await Promise.all(
-            rowCells.map((cell) =>
+    const docs: ShelterDoc[] = [];
+    for (let i = 0; i < cells.length; i += GRID_QUERY_CONCURRENCY) {
+        const slice = cells.slice(i, i + GRID_QUERY_CONCURRENCY);
+        const parts = await Promise.all(
+            slice.map((cell) =>
                 MapLayerShelter.find(cellGeoFilter(cell.bounds, opts?.stateKey))
                     .select(SHELTER_SELECT)
                     .limit(perCell)
                     .lean<ShelterDoc[]>(),
             ),
         );
-
-        for (const docs of rowResults) {
-            for (const doc of docs) {
-                if (seen.has(doc.shelterId)) continue;
-                seen.add(doc.shelterId);
-                markers.push(toShelterMapMarker(doc));
-                if (markers.length >= limit) break;
-            }
-            if (markers.length >= limit) break;
-        }
+        for (const part of parts) docs.push(...part);
     }
 
+    const markers = dedupeMarkers(docs);
     await cacheSetJson(cacheKey, markers, BBOX_CACHE_TTL_MS);
     return { markers, cached: false };
 }
@@ -164,26 +209,21 @@ export async function querySheltersByBounds(
     bounds: MapBounds,
     opts?: { stateKey?: string; force?: boolean; limit?: number },
 ): Promise<{ markers: ShelterMapMarker[]; cached: boolean }> {
-    if (isWideLayerViewport(bounds)) {
-        return querySheltersByBoundsSampled(bounds, opts);
+    const { latSpan, lngSpan } = boundsSpan(bounds);
+
+    // Continental overview — capped uniform sample across the whole USA.
+    if (isConusSizedViewport(bounds)) {
+        return querySheltersByBoundsUniform(bounds, {
+            ...opts,
+            limit: opts?.limit ?? MAX_MARKERS_CONUS,
+        });
     }
 
-    const limit = Math.min(Math.max(opts?.limit ?? MAX_MARKERS_BBOX, 1), MAX_MARKERS_BBOX);
-    const cacheKey = layerBboxCacheKey(LAYER, bounds);
-
-    if (!opts?.force) {
-        const hit = await cacheGetJson<ShelterMapMarker[]>(cacheKey);
-        if (hit) return { markers: hit.slice(0, limit), cached: true };
+    // City / tight regional zoom — every shelter in the visible box.
+    if (latSpan <= 2.5 && lngSpan <= 2.5) {
+        return querySheltersByBoundsComplete(bounds, opts);
     }
 
-    await connectDB();
-
-    const docs = await MapLayerShelter.find(cellGeoFilter(bounds, opts?.stateKey))
-        .select(SHELTER_SELECT)
-        .limit(limit)
-        .lean<ShelterDoc[]>();
-
-    const markers = docs.map(toShelterMapMarker);
-    await cacheSetJson(cacheKey, markers, BBOX_CACHE_TTL_MS);
-    return { markers, cached: false };
+    // Wider regional view — spatially uniform so the map center is never skipped.
+    return querySheltersByBoundsUniform(bounds, opts);
 }

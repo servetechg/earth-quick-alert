@@ -80,13 +80,17 @@ export function createStaticPlacesQuery(
 
         if (!opts?.force) {
             const hit = await cacheGetJson<StaticPlaceMapMarker[]>(cacheKey);
-            if (hit) return { markers: hit, cached: true };
+            if (Array.isArray(hit) && hit.length > 0) {
+                return { markers: hit, cached: true };
+            }
         }
 
         await connectDB();
         const docs = await Model.find({ stateKey: usps }).select(DOC_SELECT).lean<StaticPlaceDoc[]>();
         const markers = docs.map((doc) => toMarker(idPrefix, doc));
-        await cacheSetJson(cacheKey, markers, STATE_CACHE_TTL_MS);
+        if (markers.length > 0) {
+            await cacheSetJson(cacheKey, markers, STATE_CACHE_TTL_MS);
+        }
         return { markers, cached: false };
     }
 
