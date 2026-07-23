@@ -18,18 +18,31 @@ import {
   ResourceDeploymentCard,
   DashboardSnapshotExport,
 } from '@/components/admin-dashboard'
+import { Users, Home, CriticalFacilities, Roads } from '@/lib/icons'
 import { useUser } from '@/lib/store/user-store'
 import type { RiskReport } from '@/lib/types/risk-assessment'
 import {
   buildIncidentOverviewFromReport,
+  buildKeyImpactMetricsFromReport,
   buildRiskAnalyzeRequestBody,
+  buildTimelineFromReport,
   getRiskAnalyzeContextFromBrowser,
   mapOverallRiskToGaugeLabel,
 } from '@/lib/risk-assessment/client-analyze-context'
 
-const DASHBOARD_RISK_CACHE_KEY = 'admin-dashboard-risk-snapshot-v1'
 const DASHBOARD_RISK_CACHE_MS = 3 * 60 * 1000
+const KEY_IMPACT_ICONS = [Users, Home, CriticalFacilities, Roads] as const
 
+function dashboardRiskCacheKey(userKey: string) {
+  return `admin-dashboard-risk-snapshot-v1:${userKey || 'anon'}`
+}
+
+function keyImpactRowsFromReport(report: RiskReport | null) {
+  return buildKeyImpactMetricsFromReport(report).map((row, idx) => ({
+    ...row,
+    Icon: KEY_IMPACT_ICONS[idx] ?? Users,
+  }))
+}
 export default function Dashboard() {
   const { me } = useUser()
   const [checkingSetup, setCheckingSetup] = useState(true)
@@ -50,9 +63,15 @@ export default function Dashboard() {
 
   const loadLiveRiskSnapshot = useCallback(async () => {
     setRiskLoading(true)
+    const cacheKey = dashboardRiskCacheKey(
+      (me?.email || (typeof window !== 'undefined' ? localStorage.getItem('userEmail') : null) || '')
+        .toString()
+        .trim()
+        .toLowerCase(),
+    )
     try {
       if (typeof window !== 'undefined') {
-        const raw = sessionStorage.getItem(DASHBOARD_RISK_CACHE_KEY)
+        const raw = sessionStorage.getItem(cacheKey)
         if (raw) {
           try {
             const { t, report, ingest } = JSON.parse(raw) as {
@@ -90,7 +109,7 @@ export default function Dashboard() {
       setRiskIngestMeta(ingest ?? null)
       if (typeof window !== 'undefined') {
         sessionStorage.setItem(
-          DASHBOARD_RISK_CACHE_KEY,
+          cacheKey,
           JSON.stringify({ t: Date.now(), report, ingest }),
         )
       }
@@ -100,7 +119,7 @@ export default function Dashboard() {
     } finally {
       setRiskLoading(false)
     }
-  }, [riskCtx])
+  }, [riskCtx, me?.email])
 
   useEffect(() => {
     if (checkingSetup) return
@@ -203,16 +222,25 @@ export default function Dashboard() {
         <div className="flex-1 min-w-0 flex flex-col gap-4">
           {/* Top 4 cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2">
-            <IncidentOverviewCard loading={false} />
+            <IncidentOverviewCard
+              loading={riskLoading}
+              eventType={incidentLive?.eventType}
+              description={incidentLive?.description}
+              date={incidentLive?.date}
+              status={incidentLive?.status}
+            />
             <AIRiskPredictionCard
-              loading={false}
+              loading={riskLoading}
               score={riskReport?.ai_confidence}
               riskLabel={
                 riskReport ? mapOverallRiskToGaugeLabel(riskReport.overall_risk_level) : undefined
               }
             />
-            <KeyImpactsCard />
-            <IncidentTimelineCard />
+            <KeyImpactsCard loading={riskLoading} rows={keyImpactRowsFromReport(riskReport)} />
+            <IncidentTimelineCard
+              loading={riskLoading}
+              entries={buildTimelineFromReport(riskReport)}
+            />
           </div>
 
           {/* Live Situational Map — OpenStreetMap / Leaflet (no Google Maps JS billing) */}

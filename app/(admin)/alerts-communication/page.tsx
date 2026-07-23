@@ -32,12 +32,10 @@ import {
   Search,
   Bell,
   Clock,
-  Globe,
   ShieldCheck,
   Flag,
   ShieldAlert,
   ChevronRight,
-  Wand2,
   AlertCircle,
   CheckCircle2,
   Check,
@@ -47,7 +45,6 @@ import {
   Send,
   Loader2,
   Sparkles,
-  Search as SearchIcon
 } from 'lucide-react'
 import { Switch } from '@/components/ui/switch'
 import { cn } from '@/lib/utils'
@@ -59,72 +56,8 @@ import {
   normalizeUnifiedEventAlertCards,
   type UnifiedEventAlertCardView,
 } from '@/lib/unified-event/client-card'
-
-const ALERT_CATEGORIES = [
-  { name: 'Tornado Warning', color: '#FF0000' },
-  { name: 'Tornado Watch', color: '#FFFF00' },
-  { name: 'Flash Flood Warning', color: '#8B0000' },
-  { name: 'Special Marine Warning', color: '#FFA500' },
-  { name: 'Winter Storm Warning', color: '#FF69B4' },
-  { name: 'High Wind Warning', color: '#DAA520' },
-  { name: 'Flood Warning', color: '#00FF00' },
-  { name: 'Gale Warning', color: '#DDA0DD' },
-  { name: 'Red Flag Warning', color: '#FF1493' },
-  { name: 'Winter Weather Advisory', color: '#7B68EE' },
-  { name: 'Flood Advisory', color: '#00FA9A' },
-  { name: 'Coastal Flood Advisory', color: '#ADFF2F' },
-  { name: 'High Surf Advisory', color: '#BA55D3' },
-  { name: 'Small Craft Advisory', color: '#D8BFD8' },
-  { name: 'Brisk Wind Advisory', color: '#D8BFD8' },
-  { name: 'Hazardous Seas Warning', color: '#D8BFD8' },
-  { name: 'Lake Wind Advisory', color: '#D2B48C' },
-  { name: 'Wind Advisory', color: '#D2B48C' },
-  { name: 'Winter Storm Watch', color: '#4682B4' },
-  { name: 'Rip Current Statement', color: '#40E0D0' },
-  { name: 'Flood Watch', color: '#2E8B57' },
-  { name: 'High Wind Watch', color: '#B8860B' },
-  { name: 'Freeze Watch', color: '#00FFFF' },
-  { name: 'Fire Weather Watch', color: '#FFE4B5' },
-  { name: 'Special Weather Statement', color: '#FFE4B5' },
-  { name: 'Marine Weather Statement', color: '#FFE4B5' },
-  { name: 'Air Quality Alert', color: '#696969' },
-]
-
-const NWS_NATIONAL_ALERTS = [
-  // Severe Weather
-  { id: 'tornado_warning', name: 'Tornado Warning', severity: 'Extreme', category: 'Severe', icon: <AlertTriangle className="text-red-600" size={16} /> },
-  { id: 'tornado_watch', name: 'Tornado Watch', severity: 'High', category: 'Severe', icon: <AlertTriangle className="text-red-400" size={16} /> },
-  { id: 'severe_thunderstorm_warning', name: 'Severe Thunderstorm Warning', severity: 'Severe', category: 'Severe', icon: <Zap className="text-amber-500" size={16} /> },
-  { id: 'severe_thunderstorm_watch', name: 'Severe Thunderstorm Watch', severity: 'High', category: 'Severe', icon: <Zap className="text-amber-300" size={16} /> },
-  { id: 'flash_flood_warning', name: 'Flash Flood Warning', severity: 'Severe', category: 'Severe', icon: <CloudRain className="text-blue-600" size={16} /> },
-  { id: 'flash_flood_watch', name: 'Flash Flood Watch', severity: 'High', category: 'Severe', icon: <CloudRain className="text-blue-400" size={16} /> },
-  { id: 'flood_warning', name: 'Flood Warning', severity: 'Moderate', category: 'Severe', icon: <CloudRain className="text-blue-300" size={16} /> },
-
-  // Winter Hazards
-  { id: 'blizzard_warning', name: 'Blizzard Warning', severity: 'Extreme', category: 'Winter', icon: <CloudRain className="text-indigo-500" size={16} /> },
-  { id: 'winter_storm_warning', name: 'Winter Storm Warning', severity: 'High', category: 'Winter', icon: <CloudRain className="text-slate-500" size={16} /> },
-  { id: 'winter_storm_watch', name: 'Winter Storm Watch', severity: 'Moderate', category: 'Winter', icon: <CloudRain className="text-slate-400" size={16} /> },
-  { id: 'ice_storm_warning', name: 'Ice Storm Warning', severity: 'High', category: 'Winter', icon: <Zap className="text-cyan-500" size={16} /> },
-  { id: 'extreme_cold_warning', name: 'Extreme Cold Warning', severity: 'High', category: 'Winter', icon: <Smartphone className="text-blue-700" size={16} /> },
-
-  // Coastal & Marine
-  { id: 'hurricane_warning', name: 'Hurricane Warning', severity: 'Extreme', category: 'Coastal', icon: <Zap className="text-red-700" size={16} /> },
-  { id: 'hurricane_watch', name: 'Hurricane Watch', severity: 'High', category: 'Coastal', icon: <Zap className="text-red-500" size={16} /> },
-  { id: 'tropical_storm_warning', name: 'Tropical Storm Warning', severity: 'High', category: 'Coastal', icon: <Zap className="text-orange-500" size={16} /> },
-  { id: 'tsunami_warning', name: 'Tsunami Warning', severity: 'Extreme', category: 'Coastal', icon: <AlertTriangle className="text-red-800" size={16} /> },
-  { id: 'coastal_flood_warning', name: 'Coastal Flood Warning', severity: 'High', category: 'Coastal', icon: <CloudRain className="text-blue-800" size={16} /> },
-
-  // Fire & Heat
-  { id: 'fire_weather_warning', name: 'Fire Weather Warning (Red Flag)', severity: 'High', category: 'Fire/Heat', icon: <AlertTriangle className="text-orange-600" size={16} /> },
-  { id: 'excessive_heat_warning', name: 'Excessive Heat Warning', severity: 'Extreme', category: 'Fire/Heat', icon: <Info className="text-red-500" size={16} /> },
-  { id: 'heat_advisory', name: 'Heat Advisory', severity: 'Moderate', category: 'Fire/Heat', icon: <Info className="text-orange-400" size={16} /> },
-
-  // Others
-  { id: 'high_wind_warning', name: 'High Wind Warning', severity: 'High', category: 'Other', icon: <Zap className="text-blue-400" size={16} /> },
-  { id: 'dust_storm_warning', name: 'Dust Storm Warning', severity: 'High', category: 'Other', icon: <AlertTriangle className="text-yellow-700" size={16} /> },
-  { id: 'air_stagnation_advisory', name: 'Air Stagnation Advisory', severity: 'Low', category: 'Other', icon: <Info className="text-slate-400" size={16} /> },
-  { id: 'special_marine_warning', name: 'Special Marine Warning', severity: 'High', category: 'Other', icon: <AlertTriangle className="text-indigo-600" size={16} /> },
-];
+import { ALL_NWS_ALERT_FILTER_CATEGORIES } from '@/lib/constants/nws-alert-filter-categories'
+import { Input } from '@/components/ui/input'
 
 const SOURCE_BADGE_STYLES: Record<string, { label: string; className: string }> = {
   nws: { label: 'NWS', className: 'border-emerald-300 bg-emerald-50 text-emerald-700' },
@@ -335,6 +268,13 @@ export default function AlertsCommunicationPage() {
   const [isGeneratingAI, setIsGeneratingAI] = useState(false)
   const [isSendingAlert, setIsSendingAlert] = useState(false)
   const [filterCategory, setFilterCategory] = useState<string | null>(null)
+  const [alertTypeSearch, setAlertTypeSearch] = useState('')
+
+  const filteredAlertTypeCategories = useMemo(() => {
+    const q = alertTypeSearch.trim().toLowerCase()
+    if (!q) return ALL_NWS_ALERT_FILTER_CATEGORIES
+    return ALL_NWS_ALERT_FILTER_CATEGORIES.filter((cat) => cat.name.toLowerCase().includes(q))
+  }, [alertTypeSearch])
 
   const filteredAlerts = useMemo(
     () => alerts.filter((alert) => !filterCategory || alert.name === filterCategory),
@@ -603,7 +543,7 @@ export default function AlertsCommunicationPage() {
               <Card className="bg-white border-slate-200 rounded-[28px] p-6 shadow-sm overflow-hidden relative">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-blue-600/5 rounded-full -mr-16 -mt-16 blur-3xl pointer-events-none" />
 
-                <div className="flex items-center justify-between mb-5 relative">
+                <div className="flex items-center justify-between mb-4 relative">
                   <div className="space-y-0.5">
                     <h3 className="text-[15px] font-black text-slate-900 leading-none uppercase tracking-tight">Filter by Alert</h3>
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">NWS Official Color Logic</p>
@@ -620,30 +560,47 @@ export default function AlertsCommunicationPage() {
                   )}
                 </div>
 
+                <div className="relative mb-4">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                  <Input
+                    value={alertTypeSearch}
+                    onChange={(e) => setAlertTypeSearch(e.target.value)}
+                    placeholder="Search alert types (e.g. hurricane, tropical)…"
+                    className="pl-9 h-10 rounded-xl border-slate-200 bg-slate-50/80 text-[13px] font-semibold placeholder:text-slate-400 focus-visible:ring-[#4338CA]/30"
+                  />
+                </div>
+
                 <div className="grid grid-cols-2 gap-x-4 gap-y-2.5 max-h-[320px] overflow-y-auto pr-2 custom-scrollbar relative">
-                  {ALERT_CATEGORIES.map((cat) => (
-                    <button
-                      key={cat.name}
-                      onClick={() => setFilterCategory(filterCategory === cat.name ? null : cat.name)}
-                      className={cn(
-                        "flex items-center gap-2.5 group transition-all p-1.5 rounded-xl border",
-                        filterCategory === cat.name
-                          ? "bg-slate-900 border-slate-900 shadow-lg shadow-slate-900/10"
-                          : "hover:bg-slate-50 border-transparent"
-                      )}
-                    >
-                      <div
-                        className="w-3.5 h-3.5 rounded-md shrink-0 shadow-sm border border-black/5"
-                        style={{ backgroundColor: cat.color }}
-                      />
-                      <span className={cn(
-                        "text-[10px] font-black uppercase tracking-tight text-left leading-tight transition-colors truncate",
-                        filterCategory === cat.name ? "text-white" : "text-slate-600 group-hover:text-slate-900"
-                      )}>
-                        {cat.name}
-                      </span>
-                    </button>
-                  ))}
+                  {filteredAlertTypeCategories.length === 0 ? (
+                    <p className="col-span-2 text-[12px] font-bold text-slate-400 py-4 text-center">
+                      No alert types match “{alertTypeSearch.trim()}”
+                    </p>
+                  ) : (
+                    filteredAlertTypeCategories.map((cat) => (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() => setFilterCategory(filterCategory === cat.name ? null : cat.name)}
+                        className={cn(
+                          "flex items-center gap-2.5 group transition-all p-1.5 rounded-xl border",
+                          filterCategory === cat.name
+                            ? "bg-slate-900 border-slate-900 shadow-lg shadow-slate-900/10"
+                            : "hover:bg-slate-50 border-transparent"
+                        )}
+                      >
+                        <div
+                          className="w-3.5 h-3.5 rounded-md shrink-0 shadow-sm border border-black/5"
+                          style={{ backgroundColor: cat.color }}
+                        />
+                        <span className={cn(
+                          "text-[10px] font-black uppercase tracking-tight text-left leading-tight transition-colors truncate",
+                          filterCategory === cat.name ? "text-white" : "text-slate-600 group-hover:text-slate-900"
+                        )}>
+                          {cat.name}
+                        </span>
+                      </button>
+                    ))
+                  )}
                 </div>
               </Card>
 

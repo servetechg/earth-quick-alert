@@ -57,6 +57,10 @@ export function mapOverallRiskToGaugeLabel(level: string): 'Low' | 'Moderate' | 
     return 'Low';
 }
 
+function sortedIncidentDistribution(report: RiskReport) {
+    return [...(report.incident_distribution ?? [])].sort((a, b) => (b.count || 0) - (a.count || 0));
+}
+
 /** One-line incident card copy from the same `RiskReport` as AI Risk Assessment. */
 export function buildIncidentOverviewFromReport(
     report: RiskReport,
@@ -71,7 +75,7 @@ export function buildIncidentOverviewFromReport(
         opts?.ingestScope === 'state' && opts.stateCd
             ? `State-scoped live ingest (${opts.stateCd.toUpperCase()})`
             : 'Nationwide live ingest';
-    const top = [...(report.incident_distribution ?? [])].sort((a, b) => (b.count || 0) - (a.count || 0))[0];
+    const top = sortedIncidentDistribution(report)[0];
     const eventType = `${report.overall_risk_level || 'UNKNOWN'} risk · ${
         top ? `${top.category} (${top.count})` : 'multi-feed snapshot'
     }`;
@@ -86,4 +90,59 @@ export function buildIncidentOverviewFromReport(
     const status: 'Active' | 'Monitoring' =
         (report.alerts_count ?? 0) > 0 || (report.major_incidents ?? 0) > 0 ? 'Active' : 'Monitoring';
     return { eventType, description, date, status };
+}
+
+/** Timeline rows for Dashboard B — derived from the same live risk report. */
+export function buildTimelineFromReport(report: RiskReport | null): Array<{
+    time: string;
+    event: string;
+    tone: 'red' | 'amber' | 'navy' | 'slate';
+}> {
+    if (!report) return [];
+    const tones = ['red', 'amber', 'navy', 'slate'] as const;
+    const fromDistro = sortedIncidentDistribution(report)
+        .filter((d) => (d.count ?? 0) > 0)
+        .slice(0, 4)
+        .map((d, idx) => ({
+            time: `${d.count}`,
+            event: `${d.category} signals in scope`,
+            tone: tones[idx] ?? 'navy',
+        }));
+    if (fromDistro.length > 0) return fromDistro;
+
+    return (report.recommendations_list ?? []).slice(0, 4).map((r) => ({
+        time: r.priority,
+        event: r.action,
+        tone: (r.priority === 'IMMEDIATE' ? 'red' : r.priority === 'URGENT' ? 'amber' : 'navy') as
+            | 'red'
+            | 'amber'
+            | 'navy',
+    }));
+}
+
+/** Key-impact metric values for Dashboard B (icons applied by the card). */
+export function buildKeyImpactMetricsFromReport(report: RiskReport | null): Array<{
+    label: string;
+    value: string;
+}> {
+    const pop = report?.populations_at_risk ?? 0;
+    const users = report?.ready2go_users_reachable;
+    return [
+        {
+            label: 'Population at Risk',
+            value: pop > 0 ? pop.toLocaleString() : '0',
+        },
+        {
+            label: 'Ready2Go Users Reachable',
+            value: typeof users === 'number' ? users.toLocaleString() : '—',
+        },
+        {
+            label: 'Major Incidents',
+            value: String(report?.major_incidents ?? 0),
+        },
+        {
+            label: 'Aligned Alert Signals',
+            value: String(report?.alerts_count ?? 0),
+        },
+    ];
 }

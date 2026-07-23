@@ -1,5 +1,10 @@
-import License from '@/models/License';
-import User from '@/models/User';
+import {
+  getUsCountyBbox,
+  countyBboxCenter,
+  countyBboxRadiusMile,
+  pointInUsCountyBBox,
+  normalizeCountyStem,
+} from '@/lib/constants/us-county-bounding-boxes';
 import { getUsStateBbox, pointInUsStateBBox } from '@/lib/constants/us-state-bounding-boxes';
 import { calculateDistance } from '@/lib/services/mock-map-service';
 import { geocodeLocation } from '@/lib/services/location-matching';
@@ -7,6 +12,8 @@ import { normalizeStateToUsps, textMentionsUsState } from '@/lib/utils/us-state-
 import { parseLocations } from '@/lib/utils/alert-communication-hydrate';
 import { maybeDemoJurisdictionOverride, buildArkansasStateWideJurisdiction } from '@/lib/demo/provider';
 import { DEMO_PRESENTATION_EMAIL } from '@/lib/demo/constants';
+import License from '@/models/License';
+import User from '@/models/User';
 
 export type SubAdminJurisdiction = {
     stateRaw: string;
@@ -14,9 +21,10 @@ export type SubAdminJurisdiction = {
     center: { lat: number; lng: number };
     radiusMile: number;
     radiusKm: number;
-    coverageType: 'state' | 'radius';
+    coverageType: 'state' | 'radius' | 'county';
+    /** When coverageType is county — normalized county name (e.g. "Desha"). */
+    coverageCounty?: string;
 };
-
 const DEFAULT_RADIUS_MILE = 5;
 const MILE_TO_KM = 1.60934;
 const JURISDICTION_CACHE_TTL_MS = 10 * 60 * 1000;
@@ -51,10 +59,40 @@ async function resolveSubAdminJurisdictionUncached(
 
     const stateCode = normalizeStateToUsps(stateRaw);
     const license = u.licenseId
-        ? ((await License.findById(u.licenseId).select('radiusMile billingAddress coverageType').lean()) as any)
+        ? ((await License.findById(u.licenseId)
+              .select('radiusMile billingAddress coverageType coverageCounty')
+              .lean()) as any)
         : null;
 
-    const coverageType = (license?.coverageType || u.requestedLicenseType || 'radius') as 'state' | 'radius';
+    const rawCoverage = String(license?.coverageType || u.requestedLicenseType || 'radius').toLowerCase();
+    const coverageType = (
+        rawCoverage === 'state' || rawCoverage === 'county' ? rawCoverage : 'radius'
+    ) as 'state' | 'radius' | 'county';
+
+    const coverageCountyRaw =
+        typeof license?.coverageCounty === 'string' && license.coverageCounty.trim()
+            ? license.coverageCounty.trim()
+            : typeof u.city === 'string'
+              ? String(u.city).replace(/\bcounty\b/gi, '').trim()
+              : '';
+
+    // County licenses: lock to county bbox when available.
+    if (coverageType === 'county' && stateCode && coverageCountyRaw) {
+        const bbox = getUsCountyBbox(stateCode, coverageCountyRaw);
+        if (bbox) {
+            const center = countyBboxCenter(bbox);
+            const radiusMile = countyBboxRadiusMile(bbox);
+            return {
+                stateRaw,
+                stateCode,
+                center,
+                radiusMile,
+                radiusKm: radiusMile * MILE_TO_KM,
+                coverageType: 'county',
+                coverageCounty: normalizeCountyStem(coverageCountyRaw),
+            };
+        }
+    }
 
     const radiusMile =
         typeof license?.radiusMile === 'number' && license.radiusMile > 0
@@ -93,7 +131,10 @@ async function resolveSubAdminJurisdictionUncached(
         center,
         radiusMile,
         radiusKm: radiusMile * MILE_TO_KM,
-        coverageType,
+        coverageType: coverageType === 'county' ? 'radius' : coverageType,
+        ...(coverageType === 'county' && coverageCountyRaw
+            ? { coverageCounty: normalizeCountyStem(coverageCountyRaw) }
+            : {}),
     };
 }
 
@@ -127,6 +168,18 @@ export function jurisdictionLatLngBBox(jurisdiction: SubAdminJurisdiction): {
     minLng: number;
     maxLng: number;
 } {
+    if (
+        jurisdiction.coverageType === 'county' &&
+        jurisdiction.stateCode &&
+        jurisdiction.coverageCounty
+    ) {
+        const bbox = getUsCountyBbox(jurisdiction.stateCode, jurisdiction.coverageCounty);
+        if (bbox) {
+            const [west, south, east, north] = bbox;
+            return { minLat: south, maxLat: north, minLng: west, maxLng: east };
+        }
+    }
+
     const latDelta = jurisdiction.radiusMile / 69;
     const cosLat = Math.cos((jurisdiction.center.lat * Math.PI) / 180);
     const lngDelta = jurisdiction.radiusMile / (69 * Math.max(0.2, Math.abs(cosLat)));
@@ -149,6 +202,10 @@ export function coordinatesInJurisdiction(
     if (jurisdiction.coverageType === 'state') {
         if (!jurisdiction.stateCode) return false;
         return pointInUsStateBBox(lng, lat, jurisdiction.stateCode);
+    }
+
+    if (jurisdiction.coverageType === 'county' && jurisdiction.stateCode && jurisdiction.coverageCounty) {
+        return pointInUsCountyBBox(lng, lat, jurisdiction.stateCode, jurisdiction.coverageCounty);
     }
 
     const distMile = calculateDistance(
@@ -257,6 +314,11 @@ export function alertRowMatchesSubAdminJurisdictionSync(
         if (!coords) return false;
         return pointInUsStateBBox(coords.lng, coords.lat, jurisdiction.stateCode);
     }
+    if (jurisdiction.coverageType === 'county') {
+        const coords = extractAlertRowCoordinates(row);
+        if (!coords) return false;
+        return coordinatesInJurisdiction(coords.lat, coords.lng, jurisdiction);
+    }
     const coords = extractAlertRowCoordinates(row);
     if (!coords) return false;
     return coordinatesInJurisdiction(coords.lat, coords.lng, jurisdiction);
@@ -298,6 +360,50 @@ export async function alertRowMatchesSubAdminJurisdiction(
             }
         }
 
+        return false;
+    }
+
+    if (jurisdiction.coverageType === 'county' && jurisdiction.coverageCounty) {
+        const county = jurisdiction.coverageCounty;
+        const locationText = [
+            row.location,
+            row.name,
+            row.description,
+            ...(row.locations || []),
+        ]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase();
+
+        // Prefer explicit county name in alert text (e.g. "Desha, AR") before geocode budget.
+        if (
+            locationText.includes(county) ||
+            locationText.includes(`${county} county`)
+        ) {
+            if (!jurisdiction.stateCode || textMentionsUsState(locationText, jurisdiction.stateCode)) {
+                return true;
+            }
+            // County name alone is enough when state is already known via license.
+            if (jurisdiction.stateCode && locationText.includes(jurisdiction.stateCode.toLowerCase())) {
+                return true;
+            }
+            if (jurisdiction.stateRaw && locationText.includes(jurisdiction.stateRaw.toLowerCase())) {
+                return true;
+            }
+        }
+
+        const coords = extractAlertRowCoordinates(row);
+        if (coords && coordinatesInJurisdiction(coords.lat, coords.lng, jurisdiction)) {
+            return true;
+        }
+
+        const queries = locationQueriesFromRow(row);
+        for (const query of queries) {
+            const geo = await geocodeLocationCached(query, geocodeBudget);
+            if (geo && coordinatesInJurisdiction(geo.lat, geo.lng, jurisdiction)) {
+                return true;
+            }
+        }
         return false;
     }
 

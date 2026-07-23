@@ -12,14 +12,9 @@ interface TimelineEntry {
 export interface IncidentTimelineCardProps {
   className?: string
   entries?: TimelineEntry[]
+  loading?: boolean
+  emptyMessage?: string
 }
-
-const MOCK_ENTRIES: TimelineEntry[] = [
-  { time: '09:45 AM', event: 'Tornado Warning Issued', tone: 'red' },
-  { time: '09:52 AM', event: 'Shelter Activated-Pine Bluff HS', tone: 'navy' },
-  { time: '10:02 AM', event: 'Power Outage Reported', tone: 'amber' },
-  { time: '10:18 AM', event: 'Water Main Break Reported', tone: 'slate' },
-]
 
 const DOT_BG: Record<NonNullable<TimelineEntry['tone']>, string> = {
   red: 'bg-[#A41E22]',
@@ -30,7 +25,9 @@ const DOT_BG: Record<NonNullable<TimelineEntry['tone']>, string> = {
 
 export function IncidentTimelineCard({
   className,
-  entries = MOCK_ENTRIES,
+  entries = [],
+  loading = false,
+  emptyMessage = 'No active incident timeline for your jurisdiction right now.',
 }: IncidentTimelineCardProps) {
   return (
     <div
@@ -41,27 +38,33 @@ export function IncidentTimelineCard({
     >
       <h3 className="text-[13px] font-bold text-slate-900">Incident Timeline</h3>
 
-      <ul className="flex flex-col gap-4">
-        {entries.map((entry, idx) => (
-          <li key={`${entry.time}-${idx}`} className="flex items-start gap-2.5">
-            <span
-              className={cn(
-                'mt-1.5 w-1.5 h-1.5 rounded-full shrink-0',
-                DOT_BG[entry.tone ?? 'navy'],
-              )}
-              aria-hidden
-            />
-            <div className="flex items-baseline justify-between w-full gap-3 leading-snug">
-              <span className="text-[11px] font-semibold text-slate-700 tabular-nums shrink-0">
-                {entry.time}
-              </span>
-              <span className="text-[11px] font-medium text-slate-500 text-right">
-                {entry.event}
-              </span>
-            </div>
-          </li>
-        ))}
-      </ul>
+      {loading ? (
+        <p className="text-[11px] font-medium text-slate-500">Loading live timeline…</p>
+      ) : entries.length === 0 ? (
+        <p className="text-[11px] font-medium text-slate-500 leading-snug">{emptyMessage}</p>
+      ) : (
+        <ul className="flex flex-col gap-4">
+          {entries.map((entry, idx) => (
+            <li key={`${entry.time}-${idx}`} className="flex items-start gap-2.5">
+              <span
+                className={cn(
+                  'mt-1.5 w-1.5 h-1.5 rounded-full shrink-0',
+                  DOT_BG[entry.tone ?? 'navy'],
+                )}
+                aria-hidden
+              />
+              <div className="flex items-baseline justify-between w-full gap-3 leading-snug">
+                <span className="text-[11px] font-semibold text-slate-700 tabular-nums shrink-0">
+                  {entry.time}
+                </span>
+                <span className="text-[11px] font-medium text-slate-500 text-right">
+                  {entry.event}
+                </span>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   )
 }
