@@ -9,6 +9,7 @@ import {
 import { formatProfileAddress } from '@/lib/services/mobile/zone-utils';
 import type { UserProfilePayload } from '@/lib/types/mobile/auth';
 import { listUsersInAlignedAlertAreas } from '@/lib/services/users-in-aligned-alert-areas';
+import { sendExpoPushNotification } from '@/lib/services/mobile/expo-push-service';
 import {
     coordinatesInJurisdiction,
     resolveSubAdminJurisdiction,
@@ -235,31 +236,54 @@ async function sendInvitationNotifications(
 ): Promise<{ pushOk: boolean; emailOk: boolean }> {
     const pushBody = `You may be eligible for disaster relief. Tap to complete your status survey for ${campaignTitle}.`;
 
-    const inbox = await dispatchUserNotification({
+    // Inbox first (always). Push is sent the same direct way as profile-incomplete reminders
+    // so preference/channel gates cannot silently drop survey invites.
+    await dispatchUserNotification({
         userId: user.id,
         type: 'disaster_survey',
         title: 'Disaster relief survey',
         body: pushBody,
         priority: 'high',
         audience: 'citizen',
+        skipPush: true,
         meta: {
             dedupeKey: `disaster_survey:${invitationId}`,
             invitationId,
             campaignId,
         },
-        push: {
+    });
+
+    let pushOk = false;
+    let pushToken = String(user.expoPushToken ?? '').trim();
+    if (!pushToken) {
+        await connectDB();
+        const fresh = await User.findById(user.id).select('expoPushToken').lean();
+        pushToken = String((fresh as { expoPushToken?: string } | null)?.expoPushToken ?? '').trim();
+    }
+
+    if (pushToken) {
+        const push = await sendExpoPushNotification({
+            to: pushToken,
             title: 'Disaster relief survey',
             body: pushBody,
-            channelId: 'disaster-alerts',
+            sound: 'default',
+            // Match profile-reminder path: default Android channel (always created on device).
+            channelId: 'default',
+            priority: 'high',
             data: {
                 screen: DISASTER_PUSH_SCREEN,
+                notificationType: 'disaster_survey',
                 invitationId,
                 campaignId,
             },
-        },
-    });
-
-    const pushOk = Boolean(inbox.item) && inbox.pushSent;
+        });
+        pushOk = push.ok;
+        if (!push.ok) {
+            console.warn('[disaster-survey] Expo push failed:', user.id, push.error);
+        }
+    } else {
+        console.warn('[disaster-survey] No expoPushToken for user:', user.id, user.email);
+    }
 
     const emailOk = user.email
         ? await sendDisasterSurveyInviteEmail(user.email, user.firstName || user.name, campaignTitle)
@@ -365,11 +389,45 @@ export async function dispatchDisasterSurveyCampaign(
     let emailSent = 0;
 
     for (const user of targets) {
-        const existing = await DisasterSurveyInvitation.findOne({
+        const existing = (await DisasterSurveyInvitation.findOne({
             campaignId: campaign._id,
             userId: user.id,
-        }).lean();
-        if (existing) continue;
+        }).lean()) as {
+            _id: unknown;
+            status?: string;
+            pushSentAt?: Date | null;
+            emailSentAt?: Date | null;
+        } | null;
+
+        if (existing) {
+            // Retry remote push if invite exists but push never landed (common when
+            // the device registered its Expo token after the first dispatch).
+            const canRetryPush =
+                !existing.pushSentAt &&
+                (existing.status === 'pending' || existing.status === 'opened');
+            if (!canRetryPush) continue;
+
+            const notify = await sendInvitationNotifications(
+                user,
+                campaign.title,
+                String(existing._id),
+                String(campaign._id),
+            );
+            await DisasterSurveyInvitation.updateOne(
+                { _id: existing._id },
+                {
+                    $set: {
+                        ...(notify.pushOk ? { pushSentAt: new Date() } : {}),
+                        ...(notify.emailOk && !existing.emailSentAt
+                            ? { emailSentAt: new Date() }
+                            : {}),
+                    },
+                },
+            );
+            if (notify.pushOk) pushSent += 1;
+            if (notify.emailOk && !existing.emailSentAt) emailSent += 1;
+            continue;
+        }
 
         const invitation = await DisasterSurveyInvitation.create({
             campaignId: campaign._id,
