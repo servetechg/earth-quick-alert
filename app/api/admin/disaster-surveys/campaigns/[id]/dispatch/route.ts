@@ -16,7 +16,7 @@ export async function POST(req: Request, context: RouteContext) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
         const role = String(session.user.role ?? '').toLowerCase();
-        if (role !== 'super-admin') {
+        if (role !== 'super-admin' && role !== 'sub-admin') {
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         }
 
@@ -31,7 +31,11 @@ export async function POST(req: Request, context: RouteContext) {
             userIds = undefined;
         }
 
-        const result = await dispatchDisasterSurveyCampaign(id, { userIds });
+        const result = await dispatchDisasterSurveyCampaign(id, {
+            userIds,
+            actorRole: role,
+            actorUserId: String(session.user.id),
+        });
         return NextResponse.json(result);
     } catch (e) {
         const msg = e instanceof Error ? e.message : '';

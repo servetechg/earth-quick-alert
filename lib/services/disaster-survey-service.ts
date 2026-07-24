@@ -18,6 +18,7 @@ import {
     DISASTER_IMMEDIATE_NEED_IDS,
     type DisasterImmediateNeedId,
     type DisasterSurveyFundingStatus,
+    type DisasterSurveyTargetMode,
     type DisasterSurveyTriggerType,
 } from '@/lib/types/disaster-survey';
 import { normalizeStateToUsps } from '@/lib/utils/us-state-usps';
@@ -30,6 +31,8 @@ import UserProfile from '@/models/UserProfile';
 const DISASTER_PUSH_SCREEN = 'disasterSurvey';
 const AUTO_SEVERITY_PATTERN =
     /tornado warning|flash flood warning|hurricane warning|evacuation|major damage|disaster declaration/i;
+/** Soft cap so a single dispatch request stays within serverless time limits. */
+const MAX_SCOPE_TARGETS = 5000;
 
 export type SurveyTargetUser = {
     id: string;
@@ -104,6 +107,66 @@ async function loadTargetUsers(alignedRows: Record<string, unknown>[]): Promise<
     await connectDB();
     const ids = atRisk.map((u) => u.id);
     return loadUsersByIds(ids);
+}
+
+async function loadAllApprovedMobileUsers(): Promise<SurveyTargetUser[]> {
+    await connectDB();
+    const users = (await User.find({
+        role: 'user',
+        accountStatus: 'approved',
+    })
+        .select('_id name firstName lastName email expoPushToken lat lng state city location')
+        .limit(MAX_SCOPE_TARGETS)
+        .lean()) as Record<string, unknown>[];
+
+    const ids = users.map((u) => String(u._id));
+    const profiles = await UserProfile.find({ userId: { $in: ids } }).lean();
+    const profileByUser = new Map(
+        profiles.map((p) => [String(p.userId), p as { address?: UserProfilePayload['address'] }]),
+    );
+    return mapDbUsersToTargets(users, profileByUser);
+}
+
+async function loadUsersInJurisdiction(
+    jurisdiction: SubAdminJurisdiction,
+): Promise<SurveyTargetUser[]> {
+    await connectDB();
+
+    const users = (await User.find({
+        role: 'user',
+        accountStatus: 'approved',
+    })
+        .select('_id name firstName lastName email expoPushToken lat lng state city location')
+        .limit(MAX_SCOPE_TARGETS)
+        .lean()) as Record<string, unknown>[];
+
+    const ids = users.map((u) => String(u._id));
+    const profiles = await UserProfile.find({ userId: { $in: ids } }).lean();
+    const profileByUser = new Map(
+        profiles.map((p) => [String(p.userId), p as { address?: UserProfilePayload['address'] }]),
+    );
+
+    const mapped = mapDbUsersToTargets(users, profileByUser);
+    return mapped.filter((u) =>
+        responseInJurisdiction(
+            { userLat: u.lat, userLng: u.lng, userState: u.state },
+            jurisdiction,
+        ),
+    );
+}
+
+/** Super-admin: all app users. Sub-admin: users inside license jurisdiction (state / radius / county). */
+export async function loadUsersForAdminScope(
+    role: string,
+    adminUserId: string,
+): Promise<SurveyTargetUser[]> {
+    if (role === 'super-admin') {
+        return loadAllApprovedMobileUsers();
+    }
+    if (role !== 'sub-admin') return [];
+    const jurisdiction = await resolveSubAdminJurisdiction(adminUserId);
+    if (!jurisdiction) return [];
+    return loadUsersInJurisdiction(jurisdiction);
 }
 
 export type DisasterSurveyTargetUserOption = {
@@ -187,6 +250,7 @@ async function sendInvitationNotifications(
         push: {
             title: 'Disaster relief survey',
             body: pushBody,
+            channelId: 'disaster-alerts',
             data: {
                 screen: DISASTER_PUSH_SCREEN,
                 invitationId,
@@ -195,7 +259,7 @@ async function sendInvitationNotifications(
         },
     });
 
-    const pushOk = Boolean(inbox) && Boolean(user.expoPushToken.trim());
+    const pushOk = Boolean(inbox.item) && inbox.pushSent;
 
     const emailOk = user.email
         ? await sendDisasterSurveyInviteEmail(user.email, user.firstName || user.name, campaignTitle)
@@ -214,10 +278,18 @@ export async function createDisasterSurveyCampaign(input: {
     stateCodes?: string[];
     createdByUserId?: string;
     autoTriggerKey?: string;
+    targetMode?: DisasterSurveyTargetMode;
     targetUserIds?: string[];
 }) {
     await connectDB();
     const targetUserIds = [...new Set((input.targetUserIds ?? []).map((id) => id.trim()).filter(Boolean))];
+    const targetMode: DisasterSurveyTargetMode =
+        input.targetMode === 'specific' || input.targetMode === 'all_scope'
+            ? input.targetMode
+            : targetUserIds.length > 0
+              ? 'specific'
+              : 'alert_area';
+
     const doc = await DisasterSurveyCampaign.create({
         title: input.title.trim(),
         description: input.description?.trim() ?? '',
@@ -228,35 +300,53 @@ export async function createDisasterSurveyCampaign(input: {
         stateCodes: (input.stateCodes ?? []).map((s) => s.toUpperCase()),
         createdByUserId: input.createdByUserId ?? null,
         autoTriggerKey: input.autoTriggerKey?.trim() ?? '',
-        targetUserIds,
+        targetMode,
+        targetUserIds: targetMode === 'specific' ? targetUserIds : [],
         status: 'draft',
     });
     return doc.toObject();
 }
 
 async function resolveDispatchTargets(
-    campaign: { targetUserIds?: unknown[] },
-    overrideUserIds?: string[],
+    campaign: {
+        targetMode?: string;
+        targetUserIds?: unknown[];
+        createdByUserId?: unknown;
+    },
+    options?: {
+        userIds?: string[];
+        actorRole?: string;
+        actorUserId?: string;
+    },
 ): Promise<SurveyTargetUser[]> {
-    const override = [...new Set((overrideUserIds ?? []).map((id) => id.trim()).filter(Boolean))];
-    if (override.length > 0) {
-        return loadUsersByIds(override);
-    }
+    const mode = (campaign.targetMode || 'alert_area') as DisasterSurveyTargetMode;
+    const override = [...new Set((options?.userIds ?? []).map((id) => id.trim()).filter(Boolean))];
 
-    const stored = (campaign.targetUserIds ?? [])
-        .map((id) => String(id))
-        .filter(Boolean);
-    if (stored.length > 0) {
+    if (mode === 'specific' || override.length > 0) {
+        if (override.length > 0) return loadUsersByIds(override);
+        const stored = (campaign.targetUserIds ?? []).map((id) => String(id)).filter(Boolean);
         return loadUsersByIds(stored);
     }
 
-    const alignedRows = await fetchPopulationAtRiskAlignedEventFeed({ role: 'super-admin' });
+    if (mode === 'all_scope') {
+        const role = String(options?.actorRole ?? '').toLowerCase();
+        const actorId =
+            String(options?.actorUserId ?? '').trim() ||
+            String(campaign.createdByUserId ?? '').trim();
+        if (!actorId) return [];
+        return loadUsersForAdminScope(role || 'super-admin', actorId);
+    }
+
+    const alignedRows = await fetchPopulationAtRiskAlignedEventFeed({
+        role: (options?.actorRole as 'super-admin' | 'sub-admin') || 'super-admin',
+        userId: options?.actorUserId,
+    });
     return loadTargetUsers(alignedRows);
 }
 
 export async function dispatchDisasterSurveyCampaign(
     campaignId: string,
-    options?: { userIds?: string[] },
+    options?: { userIds?: string[]; actorRole?: string; actorUserId?: string },
 ) {
     await connectDB();
     const campaign = await DisasterSurveyCampaign.findById(campaignId);
@@ -264,10 +354,11 @@ export async function dispatchDisasterSurveyCampaign(
 
     if (options?.userIds?.length) {
         campaign.targetUserIds = [...new Set(options.userIds.map((id) => id.trim()).filter(Boolean))];
+        campaign.targetMode = 'specific';
         await campaign.save();
     }
 
-    const targets = await resolveDispatchTargets(campaign, options?.userIds);
+    const targets = await resolveDispatchTargets(campaign, options);
 
     let invited = 0;
     let pushSent = 0;
@@ -476,6 +567,7 @@ export async function listDisasterSurveyCampaigns(role: string, adminUserId?: st
             severity: c.severity,
             invitedCount: c.invitedCount,
             responseCount: c.responseCount,
+            targetMode: (c as { targetMode?: string }).targetMode || 'alert_area',
             targetUserCount: Array.isArray(c.targetUserIds) ? c.targetUserIds.length : 0,
             dispatchedAt: c.dispatchedAt,
             createdAt: c.createdAt,
@@ -489,6 +581,8 @@ export async function listDisasterSurveyCampaigns(role: string, adminUserId?: st
 
     return campaigns
         .filter((c) => {
+            // Sub-admins see their own campaigns + shared/auto without state filter, or matching state.
+            if (String(c.createdByUserId ?? '') === adminUserId) return true;
             if (!c.stateCodes?.length) return true;
             if (!jurisdiction.stateCode) return true;
             return c.stateCodes.includes(jurisdiction.stateCode);
@@ -504,6 +598,8 @@ export async function listDisasterSurveyCampaigns(role: string, adminUserId?: st
             severity: c.severity,
             invitedCount: c.invitedCount,
             responseCount: c.responseCount,
+            targetMode: (c as { targetMode?: string }).targetMode || 'alert_area',
+            targetUserCount: Array.isArray(c.targetUserIds) ? c.targetUserIds.length : 0,
             dispatchedAt: c.dispatchedAt,
             createdAt: c.createdAt,
         }));
@@ -671,7 +767,9 @@ export async function processAutoDisasterSurveyDispatch() {
         });
 
         campaignsCreated += 1;
-        await dispatchDisasterSurveyCampaign(String(campaign._id));
+        await dispatchDisasterSurveyCampaign(String(campaign._id), {
+            actorRole: 'super-admin',
+        });
         dispatched += 1;
     }
 
