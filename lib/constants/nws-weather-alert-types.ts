@@ -157,6 +157,13 @@ export const NWS_WEATHER_ALERT_TYPES: readonly NwsWeatherAlertTypeDef[] = [
         description: 'Tropical storm conditions expected within 36 hours.',
     },
     {
+        id: 'tropical_storm_watch',
+        name: 'Tropical Storm Watch',
+        severity: 'High',
+        category: 'Coastal',
+        description: 'Tropical storm conditions are possible within 48 hours.',
+    },
+    {
         id: 'tsunami_warning',
         name: 'Tsunami Warning',
         severity: 'Extreme',

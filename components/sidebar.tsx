@@ -7,7 +7,6 @@ import {
   LayoutDashboard,
   Bell,
   Users,
-  Brain,
   ClipboardList,
   FileText,
   ScrollText,
@@ -106,29 +105,39 @@ export function Sidebar({ className }: { className?: string }) {
   const adminMenuItems = isSuperAdminRole
     ? [
         { icon: LayoutDashboard, label: 'Dashboard', href: '/super-admin-dashboard' },
+        { icon: Sparkles, label: 'AI Risk Assessment', href: '/ai-risk-assessment' },
         { icon: Bell, label: 'Alerts & Communication', href: '/alerts-communication' },
+        { icon: Activity, label: 'Citizen Activity Feed', href: '/citizen-activity-feed' },
         { icon: ScrollText, label: 'Disaster Surveys', href: '/disaster-surveys' },
         { icon: FileText, label: 'Preparedness Information', href: '/preparedness-information' },
         { icon: Building2, label: 'Licenses', href: '/admin/licenses' },
         { icon: Shield, label: 'Sub-Admins', href: '/admin/sub-admins' },
         { icon: Users, label: 'Responder and Leader Approval', href: '/admin/users' },
-        { icon: Activity, label: 'Citizen Activity Feed', href: '/citizen-activity-feed' },
-        { icon: Sparkles, label: 'AI Risk Assessment', href: '/ai-risk-assessment' },
       ]
     : isEOCRole
       ? eocMenuItems
       : userRole === 'sub-admin'
         ? [
-            menuItems[0],
-            menuItems[1],
-            { icon: ScrollText, label: 'Disaster Surveys', href: '/disaster-surveys' },
+            { icon: LayoutDashboard, label: 'Dashboard', href: '/admin-dashboard' },
             { icon: Sparkles, label: 'AI Risk Assessment', href: '/ai-risk-assessment' },
-            ...menuItems.slice(3),
+            { icon: Bell, label: 'Alerts & Communication', href: '/alerts-communication' },
+            { icon: ScrollText, label: 'Disaster Surveys', href: '/disaster-surveys' },
+            { icon: ClipboardList, label: 'After Action Review', href: '/after-action-review' },
+            { icon: FileText, label: 'COOP/BC Plans', href: '/emergency-plan' },
+            { icon: FileText, label: 'Preparedness Information', href: '/preparedness-information' },
+            { icon: Users, label: 'Responders & Agencies', href: '/responders-agencies' },
           ]
         : isOperationalAdmin
           ? [
-              ...menuItems,
+              { icon: LayoutDashboard, label: 'Dashboard', href: '/admin-dashboard' },
+              { icon: Sparkles, label: 'AI Risk Assessment', href: '/ai-risk-assessment' },
+              { icon: Bell, label: 'Alerts & Communication', href: '/alerts-communication' },
               { icon: Activity, label: 'Citizen Activity Feed', href: '/citizen-activity-feed' },
+              { icon: ScrollText, label: 'Disaster Surveys', href: '/disaster-surveys' },
+              { icon: ClipboardList, label: 'After Action Review', href: '/after-action-review' },
+              { icon: FileText, label: 'COOP/BC Plans', href: '/emergency-plan' },
+              { icon: FileText, label: 'Preparedness Information', href: '/preparedness-information' },
+              { icon: Users, label: 'Responders & Agencies', href: '/responders-agencies' },
               { icon: Users, label: 'Responder and Leader Approval', href: '/admin/users' },
             ]
           : [...menuItems]

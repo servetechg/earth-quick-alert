@@ -259,7 +259,8 @@ export function GrantLicenseModal({ user, isOpen, onClose, onSuccess }: GrantLic
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent 
+      <DialogContent
+        elevated
         className="sm:max-w-[700px] rounded-3xl border-slate-200 p-0 overflow-hidden bg-white text-slate-900 max-h-[90vh] overflow-y-auto outline-none border shadow-2xl"
         onInteractOutside={(e) => {
           const target = e.target as HTMLElement;

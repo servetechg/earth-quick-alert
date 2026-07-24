@@ -9,6 +9,8 @@ export type CountyBbox = readonly [number, number, number, number];
 const US_COUNTY_BBOX: Record<string, CountyBbox> = {
   // Nominatim / OSM relation 1828017 — Desha County, Arkansas
   'AR:desha': [-91.557618, 33.5171838, -90.870461, 34.1193908],
+  // Nominatim / OSM relation 1826755 — Jefferson County, Arkansas
+  'AR:jefferson': [-92.2915, 34.0995, -91.7385, 34.4905],
 };
 
 export function normalizeCountyStem(raw: string): string {

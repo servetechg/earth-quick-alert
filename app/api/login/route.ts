@@ -8,6 +8,8 @@ import SystemStatus from '@/models/SystemStatus';
 import { recordActivity, ACTIVITY_ACTIONS } from '@/lib/activity-log';
 import { DEMO_PRESENTATION_EMAIL, DEMO_PRESENTATION_PASSWORD } from '@/lib/demo/constants';
 import { ensureArkansasPresentationLicense } from '@/lib/demo/ensure-presentation-license';
+import { clearDemoSimulationCookieOptions } from '@/lib/demo/cookie';
+import { isDemoEligibleEmail } from '@/lib/demo/eligibility';
 
 export async function POST(req: NextRequest) {
     try {
@@ -177,6 +179,11 @@ export async function POST(req: NextRequest) {
             sameSite: 'lax',
             path: '/',
         });
+
+        // Never leave presentation-demo cookie active for county / non-demo accounts.
+        if (!isDemoEligibleEmail(normalizedEmail)) {
+            (await cookies()).set(clearDemoSimulationCookieOptions());
+        }
 
         void recordActivity({
             userId: user._id.toString(),
