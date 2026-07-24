@@ -80,7 +80,9 @@ export type DispatchNotificationInput = {
     skipPush?: boolean;
 };
 
-export async function dispatchUserNotification(input: DispatchNotificationInput): Promise<UserNotificationItem | null> {
+export async function dispatchUserNotification(
+    input: DispatchNotificationInput,
+): Promise<{ item: UserNotificationItem | null; pushSent: boolean }> {
     await connectDB();
 
     const dedupeKey = input.meta?.dedupeKey;
@@ -90,7 +92,10 @@ export async function dispatchUserNotification(input: DispatchNotificationInput)
             'meta.dedupeKey': dedupeKey.trim(),
         }).lean();
         if (existing) {
-            return mapDocToItem(existing as IUserNotification & { _id: { toString(): string } });
+            return {
+                item: mapDocToItem(existing as IUserNotification & { _id: { toString(): string } }),
+                pushSent: false,
+            };
         }
     }
 
@@ -115,52 +120,88 @@ export async function dispatchUserNotification(input: DispatchNotificationInput)
                 'meta.dedupeKey': dedupeKey.trim(),
             }).lean();
             if (existing) {
-                return mapDocToItem(existing as IUserNotification & { _id: { toString(): string } });
+                return {
+                    item: mapDocToItem(existing as IUserNotification & { _id: { toString(): string } }),
+                    pushSent: false,
+                };
             }
         }
         throw e;
     }
 
+    let pushSent = false;
     if (!input.skipPush && input.push) {
-        void sendPushToUser(input.userId, input.push, input.priority ?? 'normal').catch((err) => {
+        const pushPayload = {
+            ...input.push,
+            data: {
+                notificationType: input.type,
+                ...input.push.data,
+            },
+        };
+        try {
+            // Await delivery so callers (esp. survey dispatch) get accurate pushSent.
+            pushSent = await sendPushToUser(
+                input.userId,
+                pushPayload,
+                input.priority ?? 'normal',
+                input.type,
+            );
+        } catch (err) {
             console.warn('[notifications] push delivery failed:', err);
-        });
+            pushSent = false;
+        }
     }
 
-    return mapDocToItem(doc.toObject() as IUserNotification);
+    return {
+        item: mapDocToItem(doc.toObject() as IUserNotification),
+        pushSent,
+    };
 }
 
 async function sendPushToUser(
     userId: string,
     push: NonNullable<DispatchNotificationInput['push']>,
     priority: NotificationPriority,
-): Promise<void> {
+    notificationType?: NotificationType,
+): Promise<boolean> {
     const user = await User.findById(userId)
         .select('expoPushToken notificationPreferences role')
         .lean();
-    if (!user) return;
+    if (!user) return false;
 
     const prefs = (user as { notificationPreferences?: Record<string, unknown> }).notificationPreferences;
-    if (!prefsAllowPush(prefs)) return;
-    if (priority === 'critical' || priority === 'high') {
-        if (!prefsAllowMajorAlerts(prefs)) return;
-    }
+    if (!prefsAllowPush(prefs)) return false;
+
+    // Survey invites are actionable ops notifications — do not gate on "major alerts".
+    const requiresMajorAlerts =
+        (priority === 'critical' || priority === 'high') &&
+        notificationType !== 'disaster_survey';
+    if (requiresMajorAlerts && !prefsAllowMajorAlerts(prefs)) return false;
 
     const token = String((user as { expoPushToken?: string }).expoPushToken ?? '').trim();
-    if (!token) return;
+    if (!token) return false;
 
-    await sendExpoPushNotification({
+    const result = await sendExpoPushNotification({
         to: token,
         title: push.title,
         body: push.body,
         data: {
+            // Prefer caller screen (e.g. disasterSurvey); fall back to inbox.
             screen: 'notifications',
-            notificationType: push.data?.notificationType,
+            notificationType: push.data?.notificationType ?? notificationType,
             deepLink: push.data?.deepLink,
             ...push.data,
         },
-        sound: priority === 'critical' || priority === 'high' ? 'default' : 'default',
+        sound: 'default',
+        channelId:
+            push.channelId ??
+            (notificationType === 'disaster_survey' ? 'disaster-alerts' : 'inbox-updates'),
+        priority: priority === 'critical' || priority === 'high' ? 'high' : 'default',
     });
+    if (!result.ok) {
+        console.warn('[notifications] Expo push rejected:', result.error);
+    }
+    return result.ok;
 }
 
 function locationInJurisdiction(

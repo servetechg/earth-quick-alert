@@ -6,6 +6,9 @@ export type ExpoPushPayload = {
     body: string;
     data?: Record<string, unknown>;
     sound?: 'default' | null;
+    /** Android notification channel id (must match a channel created on the device). */
+    channelId?: string;
+    priority?: 'default' | 'normal' | 'high';
 };
 
 export async function sendExpoPushNotification(
@@ -17,19 +20,23 @@ export async function sendExpoPushNotification(
     }
 
     try {
+        const body: Record<string, unknown> = {
+            to: token,
+            title: payload.title,
+            body: payload.body,
+            data: payload.data ?? {},
+            sound: payload.sound ?? 'default',
+        };
+        if (payload.channelId) body.channelId = payload.channelId;
+        if (payload.priority) body.priority = payload.priority;
+
         const res = await fetch(EXPO_PUSH_URL, {
             method: 'POST',
             headers: {
                 Accept: 'application/json',
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({
-                to: token,
-                title: payload.title,
-                body: payload.body,
-                data: payload.data ?? {},
-                sound: payload.sound ?? 'default',
-            }),
+            body: JSON.stringify(body),
         });
 
         const data = (await res.json().catch(() => ({}))) as {

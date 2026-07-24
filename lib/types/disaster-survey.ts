@@ -20,6 +20,9 @@ export type DisasterSurveyCampaignStatus = 'draft' | 'dispatched' | 'closed';
 
 export type DisasterSurveyTriggerType = 'manual' | 'auto';
 
+/** Who receives invitations when a campaign is dispatched. */
+export type DisasterSurveyTargetMode = 'alert_area' | 'specific' | 'all_scope';
+
 export type DisasterSurveyInvitationStatus = 'pending' | 'opened' | 'submitted';
 
 export type DisasterSurveyProfileDocumentRef = {
