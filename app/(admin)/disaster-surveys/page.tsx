@@ -27,6 +27,7 @@ import type { DisasterSurveyProfileSnapshot } from '@/lib/types/disaster-survey'
 import { cn } from '@/lib/utils';
 import { Loader2, Send, X } from 'lucide-react';
 import { toast } from 'sonner';
+import { useUser } from '@/lib/store/user-store';
 
 type Campaign = {
     id: string;
@@ -36,6 +37,7 @@ type Campaign = {
     status: string;
     invitedCount: number;
     responseCount: number;
+    targetMode?: string;
     targetUserCount?: number;
     dispatchedAt?: string;
     createdAt: string;
@@ -162,6 +164,13 @@ function ProfileSnapshotView({ snapshot }: { snapshot: DisasterSurveyProfileSnap
 }
 
 export default function DisasterSurveysPage() {
+    const { me } = useUser();
+    const role = (me?.role || '').toLowerCase();
+    const isSuperAdmin = role === 'super-admin';
+    const allScopeLabel = isSuperAdmin
+        ? 'All users of our app'
+        : 'All users in allocated full area';
+
     const [tab, setTab] = useState<'campaigns' | 'responses'>('responses');
     const [campaigns, setCampaigns] = useState<Campaign[]>([]);
     const [responses, setResponses] = useState<ResponseRow[]>([]);
@@ -170,7 +179,10 @@ export default function DisasterSurveysPage() {
     const [dispatchingId, setDispatchingId] = useState<string | null>(null);
     const [newTitle, setNewTitle] = useState('');
     const [newDescription, setNewDescription] = useState('');
-    const [targetMode, setTargetMode] = useState<'alert_area' | 'specific'>('alert_area');
+    const [titleError, setTitleError] = useState('');
+    const [targetMode, setTargetMode] = useState<'alert_area' | 'specific' | 'all_scope'>(
+        'alert_area',
+    );
     const [userSearch, setUserSearch] = useState('');
     const [searchResults, setSearchResults] = useState<TargetUser[]>([]);
     const [searchLoading, setSearchLoading] = useState(false);
@@ -244,9 +256,11 @@ export default function DisasterSurveysPage() {
 
     const createCampaign = async (dispatch: boolean) => {
         if (!newTitle.trim()) {
+            setTitleError('Campaign title is required');
             toast.error('Campaign title is required');
             return;
         }
+        setTitleError('');
         if (targetMode === 'specific' && dispatch && selectedUsers.length === 0) {
             toast.error('Select at least one user to dispatch');
             return;
@@ -261,11 +275,17 @@ export default function DisasterSurveysPage() {
                     title: newTitle.trim(),
                     description: newDescription.trim(),
                     dispatch,
+                    targetMode,
                     userIds:
                         targetMode === 'specific' ? selectedUsers.map((u) => u.id) : undefined,
                 }),
             });
-            if (!res.ok) throw new Error('Create failed');
+            if (!res.ok) {
+                const errBody = await res.json().catch(() => ({}));
+                throw new Error(
+                    typeof errBody?.error === 'string' ? errBody.error : 'Create failed',
+                );
+            }
             const data = await res.json();
             toast.success(
                 dispatch
@@ -274,17 +294,28 @@ export default function DisasterSurveysPage() {
             );
             setNewTitle('');
             setNewDescription('');
+            setTitleError('');
             setTargetMode('alert_area');
             setUserSearch('');
             setSearchResults([]);
             setSelectedUsers([]);
             await loadCampaigns();
             if (dispatch) await loadResponses();
-        } catch {
-            toast.error('Failed to create campaign');
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : 'Failed to create campaign');
         } finally {
             setCreating(false);
         }
+    };
+
+    const targetModeLabel = (c: Campaign) => {
+        if (c.targetMode === 'all_scope') {
+            return isSuperAdmin ? 'all app users' : 'jurisdiction-wide';
+        }
+        if (c.targetMode === 'specific' || (c.targetUserCount && c.targetUserCount > 0)) {
+            return `${c.targetUserCount ?? 0} specific users`;
+        }
+        return 'alert area targeting';
     };
 
     const dispatchCampaign = async (id: string) => {
@@ -379,9 +410,17 @@ export default function DisasterSurveysPage() {
                                 <Input
                                     id="camp-title"
                                     value={newTitle}
-                                    onChange={(e) => setNewTitle(e.target.value)}
+                                    onChange={(e) => {
+                                        setNewTitle(e.target.value);
+                                        if (titleError) setTitleError('');
+                                    }}
                                     placeholder="e.g. Tornado — Central Arkansas"
+                                    aria-invalid={Boolean(titleError)}
+                                    className={titleError ? 'border-red-500 focus-visible:ring-red-500' : undefined}
                                 />
+                                {titleError ? (
+                                    <p className="mt-1 text-sm text-red-600">{titleError}</p>
+                                ) : null}
                             </div>
                             <div>
                                 <Label htmlFor="camp-desc">Description</Label>
@@ -397,7 +436,7 @@ export default function DisasterSurveysPage() {
                                 <Select
                                     value={targetMode}
                                     onValueChange={(v) =>
-                                        setTargetMode(v as 'alert_area' | 'specific')
+                                        setTargetMode(v as 'alert_area' | 'specific' | 'all_scope')
                                     }
                                 >
                                     <SelectTrigger className="max-w-xl">
@@ -408,8 +447,16 @@ export default function DisasterSurveysPage() {
                                             All users in active alert areas
                                         </SelectItem>
                                         <SelectItem value="specific">Select specific users</SelectItem>
+                                        <SelectItem value="all_scope">{allScopeLabel}</SelectItem>
                                     </SelectContent>
                                 </Select>
+                                {targetMode === 'all_scope' ? (
+                                    <p className="text-xs text-slate-500 mt-1.5">
+                                        {isSuperAdmin
+                                            ? 'Survey invitations will be sent to every approved mobile app user.'
+                                            : 'Survey invitations will be sent to all approved mobile users inside your license area (state, county, or radius).'}
+                                    </p>
+                                ) : null}
                             </div>
                             {targetMode === 'specific' && (
                                 <div className="space-y-3 max-w-xl border rounded-lg p-4 bg-slate-50/50">
@@ -511,11 +558,8 @@ export default function DisasterSurveysPage() {
                                 <div>
                                     <div className="font-semibold text-slate-900">{c.title}</div>
                                     <div className="text-sm text-slate-500 mt-1">
-                                        {c.triggerType} ·{' '}
-                                        {c.targetUserCount
-                                            ? `${c.targetUserCount} specific users`
-                                            : 'alert area targeting'}{' '}
-                                        · {c.invitedCount} invited · {c.responseCount} responses
+                                        {c.triggerType} · {targetModeLabel(c)} · {c.invitedCount}{' '}
+                                        invited · {c.responseCount} responses
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-2">

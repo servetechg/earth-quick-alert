@@ -35,6 +35,7 @@ export const metadata: Metadata = {
 
 import { SafetyProvider } from '@/components/providers/safety-provider'
 import { Toaster } from '@/components/ui/toaster'
+import { Toaster as SonnerToaster } from '@/components/ui/sonner'
 
 export default function RootLayout({
   children,
@@ -57,6 +58,7 @@ export default function RootLayout({
           </UserProvider>
         </AuthProvider>
         <Toaster />
+        <SonnerToaster />
         <Analytics />
       </body>
     </html>
