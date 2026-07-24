@@ -11,6 +11,20 @@ export type ExpoPushPayload = {
     priority?: 'default' | 'normal' | 'high';
 };
 
+type ExpoTicket = {
+    status?: string;
+    message?: string;
+    details?: { error?: string };
+};
+
+function normalizeTickets(data: unknown): ExpoTicket[] {
+    if (!data || typeof data !== 'object') return [];
+    const root = data as { data?: ExpoTicket | ExpoTicket[] };
+    if (Array.isArray(root.data)) return root.data;
+    if (root.data && typeof root.data === 'object') return [root.data];
+    return [];
+}
+
 export async function sendExpoPushNotification(
     payload: ExpoPushPayload,
 ): Promise<{ ok: boolean; error?: string }> {
@@ -39,17 +53,23 @@ export async function sendExpoPushNotification(
             body: JSON.stringify(body),
         });
 
-        const data = (await res.json().catch(() => ({}))) as {
-            data?: { status?: string; message?: string }[];
-        };
-
+        const raw = await res.json().catch(() => ({}));
         if (!res.ok) {
             return { ok: false, error: `Expo push HTTP ${res.status}` };
         }
 
-        const ticket = data.data?.[0];
-        if (ticket?.status === 'error') {
-            return { ok: false, error: ticket.message ?? 'Expo push error' };
+        const tickets = normalizeTickets(raw);
+        const errored = tickets.find((t) => t.status === 'error');
+        if (errored) {
+            return {
+                ok: false,
+                error: errored.message ?? errored.details?.error ?? 'Expo push error',
+            };
+        }
+
+        // Expo may return an empty body on some edge cases — treat as failure.
+        if (tickets.length === 0) {
+            return { ok: false, error: 'Expo push returned no ticket' };
         }
 
         return { ok: true };

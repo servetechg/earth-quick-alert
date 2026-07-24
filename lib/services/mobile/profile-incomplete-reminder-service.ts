@@ -130,10 +130,15 @@ export async function processProfileIncompleteReminders(): Promise<ProfileIncomp
 
 export async function saveExpoPushToken(userId: string, expoPushToken: string): Promise<void> {
     await connectDB();
-    await User.updateOne(
+    const token = expoPushToken.trim();
+    const result = await User.updateOne(
         { _id: userId, role: MOBILE_ROLE },
-        { $set: { expoPushToken: expoPushToken.trim() } },
+        { $set: { expoPushToken: token } },
     );
+    if (result.matchedCount === 0) {
+        // Fallback: some legacy docs may not match role filter narrowly.
+        await User.updateOne({ _id: userId }, { $set: { expoPushToken: token } });
+    }
 }
 
 export async function clearExpoPushToken(userId: string): Promise<void> {

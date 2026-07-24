@@ -15,7 +15,8 @@ const pushTokenSchema = z.object({
         .string()
         .trim()
         .min(1, 'expoPushToken is required')
-        .regex(/^Expo(nent)?PushToken\[/, 'Invalid Expo push token format'),
+        // ExpoGo / EAS tokens: ExponentPushToken[...] or ExpoPushToken[...]
+        .regex(/^Expo(nent)?PushToken\[.+\]$/, 'Invalid Expo push token format'),
 });
 
 export async function PUT(req: NextRequest) {
