@@ -289,9 +289,18 @@ export default function DisasterSurveysPage() {
             const data = await res.json();
             toast.success(
                 dispatch
-                    ? `Campaign dispatched to ${data.dispatch?.invited ?? 0} users`
+                    ? `Campaign dispatched to ${data.dispatch?.invited ?? 0} users (${data.dispatch?.pushSent ?? 0} push, ${data.dispatch?.emailSent ?? 0} email)`
                     : 'Campaign created',
             );
+            if (
+                dispatch &&
+                (data.dispatch?.invited ?? 0) > 0 &&
+                (data.dispatch?.pushSent ?? 0) === 0
+            ) {
+                toast.message(
+                    'No remote Expo push tokens on device yet — users still get in-app notifications. Open the mobile app once (with notification permission) then re-dispatch, or ensure FCM is configured for the Android build.',
+                );
+            }
             setNewTitle('');
             setNewDescription('');
             setTitleError('');
@@ -327,7 +336,14 @@ export default function DisasterSurveysPage() {
             });
             if (!res.ok) throw new Error('Dispatch failed');
             const data = await res.json();
-            toast.success(`Invited ${data.invited} users (${data.pushSent} push, ${data.emailSent} email)`);
+            toast.success(
+                `Invited ${data.invited} users (${data.pushSent} push, ${data.emailSent} email)`,
+            );
+            if ((data.invited ?? 0) > 0 && (data.pushSent ?? 0) === 0) {
+                toast.message(
+                    'No remote Expo push tokens saved for those users yet. They still receive in-app notifications; open the app on-device to register push, then re-dispatch.',
+                );
+            }
             await loadCampaigns();
         } catch {
             toast.error('Failed to dispatch campaign');
