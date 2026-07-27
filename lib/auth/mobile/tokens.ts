@@ -7,8 +7,8 @@ import type { Types } from 'mongoose';
 const SECRET_KEY = process.env.JWT_SECRET || 'ready2go-emergency-dashboard-secret-key-2026';
 const key = new TextEncoder().encode(SECRET_KEY);
 
-const ACCESS_TTL = process.env.MOBILE_ACCESS_TOKEN_TTL || '1h';
-const REFRESH_DAYS = Number(process.env.MOBILE_REFRESH_TOKEN_DAYS || '30');
+const ACCESS_TTL = process.env.MOBILE_ACCESS_TOKEN_TTL || '7d';
+const REFRESH_DAYS = Number(process.env.MOBILE_REFRESH_TOKEN_DAYS || '90');
 
 export function randomToken(bytes = 32): string {
     return crypto.randomBytes(bytes).toString('hex');

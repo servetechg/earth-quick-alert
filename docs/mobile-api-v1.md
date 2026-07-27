@@ -40,8 +40,8 @@ Authorization: Bearer <accessToken>
 
 | Token | Lifetime (default) | Storage (app) |
 |-------|-------------------|-------------|
-| `accessToken` | 1 hour (`MOBILE_ACCESS_TOKEN_TTL`) | Secure storage (e.g. Keychain / EncryptedStorage) |
-| `refreshToken` | 30 days (`MOBILE_REFRESH_TOKEN_DAYS`) | Same secure storage |
+| `accessToken` | 7 days (`MOBILE_ACCESS_TOKEN_TTL`) | Secure storage (e.g. Keychain / EncryptedStorage) |
+| `refreshToken` | 90 days (`MOBILE_REFRESH_TOKEN_DAYS`) | Same secure storage |
 
 When `accessToken` expires, call `POST /auth/refresh` with `refreshToken`. Refresh **rotates** the refresh token — save the new one from the response.
 
