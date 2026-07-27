@@ -43,7 +43,7 @@ Authorization: Bearer <accessToken>
 | `accessToken` | 7 days (`MOBILE_ACCESS_TOKEN_TTL`) | Secure storage (e.g. Keychain / EncryptedStorage) |
 | `refreshToken` | 90 days (`MOBILE_REFRESH_TOKEN_DAYS`) | Same secure storage |
 
-When `accessToken` expires, call `POST /auth/refresh` with `refreshToken`. Refresh **rotates** the refresh token — save the new one from the response.
+When `accessToken` expires, call `POST /auth/refresh` with `refreshToken`. Refresh **slides** the refresh token expiry and returns the same refresh token (no rotation), so a force-killed app does not lose the session.
 
 ### Standard auth response
 
