@@ -981,7 +981,10 @@ export function SituationalLeafletMap({
                         pathOptions={{
                             color: line.strokeColor ?? '#DC2626',
                             opacity: line.strokeOpacity ?? 0.9,
-                            weight: line.strokeWeight ?? (line.kind === 'road_closure' ? 7 : 4),
+                            weight: line.strokeWeight ?? (line.kind === 'road_closure' ? 6 : 4),
+                            ...(line.kind === 'road_closure'
+                                ? { dashArray: '10 8', lineCap: 'butt' as const }
+                                : {}),
                         }}
                         eventHandlers={{
                             click: () => {

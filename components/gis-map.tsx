@@ -1587,20 +1587,14 @@ export function GISMap({
       const strokeColor =
         status === 'Closed' ? '#DC2626' : status === 'Restricted' ? '#F59E0B' : '#EAB308'
 
-      polylines.push({
-        id: `closure-shadow-${String(raw.id)}`,
-        path,
-        strokeColor: '#7F1D1D',
-        strokeWeight: 11,
-        strokeOpacity: 0.35,
-        kind: 'road_closure',
-      })
+      // Single dashed polyline (road-followed path). No thick solid shadow —
+      // that made sparse 2-point chords look worse.
       polylines.push({
         id: String(raw.id),
         path,
         strokeColor,
-        strokeWeight: 7,
-        strokeOpacity: 0.92,
+        strokeWeight: 6,
+        strokeOpacity: 0.95,
         kind: 'road_closure',
         label: String(raw.roadName ?? 'Road closure'),
         closure: {
@@ -2511,25 +2505,33 @@ export function GISMap({
             )
           : []
         if (path.length < 2) continue
-        const mid = path[Math.floor(path.length / 2)]!
-        if (!inUsaView(mid.lat, mid.lng)) continue
-        if (!skipCoverageFilter && !markerInCoverage({ lat: mid.lat, lng: mid.lng })) continue
-        if (skipCoverageFilter && !markerInLayerViewport(mid.lat, mid.lng)) continue
-        const parts = [closure.status]
-        if (closure.reason) parts.push(closure.reason)
-        if (closure.source) parts.push(`Source: ${closure.source}`)
-        enabledLayerMarkers.push({
-          id: `road-closure-marker-${closure.id}`,
-          position: { lat: mid.lat, lng: mid.lng },
-          title: closure.roadName,
-          type: 'infrastructure' as const,
-          category: ROAD_CLOSURES_MAP_LAYER.label,
-          status: closure.status,
-          location: closure.startLocation ?? closure.roadName,
-          description: parts.join(' · '),
-          color: ROAD_CLOSURES_MAP_LAYER.color,
-          icon: ROAD_CLOSURES_MAP_LAYER.markerIcon,
-        })
+        const ends = [path[0]!, path[path.length - 1]!]
+        const uniqueEnds =
+          ends[0].lat === ends[1].lat && ends[0].lng === ends[1].lng
+            ? [ends[0]]
+            : ends
+        let endIdx = 0
+        for (const pt of uniqueEnds) {
+          if (!inUsaView(pt.lat, pt.lng)) continue
+          if (!skipCoverageFilter && !markerInCoverage({ lat: pt.lat, lng: pt.lng })) continue
+          if (skipCoverageFilter && !markerInLayerViewport(pt.lat, pt.lng)) continue
+          const parts = [closure.status]
+          if (closure.reason) parts.push(closure.reason)
+          if (closure.source) parts.push(`Source: ${closure.source}`)
+          enabledLayerMarkers.push({
+            id: `road-closure-marker-${closure.id}-${endIdx}`,
+            position: { lat: pt.lat, lng: pt.lng },
+            title: closure.roadName,
+            type: 'infrastructure' as const,
+            category: ROAD_CLOSURES_MAP_LAYER.label,
+            status: closure.status,
+            location: closure.startLocation ?? closure.roadName,
+            description: parts.join(' · '),
+            color: ROAD_CLOSURES_MAP_LAYER.color,
+            icon: ROAD_CLOSURES_MAP_LAYER.markerIcon,
+          })
+          endIdx += 1
+        }
       }
     }
 

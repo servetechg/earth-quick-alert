@@ -1065,11 +1065,28 @@ function GoogleMapInner({
                             }}
                             options={{
                                 strokeColor: line.strokeColor ?? '#DC2626',
-                                strokeOpacity: line.strokeOpacity ?? 0.9,
-                                strokeWeight: line.strokeWeight ?? (line.kind === 'road_closure' ? 7 : 4),
+                                strokeOpacity: line.kind === 'road_closure' ? 0 : (line.strokeOpacity ?? 0.9),
+                                strokeWeight: line.strokeWeight ?? (line.kind === 'road_closure' ? 6 : 4),
                                 geodesic: true,
                                 zIndex: line.kind === 'road_closure' ? 3 : 2,
                                 clickable: Boolean(line.closure),
+                                ...(line.kind === 'road_closure' && typeof google !== 'undefined'
+                                    ? {
+                                          icons: [
+                                              {
+                                                  icon: {
+                                                      path: 'M 0,-1 0,1',
+                                                      strokeOpacity: line.strokeOpacity ?? 0.95,
+                                                      strokeColor: line.strokeColor ?? '#DC2626',
+                                                      strokeWeight: line.strokeWeight ?? 6,
+                                                      scale: 3,
+                                                  },
+                                                  offset: '0',
+                                                  repeat: '14px',
+                                              },
+                                          ],
+                                      }
+                                    : {}),
                             }}
                         />
                     ))}

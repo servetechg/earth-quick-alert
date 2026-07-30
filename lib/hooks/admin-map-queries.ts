@@ -634,7 +634,7 @@ export function useRoadClosures(opts: {
     const scopeKey = opts.scopeState?.trim().toUpperCase() || 'none';
 
     return useQuery({
-        queryKey: ['road-closures', boundsKey, scopeKey],
+        queryKey: ['road-closures', 'v10', boundsKey, scopeKey],
         queryFn: () =>
             fetchRoadClosures({
                 bounds: opts.bounds ?? undefined,
