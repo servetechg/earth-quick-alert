@@ -23,7 +23,30 @@ export type DisasterSurveyTriggerType = 'manual' | 'auto';
 /** Who receives invitations when a campaign is dispatched. */
 export type DisasterSurveyTargetMode = 'alert_area' | 'specific' | 'all_scope';
 
-export type DisasterSurveyInvitationStatus = 'pending' | 'opened' | 'submitted';
+export type DisasterSurveyInvitationStatus =
+    | 'pending'
+    | 'opened'
+    | 'submitted'
+    | 'needs_info';
+
+export type DisasterSurveyMissingField =
+    | 'comments'
+    | 'incident_pictures'
+    | 'incident_videos';
+
+export const DISASTER_SURVEY_MISSING_FIELDS = [
+    'comments',
+    'incident_pictures',
+    'incident_videos',
+] as const satisfies readonly DisasterSurveyMissingField[];
+
+export type DisasterSurveyMediaRef = {
+    url: string;
+    fileName: string;
+    mimeType?: string;
+    publicId?: string;
+    resourceType?: 'image' | 'video' | 'raw';
+};
 
 export type DisasterSurveyProfileDocumentRef = {
     fileName: string;

@@ -66,7 +66,29 @@ type ResponseDetail = ResponseRow & {
     profileSnapshot: DisasterSurveyProfileSnapshot;
     userSnapshot: Record<string, unknown>;
     fundingNotes: string;
+    comments?: string;
+    incidentPictures?: Array<{ url: string; fileName?: string }>;
+    incidentVideos?: Array<{ url: string; fileName?: string }>;
+    missingOptionalFields?: string[];
+    requestedMissingFields?: string[];
+    missingInfoRequestedAt?: string | null;
 };
+
+const MISSING_FIELD_LABELS: Record<string, string> = {
+    comments: 'Comments',
+    incident_pictures: 'Incident pictures',
+    incident_videos: 'Incident videos',
+};
+
+/** Cloudinary first-frame poster for video URLs (so_0 transformation). */
+function cloudinaryVideoPoster(url: string): string | undefined {
+    if (!url.includes('res.cloudinary.com') || !url.includes('/video/upload/')) {
+        return undefined;
+    }
+    return url
+        .replace('/video/upload/', '/video/upload/so_0/')
+        .replace(/\.(mp4|mov|webm|m4v)(\?.*)?$/i, '.jpg$2');
+}
 
 const FUNDING_LABELS: Record<string, string> = {
     pending: 'Pending',
@@ -193,6 +215,7 @@ export default function DisasterSurveysPage() {
     const [fundingStatus, setFundingStatus] = useState('pending');
     const [fundingNotes, setFundingNotes] = useState('');
     const [savingFunding, setSavingFunding] = useState(false);
+    const [requestingMissing, setRequestingMissing] = useState(false);
 
     const loadCampaigns = useCallback(async () => {
         const res = await fetch('/api/admin/disaster-surveys/campaigns', { credentials: 'include' });
@@ -388,6 +411,42 @@ export default function DisasterSurveysPage() {
             toast.error('Failed to update funding');
         } finally {
             setSavingFunding(false);
+        }
+    };
+
+    const requestMissingDetails = async () => {
+        if (!detail) return;
+        const missing = detail.missingOptionalFields ?? [];
+        if (missing.length === 0) {
+            toast.message('This user already provided comments, pictures, and videos');
+            return;
+        }
+        setRequestingMissing(true);
+        try {
+            const res = await fetch(
+                `/api/admin/disaster-surveys/responses/${detail.id}/request-missing-info`,
+                {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ fields: missing }),
+                },
+            );
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                throw new Error(
+                    typeof data?.error === 'string' ? data.error : 'Request failed',
+                );
+            }
+            toast.success(
+                `Reminder sent (${data.pushSent ? 'push' : 'no push'}, ${data.emailSent ? 'email' : 'no email'}, in-app)`,
+            );
+            await openDetail(detail.id);
+            await loadResponses();
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : 'Failed to send reminder');
+        } finally {
+            setRequestingMissing(false);
         }
     };
 
@@ -685,6 +744,129 @@ export default function DisasterSurveysPage() {
                                             {NEED_LABELS[n] ?? n}
                                         </Badge>
                                     ))}
+                                </div>
+                            </div>
+
+                            <div>
+                                <div className="font-medium mb-1">Optional incident details</div>
+                                <div className="space-y-3 rounded-lg bg-slate-50 p-4">
+                                    <div>
+                                        <div className="font-medium text-slate-800">Comments</div>
+                                        <p className="text-slate-600 mt-0.5 whitespace-pre-wrap">
+                                            {detail.comments?.trim()
+                                                ? detail.comments
+                                                : 'Not provided'}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <div className="font-medium text-slate-800">
+                                            Incident pictures
+                                        </div>
+                                        {detail.incidentPictures &&
+                                        detail.incidentPictures.length > 0 ? (
+                                            <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                                                {detail.incidentPictures.map((pic) => (
+                                                    <a
+                                                        key={pic.url}
+                                                        href={pic.url}
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                        className="block overflow-hidden rounded-md border bg-white"
+                                                    >
+                                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                        <img
+                                                            src={pic.url}
+                                                            alt={pic.fileName || 'Incident picture'}
+                                                            className="h-28 w-full object-cover"
+                                                        />
+                                                    </a>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <p className="text-slate-600 mt-0.5">Not provided</p>
+                                        )}
+                                    </div>
+                                    <div>
+                                        <div className="font-medium text-slate-800">
+                                            Incident videos
+                                        </div>
+                                        {detail.incidentVideos &&
+                                        detail.incidentVideos.length > 0 ? (
+                                            <div className="mt-2 space-y-3">
+                                                {detail.incidentVideos.map((vid) => {
+                                                    const poster = cloudinaryVideoPoster(vid.url);
+                                                    return (
+                                                        <div
+                                                            key={vid.url}
+                                                            className="overflow-hidden rounded-md border bg-black"
+                                                        >
+                                                            <video
+                                                                src={vid.url}
+                                                                controls
+                                                                preload="metadata"
+                                                                playsInline
+                                                                poster={poster}
+                                                                className="aspect-video w-full max-h-64 bg-black object-contain"
+                                                            >
+                                                                Your browser does not support video playback.
+                                                            </video>
+                                                            <div className="flex items-center justify-between gap-2 bg-white px-3 py-2">
+                                                                <span className="truncate text-xs text-slate-600">
+                                                                    {vid.fileName || 'Incident video'}
+                                                                </span>
+                                                                <a
+                                                                    href={vid.url}
+                                                                    target="_blank"
+                                                                    rel="noreferrer"
+                                                                    className="shrink-0 text-xs text-blue-600 underline"
+                                                                >
+                                                                    Open full size
+                                                                </a>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        ) : (
+                                            <p className="text-slate-600 mt-0.5">Not provided</p>
+                                        )}
+                                    </div>
+
+                                    {(detail.missingOptionalFields?.length ?? 0) > 0 ? (
+                                        <div className="border-t pt-3 space-y-2">
+                                            <p className="text-xs text-amber-700">
+                                                Missing:{' '}
+                                                {(detail.missingOptionalFields ?? [])
+                                                    .map((f) => MISSING_FIELD_LABELS[f] ?? f)
+                                                    .join(', ')}
+                                            </p>
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                disabled={requestingMissing}
+                                                onClick={() => void requestMissingDetails()}
+                                            >
+                                                {requestingMissing ? (
+                                                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                                                ) : (
+                                                    <Send className="w-4 h-4 mr-2" />
+                                                )}
+                                                Request missing details (push, email &amp; in-app)
+                                            </Button>
+                                            {detail.missingInfoRequestedAt ? (
+                                                <p className="text-xs text-slate-500">
+                                                    Last requested{' '}
+                                                    {new Date(
+                                                        detail.missingInfoRequestedAt,
+                                                    ).toLocaleString()}
+                                                </p>
+                                            ) : null}
+                                        </div>
+                                    ) : (
+                                        <p className="text-xs text-emerald-700">
+                                            All optional details were provided.
+                                        </p>
+                                    )}
                                 </div>
                             </div>
 
