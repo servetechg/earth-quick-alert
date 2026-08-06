@@ -31,6 +31,7 @@ import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { ResponderSidebar } from '@/components/responder-sidebar'
 import { notifyAuthSessionChanged } from '@/lib/sync-client-user-profile'
+import { homePathForRole } from '@/lib/auth/home-path'
 
 export const menuItems = [
   { icon: LayoutDashboard, label: 'Dashboard', href: '/admin-dashboard' },
@@ -154,10 +155,16 @@ export function Sidebar({ className }: { className?: string }) {
         ]
       : bottomItems
 
+  const logoHomeHref = homePathForRole(userRole)
+
   return (
     <div className={cn("hidden md:flex min-h-0 w-70 shrink-0 flex-col bg-[#33375D] text-white h-full border-r border-slate-700/50", className)}>
-      {/* Logo Section */}
-      <Link href="/" className="p-8 flex flex-col items-center shrink-0 hover:bg-white/5 transition-colors">
+      {/* Logo Section — always return to this role's dashboard home */}
+      <Link
+        href={logoHomeHref}
+        className="p-8 flex flex-col items-center shrink-0 hover:bg-white/5 transition-colors"
+        aria-label="Go to dashboard home"
+      >
         <Image
           src={logo}
           alt="Ready2Go Logo"

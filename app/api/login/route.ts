@@ -3,7 +3,6 @@ import connectDB from '@/lib/mongodb';
 import User from '@/models/User';
 import bcrypt from 'bcryptjs';
 import { encrypt } from '@/lib/auth';
-import { cookies } from 'next/headers';
 import SystemStatus from '@/models/SystemStatus';
 import { recordActivity, ACTIVITY_ACTIONS } from '@/lib/activity-log';
 import { DEMO_PRESENTATION_EMAIL, DEMO_PRESENTATION_PASSWORD } from '@/lib/demo/constants';
@@ -156,33 +155,33 @@ export async function POST(req: NextRequest) {
             systemMode: systemStatus.emergencyMode
         });
 
-        (await cookies()).set('session', session, {
+        const cookieOptions = {
             expires,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax' as const,
+            path: '/',
+        };
+
+        // Attach auth cookies to the JSON response (reliable in App Router).
+        response.cookies.set('session', session, {
+            ...cookieOptions,
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'lax',
-            path: '/',
         });
-
-        (await cookies()).set('userRole', user.role, {
-            expires,
+        response.cookies.set('userRole', user.role, {
+            ...cookieOptions,
             httpOnly: false,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'lax',
-            path: '/',
         });
-
-        (await cookies()).set('accountStatus', user.accountStatus || 'approved', {
-            expires,
+        response.cookies.set('accountStatus', user.accountStatus || 'approved', {
+            ...cookieOptions,
             httpOnly: false,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'lax',
-            path: '/',
         });
 
         // Never leave presentation-demo cookie active for county / non-demo accounts.
         if (!isDemoEligibleEmail(normalizedEmail)) {
-            (await cookies()).set(clearDemoSimulationCookieOptions());
+            const clearDemo = clearDemoSimulationCookieOptions();
+            response.cookies.set(clearDemo.name, clearDemo.value, {
+                ...clearDemo,
+            });
         }
 
         void recordActivity({
