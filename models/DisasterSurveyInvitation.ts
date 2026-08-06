@@ -12,7 +12,12 @@ const DisasterSurveyInvitationSchema = new Schema(
         userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
         status: {
             type: String,
-            enum: ['pending', 'opened', 'submitted'] satisfies DisasterSurveyInvitationStatus[],
+            enum: [
+                'pending',
+                'opened',
+                'submitted',
+                'needs_info',
+            ] satisfies DisasterSurveyInvitationStatus[],
             default: 'pending',
             index: true,
         },
