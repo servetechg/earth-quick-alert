@@ -21,7 +21,7 @@ import {
     wzdxStateCacheKey,
 } from '@/lib/gis/wzdx/wzdx-feed-cache'
 
-const FEED_FETCH_TIMEOUT_MS = 90_000
+const FEED_FETCH_TIMEOUT_MS = 6_000
 
 function wzdxHeaders(feed: WzdxFeedConfig): HeadersInit {
     const headers: Record<string, string> = {

@@ -629,7 +629,7 @@ export function useRoadClosures(opts: {
     scopeState?: string;
 }) {
     const boundsKey = opts.bounds
-        ? `${opts.bounds.west.toFixed(3)},${opts.bounds.south.toFixed(3)},${opts.bounds.east.toFixed(3)},${opts.bounds.north.toFixed(3)}`
+        ? `${opts.bounds.west.toFixed(2)},${opts.bounds.south.toFixed(2)},${opts.bounds.east.toFixed(2)},${opts.bounds.north.toFixed(2)}`
         : 'none';
     const scopeKey = opts.scopeState?.trim().toUpperCase() || 'none';
 

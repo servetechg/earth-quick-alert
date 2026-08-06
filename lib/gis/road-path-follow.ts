@@ -15,8 +15,8 @@ export type LatLng = { lat: number; lng: number }
 
 const MAX_STRAIGHT_SEGMENT_KM = 0.15
 const MIN_ROAD_SINUOSITY = 1.12
-const ROUTE_TIMEOUT_MS = 12_000
-const OVERPASS_TIMEOUT_MS = 20_000
+const ROUTE_TIMEOUT_MS = 2_500
+const OVERPASS_TIMEOUT_MS = 2_500
 /** Reject navigator fallbacks that wander farther than this from the chord. */
 const MAX_ROUTE_CROSS_TRACK_KM = 0.35
 const MAX_ROUTE_LENGTH_RATIO = 1.55
@@ -26,9 +26,14 @@ const OVERPASS_ENDPOINTS = [
     'https://overpass.kumi.systems/api/interpreter',
 ]
 
+/** Circuit breakers to disable failing/rate-limited external APIs temporarily. */
+let overpassDisabledUntil = 0
+let osrmDisabledUntil = 0
+
 /** Short in-process cache so a viewport of closures does not hammer Overpass. */
 const overpassCache = new Map<string, { expiresAt: number; ways: OsmWay[] }>()
 const OVERPASS_CACHE_TTL_MS = 5 * 60_000
+const OVERPASS_EMPTY_CACHE_TTL_MS = 60_000
 
 type OsmWay = {
     id: number
@@ -161,6 +166,8 @@ function nodeKey(p: LatLng): string {
 }
 
 async function fetchOverpassWays(query: string): Promise<OsmWay[]> {
+    if (Date.now() < overpassDisabledUntil) return []
+
     const cached = overpassCache.get(query)
     if (cached && cached.expiresAt > Date.now()) return cached.ways
 
@@ -175,7 +182,12 @@ async function fetchOverpassWays(query: string): Promise<OsmWay[]> {
                 headers,
                 signal: AbortSignal.timeout(OVERPASS_TIMEOUT_MS),
             })
-            if (!res.ok) continue
+            if (!res.ok) {
+                if (res.status === 429 || res.status >= 500) {
+                    overpassDisabledUntil = Date.now() + 60_000
+                }
+                continue
+            }
             const data = (await res.json()) as {
                 elements?: Array<{
                     type?: string
@@ -199,14 +211,18 @@ async function fetchOverpassWays(query: string): Promise<OsmWay[]> {
                     geometry: el.geometry.map((g) => ({ lat: g.lat, lng: g.lon })),
                 })
             }
-            if (ways.length > 0) {
-                overpassCache.set(query, { ways, expiresAt: Date.now() + OVERPASS_CACHE_TTL_MS })
-                return ways
-            }
+            overpassCache.set(query, {
+                ways,
+                expiresAt: Date.now() + (ways.length > 0 ? OVERPASS_CACHE_TTL_MS : OVERPASS_EMPTY_CACHE_TTL_MS),
+            })
+            return ways
         } catch {
-            // try next endpoint
+            // Overpass endpoint timeout or network failure -> trip circuit breaker
+            overpassDisabledUntil = Date.now() + 60_000
         }
     }
+
+    overpassCache.set(query, { ways: [], expiresAt: Date.now() + OVERPASS_EMPTY_CACHE_TTL_MS })
     return []
 }
 
@@ -490,6 +506,8 @@ async function routeViaGoogleDirections(a: LatLng, b: LatLng): Promise<LatLng[] 
 }
 
 async function routeViaOsrm(a: LatLng, b: LatLng): Promise<LatLng[] | null> {
+    if (Date.now() < osrmDisabledUntil) return null
+
     const url =
         `https://router.project-osrm.org/route/v1/driving/` +
         `${a.lng},${a.lat};${b.lng},${b.lat}?overview=full&geometries=geojson&alternatives=true`
@@ -499,7 +517,10 @@ async function routeViaOsrm(a: LatLng, b: LatLng): Promise<LatLng[] | null> {
             signal: AbortSignal.timeout(ROUTE_TIMEOUT_MS),
             headers: { Accept: 'application/json' },
         })
-        if (!res.ok) return null
+        if (!res.ok) {
+            if (res.status === 429 || res.status >= 500) osrmDisabledUntil = Date.now() + 60_000
+            return null
+        }
         const data = (await res.json()) as {
             code?: string
             routes?: Array<{ geometry?: { coordinates?: number[][] }; distance?: number }>
@@ -523,6 +544,7 @@ async function routeViaOsrm(a: LatLng, b: LatLng): Promise<LatLng[] | null> {
         }
         return best
     } catch {
+        osrmDisabledUntil = Date.now() + 60_000
         return null
     }
 }
@@ -588,5 +610,11 @@ export async function densifyClosurePaths(
     paths: LatLng[][],
     opts?: DensifyOptions,
 ): Promise<LatLng[][]> {
-    return Promise.all(paths.map((p) => densifyPathAlongRoads(p, opts)))
+    const results: LatLng[][] = []
+    const concurrency = 4
+    for (let i = 0; i < paths.length; i += concurrency) {
+        const chunk = paths.slice(i, i + concurrency)
+        results.push(...(await Promise.all(chunk.map((p) => densifyPathAlongRoads(p, opts)))))
+    }
+    return results
 }

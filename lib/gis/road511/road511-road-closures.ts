@@ -10,7 +10,7 @@ import { isGenuineFullRoadClosure } from '@/lib/gis/road511/road511-filters'
 import type { Road511Event, Road511EventsResponse } from '@/lib/gis/road511/road511-types'
 
 const ROAD511_EVENTS_URL = 'https://api.road511.com/api/v1/events'
-const REQUEST_TIMEOUT_MS = 15_000
+const REQUEST_TIMEOUT_MS = 6_000
 const PAGE_LIMIT = 100
 /** Cap scanned pages per jurisdiction (noise-heavy feeds). */
 const MAX_PAGES_PER_JURISDICTION = 6
@@ -246,7 +246,7 @@ async function fetchJurisdictionClosures(
         }
 
         const keepers = result.events.filter((event) => isGenuineFullRoadClosure(event, nowMs))
-        const segmentBatches = await Promise.all(keepers.map((event) => eventToSegments(event)))
+        const segmentBatches = await runBatched(keepers, 4, (event) => eventToSegments(event))
         for (const segments of segmentBatches) {
             for (const segment of segments) {
                 if (!byId.has(segment.id)) byId.set(segment.id, segment)
