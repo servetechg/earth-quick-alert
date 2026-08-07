@@ -47,6 +47,7 @@ export function buildUnifiedEventFromNwsAlert(
             effectiveAt: a.timestamp ?? null,
             onsetAt: null,
             endsAt: a.expiresAt ?? null,
+            ugcZones: Array.isArray(a.zones) && a.zones.length > 0 ? a.zones : null,
         },
     };
 

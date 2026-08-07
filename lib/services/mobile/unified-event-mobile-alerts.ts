@@ -92,6 +92,13 @@ type UnifiedMobileAlert = Alert & {
 function unifiedDocToAlert(doc: UnifiedEventDoc): UnifiedMobileAlert {
     const issuedIso = resolveUnifiedEventIssuedIso(doc);
     const expiresIso = resolveUnifiedEventExpiresIso(doc);
+    const ugcZones = Object.values(doc.properties ?? {})
+        .map((block) =>
+            block && typeof block === 'object' && Array.isArray((block as { ugcZones?: unknown }).ugcZones)
+                ? ((block as { ugcZones: string[] }).ugcZones)
+                : null,
+        )
+        .find((z): z is string[] => Array.isArray(z) && z.length > 0);
 
     return {
         id: doc.externalId || doc._id,
@@ -105,6 +112,11 @@ function unifiedDocToAlert(doc: UnifiedEventDoc): UnifiedMobileAlert {
         affectedAreas: doc.location ? [doc.location] : [],
         areaDesc: doc.location,
         event: doc.name,
+        zones: ugcZones,
+        coordinates:
+            doc.lat != null && doc.lng != null
+                ? { lat: Number(doc.lat), lon: Number(doc.lng) }
+                : undefined,
         sourceDisplay: sourceLabel(doc.source),
         sourceUrl: resolveUnifiedEventSourceUrl(doc),
         unifiedProperties: doc.properties,
