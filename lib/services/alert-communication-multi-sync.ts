@@ -399,15 +399,18 @@ function formatFemaDeclarationTitle(raw: string): string {
 }
 
 function mapFemaDeclaration(r: OpenFemaDisasterRecord): MappedDoc {
-    const ext = r.id
-        ? `fema:${r.id}`
-        : `fema:DR-${r.disasterNumber}-${(r.designatedArea ?? 'area').replace(/\s+/g, '-').slice(0, 80)}`;
+    const disasterNum = r.disasterNumber != null ? String(r.disasterNumber) : '';
+    const decl = r.femaDeclarationString ?? (disasterNum ? `DR-${disasterNum}` : 'DR-unknown');
+    const ext = disasterNum
+        ? `fema:DR-${disasterNum}`
+        : r.id
+          ? `fema:${r.id}`
+          : `fema:${decl}-${(r.designatedArea ?? 'area').replace(/\s+/g, '-').slice(0, 80)}`;
     const loc =
         [r.designatedArea, r.state].filter(Boolean).join(', ') ||
         r.state ||
         'United States';
     const titleRaw = r.declarationTitle || r.incidentType || 'Disaster declaration';
-    const decl = r.femaDeclarationString ?? `DR-${r.disasterNumber ?? '?'}`;
     const incident = (r.incidentType ?? '').toLowerCase();
     const icon: MappedDoc['iconType'] =
         /flood|hurricane|typhoon|rain|coastal|storm surge/.test(incident) ? 'cloud' : 'triangle';
