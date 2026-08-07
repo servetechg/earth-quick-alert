@@ -43,6 +43,11 @@ export async function issueRefreshToken(userId: Types.ObjectId | string): Promis
     return raw;
 }
 
+/**
+ * Validates a refresh token and slides its expiry.
+ * Returns the same raw token (no rotation) so a killed app that hasn't
+ * persisted a rotated token yet won't be logged out on next launch.
+ */
 export async function rotateRefreshToken(
     rawToken: string,
 ): Promise<{ userId: string; newRefreshToken: string } | null> {
@@ -50,11 +55,10 @@ export async function rotateRefreshToken(
     const row = await AuthRefreshToken.findOne({ tokenHash, revokedAt: null });
     if (!row || row.expiresAt.getTime() < Date.now()) return null;
 
-    row.revokedAt = new Date();
+    row.expiresAt = new Date(Date.now() + REFRESH_DAYS * 24 * 60 * 60 * 1000);
     await row.save();
 
-    const newRefreshToken = await issueRefreshToken(row.userId);
-    return { userId: row.userId.toString(), newRefreshToken };
+    return { userId: row.userId.toString(), newRefreshToken: rawToken };
 }
 
 export async function revokeRefreshToken(rawToken: string): Promise<void> {

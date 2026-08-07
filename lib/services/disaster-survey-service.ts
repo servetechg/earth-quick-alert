@@ -1,11 +1,17 @@
 import connectDB from '@/lib/mongodb';
 import { sendDisasterSurveyInviteEmail } from '@/lib/email/disaster-survey-invite-send';
+import { sendDisasterSurveyMissingInfoEmail } from '@/lib/email/disaster-survey-missing-info-send';
 import { fetchPopulationAtRiskAlignedEventFeed } from '@/lib/services/alert-communication-aligned-feed';
 import { dispatchUserNotification } from '@/lib/services/user-notification-service';
 import {
     buildDisasterSurveyProfileSnapshot,
     normalizeStoredProfileSnapshot,
 } from '@/lib/services/disaster-survey-profile-snapshot';
+import {
+    DISASTER_SURVEY_MAX_PICTURES,
+    DISASTER_SURVEY_MAX_VIDEOS,
+    normalizeMediaList,
+} from '@/lib/services/disaster-survey-media-service';
 import { formatProfileAddress } from '@/lib/services/mobile/zone-utils';
 import type { UserProfilePayload } from '@/lib/types/mobile/auth';
 import { listUsersInAlignedAlertAreas } from '@/lib/services/users-in-aligned-alert-areas';
@@ -19,6 +25,8 @@ import {
     DISASTER_IMMEDIATE_NEED_IDS,
     type DisasterImmediateNeedId,
     type DisasterSurveyFundingStatus,
+    type DisasterSurveyMediaRef,
+    type DisasterSurveyMissingField,
     type DisasterSurveyTargetMode,
     type DisasterSurveyTriggerType,
 } from '@/lib/types/disaster-survey';
@@ -475,17 +483,33 @@ export async function dispatchDisasterSurveyCampaign(
     return { campaignId: String(campaign._id), invited, pushSent, emailSent };
 }
 
+export function detectMissingOptionalSurveyFields(row: {
+    comments?: string | null;
+    incidentPictures?: DisasterSurveyMediaRef[] | null;
+    incidentVideos?: DisasterSurveyMediaRef[] | null;
+}): DisasterSurveyMissingField[] {
+    const missing: DisasterSurveyMissingField[] = [];
+    if (!String(row.comments ?? '').trim()) missing.push('comments');
+    if (!Array.isArray(row.incidentPictures) || row.incidentPictures.length === 0) {
+        missing.push('incident_pictures');
+    }
+    if (!Array.isArray(row.incidentVideos) || row.incidentVideos.length === 0) {
+        missing.push('incident_videos');
+    }
+    return missing;
+}
+
 export async function getActiveDisasterSurveyInvitation(userId: string) {
     await connectDB();
     const invitation = (await DisasterSurveyInvitation.findOne({
         userId,
-        status: { $in: ['pending', 'opened'] },
+        status: { $in: ['pending', 'opened', 'needs_info'] },
     })
         .sort({ createdAt: -1 })
         .lean()) as {
         _id: unknown;
         campaignId: unknown;
-        status: 'pending' | 'opened' | 'submitted';
+        status: 'pending' | 'opened' | 'submitted' | 'needs_info';
     } | null;
 
     if (!invitation) return null;
@@ -500,6 +524,42 @@ export async function getActiveDisasterSurveyInvitation(userId: string) {
     } | null;
     if (!campaign || campaign.status === 'closed') return null;
 
+    let responseId: string | undefined;
+    let requestedMissingFields: DisasterSurveyMissingField[] = [];
+    let existingImmediateNeeds: string[] = [];
+    let existingComments = '';
+    let existingPictures: DisasterSurveyMediaRef[] = [];
+    let existingVideos: DisasterSurveyMediaRef[] = [];
+
+    if (invitation.status === 'needs_info') {
+        const response = (await DisasterSurveyResponse.findOne({
+            invitationId: invitation._id,
+            userId,
+        }).lean()) as Record<string, unknown> | null;
+        if (response) {
+            responseId = String(response._id);
+            requestedMissingFields = Array.isArray(response.requestedMissingFields)
+                ? (response.requestedMissingFields as DisasterSurveyMissingField[])
+                : detectMissingOptionalSurveyFields({
+                      comments: String(response.comments ?? ''),
+                      incidentPictures: response.incidentPictures as DisasterSurveyMediaRef[],
+                      incidentVideos: response.incidentVideos as DisasterSurveyMediaRef[],
+                  });
+            existingImmediateNeeds = Array.isArray(response.immediateNeeds)
+                ? (response.immediateNeeds as string[])
+                : [];
+            existingComments = String(response.comments ?? '');
+            existingPictures = normalizeMediaList(
+                response.incidentPictures,
+                DISASTER_SURVEY_MAX_PICTURES,
+            );
+            existingVideos = normalizeMediaList(
+                response.incidentVideos,
+                DISASTER_SURVEY_MAX_VIDEOS,
+            );
+        }
+    }
+
     return {
         invitationId: String(invitation._id),
         campaignId: String(invitation.campaignId),
@@ -509,6 +569,16 @@ export async function getActiveDisasterSurveyInvitation(userId: string) {
             description: campaign.description ?? '',
             dispatchedAt: campaign.dispatchedAt,
         },
+        ...(responseId
+            ? {
+                  responseId,
+                  requestedMissingFields,
+                  existingImmediateNeeds,
+                  existingComments,
+                  existingPictures,
+                  existingVideos,
+              }
+            : {}),
     };
 }
 
@@ -554,6 +624,9 @@ export async function submitDisasterSurveyResponse(
     input: {
         invitationId: string;
         immediateNeeds: DisasterImmediateNeedId[];
+        comments?: string;
+        incidentPictures?: DisasterSurveyMediaRef[];
+        incidentVideos?: DisasterSurveyMediaRef[];
     },
 ) {
     await connectDB();
@@ -573,6 +646,13 @@ export async function submitDisasterSurveyResponse(
     );
     if (needs.length === 0) throw new Error('NEEDS_REQUIRED');
 
+    const comments = String(input.comments ?? '').trim().slice(0, 4000);
+    const incidentPictures = normalizeMediaList(
+        input.incidentPictures,
+        DISASTER_SURVEY_MAX_PICTURES,
+    );
+    const incidentVideos = normalizeMediaList(input.incidentVideos, DISASTER_SURVEY_MAX_VIDEOS);
+
     const userSnapshot = await buildUserSnapshot(userId);
     const profileSnapshot = await buildProfileSnapshot(userId);
     const submittedAt = new Date();
@@ -582,6 +662,9 @@ export async function submitDisasterSurveyResponse(
         invitationId: invitation._id,
         userId,
         immediateNeeds: needs,
+        comments,
+        incidentPictures,
+        incidentVideos,
         profileSnapshot,
         userSnapshot,
         userState: userSnapshot.state,
@@ -603,6 +686,245 @@ export async function submitDisasterSurveyResponse(
     return {
         responseId: String(response._id),
         submittedAt: submittedAt.toISOString(),
+    };
+}
+
+export async function supplementDisasterSurveyResponse(
+    userId: string,
+    input: {
+        invitationId: string;
+        comments?: string;
+        incidentPictures?: DisasterSurveyMediaRef[];
+        incidentVideos?: DisasterSurveyMediaRef[];
+    },
+) {
+    await connectDB();
+
+    const invitation = await DisasterSurveyInvitation.findOne({
+        _id: input.invitationId,
+        userId,
+        status: 'needs_info',
+    });
+    if (!invitation) throw new Error('INVITATION_NOT_FOUND');
+
+    const response = await DisasterSurveyResponse.findOne({
+        invitationId: invitation._id,
+        userId,
+    });
+    if (!response) throw new Error('RESPONSE_NOT_FOUND');
+
+    const requested = Array.isArray(response.requestedMissingFields)
+        ? (response.requestedMissingFields as DisasterSurveyMissingField[])
+        : detectMissingOptionalSurveyFields({
+              comments: response.comments,
+              incidentPictures: response.incidentPictures as DisasterSurveyMediaRef[],
+              incidentVideos: response.incidentVideos as DisasterSurveyMediaRef[],
+          });
+
+    const setDoc: Record<string, unknown> = {};
+
+    if (requested.includes('comments') && typeof input.comments === 'string') {
+        const comments = input.comments.trim().slice(0, 4000);
+        if (comments) setDoc.comments = comments;
+    }
+
+    if (requested.includes('incident_pictures') && input.incidentPictures) {
+        const merged = normalizeMediaList(
+            [
+                ...((response.incidentPictures as DisasterSurveyMediaRef[]) ?? []),
+                ...input.incidentPictures,
+            ],
+            DISASTER_SURVEY_MAX_PICTURES,
+        );
+        setDoc.incidentPictures = merged;
+    }
+
+    if (requested.includes('incident_videos') && input.incidentVideos) {
+        const merged = normalizeMediaList(
+            [
+                ...((response.incidentVideos as DisasterSurveyMediaRef[]) ?? []),
+                ...input.incidentVideos,
+            ],
+            DISASTER_SURVEY_MAX_VIDEOS,
+        );
+        setDoc.incidentVideos = merged;
+    }
+
+    if (Object.keys(setDoc).length === 0) {
+        throw new Error('NO_SUPPLEMENT_DATA');
+    }
+
+    await DisasterSurveyResponse.updateOne({ _id: response._id }, { $set: setDoc });
+
+    const refreshed = (await DisasterSurveyResponse.findById(response._id).lean()) as Record<
+        string,
+        unknown
+    > | null;
+    const stillMissing = detectMissingOptionalSurveyFields({
+        comments: String(refreshed?.comments ?? ''),
+        incidentPictures: refreshed?.incidentPictures as DisasterSurveyMediaRef[],
+        incidentVideos: refreshed?.incidentVideos as DisasterSurveyMediaRef[],
+    }).filter((field) => requested.includes(field));
+
+    if (stillMissing.length === 0) {
+        await DisasterSurveyResponse.updateOne(
+            { _id: response._id },
+            { $set: { requestedMissingFields: [], missingInfoRequestedAt: null } },
+        );
+        await DisasterSurveyInvitation.updateOne(
+            { _id: invitation._id },
+            { $set: { status: 'submitted' } },
+        );
+    } else {
+        await DisasterSurveyResponse.updateOne(
+            { _id: response._id },
+            { $set: { requestedMissingFields: stillMissing } },
+        );
+    }
+
+    return {
+        responseId: String(response._id),
+        remainingMissingFields: stillMissing,
+        completed: stillMissing.length === 0,
+    };
+}
+
+export async function requestDisasterSurveyMissingInfo(
+    responseId: string,
+    actorUserId: string,
+    fields?: DisasterSurveyMissingField[],
+) {
+    await connectDB();
+
+    const response = (await DisasterSurveyResponse.findById(responseId)) as {
+        _id: { toString(): string };
+        userId: { toString(): string };
+        invitationId: { toString(): string };
+        campaignId: { toString(): string };
+        comments?: string;
+        incidentPictures?: DisasterSurveyMediaRef[];
+        incidentVideos?: DisasterSurveyMediaRef[];
+        userSnapshot?: { email?: string; name?: string };
+    } | null;
+    if (!response) throw new Error('RESPONSE_NOT_FOUND');
+
+    const autoMissing = detectMissingOptionalSurveyFields({
+        comments: response.comments,
+        incidentPictures: response.incidentPictures,
+        incidentVideos: response.incidentVideos,
+    });
+    const missing =
+        Array.isArray(fields) && fields.length > 0
+            ? fields.filter((f) => autoMissing.includes(f))
+            : autoMissing;
+
+    if (missing.length === 0) throw new Error('NOTHING_MISSING');
+
+    const campaign = (await DisasterSurveyCampaign.findById(response.campaignId)
+        .select('title')
+        .lean()) as { title?: string } | null;
+    const campaignTitle = String(campaign?.title ?? 'Disaster relief survey');
+
+    const user = (await User.findById(response.userId)
+        .select('email firstName name expoPushToken')
+        .lean()) as {
+        email?: string;
+        firstName?: string;
+        name?: string;
+        expoPushToken?: string;
+    } | null;
+    if (!user?.email) throw new Error('USER_NOT_FOUND');
+
+    await DisasterSurveyResponse.updateOne(
+        { _id: response._id },
+        {
+            $set: {
+                requestedMissingFields: missing,
+                missingInfoRequestedAt: new Date(),
+                fundingStatus: 'needs_info',
+                fundingReviewedAt: new Date(),
+                fundingReviewedBy: actorUserId,
+            },
+        },
+    );
+
+    await DisasterSurveyInvitation.updateOne(
+        { _id: response.invitationId },
+        { $set: { status: 'needs_info' } },
+    );
+
+    const fieldLabels: Record<DisasterSurveyMissingField, string> = {
+        comments: 'comments',
+        incident_pictures: 'incident pictures',
+        incident_videos: 'incident videos',
+    };
+    const labelList = missing.map((f) => fieldLabels[f]).join(', ');
+    const body = `Please add the missing survey details (${labelList}) for ${campaignTitle}.`;
+
+    const notif = await dispatchUserNotification({
+        userId: String(response.userId),
+        type: 'disaster_survey',
+        title: 'Additional survey details needed',
+        body,
+        priority: 'high',
+        audience: 'citizen',
+        deepLink: 'disasterSurvey',
+        meta: {
+            dedupeKey: `disaster_survey_missing:${String(response._id)}:${missing.sort().join(',')}:${Date.now()}`,
+            invitationId: String(response.invitationId),
+            responseId: String(response._id),
+            campaignId: String(response.campaignId),
+            requestedMissingFields: missing,
+        },
+        push: {
+            title: 'Additional survey details needed',
+            body,
+            channelId: 'disaster-alerts',
+            data: {
+                screen: 'disasterSurvey',
+                notificationType: 'disaster_survey',
+                invitationId: String(response.invitationId),
+                responseId: String(response._id),
+            },
+        },
+    });
+
+    // Also send direct Expo push if dispatch skip path ever changes — push already in dispatch.
+    let pushSent = notif.pushSent;
+    if (!pushSent) {
+        const token = String(user.expoPushToken ?? '').trim();
+        if (token) {
+            const push = await sendExpoPushNotification({
+                to: token,
+                title: 'Additional survey details needed',
+                body,
+                data: {
+                    screen: 'disasterSurvey',
+                    notificationType: 'disaster_survey',
+                    invitationId: String(response.invitationId),
+                    responseId: String(response._id),
+                },
+                sound: 'default',
+                channelId: 'disaster-alerts',
+                priority: 'high',
+            });
+            pushSent = push.ok;
+        }
+    }
+
+    const emailSent = await sendDisasterSurveyMissingInfoEmail(
+        user.email,
+        user.firstName || user.name || '',
+        campaignTitle,
+        missing,
+    );
+
+    return {
+        responseId: String(response._id),
+        missingFields: missing,
+        pushSent,
+        emailSent,
+        inboxSent: Boolean(notif.item),
     };
 }
 
@@ -743,12 +1065,29 @@ export async function getDisasterSurveyResponseDetail(
     }
 
     const userSnapshot = (row.userSnapshot ?? {}) as Record<string, unknown>;
+    const comments = String(row.comments ?? '');
+    const incidentPictures = normalizeMediaList(row.incidentPictures, DISASTER_SURVEY_MAX_PICTURES);
+    const incidentVideos = normalizeMediaList(row.incidentVideos, DISASTER_SURVEY_MAX_VIDEOS);
+    const missingOptionalFields = detectMissingOptionalSurveyFields({
+        comments,
+        incidentPictures,
+        incidentVideos,
+    });
+
     return {
         id: String(row._id),
         campaignId: String(row.campaignId),
         invitationId: String(row.invitationId),
         userId: String(row.userId),
         immediateNeeds: (row.immediateNeeds as string[]) ?? [],
+        comments,
+        incidentPictures,
+        incidentVideos,
+        missingOptionalFields,
+        requestedMissingFields: Array.isArray(row.requestedMissingFields)
+            ? row.requestedMissingFields
+            : [],
+        missingInfoRequestedAt: row.missingInfoRequestedAt as Date | null | undefined,
         profileSnapshot: normalizeStoredProfileSnapshot(
             (row.profileSnapshot as Record<string, unknown>) ?? {},
         ),

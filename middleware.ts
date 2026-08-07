@@ -1,69 +1,110 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { jwtVerify } from 'jose'
 import { handleApiCors } from '@/lib/api/cors'
+import {
+    homePathForRole,
+    isApprovedStatus,
+    isPendingStatus,
+} from '@/lib/auth/home-path'
 
-export function middleware(request: NextRequest) {
+const SECRET_KEY = process.env.JWT_SECRET || 'ready2go-emergency-dashboard-secret-key-2026'
+const key = new TextEncoder().encode(SECRET_KEY)
+
+type SessionIdentity = {
+    role: string
+    accountStatus: string
+}
+
+async function resolveIdentity(request: NextRequest): Promise<SessionIdentity | null> {
+    const raw = request.cookies.get('session')?.value
+    if (!raw) return null
+
+    try {
+        const { payload } = await jwtVerify(raw, key, { algorithms: ['HS256'] })
+        const user = (payload as { user?: Record<string, unknown> }).user
+        if (!user || typeof user !== 'object') return null
+
+        const role = String(user.role ?? request.cookies.get('userRole')?.value ?? '').trim()
+        if (!role) return null
+
+        const accountStatus = String(
+            user.accountStatus ??
+                request.cookies.get('accountStatus')?.value ??
+                'approved',
+        ).trim()
+
+        return { role, accountStatus }
+    } catch {
+        // Invalid / expired JWT — treat as signed out.
+        return null
+    }
+}
+
+function redirectTo(request: NextRequest, path: string) {
+    return NextResponse.redirect(new URL(path, request.url))
+}
+
+export async function middleware(request: NextRequest) {
     const apiCors = handleApiCors(request)
     if (apiCors) return apiCors
 
-    const session = request.cookies.get('session')?.value
-    const userRole = request.cookies.get('userRole')?.value
-    const accountStatus = request.cookies.get('accountStatus')?.value
     const { pathname } = request.nextUrl
+    const identity = await resolveIdentity(request)
+    const cookieRole = request.cookies.get('userRole')?.value
+    const cookieStatus = request.cookies.get('accountStatus')?.value
 
-    // `/` is not a post-login landing: unauthenticated visitors go to login; signed-in users get their role home.
+    // Prefer JWT claims; fall back to cookies only when JWT is absent/invalid.
+    const userRole = identity?.role || cookieRole || ''
+    const accountStatus = identity?.accountStatus || cookieStatus || ''
+    const hasSession = Boolean(identity)
+
+    // `/` — never show a blank landing for signed-in staff; send them home.
     if (pathname === '/') {
-        if (!session) {
-            return NextResponse.redirect(new URL('/login', request.url))
+        if (!hasSession) {
+            return redirectTo(request, '/login')
         }
-        if (accountStatus === 'pending') {
-            return NextResponse.redirect(new URL('/pending-approval', request.url))
+        if (isPendingStatus(accountStatus)) {
+            return redirectTo(request, '/pending-approval')
         }
-        if (accountStatus === 'approved') {
-            const isEOC = userRole === 'eoc-manager' || userRole === 'eoc-observer'
-            if (userRole === 'super-admin') {
-                return NextResponse.redirect(new URL('/super-admin-dashboard', request.url))
-            }
-            if (isEOC) {
-                return NextResponse.redirect(new URL('/virtual-eoc', request.url))
-            }
-            if (userRole === 'responder' || userRole === 'public_official') {
-                return NextResponse.redirect(new URL('/responder-dashboard', request.url))
-            }
-            if (
-                userRole === 'admin' ||
-                userRole === 'sub-admin' ||
-                userRole === 'observer' ||
-                userRole === 'manager'
-            ) {
-                return NextResponse.redirect(new URL('/admin-dashboard', request.url))
-            }
-            return NextResponse.redirect(new URL('/user-dashboard', request.url))
+        if (isApprovedStatus(accountStatus)) {
+            return redirectTo(request, homePathForRole(userRole))
         }
-        return NextResponse.redirect(new URL('/login', request.url))
+        // Unknown status with a valid session — still prefer role home over login.
+        return redirectTo(request, homePathForRole(userRole))
     }
 
-    // Define public routes that don't need auth
     const isPublicRoute =
-        pathname === '/login' || pathname === '/signup' || pathname.startsWith('/_next') || pathname === '/favicon.ico'
+        pathname === '/login' ||
+        pathname === '/signup' ||
+        pathname.startsWith('/_next') ||
+        pathname === '/favicon.ico'
 
-    // 1. If no session, only allow public routes or pending-approval
-    if (!session && !isPublicRoute && pathname !== '/pending-approval') {
-        return NextResponse.redirect(new URL('/login', request.url))
+    // Signed-in users hitting auth pages go to their dashboard.
+    if (hasSession && (pathname === '/login' || pathname === '/signup')) {
+        if (isPendingStatus(accountStatus)) {
+            return redirectTo(request, '/pending-approval')
+        }
+        return redirectTo(request, homePathForRole(userRole))
     }
 
-    // 2. If authenticated, but account status is pending, ONLY allow /pending-approval and logout API
-    if (session && accountStatus === 'pending' && pathname !== '/pending-approval') {
-        return NextResponse.redirect(new URL('/pending-approval', request.url))
+    // 1. No session → public only
+    if (!hasSession && !isPublicRoute && pathname !== '/pending-approval') {
+        return redirectTo(request, '/login')
     }
 
-    // 3. If authenticated and status is approved, prevent going to pending-approval
-    if (session && accountStatus === 'approved' && pathname === '/pending-approval') {
-        return NextResponse.redirect(new URL('/user-dashboard', request.url))
+    // 2. Pending accounts stay on pending-approval
+    if (hasSession && isPendingStatus(accountStatus) && pathname !== '/pending-approval') {
+        return redirectTo(request, '/pending-approval')
+    }
+
+    // 3. Approved users leave pending-approval
+    if (hasSession && isApprovedStatus(accountStatus) && pathname === '/pending-approval') {
+        return redirectTo(request, homePathForRole(userRole))
     }
 
     // 4. Role-based protection for approved users
-    if (accountStatus === 'approved') {
+    if (hasSession && isApprovedStatus(accountStatus)) {
         const adminRoutes = [
             '/super-admin-dashboard',
             '/admin-dashboard',
@@ -81,10 +122,20 @@ export function middleware(request: NextRequest) {
             '/admin/users',
             '/ai-risk-assessment',
             '/citizen-activity-feed',
+            '/disaster-surveys',
         ]
 
-        const isAdminRoute = adminRoutes.some(route => pathname.startsWith(route))
-        const isAdminRole = userRole === 'admin' || userRole === 'super-admin' || userRole === 'sub-admin' || userRole === 'observer' || userRole === 'responder' || userRole === 'public_official' || userRole === 'manager' || userRole === 'eoc-manager' || userRole === 'eoc-observer'
+        const isAdminRoute = adminRoutes.some((route) => pathname.startsWith(route))
+        const isAdminRole =
+            userRole === 'admin' ||
+            userRole === 'super-admin' ||
+            userRole === 'sub-admin' ||
+            userRole === 'observer' ||
+            userRole === 'responder' ||
+            userRole === 'public_official' ||
+            userRole === 'manager' ||
+            userRole === 'eoc-manager' ||
+            userRole === 'eoc-observer'
         const isEOCRole = userRole === 'eoc-manager' || userRole === 'eoc-observer'
 
         const responderAllowedRoutes = [
@@ -106,7 +157,6 @@ export function middleware(request: NextRequest) {
                 (r) => pathname === r || pathname.startsWith(`${r}/`),
             )
 
-        /** Only `role: responder` should load responder portal pages; others get a clear redirect. */
         const responderExclusiveRoutes = [
             '/responder-dashboard',
             '/responder-bed-status',
@@ -120,54 +170,45 @@ export function middleware(request: NextRequest) {
             (r) => pathname === r || pathname.startsWith(`${r}/`),
         )
         if (isResponderExclusivePage && userRole !== 'responder' && userRole !== 'public_official') {
-            if (userRole === 'super-admin') {
-                return NextResponse.redirect(new URL('/super-admin-dashboard', request.url))
-            }
-            if (isEOCRole) {
-                return NextResponse.redirect(new URL('/virtual-eoc', request.url))
-            }
-            if (
-                userRole === 'admin' ||
-                userRole === 'sub-admin' ||
-                userRole === 'observer' ||
-                userRole === 'manager'
-            ) {
-                return NextResponse.redirect(new URL('/admin-dashboard', request.url))
-            }
-            return NextResponse.redirect(new URL('/user-dashboard', request.url))
+            return redirectTo(request, homePathForRole(userRole))
         }
 
         if (userRole === 'responder' || userRole === 'public_official') {
             if (pathname === '/admin-dashboard' || pathname === '/user-dashboard') {
-                return NextResponse.redirect(new URL('/responder-dashboard', request.url))
+                return redirectTo(request, '/responder-dashboard')
             }
             if (isAdminRoute && !isResponderAllowedPath) {
-                return NextResponse.redirect(new URL('/responder-dashboard', request.url))
+                return redirectTo(request, '/responder-dashboard')
             }
         }
 
-        // 1. EOC Roles specific redirection and restrictions
         if (isEOCRole) {
-            // If EOC role is on standard admin-dashboard or user-dashboard, redirect to Virtual EOC dashboard
-            if (pathname === '/admin-dashboard' || pathname === '/eoc-dashboard' || pathname === '/user-dashboard' || pathname === '/') {
-                return NextResponse.redirect(new URL('/virtual-eoc', request.url))
+            if (
+                pathname === '/admin-dashboard' ||
+                pathname === '/eoc-dashboard' ||
+                pathname === '/user-dashboard' ||
+                pathname === '/'
+            ) {
+                return redirectTo(request, '/virtual-eoc')
             }
-            // Block EOC roles from management pages
-            const managementRoutes = ['/admin/users', '/admin/licenses', '/admin/sub-admins', '/super-admin-dashboard']
-            if (managementRoutes.some(route => pathname.startsWith(route))) {
-                return NextResponse.redirect(new URL('/virtual-eoc', request.url))
+            const managementRoutes = [
+                '/admin/users',
+                '/admin/licenses',
+                '/admin/sub-admins',
+                '/super-admin-dashboard',
+            ]
+            if (managementRoutes.some((route) => pathname.startsWith(route))) {
+                return redirectTo(request, '/virtual-eoc')
             }
         }
 
-        // 2. Super Admin or Admin/Sub-Admin routes
         if (pathname.startsWith('/super-admin-dashboard') && userRole !== 'super-admin') {
-            return NextResponse.redirect(new URL('/admin-dashboard', request.url))
+            return redirectTo(request, homePathForRole(userRole))
         }
 
-        // 2b. AI Risk Assessment — same operational roles as other admin tools (not EOC-exclusive portal)
         if (pathname.startsWith('/ai-risk-assessment')) {
             if (isEOCRole) {
-                return NextResponse.redirect(new URL('/virtual-eoc', request.url))
+                return redirectTo(request, '/virtual-eoc')
             }
             const canAccessAiRisk =
                 userRole === 'super-admin' ||
@@ -176,17 +217,13 @@ export function middleware(request: NextRequest) {
                 userRole === 'observer' ||
                 userRole === 'manager'
             if (!canAccessAiRisk) {
-                const dest =
-                    userRole === 'responder' || userRole === 'public_official'
-                        ? '/responder-dashboard'
-                        : '/user-dashboard'
-                return NextResponse.redirect(new URL(dest, request.url))
+                return redirectTo(request, homePathForRole(userRole))
             }
         }
 
         if (pathname.startsWith('/citizen-activity-feed')) {
             if (isEOCRole) {
-                return NextResponse.redirect(new URL('/virtual-eoc', request.url))
+                return redirectTo(request, '/virtual-eoc')
             }
             const canAccessCitizenFeed =
                 userRole === 'super-admin' ||
@@ -195,33 +232,37 @@ export function middleware(request: NextRequest) {
                 userRole === 'observer' ||
                 userRole === 'manager'
             if (!canAccessCitizenFeed) {
-                const dest =
-                    userRole === 'responder' || userRole === 'public_official'
-                        ? '/responder-dashboard'
-                        : '/user-dashboard'
-                return NextResponse.redirect(new URL(dest, request.url))
+                return redirectTo(request, homePathForRole(userRole))
             }
         }
 
-        // 3. Allow admin and sub-admin to access their respective management pages if they are in adminRoutes
-        const restrictedForSubAdmin = pathname.startsWith('/admin/licenses') || pathname.startsWith('/admin/sub-admins')
-        if (restrictedForSubAdmin && (userRole !== 'super-admin' && userRole !== 'admin' && userRole !== 'sub-admin')) {
-            return NextResponse.redirect(new URL('/admin-dashboard', request.url))
+        const restrictedForSubAdmin =
+            pathname.startsWith('/admin/licenses') || pathname.startsWith('/admin/sub-admins')
+        if (
+            restrictedForSubAdmin &&
+            userRole !== 'super-admin' &&
+            userRole !== 'admin' &&
+            userRole !== 'sub-admin'
+        ) {
+            return redirectTo(request, homePathForRole(userRole))
         }
 
-        // 4. Restriction: If on admin route but NOT an admin, go to user dashboard
         if (isAdminRoute && !isAdminRole) {
-            return NextResponse.redirect(new URL('/user-dashboard', request.url))
+            return redirectTo(request, '/user-dashboard')
         }
 
-        // 5. Restriction: If on user dashboard but IS an admin (and not EOC), go to admin dashboard
-        if (pathname === '/user-dashboard' && isAdminRole && !isEOCRole && userRole !== 'responder' && userRole !== 'public_official') {
-            return NextResponse.redirect(new URL('/admin-dashboard', request.url))
+        if (
+            pathname === '/user-dashboard' &&
+            isAdminRole &&
+            !isEOCRole &&
+            userRole !== 'responder' &&
+            userRole !== 'public_official'
+        ) {
+            return redirectTo(request, homePathForRole(userRole))
         }
 
-        // 6. Redirect EOC roles to EOC dashboard if they are on admin dashboard
         if (pathname === '/admin-dashboard' && isEOCRole) {
-            return NextResponse.redirect(new URL('/virtual-eoc', request.url))
+            return redirectTo(request, '/virtual-eoc')
         }
     }
 
