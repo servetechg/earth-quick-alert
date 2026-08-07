@@ -79,7 +79,7 @@ function severityRank(s: MobileAlertSeverity): number {
 }
 
 function legacySourceLabel(source: AlertSource): string {
-    if (source === AlertSource.WEATHER_API) return 'NWPS';
+    if (source === AlertSource.WEATHER_API) return 'NWS';
     if (source === AlertSource.EARTHQUAKE_API) return 'USGS';
     if (source === AlertSource.ADMIN_MANUAL) return 'COMMUNITY';
     return 'ALERT';
@@ -198,7 +198,14 @@ export async function fetchMobileAlertsForUser(
             areaDesc: record.areaDesc,
             zones: record.zones || [],
             event: record.event,
-            sourceUrl: resolveNwsAlertSourceUrl(record.alertId),
+            coordinates: record.coordinates,
+            sourceUrl: resolveNwsAlertSourceUrl(record.alertId, {
+                lat: record.coordinates?.lat,
+                lon: record.coordinates?.lon,
+                zones: record.zones,
+                event: record.event || record.title,
+                areaDesc: record.areaDesc,
+            }),
             unifiedSource: 'nws',
         } as UnifiedMobileAlert);
     }
@@ -217,14 +224,15 @@ export async function fetchMobileAlertsForUser(
                         ...alert,
                         affectedAreas: unique([...(alert.affectedAreas || []), location.name]),
                         unifiedSource: 'earthquake',
-                        sourceUrl:
-                            'sourceUrl' in alert && typeof alert.sourceUrl === 'string'
-                                ? alert.sourceUrl
-                                : resolveLegacyAlertSourceUrl({
-                                      id: alert.id,
-                                      source: alert.source,
-                                      unifiedSource: 'earthquake',
-                                  }),
+                        sourceUrl: resolveLegacyAlertSourceUrl({
+                            id: alert.id,
+                            source: alert.source,
+                            unifiedSource: 'earthquake',
+                            sourceUrl:
+                                'sourceUrl' in alert && typeof alert.sourceUrl === 'string'
+                                    ? alert.sourceUrl
+                                    : undefined,
+                        }),
                     } as UnifiedMobileAlert);
                 } else {
                     existing.affectedAreas = unique([
@@ -326,14 +334,20 @@ export function alertToMobileItem(
         expiresLabel: expiresLabel(expiresAt),
         read: readMap.get(alert.id) === true,
         description: alert.description,
-        sourceUrl:
-            alert.sourceUrl ??
-            resolveLegacyAlertSourceUrl({
-                id: alert.id,
-                source: alert.source,
-                unifiedSource: alert.unifiedSource,
-                properties: alert.unifiedProperties,
-            }),
+        sourceUrl: resolveLegacyAlertSourceUrl({
+            id: alert.id,
+            source: alert.source,
+            unifiedSource: alert.unifiedSource,
+            sourceUrl: alert.sourceUrl,
+            description: alert.description,
+            title: alert.title,
+            event: alert.event,
+            areaDesc: alert.areaDesc,
+            zones: alert.zones,
+            properties: alert.unifiedProperties,
+            lat: alert.coordinates?.lat,
+            lon: alert.coordinates?.lon,
+        }),
     };
 }
 
