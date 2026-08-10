@@ -23,12 +23,23 @@ import {
   Globe,
   Navigation,
   Search,
-  Check,
   UserPlus
 } from "lucide-react"
 import { toast } from "sonner"
-import { GoogleMap, useJsApiLoader, Autocomplete, Circle, Marker } from '@react-google-maps/api'
-import { GOOGLE_MAPS_API_KEY, GOOGLE_MAPS_LIBRARIES, GOOGLE_MAPS_LOADER_ID } from '@/lib/constants/google-maps-config'
+
+import dynamic from 'next/dynamic'
+import { GeoapifyAutocomplete, GeoapifyPlace } from '@/components/ui/geoapify-autocomplete'
+
+
+const LicenseCoverageMap = dynamic(() => import('@/components/ui/license-coverage-map'), {
+  ssr: false,
+  loading: () => (
+    <div className="h-40 bg-slate-100 animate-pulse rounded-2xl flex items-center justify-center text-xs text-slate-400 font-bold">
+      Loading Map...
+    </div>
+  ),
+})
+
 import { useLicenseCoverageRadius } from '@/hooks/use-license-coverage-radius'
 import {
   LICENSE_COVERAGE_MIN_MILE,
@@ -101,16 +112,7 @@ export function GrantLicenseModal({ user, isOpen, onClose, onSuccess }: GrantLic
   } = useLicenseCoverageRadius()
 
   const [mapCenter, setMapCenter] = useState(defaultCenter)
-  const primaryAutocompleteRef = useRef<any>(null)
-  const orgAutocompleteRef = useRef<any>(null)
 
-  const { isLoaded } = useJsApiLoader({
-    id: GOOGLE_MAPS_LOADER_ID,
-    googleMapsApiKey: GOOGLE_MAPS_API_KEY,
-    libraries: GOOGLE_MAPS_LIBRARIES,
-  })
-
-  // Fetch users for the dropdown
   useEffect(() => {
     if (isOpen && user) {
       const fullAddress = [user.city, user.state, user.country].filter(Boolean).join(', ')
@@ -152,80 +154,47 @@ export function GrantLicenseModal({ user, isOpen, onClose, onSuccess }: GrantLic
     }
   }, [isOpen, user, geocodeAddressAndFetchCoverage, fetchCoverageMax, resetCoverage])
 
-  const onPrimaryLoad = useCallback((autocomplete: any) => {
-    primaryAutocompleteRef.current = autocomplete
-  }, [])
 
-  const onOrgLoad = useCallback((autocomplete: any) => {
-    orgAutocompleteRef.current = autocomplete
-  }, [])
-
-  const onPrimaryPlaceChanged = useCallback(() => {
-    if (primaryAutocompleteRef.current !== null) {
-      const place = primaryAutocompleteRef.current.getPlace()
-      if (place.geometry?.location) {
-        const lat = place.geometry.location.lat()
-        const lng = place.geometry.location.lng()
-        setMapCenter({ lat, lng })
-
-        let city = ''
-        let state = ''
-        let stateCode = ''
-        let country = ''
-        let countryCode = ''
-        let zipcode = ''
-        place.address_components?.forEach((c: any) => {
-          if (c.types.includes('locality')) city = c.long_name
-          if (c.types.includes('administrative_area_level_1')) {
-            state = c.long_name
-            stateCode = c.short_name
-          }
-          if (c.types.includes('country')) {
-            country = c.long_name
-            countryCode = c.short_name
-          }
-          if (c.types.includes('postal_code')) zipcode = c.long_name
-        })
-
-        setFormData((prev) => ({
-          ...prev,
-          city: city || prev.city,
-          state: state || prev.state,
-          stateCode: stateCode || prev.stateCode,
-          country: country || prev.country,
-          countryCode: countryCode || prev.countryCode,
-          zipcode: zipcode || prev.zipcode,
-          billingAddress: place.formatted_address || prev.billingAddress,
-        }))
-
-        void fetchCoverageMax({
-          stateCode: stateCode || undefined,
-          countryCode: countryCode || undefined,
-          stateName: state || undefined,
-          countryName: country || undefined,
-        }).then((max) => {
-          if (max != null) {
-            setFormData((prev) => ({
-              ...prev,
-              radiusMile: clampLicenseRadiusMile(prev.radiusMile, max),
-            }))
-          }
-        })
+  const handlePrimaryGeoapifySelect = useCallback(
+    (place: GeoapifyPlace) => {
+      if (place.lat && place.lng) {
+        setMapCenter({ lat: place.lat, lng: place.lng })
       }
-    }
-  }, [fetchCoverageMax])
 
-  const onOrgPlaceChanged = useCallback(() => {
-    if (orgAutocompleteRef.current !== null) {
-      const place = orgAutocompleteRef.current.getPlace()
-      if (place.formatted_address) {
-        setFormData(prev => ({
-          ...prev,
-          organizationalAddress: place.formatted_address
-        }))
-      }
-    }
+      const stateName = place.state || ''
+      const countryName = place.country || ''
+
+      setFormData((prev) => ({
+        ...prev,
+        city: place.city || prev.city,
+        state: stateName || prev.state,
+        country: countryName || prev.country,
+        zipcode: place.zipcode || prev.zipcode,
+        billingAddress: place.formatted || prev.billingAddress,
+      }))
+
+      void fetchCoverageMax({
+        stateName: stateName || undefined,
+        countryName: countryName || undefined,
+      }).then((max) => {
+        if (max != null) {
+          setFormData((prev) => ({
+            ...prev,
+            radiusMile: clampLicenseRadiusMile(prev.radiusMile, max),
+          }))
+        }
+      })
+    },
+    [fetchCoverageMax],
+  )
+
+  const handleOrgGeoapifySelect = useCallback((place: GeoapifyPlace) => {
+    setFormData((prev) => ({
+      ...prev,
+      organizationalAddress: place.formatted,
+    }))
   }, [])
+
 
   const handleGrant = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -304,20 +273,14 @@ export function GrantLicenseModal({ user, isOpen, onClose, onSuccess }: GrantLic
 
                 <div className="md:col-span-2 space-y-2">
                   <Label className="text-sm font-medium text-slate-700 ml-1">Organization Address</Label>
-                  {isLoaded ? (
-                    <Autocomplete onLoad={onOrgLoad} onPlaceChanged={onOrgPlaceChanged}>
-                      <Input
-                        required
-                        value={formData.organizationalAddress}
-                        onChange={(e) => setFormData(prev => ({ ...prev, organizationalAddress: e.target.value }))}
-                        placeholder="HQ or Registered Address"
-                        className="h-11 bg-white border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 transition-all font-medium"
-                      />
-                    </Autocomplete>
-                  ) : (
-                    <Input disabled className="h-11 bg-slate-50 border-slate-200 rounded-lg" placeholder="Initializing maps..." />
-                  )}
+                  <GeoapifyAutocomplete
+                    initialValue={formData.organizationalAddress}
+                    placeholder="HQ or Registered Address"
+                    onSelect={handleOrgGeoapifySelect}
+                    inputClassName="h-11 bg-white border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 font-medium text-sm"
+                  />
                 </div>
+
 
                 <div className="space-y-2">
                   <Label className="text-sm font-medium text-slate-700 ml-1">Point of Contact</Label>
@@ -364,20 +327,14 @@ export function GrantLicenseModal({ user, isOpen, onClose, onSuccess }: GrantLic
               <div className="space-y-6">
                 <div className="space-y-2">
                   <Label className="text-sm font-medium text-slate-700 ml-1 font-bold">Primary Address</Label>
-                  {isLoaded ? (
-                    <Autocomplete onLoad={onPrimaryLoad} onPlaceChanged={onPrimaryPlaceChanged}>
-                      <Input
-                        required
-                        value={formData.billingAddress}
-                        onChange={(e) => setFormData(prev => ({ ...prev, billingAddress: e.target.value }))}
-                        placeholder="Operations center or target location"
-                        className="h-11 bg-white border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 transition-all font-medium border-blue-100 shadow-sm"
-                      />
-                    </Autocomplete>
-                  ) : (
-                    <Input disabled className="h-11 bg-slate-50 border-slate-200 rounded-lg" placeholder="Initializing maps..." />
-                  )}
+                  <GeoapifyAutocomplete
+                    initialValue={formData.billingAddress}
+                    placeholder="Operations center or target location"
+                    onSelect={handlePrimaryGeoapifySelect}
+                    inputClassName="h-11 bg-white border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 font-medium border-blue-100 shadow-sm text-sm"
+                  />
                 </div>
+
 
                 <div className="space-y-3 p-4 bg-slate-50 rounded-2xl border border-slate-100">
                   <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Coverage Scope Option</Label>
@@ -436,8 +393,9 @@ export function GrantLicenseModal({ user, isOpen, onClose, onSuccess }: GrantLic
                       <>
                         {!hasStateCoverage && !coverageLoading && (
                           <p className="text-xs text-slate-500">
-                            Pick a primary address from Google suggestions (not just typed text) to load the state max radius.
+                            Pick a primary address from search suggestions to load the state max radius.
                           </p>
+
                         )}
                         {hasStateCoverage && maxRadiusMile != null && formData.state && (
                           <p className="text-xs text-slate-500">
@@ -474,37 +432,15 @@ export function GrantLicenseModal({ user, isOpen, onClose, onSuccess }: GrantLic
                     </div>
                   </div>
 
-                  {isLoaded && (
-                    <div className="h-40 rounded-2xl overflow-hidden border border-slate-200 shadow-sm relative">
-                      <GoogleMap
-                        mapContainerStyle={{ width: '100%', height: '100%' }}
-                        center={mapCenter}
-                        zoom={formData.coverageType === 'state' ? 6 : mapZoomForRadiusMiles(formData.radiusMile)}
-                        options={{
-                          disableDefaultUI: true,
-                          zoomControl: false,
-                          styles: [
-                            { featureType: 'all', elementType: 'labels', stylers: [{ visibility: 'on' }] }
-                          ]
-                        }}
-                      >
-                        <Marker position={mapCenter} />
-                        {formData.coverageType !== 'state' && (
-                          <Circle
-                            center={mapCenter}
-                            radius={formData.radiusMile * 1609.34}
-                            options={{
-                              fillOpacity: 0.1,
-                              strokeOpacity: 0.4,
-                              fillColor: '#3b82f6',
-                              strokeColor: '#3b82f6',
-                              strokeWeight: 1
-                            }}
-                          />
-                        )}
-                      </GoogleMap>
-                    </div>
-                  )}
+                  <div className="h-40 rounded-2xl overflow-hidden border border-slate-200 shadow-sm relative z-0">
+                    <LicenseCoverageMap
+                      center={mapCenter}
+                      radiusMile={formData.radiusMile}
+                      coverageType={formData.coverageType}
+                      zoom={formData.coverageType === 'state' ? 6 : mapZoomForRadiusMiles(formData.radiusMile)}
+                    />
+                  </div>
+
                 </div>
               </div>
             </div>

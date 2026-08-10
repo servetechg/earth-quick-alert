@@ -47,6 +47,8 @@ export function splitAreaDescription(areaDesc: string | undefined): string[] {
 const GEOCODE_TIMEOUT_MS = 2_500;
 const geocodeCache = new Map<string, NamedCoordinates | null>();
 
+import { getStateCenterCoords } from '@/lib/utils/us-state-usps';
+
 export async function geocodeLocation(location: string): Promise<NamedCoordinates | null> {
     const trimmed = (location || '').trim();
     if (!trimmed) return null;
@@ -58,9 +60,39 @@ export async function geocodeLocation(location: string): Promise<NamedCoordinate
 
     const cacheKey = normalizeAreaText(trimmed);
     if (cacheKey && geocodeCache.has(cacheKey)) {
-        return geocodeCache.get(cacheKey) ?? null;
+        const cached = geocodeCache.get(cacheKey);
+        if (cached) return cached;
     }
 
+    const apiKey =
+        process.env.GEOAPIFY_API_KEY ||
+        process.env.NEXT_PUBLIC_GEOAPIFY_API_KEY ||
+        '9abe9caf7f5943d189e9ef564c5cdec7';
+
+    // 1. Primary: Geoapify REST Geocoding
+    try {
+        const geoUrl = `https://api.geoapify.com/v1/geocode/search?text=${encodeURIComponent(
+            trimmed
+        )}&apiKey=${apiKey}`;
+        const res = await fetch(geoUrl, { next: { revalidate: 86400 } });
+        if (res.ok) {
+            const data = await res.json();
+            const props = data.features?.[0]?.properties;
+            if (props?.lat && props?.lon) {
+                const resolved: NamedCoordinates = {
+                    lat: Number(props.lat),
+                    lon: Number(props.lon),
+                    name: trimmed,
+                };
+                if (cacheKey) geocodeCache.set(cacheKey, resolved);
+                return resolved;
+            }
+        }
+    } catch (err) {
+        console.error(`Geoapify geocodeLocation failed for "${trimmed}":`, err);
+    }
+
+    // 2. Secondary: Nominatim OpenStreetMap
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), GEOCODE_TIMEOUT_MS);
 
@@ -72,36 +104,43 @@ export async function geocodeLocation(location: string): Promise<NamedCoordinate
             signal: controller.signal,
         });
 
-        if (!response.ok) {
-            if (cacheKey) geocodeCache.set(cacheKey, null);
-            return null;
+        if (response.ok) {
+            const data = await response.json();
+            const result = Array.isArray(data) ? data[0] : undefined;
+            if (result && result.lat != null && result.lon != null) {
+                const resolved: NamedCoordinates = {
+                    lat: Number(result.lat),
+                    lon: Number(result.lon),
+                    name: trimmed,
+                };
+                if (cacheKey) geocodeCache.set(cacheKey, resolved);
+                return resolved;
+            }
         }
-        const data = await response.json();
-        const result = Array.isArray(data) ? data[0] : undefined;
-        if (!result || result.lat == null || result.lon == null) {
-            if (cacheKey) geocodeCache.set(cacheKey, null);
-            return null;
-        }
+    } catch {
+        // Fallback to state center
+    } finally {
+        clearTimeout(timer);
+    }
 
+    // 3. Fallback: US State Center coordinates
+    const stateCenter = getStateCenterCoords(trimmed);
+    if (stateCenter) {
         const resolved: NamedCoordinates = {
-            lat: Number(result.lat),
-            lon: Number(result.lon),
+            lat: stateCenter.lat,
+            lon: stateCenter.lng,
             name: trimmed,
         };
         if (cacheKey) geocodeCache.set(cacheKey, resolved);
         return resolved;
-    } catch (error) {
-        if ((error as Error)?.name !== 'AbortError') {
-            console.error(`Failed to geocode location: ${trimmed}`, error);
-        }
-        if (cacheKey) geocodeCache.set(cacheKey, null);
-        return null;
-    } finally {
-        clearTimeout(timer);
     }
+
+    if (cacheKey) geocodeCache.set(cacheKey, null);
+    return null;
 }
 
 export function locationMatchesAlertAreas(
+
     locationName: string,
     affectedAreas: string[] = [],
     areaDesc?: string,

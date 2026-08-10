@@ -1,7 +1,8 @@
 import User from '@/models/User';
 import Responder from '@/models/Responder';
 import { geocodeLocation } from '@/lib/services/location-matching';
-import { normalizeStateToUsps } from '@/lib/utils/us-state-usps';
+import { getStateCenterCoords, normalizeStateToUsps } from '@/lib/utils/us-state-usps';
+
 import {
     coordinatesInJurisdiction,
     jurisdictionLatLngBBox,
@@ -78,11 +79,12 @@ export async function fetchScopedCitizenMarkers(
     const jurisdiction = await resolveSubAdminJurisdiction(subAdminUserId);
     if (!jurisdiction) return [];
 
-    const subAdmin = await User.findById(subAdminUserId).select('state licenseId').lean();
+    const subAdmin: any = await User.findById(subAdminUserId).select('state licenseId').lean();
     if (!subAdmin) return [];
 
     const stateRaw = typeof subAdmin.state === 'string' ? subAdmin.state.trim() : '';
     const licenseId = subAdmin.licenseId;
+
     const allowGeocode = opts?.allowGeocode === true;
 
     const query = buildScopedCitizenQuery(
@@ -203,10 +205,11 @@ export async function fetchScopedResponderMarkers(
     opts?: { allowGeocode?: boolean }
 ): Promise<GisMapMarkerDto[]> {
     const jurisdiction = await resolveSubAdminJurisdiction(subAdminUserId);
-    const subAdmin = await User.findById(subAdminUserId)
+    const subAdmin: any = await User.findById(subAdminUserId)
         .select('state city licenseId')
         .lean();
     if (!subAdmin) return [];
+
 
     const stateRaw = typeof subAdmin.state === 'string' ? subAdmin.state.trim() : '';
     const stateCode = normalizeStateToUsps(stateRaw);
@@ -346,11 +349,11 @@ function stateRegex(stateRaw: string): RegExp {
 }
 
 function userMatchesStateFilter(
-    user: { state?: string | null },
+    user: any,
     stateRaw?: string
 ): boolean {
     if (!stateRaw?.trim()) return true;
-    const st = String(user.state ?? '').trim();
+    const st = String(user?.state ?? '').trim();
     if (!st) return false;
     const usps = normalizeStateToUsps(stateRaw);
     const userUsps = normalizeStateToUsps(st);
@@ -358,17 +361,13 @@ function userMatchesStateFilter(
     return stateRegex(stateRaw).test(st);
 }
 
-function citizenLocationStr(u: {
-    location?: string | null;
-    city?: string | null;
-    state?: string | null;
-    zipcode?: string | null;
-}): string {
+function citizenLocationStr(u: any): string {
     return (
-        (typeof u.location === 'string' && u.location.trim()) ||
-        [u.city, u.state, u.zipcode].filter(Boolean).join(', ')
+        (typeof u?.location === 'string' && u.location.trim()) ||
+        [u?.city, u?.state, u?.zipcode].filter(Boolean).join(', ')
     );
 }
+
 
 /** Super-admin: approved citizens from `User` (not legacy seed collections). */
 export async function fetchNationwideCitizenMarkers(opts?: {
@@ -486,23 +485,37 @@ export async function fetchSubAdminLeaderMarkers(opts?: {
     for (const u of filtered) {
         const id = String(u._id);
         const locationStr = locationOf(u);
-        const coords =
+        let coords =
             typeof u.lat === 'number' && typeof u.lng === 'number'
                 ? { lat: u.lat, lng: u.lng }
                 : geocoded.get(id) ?? null;
+
+        // Guaranteed state center fallback if lat/lng not stored yet
+        if (!coords && u.state) {
+            const center = getStateCenterCoords(u.state);
+            if (center) {
+                coords = center;
+                void User.updateOne(
+                    { _id: u._id },
+                    { $set: { lat: center.lat, lng: center.lng } }
+                ).catch(() => undefined);
+            }
+        }
+
         if (!coords) continue;
 
         markers.push({
             id,
             lat: coords.lat,
             lng: coords.lng,
-            title: String(u.name || 'Sub-Admin'),
+            title: String(u.name || u.email || 'Sub-Admin'),
             type: 'user',
             status: 'Online',
-            location: locationStr,
-            description: `Sub-Admin · ${locationStr}`,
+            location: locationStr || u.state || 'USA',
+            description: `Sub-Admin · ${locationStr || u.state || 'USA'}`,
         });
     }
 
     return markers;
+
 }

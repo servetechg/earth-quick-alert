@@ -78,7 +78,7 @@ export function useLicenseCoverageRadius() {
             fallbacks: { stateName?: string; countryName?: string },
             onCenter?: (center: { lat: number; lng: number }) => void
         ) => {
-            if (!address.trim() || !GOOGLE_MAPS_API_KEY) {
+            if (!address.trim()) {
                 if (fallbacks.stateName) {
                     await fetchCoverageMax({
                         stateName: fallbacks.stateName,
@@ -89,34 +89,45 @@ export function useLicenseCoverageRadius() {
             }
 
             try {
+                const apiKey = process.env.NEXT_PUBLIC_GEOAPIFY_API_KEY || '9abe9caf7f5943d189e9ef564c5cdec7';
                 const res = await fetch(
-                    `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${GOOGLE_MAPS_API_KEY}`
+                    `https://api.geoapify.com/v1/geocode/search?text=${encodeURIComponent(address)}&apiKey=${apiKey}`
                 );
-                const data = await res.json();
-                const result = data.results?.[0];
-                const center = centerFromGeocodeGeometry(result?.geometry);
-                if (center) onCenter?.(center);
-
-                const region = parseRegionCodesFromGeocodeResult(result ?? {});
-                await fetchCoverageMax({
-                    stateCode: region.stateCode || undefined,
-                    countryCode: region.countryCode || undefined,
-                    stateName: region.stateName || fallbacks.stateName,
-                    countryName: region.countryName || fallbacks.countryName,
-                });
-                return region;
-            } catch {
-                if (fallbacks.stateName) {
+                if (res.ok) {
+                    const data = await res.json();
+                    const feature = data.features?.[0];
+                    const props = feature?.properties;
+                    if (props?.lat && props?.lon) {
+                        onCenter?.({ lat: Number(props.lat), lng: Number(props.lon) });
+                    }
+                    const stateName = props?.state || fallbacks.stateName;
+                    const countryName = props?.country || fallbacks.countryName;
                     await fetchCoverageMax({
-                        stateName: fallbacks.stateName,
-                        countryName: fallbacks.countryName,
+                        stateName: stateName,
+                        countryName: countryName,
                     });
+                    return {
+                        stateName: stateName || '',
+                        countryName: countryName || '',
+                        stateCode: props?.state_code || '',
+                        countryCode: props?.country_code || '',
+                    };
                 }
-                return null;
+            } catch (err) {
+                console.error('Geoapify geocoding error:', err);
             }
+
+            if (fallbacks.stateName) {
+                await fetchCoverageMax({
+                    stateName: fallbacks.stateName,
+                    countryName: fallbacks.countryName,
+                });
+            }
+            return null;
         },
         [fetchCoverageMax]
     );
+
 
     return {
         maxRadiusMile,

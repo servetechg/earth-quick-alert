@@ -344,7 +344,7 @@ function WeatherRadarWmsLayer({
         const wmsPx = nexradWmsTilePixelSize();
         layer.wmsParams.width = wmsPx;
         layer.wmsParams.height = wmsPx;
-        layer.setParams({ _t: Date.now() });
+        layer.setParams({ _t: Date.now() } as unknown as L.WMSParams);
         layer.addTo(map);
         layerRef.current = layer;
 
@@ -364,7 +364,7 @@ function WeatherRadarWmsLayer({
         syncClip();
 
         const refresh = window.setInterval(() => {
-            layer.setParams({ _t: Date.now() });
+            layer.setParams({ _t: Date.now() } as unknown as L.WMSParams);
             syncClip();
         }, NEXRAD_WMS.refreshIntervalMs);
 
@@ -557,57 +557,75 @@ function MarkerPopupContent({
     onViewDetails?: () => void;
     onClose?: () => void;
 }) {
+    const isHelp = isHelpStatus(marker.status, marker.isSafe);
+    const statusLabel =
+        marker.type === 'infrastructure' && marker.status
+            ? marker.status
+            : formatMarkerStatus(marker.status, marker.isSafe);
+
     return (
-        <div className="p-2 min-w-[200px] max-w-[300px] text-slate-900">
+        <div className="p-4 pr-9 min-w-[240px] max-w-[320px] text-slate-900 font-sans">
             {marker.category && (
                 <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">
                     {marker.category}
                 </p>
             )}
-            <h3 className="font-extrabold text-sm mb-1 uppercase tracking-tight">{marker.title}</h3>
+            <h3 className="font-bold text-sm tracking-tight text-slate-900 mb-1.5 leading-snug">
+                {marker.title}
+            </h3>
+
             {marker.description && (
-                <p className="text-xs text-slate-600 mb-2 leading-relaxed">{marker.description}</p>
-            )}
-            {marker.location && (
-                <p className="text-xs text-slate-500 mb-1">
-                    <span className="font-semibold">Location:</span> {marker.location}
+                <p className="text-xs text-slate-600 mb-2 leading-relaxed font-normal">
+                    {marker.description}
                 </p>
             )}
+
+            {marker.location && (
+                <p className="text-xs text-slate-600 mb-2.5 leading-normal flex items-start gap-1">
+                    <span className="font-semibold text-slate-700 shrink-0">Location:</span>
+                    <span className="text-slate-600">{marker.location}</span>
+                </p>
+            )}
+
             {marker.phone && (
-                <p className="text-xs text-slate-500 mb-1">
-                    <span className="font-semibold">Phone Number:</span>{' '}
-                    <a href={`tel:${marker.phone.replace(/[^\d+]/g, '')}`} className="hover:underline">
+                <p className="text-xs text-slate-600 mb-2.5 leading-normal flex items-center gap-1">
+                    <span className="font-semibold text-slate-700 shrink-0">Phone:</span>
+                    <a
+                        href={`tel:${marker.phone.replace(/[^\d+]/g, '')}`}
+                        className="text-blue-600 font-medium hover:underline"
+                    >
                         {marker.phone}
                     </a>
                 </p>
             )}
+
             {(marker.status || marker.isSafe != null) && (
-                <p
-                    className={`text-[10px] font-black uppercase inline-block px-2 py-0.5 rounded ${
-                        isHelpStatus(marker.status, marker.isSafe)
-                            ? 'bg-red-100 text-red-700'
-                            : marker.type === 'infrastructure'
-                              ? 'bg-red-100 text-red-700'
-                              : 'bg-emerald-100 text-emerald-700'
-                    }`}
-                >
-                    {marker.type === 'infrastructure' && marker.status
-                        ? marker.status
-                        : formatMarkerStatus(marker.status, marker.isSafe)}
-                </p>
+                <div className="mt-1 mb-2">
+                    <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${
+                            isHelp || marker.type === 'infrastructure'
+                                ? 'bg-rose-50 text-rose-700 border border-rose-200/80 shadow-sm'
+                                : 'bg-emerald-50 text-emerald-700 border border-emerald-200/80 shadow-sm'
+                        }`}
+                    >
+                        {statusLabel}
+                    </span>
+                </div>
             )}
+
             {marker.riskReportHref && (
                 <a
                     href={marker.riskReportHref}
-                    className="mt-2 block text-xs font-bold text-[#33375D] hover:underline"
+                    className="mt-2 block text-xs font-bold text-[#33375D] hover:text-blue-600 transition-colors"
                 >
                     View in AI Risk Assessment →
                 </a>
             )}
+
             {marker.incidentId && onViewDetails && (
                 <button
                     type="button"
-                    className="mt-2 block text-xs font-bold text-[#33375D] hover:underline text-left"
+                    className="mt-2 block text-xs font-bold text-[#33375D] hover:text-blue-600 transition-colors text-left"
                     onClick={(e) => {
                         e.stopPropagation();
                         onViewDetails();
@@ -616,10 +634,11 @@ function MarkerPopupContent({
                     View details →
                 </button>
             )}
+
             {onClose && (
                 <button
                     type="button"
-                    className="mt-3 text-xs font-bold text-slate-500 hover:text-slate-800"
+                    className="mt-3 text-xs font-bold text-slate-400 hover:text-slate-700 transition-colors"
                     onClick={(e) => {
                         e.stopPropagation();
                         onClose();
@@ -631,6 +650,7 @@ function MarkerPopupContent({
         </div>
     );
 }
+
 
 type IncidentDialogPayload = { eventIds: string[]; bulletText: string };
 
