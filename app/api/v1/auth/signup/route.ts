@@ -1,9 +1,10 @@
 import { NextRequest } from 'next/server';
 import connectDB from '@/lib/mongodb';
 import { apiError, apiJson, validationError } from '@/lib/api/json-response';
+import { toApiUser } from '@/lib/auth/mobile/user-mapper';
 import { signupSchema, zodFieldErrors } from '@/lib/validation/mobile/auth';
 import User from '@/models/User';
-import { buildAuthResponse, createMobileUser } from '@/lib/services/mobile/auth-service';
+import { createMobileUser } from '@/lib/services/mobile/auth-service';
 import { sendOtp } from '@/lib/services/mobile/otp-service';
 
 export const dynamic = 'force-dynamic';
@@ -30,8 +31,15 @@ export async function POST(req: NextRequest) {
             console.error('signup OTP send:', e);
         }
 
-        const auth = await buildAuthResponse(user);
-        return apiJson(auth, 201);
+        // Do not issue access/refresh tokens until email OTP is verified.
+        // Returning a live session here caused the mobile app to skip OTP + onboarding.
+        return apiJson(
+            {
+                user: toApiUser(user),
+                message: 'Account created. Verify the code sent to your email to continue.',
+            },
+            201,
+        );
     } catch (e) {
         console.error('v1/auth/signup:', e);
         return apiError('Signup failed', 500);
