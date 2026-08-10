@@ -24,6 +24,12 @@ import {
     notifyAdminsOfCitizenActivity,
     notifyCitizenOfReportResolution,
 } from '@/lib/services/user-notification-service';
+import {
+    CITIZEN_ACTIVITY_MAX_PICTURES,
+    CITIZEN_ACTIVITY_MAX_VIDEOS,
+    normalizeMediaList,
+    type CitizenActivityMediaRef,
+} from '@/lib/services/citizen-activity-media-service';
 
 export const MOBILE_REPORT_CATEGORIES = [
     'help_request',
@@ -166,6 +172,8 @@ export function mapCitizenActivityDocToFeedItem(
 ): CitizenActivityItem {
     const created = doc.createdAt ? new Date(doc.createdAt) : new Date();
     const category = doc.category;
+    const pictures = normalizeMediaList(doc.pictures, CITIZEN_ACTIVITY_MAX_PICTURES);
+    const videos = normalizeMediaList(doc.videos, CITIZEN_ACTIVITY_MAX_VIDEOS);
     return {
         id: doc._id?.toString() ?? `activity-${created.getTime()}`,
         category,
@@ -183,6 +191,8 @@ export function mapCitizenActivityDocToFeedItem(
         takeAction: doc.takeAction,
         resolutionStatus: doc.resolutionStatus,
         userId: String(doc.userId),
+        pictures: pictures.length ? pictures : undefined,
+        videos: videos.length ? videos : undefined,
     };
 }
 
@@ -211,6 +221,8 @@ export async function createCitizenActivityReport(
         lat?: number;
         lng?: number;
         location?: string;
+        pictures?: CitizenActivityMediaRef[];
+        videos?: CitizenActivityMediaRef[];
     },
 ) {
     await connectDB();
@@ -224,6 +236,9 @@ export async function createCitizenActivityReport(
     const title = CITIZEN_ACTIVITY_CATEGORY_META[category].label;
     const description = input.description.trim();
     if (!description) throw new Error('DESCRIPTION_REQUIRED');
+
+    const pictures = normalizeMediaList(input.pictures, CITIZEN_ACTIVITY_MAX_PICTURES);
+    const videos = normalizeMediaList(input.videos, CITIZEN_ACTIVITY_MAX_VIDEOS);
 
     const doc = await CitizenActivity.create({
         userId,
@@ -244,6 +259,8 @@ export async function createCitizenActivityReport(
         resolutionStatus: 'pending',
         takeAction: initialTakeAction(category, citizenName, loc.address),
         source: 'citizen',
+        pictures,
+        videos,
     });
 
     const activityObj = doc.toObject() as ICitizenActivity;

@@ -16,6 +16,14 @@ export type CitizenActivityPriority = 'critical' | 'high' | 'normal' | 'low'
 
 export type CitizenActivitySource = 'citizen' | 'system' | 'responder'
 
+export interface CitizenActivityMediaRef {
+    url: string
+    fileName?: string
+    mimeType?: string
+    publicId?: string
+    resourceType?: 'image' | 'video' | 'raw'
+}
+
 export interface CitizenActivityItem {
     id: string
     category: CitizenActivityCategory
@@ -34,6 +42,8 @@ export interface CitizenActivityItem {
     takeAction?: string
     resolutionStatus?: 'pending' | 'completed'
     userId?: string
+    pictures?: CitizenActivityMediaRef[]
+    videos?: CitizenActivityMediaRef[]
 }
 
 export type CitizenActivityFilter =
