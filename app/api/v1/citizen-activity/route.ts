@@ -8,9 +8,21 @@ import {
     listCitizenActivitiesForUser,
     MOBILE_REPORT_CATEGORIES,
 } from '@/lib/services/citizen-activity-service';
+import {
+    CITIZEN_ACTIVITY_MAX_PICTURES,
+    CITIZEN_ACTIVITY_MAX_VIDEOS,
+} from '@/lib/services/citizen-activity-media-service';
 import { zodFieldErrors } from '@/lib/validation/mobile/auth';
 
 export const dynamic = 'force-dynamic';
+
+const mediaRefSchema = z.object({
+    url: z.string().url(),
+    fileName: z.string().min(1).optional(),
+    mimeType: z.string().optional(),
+    publicId: z.string().optional(),
+    resourceType: z.enum(['image', 'video', 'raw']).optional(),
+});
 
 const reportSchema = z.object({
     category: z.enum(MOBILE_REPORT_CATEGORIES as unknown as [string, ...string[]]),
@@ -19,6 +31,8 @@ const reportSchema = z.object({
     lat: z.number().finite().optional(),
     lng: z.number().finite().optional(),
     location: z.string().max(240).optional(),
+    pictures: z.array(mediaRefSchema).max(CITIZEN_ACTIVITY_MAX_PICTURES).optional(),
+    videos: z.array(mediaRefSchema).max(CITIZEN_ACTIVITY_MAX_VIDEOS).optional(),
 });
 
 const safeCheckInSchema = z.object({
@@ -66,6 +80,8 @@ export async function POST(req: NextRequest) {
             lat: parsed.data.lat,
             lng: parsed.data.lng,
             location: parsed.data.location,
+            pictures: parsed.data.pictures,
+            videos: parsed.data.videos,
         });
         return apiJson({ message: 'Report submitted', item }, 201);
     } catch (e) {

@@ -3,6 +3,14 @@ import type { CitizenActivityCategory, CitizenActivityPriority } from '@/lib/cit
 
 export type CitizenActivityResolutionStatus = 'pending' | 'completed';
 
+export interface ICitizenActivityMediaRef {
+    url: string;
+    fileName?: string;
+    mimeType?: string;
+    publicId?: string;
+    resourceType?: 'image' | 'video' | 'raw';
+}
+
 export interface ICitizenActivity {
     userId: Schema.Types.ObjectId;
     category: CitizenActivityCategory;
@@ -22,11 +30,24 @@ export interface ICitizenActivity {
     resolutionStatus: CitizenActivityResolutionStatus;
     takeAction: string;
     source: 'citizen' | 'system' | 'responder';
+    pictures: ICitizenActivityMediaRef[];
+    videos: ICitizenActivityMediaRef[];
     reviewedBy?: Schema.Types.ObjectId | null;
     reviewedAt?: Date | null;
     createdAt: Date;
     updatedAt: Date;
 }
+
+const MediaRefSchema = new Schema(
+    {
+        url: { type: String, required: true },
+        fileName: { type: String, default: '' },
+        mimeType: { type: String, default: '' },
+        publicId: { type: String, default: '' },
+        resourceType: { type: String, enum: ['image', 'video', 'raw'], default: 'image' },
+    },
+    { _id: false },
+);
 
 const CitizenActivitySchema = new Schema<ICitizenActivity>(
     {
@@ -79,6 +100,8 @@ const CitizenActivitySchema = new Schema<ICitizenActivity>(
             enum: ['citizen', 'system', 'responder'],
             default: 'citizen',
         },
+        pictures: { type: [MediaRefSchema], default: [] },
+        videos: { type: [MediaRefSchema], default: [] },
         reviewedBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
         reviewedAt: { type: Date, default: null },
     },
