@@ -108,6 +108,60 @@ function ActivityCell({
     )
 }
 
+function cloudinaryVideoPoster(url: string): string | undefined {
+    if (!url.includes('res.cloudinary.com') || !url.includes('/video/upload/')) {
+        return undefined
+    }
+    return url
+        .replace('/video/upload/', '/video/upload/so_0/')
+        .replace(/\.(mp4|mov|webm|m4v)(\?.*)?$/i, '.jpg$2')
+}
+
+function ActivityMedia({ entry }: { entry: CitizenActivityDisplayRow }) {
+    const pictures = entry.pictures ?? []
+    const videos = entry.videos ?? []
+    if (pictures.length === 0 && videos.length === 0) return null
+
+    return (
+        <div className="mt-3 space-y-2">
+            {pictures.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                    {pictures.map((pic) => (
+                        <a
+                            key={pic.url}
+                            href={pic.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="block h-16 w-16 overflow-hidden rounded-md border bg-white"
+                        >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                                src={pic.url}
+                                alt={pic.fileName || 'Report picture'}
+                                className="h-full w-full object-cover"
+                            />
+                        </a>
+                    ))}
+                </div>
+            ) : null}
+            {videos.map((vid) => (
+                <div key={vid.url} className="overflow-hidden rounded-md border bg-black">
+                    <video
+                        src={vid.url}
+                        controls
+                        preload="metadata"
+                        playsInline
+                        poster={cloudinaryVideoPoster(vid.url)}
+                        className="aspect-video max-h-40 w-full bg-black object-contain"
+                    >
+                        Your browser does not support video playback.
+                    </video>
+                </div>
+            ))}
+        </div>
+    )
+}
+
 function FeedTableRow({
     entry,
     onMarkCompleted,
@@ -120,6 +174,7 @@ function FeedTableRow({
         <tr className="border-b border-slate-100 last:border-0 align-top">
             <td className="py-4 pr-4 min-w-[220px]">
                 <ActivityCell entry={entry} />
+                <ActivityMedia entry={entry} />
             </td>
             <td className="py-4 pr-4 min-w-[120px]">
                 <p className="text-sm font-bold text-slate-900">{entry.citizenName}</p>
