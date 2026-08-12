@@ -11,6 +11,9 @@ import {
     resolveMaxRadiusForState,
 } from '@/lib/geo/license-coverage-radius';
 import bcrypt from 'bcryptjs';
+import { getStateCenterCoords } from '@/lib/utils/us-state-usps';
+import { geocodeLocation } from '@/lib/services/location-matching';
+
 
 export async function GET(req: NextRequest) {
     try {
@@ -127,7 +130,20 @@ export async function POST(req: NextRequest) {
         if (city) assignedSubAdmin.city = city;
         if (zipcode) assignedSubAdmin.zipcode = zipcode;
         if (phoneNumber) assignedSubAdmin.phoneNumber = phoneNumber;
+
+        // Resolve and save lat/lng coordinates for map marker placement
+        const targetState = state || assignedSubAdmin.state;
+        const targetAddress = billingAddress || [city, state, country].filter(Boolean).join(', ');
+        const resolvedCoords =
+            (targetAddress ? await geocodeLocation(targetAddress) : null) ||
+            getStateCenterCoords(targetState);
+        if (resolvedCoords) {
+            assignedSubAdmin.lat = resolvedCoords.lat;
+            assignedSubAdmin.lng = 'lon' in resolvedCoords ? resolvedCoords.lon : resolvedCoords.lng;
+        }
+
         await assignedSubAdmin.save();
+
 
         // 2. Create the License
         const license = await License.create({
