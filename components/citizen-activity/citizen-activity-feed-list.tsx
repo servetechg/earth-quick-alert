@@ -2,6 +2,7 @@
 
 import * as React from 'react'
 import Image from 'next/image'
+import { Camera, Film, Play } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { CitizenActivityItem } from '@/lib/citizen-activity/types'
 import { CITIZEN_ACTIVITY_CATEGORY_META } from '@/lib/citizen-activity/category-meta'
@@ -10,6 +11,7 @@ import {
     type CitizenActivityDisplayRow,
     type CitizenActivityResolutionStatus,
 } from '@/components/citizen-activity/citizen-activity-display'
+import { CitizenActivityMediaModal } from '@/components/citizen-activity/citizen-activity-media-modal'
 
 const PRIORITY_STYLES: Record<CitizenActivityItem['priority'], string> = {
     critical: 'bg-red-100 text-red-700',
@@ -117,64 +119,68 @@ function cloudinaryVideoPoster(url: string): string | undefined {
         .replace(/\.(mp4|mov|webm|m4v)(\?.*)?$/i, '.jpg$2')
 }
 
-function ActivityMedia({ entry }: { entry: CitizenActivityDisplayRow }) {
+function MediaTriggerButton({
+    entry,
+    onClick,
+}: {
+    entry: CitizenActivityDisplayRow
+    onClick: () => void
+}) {
     const pictures = entry.pictures ?? []
     const videos = entry.videos ?? []
-    if (pictures.length === 0 && videos.length === 0) return null
+    const totalCount = pictures.length + videos.length
+    if (totalCount === 0) return null
+
+    const firstPic = pictures[0]?.url
+    const firstVidPoster = videos[0] ? cloudinaryVideoPoster(videos[0].url) : undefined
+    const thumbUrl = firstPic || firstVidPoster
 
     return (
-        <div className="mt-3 space-y-2">
-            {pictures.length > 0 ? (
-                <div className="flex flex-wrap gap-2">
-                    {pictures.map((pic) => (
-                        <a
-                            key={pic.url}
-                            href={pic.url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="block h-16 w-16 overflow-hidden rounded-md border bg-white"
-                        >
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                                src={pic.url}
-                                alt={pic.fileName || 'Report picture'}
-                                className="h-full w-full object-cover"
-                            />
-                        </a>
-                    ))}
-                </div>
-            ) : null}
-            {videos.map((vid) => (
-                <div key={vid.url} className="overflow-hidden rounded-md border bg-black">
-                    <video
-                        src={vid.url}
-                        controls
-                        preload="metadata"
-                        playsInline
-                        poster={cloudinaryVideoPoster(vid.url)}
-                        className="aspect-video max-h-40 w-full bg-black object-contain"
-                    >
-                        Your browser does not support video playback.
-                    </video>
-                </div>
-            ))}
-        </div>
+        <button
+            type="button"
+            onClick={onClick}
+            className="mt-2 inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:border-slate-300 hover:bg-slate-100 hover:text-slate-900 transition-all shadow-2xs group cursor-pointer"
+        >
+            {thumbUrl ? (
+                <span className="relative h-6 w-6 shrink-0 overflow-hidden rounded-md border border-slate-200 bg-slate-900">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                        src={thumbUrl}
+                        alt=""
+                        className="h-full w-full object-cover group-hover:scale-110 transition-transform"
+                    />
+                    {videos.length > 0 && (
+                        <span className="absolute inset-0 flex items-center justify-center bg-black/40 text-white">
+                            <Play className="h-3 w-3 fill-current" />
+                        </span>
+                    )}
+                </span>
+            ) : (
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[#33375D] text-white">
+                    {videos.length > 0 ? <Film className="h-3.5 w-3.5" /> : <Camera className="h-3.5 w-3.5" />}
+                </span>
+            )}
+
+            <span>View Media ({totalCount})</span>
+        </button>
     )
 }
 
 function FeedTableRow({
     entry,
     onMarkCompleted,
+    onOpenMedia,
 }: {
     entry: CitizenActivityDisplayRow
     onMarkCompleted?: (id: string) => void | Promise<void>
+    onOpenMedia: (entry: CitizenActivityDisplayRow) => void
 }) {
     const isLiveRecord = Boolean(entry.userId)
     return (
         <tr className="border-b border-slate-100 last:border-0 align-top">
-            <td className="py-4 pr-4 min-w-[220px]">
+            <td className="py-4 pr-4 min-w-[240px]">
                 <ActivityCell entry={entry} />
-                <ActivityMedia entry={entry} />
+                <MediaTriggerButton entry={entry} onClick={() => onOpenMedia(entry)} />
             </td>
             <td className="py-4 pr-4 min-w-[120px]">
                 <p className="text-sm font-bold text-slate-900">{entry.citizenName}</p>
@@ -201,7 +207,13 @@ function FeedTableRow({
     )
 }
 
-function CompactFeedRow({ entry }: { entry: CitizenActivityDisplayRow }) {
+function CompactFeedRow({
+    entry,
+    onOpenMedia,
+}: {
+    entry: CitizenActivityDisplayRow
+    onOpenMedia: (entry: CitizenActivityDisplayRow) => void
+}) {
     return (
         <li className="py-3 first:pt-1 last:pb-1">
             <div className="flex items-start justify-between gap-3">
@@ -215,6 +227,7 @@ function CompactFeedRow({ entry }: { entry: CitizenActivityDisplayRow }) {
                     <span className="font-medium text-slate-500">{entry.citizenAddress}</span>
                 </p>
                 <p className="text-[10px] leading-relaxed text-slate-500 line-clamp-2">{entry.takeAction}</p>
+                <MediaTriggerButton entry={entry} onClick={() => onOpenMedia(entry)} />
             </div>
         </li>
     )
@@ -228,6 +241,8 @@ export function CitizenActivityFeedList({
     searchQuery = '',
     onMarkCompleted,
 }: CitizenActivityFeedListProps) {
+    const [selectedMediaEntry, setSelectedMediaEntry] = React.useState<CitizenActivityDisplayRow | null>(null)
+
     const rows = React.useMemo(() => {
         const enriched = enrichCitizenActivityItems(items)
         const q = searchQuery.trim().toLowerCase()
@@ -257,44 +272,63 @@ export function CitizenActivityFeedList({
         )
     }
 
-    if (compact) {
-        return (
-            <ul className={cn('flex flex-col divide-y divide-slate-100', className)}>
-                {rows.map((entry) => (
-                    <CompactFeedRow key={entry.id} entry={entry} />
-                ))}
-            </ul>
-        )
-    }
-
     return (
-        <div className={cn('overflow-x-auto', className)}>
-            <table className="w-full min-w-[960px] border-collapse text-left">
-                <thead>
-                    <tr className="border-b border-slate-200">
-                        <th className="pb-3 pr-4 text-[11px] font-black uppercase tracking-widest text-slate-400">
-                            Activity
-                        </th>
-                        <th className="pb-3 pr-4 text-[11px] font-black uppercase tracking-widest text-slate-400">
-                            Citizen
-                        </th>
-                        <th className="pb-3 pr-4 text-[11px] font-black uppercase tracking-widest text-slate-400">
-                            Address
-                        </th>
-                        <th className="pb-3 pr-4 text-[11px] font-black uppercase tracking-widest text-slate-400">
-                            Take action
-                        </th>
-                        <th className="pb-3 text-right text-[11px] font-black uppercase tracking-widest text-slate-400">
-                            Status
-                        </th>
-                    </tr>
-                </thead>
-                <tbody>
+        <>
+            {compact ? (
+                <ul className={cn('flex flex-col divide-y divide-slate-100', className)}>
                     {rows.map((entry) => (
-                        <FeedTableRow key={entry.id} entry={entry} onMarkCompleted={onMarkCompleted} />
+                        <CompactFeedRow
+                            key={entry.id}
+                            entry={entry}
+                            onOpenMedia={(item) => setSelectedMediaEntry(item)}
+                        />
                     ))}
-                </tbody>
-            </table>
-        </div>
+                </ul>
+            ) : (
+                <div className={cn('overflow-x-auto', className)}>
+                    <table className="w-full min-w-[960px] border-collapse text-left">
+                        <thead>
+                            <tr className="border-b border-slate-200">
+                                <th className="pb-3 pr-4 text-[11px] font-black uppercase tracking-widest text-slate-400">
+                                    Activity
+                                </th>
+                                <th className="pb-3 pr-4 text-[11px] font-black uppercase tracking-widest text-slate-400">
+                                    Citizen
+                                </th>
+                                <th className="pb-3 pr-4 text-[11px] font-black uppercase tracking-widest text-slate-400">
+                                    Address
+                                </th>
+                                <th className="pb-3 pr-4 text-[11px] font-black uppercase tracking-widest text-slate-400">
+                                    Take action
+                                </th>
+                                <th className="pb-3 text-right text-[11px] font-black uppercase tracking-widest text-slate-400">
+                                    Status
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {rows.map((entry) => (
+                                <FeedTableRow
+                                    key={entry.id}
+                                    entry={entry}
+                                    onMarkCompleted={onMarkCompleted}
+                                    onOpenMedia={(item) => setSelectedMediaEntry(item)}
+                                />
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+
+            {/* Media Lightbox Popup Modal */}
+            <CitizenActivityMediaModal
+                entry={selectedMediaEntry}
+                open={Boolean(selectedMediaEntry)}
+                onOpenChange={(open) => {
+                    if (!open) setSelectedMediaEntry(null)
+                }}
+            />
+        </>
     )
 }
+

@@ -25,7 +25,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import type { DisasterSurveyProfileSnapshot } from '@/lib/types/disaster-survey';
 import { cn } from '@/lib/utils';
-import { Loader2, Send, X } from 'lucide-react';
+import { ExternalLink, Eye, FileText, Loader2, Send, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useUser } from '@/lib/store/user-store';
 
@@ -107,7 +107,150 @@ const NEED_LABELS: Record<string, string> = {
     transportation: 'Transportation',
 };
 
-function ProfileSnapshotView({ snapshot }: { snapshot: DisasterSurveyProfileSnapshot }) {
+type DocumentPreviewState = {
+    title: string;
+    url: string;
+    fileName?: string;
+} | null;
+
+function isImageUrl(url: string, fileName?: string): boolean {
+    const combined = `${url} ${fileName || ''}`.toLowerCase();
+    return (
+        combined.includes('res.cloudinary.com') ||
+        /\.(png|jpe?g|webp|gif|svg|avif)($|\?)/i.test(combined)
+    );
+}
+
+function DocumentThumbnailCard({
+    title,
+    url,
+    fileName,
+    onPreview,
+}: {
+    title: string;
+    url: string;
+    fileName?: string;
+    onPreview: (doc: { title: string; url: string; fileName?: string }) => void;
+}) {
+    const isImage = isImageUrl(url, fileName);
+
+    return (
+        <div className="group relative flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-2.5 shadow-2xs hover:border-slate-300 hover:shadow-xs transition-all max-w-md">
+            <button
+                type="button"
+                onClick={() => onPreview({ title, url, fileName })}
+                className="relative h-20 w-24 shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-slate-900 cursor-pointer focus:outline-hidden ring-offset-2 focus:ring-2 focus:ring-slate-400"
+            >
+                {isImage ? (
+                    <>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                            src={url}
+                            alt={fileName || title}
+                            className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
+                        />
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Eye className="h-5 w-5 text-white drop-shadow-md" />
+                        </div>
+                    </>
+                ) : (
+                    <div className="flex h-full w-full flex-col items-center justify-center bg-slate-100 text-slate-500 group-hover:bg-slate-200 transition-colors">
+                        <FileText className="h-7 w-7 text-slate-600 mb-1" />
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Document</span>
+                    </div>
+                )}
+            </button>
+
+            <div className="min-w-0 flex-1 pr-1">
+                <p className="text-xs font-bold text-slate-900">{title}</p>
+                <p className="mt-0.5 truncate text-xs text-slate-500">{fileName || 'document.png'}</p>
+                <button
+                    type="button"
+                    onClick={() => onPreview({ title, url, fileName })}
+                    className="mt-2 inline-flex items-center gap-1.5 text-xs font-bold text-[#33375D] hover:underline cursor-pointer"
+                >
+                    <Eye className="h-3.5 w-3.5" />
+                    View {isImage ? 'image' : 'document'}
+                </button>
+            </div>
+        </div>
+    );
+}
+
+function DocumentPreviewModal({
+    doc,
+    onClose,
+}: {
+    doc: DocumentPreviewState;
+    onClose: () => void;
+}) {
+    if (!doc) return null;
+    const isImage = isImageUrl(doc.url, doc.fileName);
+
+    return (
+        <Dialog open={Boolean(doc)} onOpenChange={(open) => { if (!open) onClose(); }}>
+            <DialogContent elevated className="max-w-3xl overflow-hidden rounded-2xl bg-white p-0 gap-0 border-0 shadow-2xl sm:max-w-2xl">
+                <DialogHeader className="border-b border-slate-100 bg-slate-50/80 px-6 py-4 text-left">
+                    <div className="pr-6">
+                        <DialogTitle className="text-base font-bold text-slate-900">
+                            {doc.title}
+                        </DialogTitle>
+                        {doc.fileName ? (
+                            <p className="mt-0.5 text-xs text-slate-500">{doc.fileName}</p>
+                        ) : null}
+                    </div>
+                </DialogHeader>
+
+                <div className="flex min-h-[300px] max-h-[70vh] w-full items-center justify-center bg-slate-950 p-4">
+                    {isImage ? (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img
+                            src={doc.url}
+                            alt={doc.fileName || doc.title}
+                            className="max-h-[65vh] w-auto max-w-full rounded-lg object-contain shadow-lg"
+                        />
+                    ) : (
+                        <div className="flex flex-col items-center justify-center p-8 text-center text-white">
+                            <FileText className="h-16 w-16 text-slate-400 mb-3" />
+                            <p className="text-sm font-semibold">{doc.fileName || 'Document File'}</p>
+                            <p className="text-xs text-slate-400 mt-1 mb-4">Click below to open or download the full document</p>
+                            <a
+                                href={doc.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700 transition-colors"
+                            >
+                                Open document
+                                <ExternalLink className="h-4 w-4" />
+                            </a>
+                        </div>
+                    )}
+                </div>
+
+                <div className="flex items-center justify-between border-t border-slate-100 bg-white px-6 py-3.5 text-xs text-slate-500">
+                    <span className="font-medium truncate max-w-[60%]">{doc.fileName || doc.title}</span>
+                    <a
+                        href={doc.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1.5 font-bold text-[#33375D] hover:underline"
+                    >
+                        Open full size in new tab
+                        <ExternalLink className="h-3.5 w-3.5" />
+                    </a>
+                </div>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+function ProfileSnapshotView({
+    snapshot,
+    onPreviewDoc,
+}: {
+    snapshot: DisasterSurveyProfileSnapshot;
+    onPreviewDoc: (doc: { title: string; url: string; fileName?: string }) => void;
+}) {
     const rows: Array<{ label: string; value: React.ReactNode }> = [
         { label: 'Address', value: snapshot.address },
         {
@@ -152,32 +295,28 @@ function ProfileSnapshotView({ snapshot }: { snapshot: DisasterSurveyProfileSnap
                 </div>
             ) : null}
             {snapshot.proofOfOwnership?.url ? (
-                <div>
-                    <dt className="font-medium text-slate-800">Proof of ownership</dt>
+                <div className="pt-1">
+                    <dt className="font-medium text-slate-800 mb-1.5">Proof of ownership</dt>
                     <dd className="mt-0.5">
-                        <a
-                            href={snapshot.proofOfOwnership.url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-blue-600 underline"
-                        >
-                            {snapshot.proofOfOwnership.fileName}
-                        </a>
+                        <DocumentThumbnailCard
+                            title="Proof of Ownership"
+                            url={snapshot.proofOfOwnership.url}
+                            fileName={snapshot.proofOfOwnership.fileName}
+                            onPreview={onPreviewDoc}
+                        />
                     </dd>
                 </div>
             ) : null}
             {snapshot.proofOfResidency?.url ? (
-                <div>
-                    <dt className="font-medium text-slate-800">Proof of residency</dt>
+                <div className="pt-1">
+                    <dt className="font-medium text-slate-800 mb-1.5">Proof of residency</dt>
                     <dd className="mt-0.5">
-                        <a
-                            href={snapshot.proofOfResidency.url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-blue-600 underline"
-                        >
-                            {snapshot.proofOfResidency.fileName}
-                        </a>
+                        <DocumentThumbnailCard
+                            title="Proof of Residency"
+                            url={snapshot.proofOfResidency.url}
+                            fileName={snapshot.proofOfResidency.fileName}
+                            onPreview={onPreviewDoc}
+                        />
                     </dd>
                 </div>
             ) : null}
@@ -216,6 +355,7 @@ export default function DisasterSurveysPage() {
     const [fundingNotes, setFundingNotes] = useState('');
     const [savingFunding, setSavingFunding] = useState(false);
     const [requestingMissing, setRequestingMissing] = useState(false);
+    const [previewDoc, setPreviewDoc] = useState<DocumentPreviewState>(null);
 
     const loadCampaigns = useCallback(async () => {
         const res = await fetch('/api/admin/disaster-surveys/campaigns', { credentials: 'include' });
@@ -765,21 +905,29 @@ export default function DisasterSurveysPage() {
                                         {detail.incidentPictures &&
                                         detail.incidentPictures.length > 0 ? (
                                             <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
-                                                {detail.incidentPictures.map((pic) => (
-                                                    <a
-                                                        key={pic.url}
-                                                        href={pic.url}
-                                                        target="_blank"
-                                                        rel="noreferrer"
-                                                        className="block overflow-hidden rounded-md border bg-white"
+                                                {detail.incidentPictures.map((pic, idx) => (
+                                                    <button
+                                                        key={pic.url + idx}
+                                                        type="button"
+                                                        onClick={() =>
+                                                            setPreviewDoc({
+                                                                title: 'Incident Picture',
+                                                                url: pic.url,
+                                                                fileName: pic.fileName || `Picture ${idx + 1}`,
+                                                            })
+                                                        }
+                                                        className="group relative block h-24 w-full overflow-hidden rounded-xl border border-slate-200 bg-white cursor-pointer"
                                                     >
                                                         {/* eslint-disable-next-line @next/next/no-img-element */}
                                                         <img
                                                             src={pic.url}
                                                             alt={pic.fileName || 'Incident picture'}
-                                                            className="h-28 w-full object-cover"
+                                                            className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
                                                         />
-                                                    </a>
+                                                        <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                            <Eye className="h-5 w-5 text-white drop-shadow-md" />
+                                                        </div>
+                                                    </button>
                                                 ))}
                                             </div>
                                         ) : (
@@ -872,7 +1020,10 @@ export default function DisasterSurveysPage() {
 
                             <div>
                                 <div className="font-medium mb-1">Profile snapshot</div>
-                                <ProfileSnapshotView snapshot={detail.profileSnapshot} />
+                                <ProfileSnapshotView
+                                    snapshot={detail.profileSnapshot}
+                                    onPreviewDoc={(doc) => setPreviewDoc(doc)}
+                                />
                             </div>
 
                             <div className="border-t pt-4 space-y-3">
@@ -906,6 +1057,9 @@ export default function DisasterSurveysPage() {
                     ) : null}
                 </DialogContent>
             </Dialog>
+
+            {/* Document Lightbox Modal Popup */}
+            <DocumentPreviewModal doc={previewDoc} onClose={() => setPreviewDoc(null)} />
         </AdminPageShell>
     );
 }
