@@ -6,14 +6,25 @@ import { Button } from '@/components/ui/button'
 import { Eye, EyeOff, User, Mail, Lock, MapPin, Navigation } from 'lucide-react'
 import Image from 'next/image'
 import logo from '../../public/logo.png'
-import { useJsApiLoader, Autocomplete, GoogleMap, MarkerF } from '@react-google-maps/api'
-import { GOOGLE_MAPS_API_KEY, GOOGLE_MAPS_LIBRARIES, GOOGLE_MAPS_LOADER_ID } from '@/lib/constants/google-maps-config'
+import dynamic from 'next/dynamic'
 import { useUser } from '@/lib/store/user-store'
+import { GeoapifyAutocomplete, GeoapifyPlace } from '@/components/ui/geoapify-autocomplete'
+
+const SignupLocationMap = dynamic(() => import('@/components/ui/signup-location-map'), {
+  ssr: false,
+  loading: () => (
+    <div className="w-full h-44 bg-slate-100 animate-pulse rounded-2xl flex items-center justify-center text-xs text-slate-400 font-bold">
+      Loading Map...
+    </div>
+  ),
+})
+
 
 function SignupPageInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const responderInviteToken = searchParams.get('responderInvite')?.trim() ?? ''
+  const responderInviteToken = searchParams?.get('responderInvite')?.trim() ?? ''
+
   const { refresh: refreshUserProfile } = useUser()
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
@@ -21,19 +32,21 @@ function SignupPageInner() {
   const [isSafe, setIsSafe] = useState(true)
   const [role, setRole] = useState('user')
   const [requestedLicenseType, setRequestedLicenseType] = useState('radius')
-  const [country, setCountry] = useState('')
+  const [country, setCountry] = useState('USA')
   const [state, setState] = useState('')
   const [city, setCity] = useState('')
   const [zipcode, setZipcode] = useState('')
+
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const [mapCenter, setMapCenter] = useState({ lat: 34.7465, lng: -92.2896 }) // Default to Little Rock, Arkansas
+  const [mapCenter, setMapCenter] = useState({ lat: 37.0902, lng: -95.7129 }) // Default center of USA
+  const [mapZoom, setMapZoom] = useState(4) // Zoom level 4 shows USA overview
   const [markerPosition, setMarkerPosition] = useState<{ lat: number, lng: number } | null>(null)
-  const [map, setMap] = useState<google.maps.Map | null>(null)
-
-  const [autocompleteInfo, setAutocompleteInfo] = useState<any>(null)
   const [inviteRoleLabel, setInviteRoleLabel] = useState<string | null>(null)
+
+
+
 
   useEffect(() => {
     if (!responderInviteToken) return
@@ -58,86 +71,46 @@ function SignupPageInner() {
     }
   }, [responderInviteToken])
 
-  const { isLoaded } = useJsApiLoader({
-    id: GOOGLE_MAPS_LOADER_ID,
-    googleMapsApiKey: GOOGLE_MAPS_API_KEY,
-    libraries: GOOGLE_MAPS_LIBRARIES,
-  })
+  const handleGeoapifySelect = (place: GeoapifyPlace) => {
+    if (place.city) setCity(place.city)
+    if (place.state) setState(place.state)
+    if (place.country) setCountry(place.country)
+    if (place.zipcode) setZipcode(place.zipcode)
+    else setZipcode('')
 
-  const onPlaceLoaded = (autocomplete: any) => {
-    setAutocompleteInfo(autocomplete)
-  }
-
-  const onPlaceChanged = () => {
-    if (autocompleteInfo) {
-      const place = autocompleteInfo.getPlace()
-      if (!place.geometry || !place.geometry.location) return
-
-      const lat = place.geometry.location.lat()
-      const lng = place.geometry.location.lng()
-
-      const newPos = { lat, lng }
+    if (place.lat && place.lng) {
+      const newPos = { lat: place.lat, lng: place.lng }
       setMapCenter(newPos)
+      setMapZoom(12)
       setMarkerPosition(newPos)
-      if (map) map.panTo(newPos)
-
-      let newCity = ''
-      let newState = ''
-      let newCountry = ''
-      let newZip = ''
-
-      place.address_components?.forEach((component: any) => {
-        const types = component.types
-        if (types.includes('locality')) {
-          newCity = component.long_name
-        }
-        if (types.includes('administrative_area_level_1')) {
-          newState = component.long_name
-        }
-        if (types.includes('country')) {
-          newCountry = component.long_name
-        }
-        if (types.includes('postal_code')) {
-          newZip = component.long_name
-        }
-      })
-
-      if (newCity) setCity(newCity)
-      if (newState) setState(newState)
-      if (newCountry) setCountry(newCountry)
-      if (newZip) setZipcode(newZip)
-      else setZipcode('')
     }
   }
 
   const handleLocateMe = () => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        (position) => {
+        async (position) => {
           const { latitude, longitude } = position.coords
           const newPos = { lat: latitude, lng: longitude }
           setMapCenter(newPos)
+          setMapZoom(12)
           setMarkerPosition(newPos)
-          if (map) map.panTo(newPos)
 
-          // Reverse geocode to fill fields
-          if (typeof google !== 'undefined') {
-            const geocoder = new google.maps.Geocoder()
-            geocoder.geocode({ location: newPos }, (results, status) => {
-              if (status === 'OK' && results?.[0]) {
-                const place = results[0]
-                let newCity = ''
-                let newState = ''
-                let newCountry = ''
-                let newZip = ''
 
-                place.address_components?.forEach((component: any) => {
-                  const types = component.types
-                  if (types.includes('locality')) newCity = component.long_name
-                  if (types.includes('administrative_area_level_1')) newState = component.long_name
-                  if (types.includes('country')) newCountry = component.long_name
-                  if (types.includes('postal_code')) newZip = component.long_name
-                })
+          try {
+            const apiKey =
+              process.env.NEXT_PUBLIC_GEOAPIFY_API_KEY || '9abe9caf7f5943d189e9ef564c5cdec7'
+            const res = await fetch(
+              `https://api.geoapify.com/v1/geocode/reverse?lat=${latitude}&lon=${longitude}&apiKey=${apiKey}`,
+            )
+            if (res.ok) {
+              const data = await res.json()
+              const props = data?.features?.[0]?.properties
+              if (props) {
+                const newCity = props.city || props.town || props.village || props.county || ''
+                const newState = props.state || props.region || ''
+                const newCountry = props.country || ''
+                const newZip = props.postcode || ''
 
                 if (newCity) setCity(newCity)
                 if (newState) setState(newState)
@@ -145,7 +118,9 @@ function SignupPageInner() {
                 if (newZip) setZipcode(newZip)
                 else setZipcode('')
               }
-            })
+            }
+          } catch (err) {
+            console.error('Geoapify reverse geocode failed:', err)
           }
         },
         () => {
@@ -156,6 +131,7 @@ function SignupPageInner() {
       setError('Geolocation is not supported by your browser.')
     }
   }
+
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -389,7 +365,6 @@ function SignupPageInner() {
 
               {/* Location Fields */}
               <div className="space-y-5 p-6 bg-[#33375D]/5 border border-[#33375D]/10 rounded-3xl animate-in fade-in slide-in-from-top-2 duration-500 shadow-inner">
-                {isLoaded && (
                   <div className="space-y-4 mb-2 pb-6 border-b border-[#33375D]/10">
                     <div className="flex items-center justify-between px-1">
                       <label className="text-[10px] font-black text-[#33375D] uppercase tracking-[0.2em] flex items-center gap-2">
@@ -403,45 +378,21 @@ function SignupPageInner() {
                         <Navigation size={10} /> Find My Location
                       </button>
                     </div>
-                    <Autocomplete onLoad={onPlaceLoaded} onPlaceChanged={onPlaceChanged}>
-                      <input
-                        type="text"
-                        placeholder="Search for your city or zip code..."
-                        className="w-full px-5 py-4 bg-white border border-slate-200 shadow-sm rounded-2xl focus:outline-none focus:ring-4 focus:ring-[#33375D]/5 focus:border-[#33375D] transition-all text-[#33375D] placeholder:text-slate-300"
+                    <div className="relative z-30">
+                      <GeoapifyAutocomplete
+                        placeholder="Search for your city, zip code, or address..."
+                        onSelect={handleGeoapifySelect}
                       />
-                    </Autocomplete>
+                    </div>
 
                     {/* Interactive Map */}
-                    <div className="w-full h-44 rounded-2xl overflow-hidden border border-slate-200 shadow-inner mt-4 relative group">
-                      <GoogleMap
-                        mapContainerStyle={{ width: '100%', height: '100%' }}
-                        center={mapCenter}
-                        zoom={12}
-                        onLoad={(map) => setMap(map)}
-                        options={{
-                          disableDefaultUI: true,
-                          zoomControl: true,
-                          styles: [
-                            {
-                              "featureType": "all",
-                              "elementType": "labels.text.fill",
-                              "stylers": [{ "color": "#33375D" }]
-                            },
-                            {
-                              "featureType": "water",
-                              "elementType": "geometry",
-                              "stylers": [{ "color": "#E2E8F0" }]
-                            }
-                          ]
-                        }}
-                      >
-                        {markerPosition && (
-                          <MarkerF position={markerPosition} />
-                        )}
-                      </GoogleMap>
+                    <div className="w-full mt-4 relative z-0">
+                      <SignupLocationMap center={mapCenter} markerPosition={markerPosition} zoom={mapZoom} />
                     </div>
+
+
                   </div>
-                )}
+
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">

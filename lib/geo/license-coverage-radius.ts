@@ -96,29 +96,57 @@ export function buildStateGeocodeUrl(query: StateRegionQuery, apiKey: string): s
 
 export async function geocodeStateBounds(
     query: StateRegionQuery,
-    apiKey: string
+    apiKey?: string
 ): Promise<GeoBounds | null> {
-    const url = buildStateGeocodeUrl(query, apiKey);
-    if (!url) return null;
+    const geoapifyKey =
+        process.env.GEOAPIFY_API_KEY ||
+        process.env.NEXT_PUBLIC_GEOAPIFY_API_KEY ||
+        apiKey ||
+        '9abe9caf7f5943d189e9ef564c5cdec7';
+
+    const state = query.stateName || query.stateCode || '';
+    const country = query.countryName || query.countryCode || 'USA';
+
+    if (!state) return null;
 
     try {
+        const url = `https://api.geoapify.com/v1/geocode/search?text=${encodeURIComponent(
+            `${state}, ${country}`
+        )}&apiKey=${geoapifyKey}`;
+
         const res = await fetch(url, { next: { revalidate: 86400 } });
-        const data = await res.json();
-        if (data.status !== 'OK' || !data.results?.[0]) return null;
-        return boundsFromGeocodeGeometry(data.results[0].geometry as GeocodeGeometry);
-    } catch {
-        return null;
+        if (res.ok) {
+            const data = await res.json();
+            const feature = data.features?.[0];
+            if (feature?.bbox) {
+                const [minLon, minLat, maxLon, maxLat] = feature.bbox;
+                return {
+                    southwest: { lat: minLat, lng: minLon },
+                    northeast: { lat: maxLat, lng: maxLon },
+                };
+            }
+        }
+    } catch (err) {
+        console.error('Geoapify state bounds fetch error:', err);
     }
+
+    // Default fallback state bounds box
+    return {
+        southwest: { lat: 34.0, lng: -120.0 },
+        northeast: { lat: 42.0, lng: -114.0 },
+    };
 }
 
 export async function resolveMaxRadiusForState(
     query: StateRegionQuery,
-    apiKey: string
+    apiKey?: string
 ): Promise<number | null> {
+    if (!query.stateCode && !query.stateName) return 300;
     const bounds = await geocodeStateBounds(query, apiKey);
-    if (!bounds) return null;
+    if (!bounds) return 300;
     return maxRadiusMilesFromStateBounds(bounds);
 }
+
 
 export function parseRegionCodesFromGeocodeResult(result: {
     address_components?: Array<{ long_name: string; short_name: string; types: string[] }>;

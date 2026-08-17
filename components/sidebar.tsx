@@ -23,6 +23,7 @@ import {
   RefreshCw,
   Sparkles,
   Activity,
+  FileCheck,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import Image from 'next/image'
@@ -37,6 +38,7 @@ export const menuItems = [
   { icon: LayoutDashboard, label: 'Dashboard', href: '/admin-dashboard' },
   { icon: Bell, label: 'Alerts & Communication', href: '/alerts-communication' },
   { icon: ScrollText, label: 'Disaster Surveys', href: '/disaster-surveys' },
+  { icon: FileCheck, label: 'Disaster Assistance', href: '/disaster-assistance' },
   { icon: ClipboardList, label: 'After Action Review', href: '/after-action-review' },
   { icon: FileText, label: 'COOP/BC Plans', href: '/emergency-plan' },
   { icon: FileText, label: 'Preparedness Information', href: '/preparedness-information' },
@@ -110,6 +112,7 @@ export function Sidebar({ className }: { className?: string }) {
         { icon: Bell, label: 'Alerts & Communication', href: '/alerts-communication' },
         { icon: Activity, label: 'Citizen Activity Feed', href: '/citizen-activity-feed' },
         { icon: ScrollText, label: 'Disaster Surveys', href: '/disaster-surveys' },
+        { icon: FileCheck, label: 'Disaster Assistance', href: '/disaster-assistance' },
         { icon: FileText, label: 'Preparedness Information', href: '/preparedness-information' },
         { icon: Building2, label: 'Licenses', href: '/admin/licenses' },
         { icon: Shield, label: 'Sub-Admins', href: '/admin/sub-admins' },
@@ -123,6 +126,7 @@ export function Sidebar({ className }: { className?: string }) {
             { icon: Sparkles, label: 'AI Risk Assessment', href: '/ai-risk-assessment' },
             { icon: Bell, label: 'Alerts & Communication', href: '/alerts-communication' },
             { icon: ScrollText, label: 'Disaster Surveys', href: '/disaster-surveys' },
+            { icon: FileCheck, label: 'Disaster Assistance', href: '/disaster-assistance' },
             { icon: ClipboardList, label: 'After Action Review', href: '/after-action-review' },
             { icon: FileText, label: 'COOP/BC Plans', href: '/emergency-plan' },
             { icon: FileText, label: 'Preparedness Information', href: '/preparedness-information' },
@@ -135,6 +139,7 @@ export function Sidebar({ className }: { className?: string }) {
               { icon: Bell, label: 'Alerts & Communication', href: '/alerts-communication' },
               { icon: Activity, label: 'Citizen Activity Feed', href: '/citizen-activity-feed' },
               { icon: ScrollText, label: 'Disaster Surveys', href: '/disaster-surveys' },
+              { icon: FileCheck, label: 'Disaster Assistance', href: '/disaster-assistance' },
               { icon: ClipboardList, label: 'After Action Review', href: '/after-action-review' },
               { icon: FileText, label: 'COOP/BC Plans', href: '/emergency-plan' },
               { icon: FileText, label: 'Preparedness Information', href: '/preparedness-information' },
