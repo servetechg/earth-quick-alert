@@ -3,6 +3,7 @@ export type NotificationType =
     | 'citizen_report_resolved'
     | 'alert_dispatched'
     | 'disaster_survey'
+    | 'ida_application'
     | 'ai_report'
     | 'responder_approval'
     | 'system';

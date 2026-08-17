@@ -172,10 +172,11 @@ async function sendPushToUser(
     const prefs = (user as { notificationPreferences?: Record<string, unknown> }).notificationPreferences;
     if (!prefsAllowPush(prefs)) return false;
 
-    // Survey invites are actionable ops notifications — do not gate on "major alerts".
+    // Survey / IDA invites are actionable ops notifications — do not gate on "major alerts".
     const requiresMajorAlerts =
         (priority === 'critical' || priority === 'high') &&
-        notificationType !== 'disaster_survey';
+        notificationType !== 'disaster_survey' &&
+        notificationType !== 'ida_application';
     if (requiresMajorAlerts && !prefsAllowMajorAlerts(prefs)) return false;
 
     const token = String((user as { expoPushToken?: string }).expoPushToken ?? '').trim();
@@ -195,7 +196,9 @@ async function sendPushToUser(
         sound: 'default',
         channelId:
             push.channelId ??
-            (notificationType === 'disaster_survey' ? 'disaster-alerts' : 'inbox-updates'),
+            (notificationType === 'disaster_survey' || notificationType === 'ida_application'
+                ? 'disaster-alerts'
+                : 'inbox-updates'),
         priority: priority === 'critical' || priority === 'high' ? 'high' : 'default',
     });
     if (!result.ok) {

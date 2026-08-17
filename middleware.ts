@@ -123,6 +123,7 @@ export async function middleware(request: NextRequest) {
             '/ai-risk-assessment',
             '/citizen-activity-feed',
             '/disaster-surveys',
+            '/disaster-assistance',
         ]
 
         const isAdminRoute = adminRoutes.some((route) => pathname.startsWith(route))
