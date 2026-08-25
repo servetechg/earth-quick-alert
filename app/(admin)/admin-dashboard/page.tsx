@@ -12,11 +12,11 @@ import {
   IncidentTimelineCard,
   RealTimeResourcesPanel,
   CitizenActivityFeed,
-  ShelterStatusCard,
   HospitalCapacityCard,
   PowerOutageSummaryCard,
   ResourceDeploymentCard,
   DashboardSnapshotExport,
+  ShelterStatusCard,
 } from '@/components/admin-dashboard'
 import { Users, Home, CriticalFacilities, Roads } from '@/lib/icons'
 import { useUser } from '@/lib/store/user-store'
@@ -258,7 +258,7 @@ export default function Dashboard() {
         </div>
 
         {/* Right column — fixed compact width on xl+ screens */}
-        <div className="flex flex-col gap-4 xl:w-[220px] xl:shrink-0">
+        <div className="flex flex-col gap-4 xl:w-[280px] xl:shrink-0">
           <RealTimeResourcesPanel />
           <CitizenActivityFeed />
         </div>

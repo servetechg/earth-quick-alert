@@ -19,6 +19,19 @@ import {
 import { buildUserZones, type UserZone } from '@/lib/services/mobile/zone-utils';
 import type { UserProfilePayload } from '@/lib/types/mobile/auth';
 import type { MobileAlertSeverity, MobileWeatherAlert } from '@/lib/types/mobile/alerts';
+import { alertRowMatchesAiAlignedStateScope } from '@/lib/utils/alert-location-state-match';
+import { normalizeStateToUsps } from '@/lib/utils/us-state-usps';
+import { pointInUsStateBBox } from '@/lib/constants/us-state-bounding-boxes';
+
+function statesFromProfile(profile: UserProfilePayload | null): string[] {
+    const states = new Set<string>();
+    const addrState = profile?.address?.state?.trim();
+    if (addrState) states.add(addrState);
+    for (const loc of profile?.alertLocations ?? []) {
+        if (loc.state?.trim()) states.add(loc.state.trim());
+    }
+    return [...states];
+}
 
 type WeatherAlertDoc = {
     alertId: string;
@@ -218,6 +231,28 @@ export async function fetchMobileAlertsForUser(
                 [AlertSource.EARTHQUAKE_API],
             );
             for (const alert of fetched) {
+                // Strictly filter earthquakes to ensure they actually match the user's state
+                const row = {
+                    source: alert.source,
+                    location: alert.areaDesc ?? alert.affectedAreas?.[0] ?? '',
+                    name: alert.title,
+                };
+                let matchesState = false;
+                for (const state of statesFromProfile(profile)) {
+                    if (alertRowMatchesAiAlignedStateScope(row, state)) {
+                        matchesState = true;
+                        break;
+                    }
+                    if (alert.coordinates?.lat && alert.coordinates?.lon) {
+                        const usps = normalizeStateToUsps(state);
+                        if (usps && pointInUsStateBBox(alert.coordinates.lon, alert.coordinates.lat, usps)) {
+                            matchesState = true;
+                            break;
+                        }
+                    }
+                }
+                if (!matchesState) continue;
+
                 const existing = earthquakeAlerts.find((item) => item.id === alert.id);
                 if (!existing) {
                     earthquakeAlerts.push({
