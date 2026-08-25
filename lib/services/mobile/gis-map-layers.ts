@@ -200,18 +200,29 @@ export async function buildGisMapLayers(
         for (const alert of unified) {
             const layer = keywordLayer(alert.title, alert.description ?? '') ?? 'incidentReports';
             
-            // Only add marker if the alert has valid real coordinates from the source
-            if (alert.coordinates?.lat != null && alert.coordinates?.lon != null) {
-                addMarker({
-                    id: `mobile-alert-${alert.id}`,
-                    latitude: alert.coordinates.lat,
-                    longitude: alert.coordinates.lon,
-                    title: alert.title,
-                    description: alert.location,
-                    layer,
-                    severity: alert.severity,
-                });
+            let lat = alert.coordinates?.lat;
+            let lon = alert.coordinates?.lon;
+            
+            // If the alert lacks specific coordinates (e.g., FEMA text alerts like Pine Tree Fire),
+            // plot them near the user's center so they are still visible on the map.
+            if (lat == null || lon == null) {
+                const center = uniqueCenters[0];
+                if (!center) continue;
+                // Add a small spaced offset so multiple alerts don't overlap on the exact same pixel
+                const idx = mapMarkers.length;
+                lat = center.lat + (idx % 5) * 0.008 - 0.016;
+                lon = center.lng + (idx % 4) * 0.006 - 0.012;
             }
+
+            addMarker({
+                id: `mobile-alert-${alert.id}`,
+                latitude: lat,
+                longitude: lon,
+                title: alert.title,
+                description: alert.location,
+                layer,
+                severity: alert.severity,
+            });
         }
     } catch (e) {
         console.error('gis-map-layers unified:', e);
