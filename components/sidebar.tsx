@@ -125,6 +125,7 @@ export function Sidebar({ className }: { className?: string }) {
             { icon: LayoutDashboard, label: 'Dashboard', href: '/admin-dashboard' },
             { icon: Sparkles, label: 'AI Risk Assessment', href: '/ai-risk-assessment' },
             { icon: Bell, label: 'Alerts & Communication', href: '/alerts-communication' },
+            { icon: Activity, label: 'Citizen Activity Feed', href: '/citizen-activity-feed' },
             { icon: ScrollText, label: 'Disaster Surveys', href: '/disaster-surveys' },
             { icon: FileCheck, label: 'Disaster Assistance', href: '/disaster-assistance' },
             { icon: ClipboardList, label: 'After Action Review', href: '/after-action-review' },

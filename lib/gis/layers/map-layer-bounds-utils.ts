@@ -84,9 +84,9 @@ export function buildViewportGrid(
     limit: number,
 ): { perCell: number; rows: number; cols: number; cells: GridCellSpec[] } {
     const { latSpan, lngSpan } = boundsSpan(bounds);
-    // ~1° cells so multi-state views sample the map center as densely as the edges.
-    const cols = Math.max(4, Math.min(24, Math.ceil(lngSpan / 1)));
-    const rows = Math.max(4, Math.min(16, Math.ceil(latSpan / 1)));
+    // ~5° cells so multi-state views sample the map evenly, max 24 queries per layer.
+    const cols = Math.max(2, Math.min(6, Math.ceil(lngSpan / 5)));
+    const rows = Math.max(2, Math.min(4, Math.ceil(latSpan / 5)));
     const perCell = Math.max(1, Math.ceil(limit / (cols * rows)));
     const cellW = lngSpan / cols;
     const cellH = latSpan / rows;

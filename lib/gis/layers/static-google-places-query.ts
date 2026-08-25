@@ -112,28 +112,23 @@ export function createStaticPlacesQuery(
 
         await connectDB();
 
-        for (let row = 0; row < rows; row++) {
-            if (markers.length >= limit) break;
+        const results = await Promise.all(
+            cells.map((cell) =>
+                Model.find(cellGeoFilter(cell.bounds, opts?.stateKey))
+                    .select(DOC_SELECT)
+                    .limit(perCell)
+                    .lean<StaticPlaceDoc[]>(),
+            )
+        );
 
-            const rowCells = cells.filter((c) => c.row === row);
-            const rowResults = await Promise.all(
-                rowCells.map((cell) =>
-                    Model.find(cellGeoFilter(cell.bounds, opts?.stateKey))
-                        .select(DOC_SELECT)
-                        .limit(perCell)
-                        .lean<StaticPlaceDoc[]>(),
-                ),
-            );
-
-            for (const docs of rowResults) {
-                for (const doc of docs) {
-                    if (seen.has(doc.placeId)) continue;
-                    seen.add(doc.placeId);
-                    markers.push(toMarker(idPrefix, doc));
-                    if (markers.length >= limit) break;
-                }
+        for (const docs of results) {
+            for (const doc of docs) {
+                if (seen.has(doc.placeId)) continue;
+                seen.add(doc.placeId);
+                markers.push(toMarker(idPrefix, doc));
                 if (markers.length >= limit) break;
             }
+            if (markers.length >= limit) break;
         }
 
         await cacheSetJson(cacheKey, markers, BBOX_CACHE_TTL_MS);
