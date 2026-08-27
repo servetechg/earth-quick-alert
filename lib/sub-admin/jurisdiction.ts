@@ -1,3 +1,4 @@
+import { isUsCenterFallbackCoords } from '@/lib/geo/us-center-coords';
 import {
   getUsCountyBbox,
   countyBboxCenter,
@@ -240,6 +241,9 @@ export function extractAlertRowCoordinates(row: {
     location?: string;
 }): { lat: number; lng: number } | null {
     if (typeof row.lat === 'number' && typeof row.lng === 'number') {
+        if (isUsCenterFallbackCoords(row.lat, row.lng)) {
+            return null;
+        }
         return { lat: row.lat, lng: row.lng };
     }
     const loc = typeof row.location === 'string' ? row.location : '';

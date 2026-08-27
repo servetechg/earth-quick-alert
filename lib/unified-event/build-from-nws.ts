@@ -2,6 +2,8 @@ import type { WeatherAlert as APIWeatherAlert } from '@/lib/types/api-alerts';
 import type { UnifiedEventInsert } from '@/lib/unified-event/types';
 import { inferCategoryFromLegacyRow } from '@/lib/unified-event/category-infer';
 import { normalizeExternalId } from '@/lib/unified-event/legacy-source';
+import { coordsFromUgcZones, storedAlertCoordsAreTrustworthy } from '@/lib/geo/resolve-alert-coordinates';
+import { sanitizeAlertCoordinates } from '@/lib/geo/us-center-coords';
 
 export function buildUnifiedEventFromNwsAlert(
     a: APIWeatherAlert,
@@ -25,8 +27,24 @@ export function buildUnifiedEventFromNwsAlert(
         externalId,
     });
 
-    const lat = a.coordinates?.lat ?? null;
-    const lng = a.coordinates?.lon ?? null;
+    const sanitized = sanitizeAlertCoordinates(a.coordinates?.lat, a.coordinates?.lon);
+    let lat = sanitized.lat;
+    let lng = sanitized.lng;
+
+    // Do not persist statewide centroid coords — map/API layers geocode specific locations instead.
+    if (lat != null && lng != null) {
+        const fromUgc = coordsFromUgcZones(
+            Array.isArray(a.zones) ? a.zones.map((z) => String(z).trim().toUpperCase()) : [],
+        );
+        if (
+            fromUgc &&
+            Math.abs(lat - fromUgc.lat) < 0.001 &&
+            Math.abs(lng - fromUgc.lng) < 0.001
+        ) {
+            lat = null;
+            lng = null;
+        }
+    }
 
     const properties: Record<string, unknown> = {
         [category]: {
@@ -50,6 +68,15 @@ export function buildUnifiedEventFromNwsAlert(
             ugcZones: Array.isArray(a.zones) && a.zones.length > 0 ? a.zones : null,
         },
     };
+
+    if (
+        lat != null &&
+        lng != null &&
+        !storedAlertCoordsAreTrustworthy(lat, lng, { source: 'nws', properties })
+    ) {
+        lat = null;
+        lng = null;
+    }
 
     return {
         externalId,

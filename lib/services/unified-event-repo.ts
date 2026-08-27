@@ -6,6 +6,7 @@ import {
     jurisdictionLatLngBBox,
     type SubAdminJurisdiction,
 } from '@/lib/sub-admin/jurisdiction';
+import { US_CENTER_LAT, US_CENTER_LNG } from '@/lib/geo/us-center-coords';
 
 export interface UnifiedEventDoc {
     _id: string;
@@ -29,11 +30,42 @@ export interface UnifiedEventDoc {
     updatedAt: string;
 }
 
+const STATE_NAMES: Record<string, string> = {
+    'al': 'alabama', 'ak': 'alaska', 'az': 'arizona', 'ar': 'arkansas', 'ca': 'california',
+    'co': 'colorado', 'ct': 'connecticut', 'de': 'delaware', 'fl': 'florida', 'ga': 'georgia',
+    'hi': 'hawaii', 'id': 'idaho', 'il': 'illinois', 'in': 'indiana', 'ia': 'iowa',
+    'ks': 'kansas', 'ky': 'kentucky', 'la': 'louisiana', 'me': 'maine', 'md': 'maryland',
+    'ma': 'massachusetts', 'mi': 'michigan', 'mn': 'minnesota', 'ms': 'mississippi',
+    'mo': 'missouri', 'mt': 'montana', 'ne': 'nebraska', 'nv': 'nevada', 'nh': 'new hampshire',
+    'nj': 'new jersey', 'nm': 'new mexico', 'ny': 'new york', 'nc': 'north carolina',
+    'nd': 'north dakota', 'oh': 'ohio', 'ok': 'oklahoma', 'or': 'oregon', 'pa': 'pennsylvania',
+    'ri': 'rhode island', 'sc': 'south carolina', 'sd': 'south dakota', 'tn': 'tennessee',
+    'tx': 'texas', 'ut': 'utah', 'vt': 'vermont', 'va': 'virginia', 'wa': 'washington',
+    'wv': 'west virginia', 'wi': 'wisconsin', 'wy': 'wyoming'
+};
+
 /** Build a location regex filter for jurisdiction scoping. */
 function locationFilter(stateCd: string | undefined): Record<string, unknown> | null {
     if (!stateCd || stateCd === 'us') return null;
-    // Match 2-letter state abbreviation as whole word (case-insensitive)
-    return { location: { $regex: new RegExp(`\\b${stateCd.toUpperCase()}\\b`) } };
+    const lowerCd = stateCd.toLowerCase();
+    const stateName = STATE_NAMES[lowerCd];
+    
+    if (stateName) {
+        // Match either the 2-letter code or the full state name
+        return { 
+            location: { 
+                $regex: `\\b(${lowerCd}|${stateName})\\b`,
+                $options: 'i'
+            } 
+        };
+    }
+    
+    return { 
+        location: { 
+            $regex: `\\b${lowerCd}\\b`,
+            $options: 'i'
+        } 
+    };
 }
 
 /**
@@ -60,6 +92,11 @@ export async function getCurrentEventsForJurisdiction(
             },
             { lat: null },
             { lng: null },
+            // Treat US Center fallback coordinates as missing
+            {
+                lat: { $gte: US_CENTER_LAT - 0.0001, $lte: US_CENTER_LAT + 0.0001 },
+                lng: { $gte: US_CENTER_LNG - 0.0001, $lte: US_CENTER_LNG + 0.0001 },
+            },
         ],
     };
 
