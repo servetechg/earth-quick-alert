@@ -12,6 +12,8 @@ import {
 import { unifiedCategoryToDistroBucket } from '@/lib/unified-event/category-infer';
 import { unifiedEventToLegacyAlertCard } from '@/lib/unified-event/legacy-card';
 import { hydrateAlertCommunicationRows } from '@/lib/utils/alert-communication-hydrate';
+import { enrichAlignedCardsWithMapCoordinates } from '@/lib/geo/enrich-alert-cards-coordinates';
+import { normalizeStateToUsps } from '@/lib/utils/us-state-usps';
 import type { DistroPoint } from '@/lib/types/risk-assessment';
 import type { UnifiedEventCategory } from '@/lib/unified-event/types';
 import User from '@/models/User';
@@ -76,6 +78,18 @@ function docsToLegacyCards(docs: UnifiedEventDoc[]): Record<string, unknown>[] {
         unifiedEventToLegacyAlertCard(doc as unknown as Record<string, unknown>),
     );
     return hydrateAlertCommunicationRows(cards);
+}
+
+async function resolvePreferStateForSession(
+    userId?: string,
+    role?: string,
+): Promise<string | null> {
+    const r = String(role ?? '').toLowerCase();
+    if (r !== 'sub-admin' || !userId) return null;
+    const jurisdiction = await resolveSubAdminJurisdiction(userId);
+    if (jurisdiction?.stateCode) return jurisdiction.stateCode;
+    const u = await User.findById(userId).select('state').lean();
+    return normalizeStateToUsps(typeof u?.state === 'string' ? u.state : null);
 }
 
 /** Map legacy alert cards to `UnifiedEventDoc` for AI Risk snapshot APIs. */
@@ -161,9 +175,13 @@ async function loadAlignedUnifiedEvents(options: {
         docs = await getCurrentEvents();
     }
 
+    const rawCards = docsToLegacyCards(docs);
+    const preferState = await resolvePreferStateForSession(options.userId, role);
+    const cards = await enrichAlignedCardsWithMapCoordinates(rawCards, preferState);
+
     const entry: FeedCacheEntry = {
         docs,
-        cards: docsToLegacyCards(docs),
+        cards,
         expiresAt: Date.now() + FEED_CACHE_TTL_MS,
     };
     feedCache.set(key, entry);

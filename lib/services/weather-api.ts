@@ -2,6 +2,10 @@
 
 import { WeatherAlert as APIWeatherAlert, AlertSeverity as APIAlertSeverity, AlertSource } from '@/lib/types/api-alerts';
 import { WeatherData, DayForecast, WeatherAlert } from '@/lib/types/emergency';
+import { US_STATE_CENTERS } from '@/lib/utils/us-state-usps';
+import { isUsCenterFallbackCoords } from '@/lib/geo/us-center-coords';
+import { pointInUsaBounds } from '@/lib/constants/usa-map-bounds';
+import { hasUsNwsUgcZones } from '@/lib/geo/resolve-alert-coordinates';
 
 interface OpenWeatherAlert {
     sender_name: string;
@@ -180,19 +184,34 @@ export class WeatherAPIService {
         };
     }
 
-    /** Representative coordinates from GeoJSON geometry, or fallback (e.g. point-query lat/lon). */
+    /** Representative coordinates from GeoJSON geometry, UGC zones, or optional point fallback — never US center. */
     private coordsFromNwsFeature(
         feature: any,
         fallback?: { lat: number; lon: number }
-    ): { lat: number; lon: number } {
-        const US_CENTER = { lat: 39.8283, lon: -98.5795 };
+    ): { lat: number | null; lon: number | null } {
+        const ugcZones: string[] = Array.isArray(feature?.properties?.geocode?.UGC)
+            ? feature.properties.geocode.UGC
+            : [];
+        const requiresUsCoords = hasUsNwsUgcZones(ugcZones.map((z) => String(z).trim().toUpperCase()));
+
+        const acceptCoords = (lat: number, lon: number): { lat: number; lon: number } | null => {
+            if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+            if (isUsCenterFallbackCoords(lat, lon)) return null;
+            if (requiresUsCoords && !pointInUsaBounds(lat, lon)) return null;
+            return { lat, lon };
+        };
+
         const g = feature?.geometry;
         if (!g?.type) {
-            return fallback ?? US_CENTER;
+            const safeFallback =
+                fallback && acceptCoords(fallback.lat, fallback.lon) ? fallback : null;
+            if (safeFallback) return safeFallback;
+            return this.coordsFromNwsUgcOrNull(feature);
         }
         if (g.type === 'Point' && Array.isArray(g.coordinates) && g.coordinates.length >= 2) {
             const [lon, lat] = g.coordinates;
-            if (Number.isFinite(lat) && Number.isFinite(lon)) return { lat, lon };
+            const accepted = acceptCoords(lat, lon);
+            if (accepted) return accepted;
         }
         const avgRing = (ring: number[][]): { lat: number; lon: number } | null => {
             let sLat = 0;
@@ -206,7 +225,9 @@ export class WeatherAPIService {
                 }
             }
             if (n === 0) return null;
-            return { lat: sLat / n, lon: sLon / n };
+            const lat = sLat / n;
+            const lon = sLon / n;
+            return acceptCoords(lat, lon);
         };
         if (g.type === 'Polygon' && Array.isArray(g.coordinates?.[0])) {
             const c = avgRing(g.coordinates[0]);
@@ -216,7 +237,31 @@ export class WeatherAPIService {
             const c = avgRing(g.coordinates[0][0]);
             if (c) return c;
         }
-        return fallback ?? US_CENTER;
+
+        const safeFallback =
+            fallback && acceptCoords(fallback.lat, fallback.lon) ? fallback : null;
+        if (safeFallback) return safeFallback;
+
+        return this.coordsFromNwsUgcOrNull(feature);
+    }
+
+    private coordsFromNwsUgcOrNull(feature: any): { lat: number | null; lon: number | null } {
+        const props = feature?.properties || {};
+        const geocode = props.geocode || {};
+        const ugcZones: string[] = Array.isArray(geocode.UGC) ? geocode.UGC : [];
+
+        if (ugcZones.length > 0) {
+            const firstUGC = ugcZones[0];
+            if (typeof firstUGC === 'string' && firstUGC.length >= 2) {
+                const statePrefix = firstUGC.substring(0, 2).toUpperCase();
+                const center = US_STATE_CENTERS[statePrefix];
+                if (center) {
+                    return { lat: center.lat, lon: center.lng };
+                }
+            }
+        }
+
+        return { lat: null, lon: null };
     }
 
     private mapNwsGeoJsonFeature(
@@ -268,7 +313,10 @@ export class WeatherAPIService {
             windSpeed: undefined,
             humidity: undefined,
             precipitation: undefined,
-            coordinates: { lat, lon },
+            coordinates:
+                lat != null && lon != null && Number.isFinite(lat) && Number.isFinite(lon)
+                    ? { lat, lon }
+                    : undefined,
             affectedAreas,
         };
     }

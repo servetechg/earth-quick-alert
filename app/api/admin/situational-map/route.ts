@@ -5,6 +5,7 @@ import {
     alignedIncidentStatsFromCards,
     fetchAlignedUnifiedEventFeed,
 } from '@/lib/services/alert-communication-aligned-feed';
+import { syncAlertCommunicationFeedsGate } from '@/lib/services/alert-communication-feed-sync-gate';
 import { resolveHeatPointsFromAlignedRows } from '@/lib/geo/resolve-aligned-event-heatpoints';
 import {
     fetchNationwideCitizenMarkers,
@@ -141,7 +142,7 @@ export async function GET(req: Request) {
             }
             const stats = alignedIncidentStatsFromCards(demo.alignedRows);
             const incidents = await resolveHeatPointsFromAlignedRows(demo.alignedRows, {
-                maxGeocode: 0,
+                maxGeocode: demo.alignedRows.length,
             });
             return NextResponse.json({
                 incidents,
@@ -178,12 +179,27 @@ export async function GET(req: Request) {
         }
 
         const rows = await fetchAlignedUnifiedEventFeed({ userId, role });
+
+        void syncAlertCommunicationFeedsGate().catch((e) =>
+            console.error('[situational-map:bg-sync]', e),
+        );
+
         const stats = alignedIncidentStatsFromCards(rows as Record<string, unknown>[]);
 
-        // Fast path: heat + markers that already have stored coordinates.
+        let preferState: string | undefined;
+        if (role === 'sub-admin') {
+            const jurisdictionForCoords = await resolveSubAdminJurisdiction(userId);
+            preferState = jurisdictionForCoords?.stateCode ?? undefined;
+        } else if (scopeState) {
+            preferState = scopeState.trim().toUpperCase().slice(0, 2);
+        }
+
+        const maxGeocode = Math.min(Math.max(rows.length * 12, 12), 48);
+
         const [rawIncidents, entities] = await Promise.all([
             resolveHeatPointsFromAlignedRows(rows as Record<string, unknown>[], {
-                maxGeocode: 0,
+                maxGeocode,
+                preferState,
             }),
             loadEntityMarkers({
                 role,
@@ -194,9 +210,7 @@ export async function GET(req: Request) {
             }),
         ]);
 
-        const incidents = usaOnlyNationwide
-            ? filterLatLngInUsa(rawIncidents)
-            : rawIncidents;
+        const incidents = filterLatLngInUsa(rawIncidents);
 
         let coverage: {
             center: { lat: number; lng: number };

@@ -1,10 +1,15 @@
 import { GOOGLE_MAPS_API_KEY } from '@/lib/constants/google-maps-config';
 import { geocodeLocation } from '@/lib/services/location-matching';
-import { getCurrentEvents } from '@/lib/services/unified-event-repo';
-import { fetchUnifiedEventsForMobileUser } from '@/lib/services/mobile/unified-event-mobile-alerts';
-import { unifiedSourceToLegacy } from '@/lib/unified-event/legacy-source';
-import { alertRowMatchesAiAlignedStateScope } from '@/lib/utils/alert-location-state-match';
+import {
+    coordsInUserProfileStates,
+    preferStateFromProfile,
+    resolveCoordsForMobileAlert,
+} from '@/lib/services/mobile/mobile-alert-coordinates';
+import { isUsCenterFallbackCoords } from '@/lib/geo/us-center-coords';
+import { getStateCenterCoords } from '@/lib/utils/us-state-usps';
 import { buildUserZones } from '@/lib/services/mobile/zone-utils';
+import type { Alert } from '@/lib/types/api-alerts';
+import { AlertSource } from '@/lib/types/api-alerts';
 import type { UserProfilePayload } from '@/lib/types/mobile/auth';
 import type {
     EmergencyMapMarker,
@@ -39,16 +44,6 @@ const INFRA_TYPES: PlaceType[] = [
     'school',
     'fire_station',
 ];
-
-function statesFromProfile(profile: UserProfilePayload | null): string[] {
-    const states = new Set<string>();
-    const addrState = profile?.address?.state?.trim();
-    if (addrState) states.add(addrState);
-    for (const loc of profile?.alertLocations ?? []) {
-        if (loc.state?.trim()) states.add(loc.state.trim());
-    }
-    return [...states];
-}
 
 function squarePolygon(
     lat: number,
@@ -135,6 +130,8 @@ export async function buildGisMapLayers(
         description?: string;
         severity: string;
         location: string;
+        lat?: number;
+        lng?: number;
     }>,
     incidents: Array<{
         id: string;
@@ -145,7 +142,6 @@ export async function buildGisMapLayers(
     }>,
 ): Promise<{ mapMarkers: EmergencyMapMarker[]; mapOverlays: EmergencyMapOverlay[] }> {
     const zones = buildUserZones(profile);
-    const states = statesFromProfile(profile);
     const mapMarkers: EmergencyMapMarker[] = [];
     const mapOverlays: EmergencyMapOverlay[] = [];
     const seenMarkerIds = new Set<string>();
@@ -182,7 +178,7 @@ export async function buildGisMapLayers(
     // Removed fake scattered alerts loop that placed markers without coordinates around user's location.
 
     for (const inc of incidents) {
-        if (inc.lat == null || inc.lng == null) continue;
+        if (inc.lat == null || inc.lng == null || !Number.isFinite(inc.lat) || !Number.isFinite(inc.lng)) continue;
         const layer = keywordLayer(inc.title, inc.description) ?? 'incidentReports';
         addMarker({
             id: `inc-${inc.id}`,
@@ -195,24 +191,47 @@ export async function buildGisMapLayers(
     }
 
     try {
-        const unified = await fetchUnifiedEventsForMobileUser(profile);
-        
-        for (const alert of unified) {
+        const preferState = preferStateFromProfile(profile);
+
+        for (const alert of alerts) {
             const layer = keywordLayer(alert.title, alert.description ?? '') ?? 'incidentReports';
-            
-            let lat = alert.coordinates?.lat;
-            let lon = alert.coordinates?.lon;
-            
-            // If the alert lacks specific coordinates (e.g., FEMA text alerts like Pine Tree Fire),
-            // plot them near the user's center so they are still visible on the map.
-            if (lat == null || lon == null) {
-                const center = uniqueCenters[0];
-                if (!center) continue;
-                // Add a small spaced offset so multiple alerts don't overlap on the exact same pixel
-                const idx = mapMarkers.length;
-                lat = center.lat + (idx % 5) * 0.008 - 0.016;
-                lon = center.lng + (idx % 4) * 0.006 - 0.012;
+
+            let lat = alert.lat;
+            let lon = alert.lng;
+
+            if (lat == null || lon == null || !Number.isFinite(lat) || !Number.isFinite(lon)) {
+                const stubAlert = {
+                    id: alert.id,
+                    title: alert.title,
+                    description: alert.description ?? '',
+                    timestamp: new Date().toISOString(),
+                    severity: alert.severity,
+                    source: AlertSource.WEATHER_API,
+                    areaDesc: alert.location,
+                    affectedAreas: alert.location ? [alert.location] : [],
+                } satisfies Alert;
+                const resolved = await resolveCoordsForMobileAlert(stubAlert, preferState);
+                if (resolved) {
+                    lat = resolved.lat;
+                    lon = resolved.lon;
+                } else if (preferState) {
+                    const center = getStateCenterCoords(preferState);
+                    if (center) {
+                        lat = center.lat;
+                        lon = center.lng;
+                    } else {
+                        continue;
+                    }
+                } else if (uniqueCenters[0]) {
+                    lat = uniqueCenters[0].lat;
+                    lon = uniqueCenters[0].lng;
+                } else {
+                    continue;
+                }
             }
+
+            if (isUsCenterFallbackCoords(lat, lon)) continue;
+            if (!coordsInUserProfileStates(lat, lon, profile)) continue;
 
             addMarker({
                 id: `mobile-alert-${alert.id}`,
@@ -222,10 +241,13 @@ export async function buildGisMapLayers(
                 description: alert.location,
                 layer,
                 severity: alert.severity,
+                type: 'alert',
+                lat,
+                lng: lon,
             });
         }
     } catch (e) {
-        console.error('gis-map-layers unified:', e);
+        console.error('gis-map-layers alerts:', e);
     }
 
     return { mapMarkers, mapOverlays };

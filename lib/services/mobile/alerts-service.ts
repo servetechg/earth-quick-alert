@@ -3,6 +3,7 @@ import MobileAlertRead from '@/models/MobileAlertRead';
 import { loadUserProfile } from '@/lib/services/mobile/auth-service';
 import {
     alertToMobileItem,
+    buildMobileWeatherAlerts,
     deriveDashboardMode,
     fetchMobileAlertsForUser,
     filterMobileAlerts,
@@ -40,7 +41,7 @@ export async function listMobileAlerts(
     const zones = buildUserZones(profile);
     const raw = await fetchMobileAlertsForUser(userId, profile);
     const readMap = await loadReadMap(userId);
-    let items = raw.map((a) => alertToMobileItem(a, zones, readMap));
+    let items = await buildMobileWeatherAlerts(raw, profile, zones, readMap);
     items = sortMobileAlerts(items, query.sort ?? 'recent');
     const unreadCount = items.filter((a) => !a.read).length;
 
@@ -68,7 +69,7 @@ export async function getAllMobileAlertsForUser(userId: string): Promise<MobileW
     const zones = buildUserZones(profile);
     const raw = await fetchMobileAlertsForUser(userId, profile);
     const readMap = await loadReadMap(userId);
-    return raw.map((a) => alertToMobileItem(a, zones, readMap));
+    return buildMobileWeatherAlerts(raw, profile, zones, readMap);
 }
 
 export async function getMobileAlertById(
