@@ -15,6 +15,8 @@ export type MobileWeatherAlert = {
     description?: string;
     /** Official source page (NWS, USGS, etc.) */
     sourceUrl?: string;
+    /** Geocoded coordinates of the alert, if available */
+    coordinates?: { lat: number; lon: number };
 };
 
 export type MobileAlertsListResponse = {

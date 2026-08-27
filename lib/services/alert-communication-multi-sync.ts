@@ -51,6 +51,8 @@ interface MappedDoc {
     status: string;
     description: string;
     severity: string;
+    lat?: number | null;
+    lng?: number | null;
 }
 
 /** Elevated hydrology / wildfire signals only (unless USGS includes normal gauges). */
@@ -155,6 +157,8 @@ function mapUSGS(series: USGSTimeSeries): MappedDoc | null {
         status: 'Take Action',
         description: event.description,
         severity: severityScoreToLabel(event.severity_score),
+        lat: event.geo_coordinates.lat,
+        lng: event.geo_coordinates.lon,
     };
 }
 

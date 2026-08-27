@@ -13,6 +13,14 @@ import {
     unifiedSourceDisplay,
 } from '@/lib/services/mobile/unified-event-mobile-alerts';
 import {
+    preferStateFromProfile,
+    resolveCoordsForMobileAlert,
+    resolveMobileAlertCoordinateMap,
+    stateCenterCoordsForPreferState,
+    statesFromProfile,
+} from '@/lib/services/mobile/mobile-alert-coordinates';
+import { isUsCenterFallbackCoords } from '@/lib/geo/us-center-coords';
+import {
     resolveLegacyAlertSourceUrl,
     resolveNwsAlertSourceUrl,
 } from '@/lib/services/mobile/alert-source-url';
@@ -23,14 +31,8 @@ import { alertRowMatchesAiAlignedStateScope } from '@/lib/utils/alert-location-s
 import { normalizeStateToUsps } from '@/lib/utils/us-state-usps';
 import { pointInUsStateBBox } from '@/lib/constants/us-state-bounding-boxes';
 
-function statesFromProfile(profile: UserProfilePayload | null): string[] {
-    const states = new Set<string>();
-    const addrState = profile?.address?.state?.trim();
-    if (addrState) states.add(addrState);
-    for (const loc of profile?.alertLocations ?? []) {
-        if (loc.state?.trim()) states.add(loc.state.trim());
-    }
-    return [...states];
+function statesFromProfileLocal(profile: UserProfilePayload | null): string[] {
+    return statesFromProfile(profile);
 }
 
 type WeatherAlertDoc = {
@@ -182,18 +184,20 @@ export async function fetchMobileAlertsForUser(
         );
 
         if (matchedAreas.length === 0 && record.coordinates && coordinateLocations.length > 0) {
-            const nearby = coordinateLocations
-                .filter(
-                    (coords) =>
-                        distanceKm(
-                            coords.lat,
-                            coords.lon,
-                            record.coordinates!.lat,
-                            record.coordinates!.lon,
-                        ) <= 80,
-                )
-                .map((coords) => coords.name);
-            matchedAreas.push(...nearby);
+            const rc = record.coordinates;
+            const coordsValid =
+                Number.isFinite(rc.lat) &&
+                Number.isFinite(rc.lon) &&
+                !isUsCenterFallbackCoords(rc.lat, rc.lon);
+            if (coordsValid) {
+                const nearby = coordinateLocations
+                    .filter(
+                        (coords) =>
+                            distanceKm(coords.lat, coords.lon, rc.lat, rc.lon) <= 80,
+                    )
+                    .map((coords) => coords.name);
+                matchedAreas.push(...nearby);
+            }
         }
 
         if (matchedAreas.length === 0) continue;
@@ -238,7 +242,7 @@ export async function fetchMobileAlertsForUser(
                     name: alert.title,
                 };
                 let matchesState = false;
-                for (const state of statesFromProfile(profile)) {
+                for (const state of statesFromProfileLocal(profile)) {
                     if (alertRowMatchesAiAlignedStateScope(row, state)) {
                         matchesState = true;
                         break;
@@ -350,25 +354,50 @@ export async function fetchMobileAlertsForUser(
     return allAlerts;
 }
 
-export function alertToMobileItem(
+export async function alertToMobileItem(
     alert: UnifiedMobileAlert,
     zones: UserZone[],
     readMap: Map<string, boolean>,
-): MobileWeatherAlert {
+    resolvedCoords?: Map<string, { lat: number; lon: number }>,
+    preferState?: string | null,
+): Promise<MobileWeatherAlert> {
     const severity = toMobileSeverity(String(alert.severity));
     const issuedAt = alert.timestamp;
     const expiresAt = alert.expiresAt;
+
+    const location = pickLocation(alert, zones);
+    let coordinates = resolvedCoords?.get(alert.id);
+
+    if (!coordinates) {
+        coordinates =
+            (await resolveCoordsForMobileAlert(alert, preferState ?? null)) ??
+            stateCenterCoordsForPreferState(preferState) ??
+            undefined;
+    }
+
+    if (!coordinates && alert.coordinates) {
+        const { lat, lon } = alert.coordinates;
+        if (
+            Number.isFinite(lat) &&
+            Number.isFinite(lon) &&
+            !isUsCenterFallbackCoords(lat, lon)
+        ) {
+            coordinates = { lat, lon };
+        }
+    }
+
     return {
         id: alert.id,
         severity,
         title: alert.title,
-        location: pickLocation(alert, zones),
+        location,
         source: resolveDisplaySource(alert),
         issuedAt,
         expiresAt,
         expiresLabel: expiresLabel(expiresAt),
         read: readMap.get(alert.id) === true,
         description: alert.description,
+        coordinates,
         sourceUrl: resolveLegacyAlertSourceUrl({
             id: alert.id,
             source: alert.source,
@@ -380,8 +409,8 @@ export function alertToMobileItem(
             areaDesc: alert.areaDesc,
             zones: alert.zones,
             properties: alert.unifiedProperties,
-            lat: alert.coordinates?.lat,
-            lon: alert.coordinates?.lon,
+            lat: coordinates?.lat,
+            lon: coordinates?.lon,
         }),
     };
 }
@@ -433,4 +462,16 @@ export function filterMobileAlerts(
 export function deriveDashboardMode(alerts: MobileWeatherAlert[]): 'blue_sky' | 'cloudy' {
     const disruptive = alerts.some((a) => a.severity === 'EXTREME' || a.severity === 'HIGH');
     return disruptive ? 'cloudy' : 'blue_sky';
+}
+
+/** Resolve map coordinates once per batch — same logic as admin situational map. */
+export async function buildMobileWeatherAlerts(
+    raw: UnifiedMobileAlert[],
+    profile: UserProfilePayload | null,
+    zones: UserZone[],
+    readMap: Map<string, boolean>,
+): Promise<MobileWeatherAlert[]> {
+    const preferState = preferStateFromProfile(profile);
+    const coordMap = await resolveMobileAlertCoordinateMap(raw, preferState);
+    return Promise.all(raw.map((a) => alertToMobileItem(a, zones, readMap, coordMap, preferState)));
 }

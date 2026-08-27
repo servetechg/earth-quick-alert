@@ -1,4 +1,6 @@
 import { pointInUsStateBBox } from '@/lib/constants/us-state-bounding-boxes';
+import { isImpreciseAlertCoords } from '@/lib/geo/resolve-alert-coordinates';
+import { isUsCenterFallbackCoords } from '@/lib/geo/us-center-coords';
 import { getCurrentEvents, type UnifiedEventDoc } from '@/lib/services/unified-event-repo';
 import { buildUserZones } from '@/lib/services/mobile/zone-utils';
 import { unifiedSourceToLegacy } from '@/lib/unified-event/legacy-source';
@@ -72,10 +74,13 @@ function unifiedEventMatchesUser(
     }
 
     if (doc.lat != null && doc.lng != null && Number.isFinite(doc.lat) && Number.isFinite(doc.lng)) {
-        for (const state of states) {
-            const usps = normalizeStateToUsps(state);
-            if (!usps) continue;
-            if (pointInUsStateBBox(doc.lng, doc.lat, usps)) return true;
+        if (!isUsCenterFallbackCoords(doc.lat, doc.lng)) {
+            for (const state of states) {
+                const usps = normalizeStateToUsps(state);
+                if (!usps) continue;
+                if (isImpreciseAlertCoords(doc.lat, doc.lng, usps)) continue;
+                if (pointInUsStateBBox(doc.lng, doc.lat, usps)) return true;
+            }
         }
     }
 

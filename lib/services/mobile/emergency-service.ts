@@ -90,9 +90,33 @@ export async function getEmergencyIncidents(userId: string): Promise<EmergencyIn
             location: String(r.location ?? ''),
             severity: String(r.severity ?? 'moderate'),
             reportedAt: new Date((r.createdAt as Date) ?? new Date()).toISOString(),
-            lat: typeof r.lat === 'number' ? r.lat : undefined,
-            lng: typeof r.lng === 'number' ? r.lng : undefined,
+            lat: r.lat != null && r.lat !== '' && Number.isFinite(Number(r.lat)) ? Number(r.lat) : undefined,
+            lng: r.lng != null && r.lng !== '' && Number.isFinite(Number(r.lng)) ? Number(r.lng) : undefined,
         }));
+}
+
+function computeMapRegion(
+    userLat: number,
+    userLng: number,
+    markers: Array<{ latitude: number; longitude: number }>,
+    zonesCount: number,
+): EmergencyMapResponse['mapRegion'] {
+    const minLat = markers.reduce((m, p) => Math.min(m, p.latitude), userLat);
+    const maxLat = markers.reduce((m, p) => Math.max(m, p.latitude), userLat);
+    const minLng = markers.reduce((m, p) => Math.min(m, p.longitude), userLng);
+    const maxLng = markers.reduce((m, p) => Math.max(m, p.longitude), userLng);
+
+    const latSpan = Math.max(0.08, maxLat - minLat);
+    const lngSpan = Math.max(0.08, maxLng - minLng);
+    const latitudeDelta = Math.min(12, Math.max(0.15, latSpan * 1.5 + 0.12));
+    const longitudeDelta = Math.min(12, Math.max(0.15, lngSpan * 1.5 + 0.12));
+
+    return {
+        latitude: (minLat + maxLat) / 2,
+        longitude: (minLng + maxLng) / 2,
+        latitudeDelta: zonesCount > 1 ? Math.max(latitudeDelta, 0.35) : latitudeDelta,
+        longitudeDelta: zonesCount > 1 ? Math.max(longitudeDelta, 0.35) : longitudeDelta,
+    };
 }
 
 export async function getEmergencyMap(userId: string): Promise<EmergencyMapResponse | null> {
@@ -115,6 +139,8 @@ export async function getEmergencyMap(userId: string): Promise<EmergencyMapRespo
             description: a.description,
             severity: a.severity,
             location: a.location,
+            lat: a.coordinates?.lat,
+            lng: a.coordinates?.lon,
         })),
         incidents,
     );
@@ -122,13 +148,18 @@ export async function getEmergencyMap(userId: string): Promise<EmergencyMapRespo
     const latitudeDelta = zones.length > 1 ? 0.35 : 0.15;
     const longitudeDelta = zones.length > 1 ? 0.35 : 0.15;
 
+    const mapRegion =
+        mapMarkers.length > 0
+            ? computeMapRegion(geo.lat, geo.lon, mapMarkers, zones.length)
+            : {
+                  latitude: geo.lat,
+                  longitude: geo.lon,
+                  latitudeDelta,
+                  longitudeDelta,
+              };
+
     return {
-        mapRegion: {
-            latitude: geo.lat,
-            longitude: geo.lon,
-            latitudeDelta,
-            longitudeDelta,
-        },
+        mapRegion,
         mapMarkers,
         mapOverlays,
         markers: mapMarkers,

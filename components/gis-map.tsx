@@ -175,7 +175,7 @@ function buildOpenSourceLayerFetchScope(
   const stateScopedView = Boolean(opts.stateScoped || opts.stateBoundsRestriction)
   const hasStateScope = Boolean(
     opts.licensedStateKey &&
-      (stateScopedView || opts.scopeState?.trim() || opts.focusState?.trim()),
+    (stateScopedView || opts.scopeState?.trim() || opts.focusState?.trim()),
   )
 
   if (hasStateScope && opts.licensedStateKey) {
@@ -293,7 +293,6 @@ export function GISMap({
   const [selectedDemoHeat, setSelectedDemoHeat] = useState<UnifiedEventHeatPoint | null>(null)
   const [showHeatmap, setShowHeatmap] = useState(true)
   const [unifiedIncidents, setUnifiedIncidents] = useState<UnifiedEventHeatPoint[]>([])
-  const [incidentHeatCount, setIncidentHeatCount] = useState(0)
   const [coverageCircle, setCoverageCircle] = useState<CoverageCircleSpec | null>(null)
   const [coverageMeta, setCoverageMeta] = useState<{
     coverageType: 'state' | 'radius'
@@ -549,127 +548,173 @@ export function GISMap({
     if (!data || !situationalEnabled) return
 
     try {
-        setScenarioDemo(data.demo === true)
-        const incidents = Array.isArray(data.incidents) ? data.incidents : []
-        setUnifiedIncidents(
-          restrictToUsa
-            ? incidents.filter(
-                (inc: { lat?: number; lng?: number }) =>
-                  Number.isFinite(inc.lat) &&
-                  Number.isFinite(inc.lng) &&
-                  pointInUsaBounds(inc.lat as number, inc.lng as number),
-              )
-            : incidents,
-        )
-        setIncidentHeatCount(
-          typeof data.alignedEventCount === 'number'
-            ? data.alignedEventCount
-            : typeof data.incidentCount === 'number'
-              ? data.incidentCount
-              : Array.isArray(data.incidents)
-                ? data.incidents.length
-                : 0
-        )
+      setScenarioDemo(data.demo === true)
+      const incidents = Array.isArray(data.incidents) ? data.incidents : []
+      setUnifiedIncidents(
+        restrictToUsa
+          ? incidents.filter(
+            (inc: { lat?: number; lng?: number }) =>
+              Number.isFinite(inc.lat) &&
+              Number.isFinite(inc.lng) &&
+              pointInUsaBounds(inc.lat as number, inc.lng as number),
+          )
+          : incidents,
+      )
 
-        const usaOnly = <T extends { lat: number; lng: number }>(rows: T[] | undefined): T[] =>
-          restrictToUsa
-            ? (rows ?? []).filter((row) => pointInUsaBounds(row.lat, row.lng))
-            : (rows ?? [])
+      const usaOnly = <T extends { lat: number; lng: number }>(rows: T[] | undefined): T[] =>
+        restrictToUsa
+          ? (rows ?? []).filter((row) => pointInUsaBounds(row.lat, row.lng))
+          : (rows ?? [])
 
-        const mapCitizens = (
-          rows: Array<{
-            id: string
-            lat: number
-            lng: number
-            title: string
-            isSafe?: boolean
-            status?: string
-            location?: string
-            description?: string
-          }> | undefined,
-        ) =>
-          usaOnly(rows).map((c) => ({
-            id: c.id,
-            position: { lat: c.lat, lng: c.lng },
-            title: c.title,
-            type: 'user',
-            isSafe: c.isSafe,
-            status: c.status,
-            location: c.location,
-            description: c.description,
-          }))
+      const mapCitizens = (
+        rows: Array<{
+          id: string
+          lat: number
+          lng: number
+          title: string
+          isSafe?: boolean
+          status?: string
+          location?: string
+          description?: string
+        }> | undefined,
+      ) =>
+        usaOnly(rows).map((c) => ({
+          id: c.id,
+          position: { lat: c.lat, lng: c.lng },
+          title: c.title,
+          type: 'user',
+          isSafe: c.isSafe,
+          status: c.status,
+          location: c.location,
+          description: c.description,
+        }))
 
-        const mapResponders = (
-          rows: Array<{
-            id: string
-            lat: number
-            lng: number
-            title: string
-            status?: string
-            location?: string
-            description?: string
-            color?: string
-            icon?: string
-          }> | undefined,
-        ) =>
-          usaOnly(rows).map((r) => ({
-            id: r.id,
-            position: { lat: r.lat, lng: r.lng },
-            title: r.title,
-            type: 'responder',
-            status: r.status,
-            location: r.location,
-            description: r.description,
-            color: r.color,
-            icon: r.icon,
-          }))
+      const mapResponders = (
+        rows: Array<{
+          id: string
+          lat: number
+          lng: number
+          title: string
+          status?: string
+          location?: string
+          description?: string
+          color?: string
+          icon?: string
+        }> | undefined,
+      ) =>
+        usaOnly(rows).map((r) => ({
+          id: r.id,
+          position: { lat: r.lat, lng: r.lng },
+          title: r.title,
+          type: 'responder',
+          status: r.status,
+          location: r.location,
+          description: r.description,
+          color: r.color,
+          icon: r.icon,
+        }))
 
-        const mapLeaders = (
-          rows: Array<{
-            id: string
-            lat: number
-            lng: number
-            title: string
-            status?: string
-            location?: string
-            description?: string
-          }> | undefined,
-        ) =>
-          usaOnly(rows).map((l) => ({
-            id: l.id,
-            position: { lat: l.lat, lng: l.lng },
-            title: l.title,
-            type: 'admin',
-            status: l.status,
-            location: l.location,
-            description: l.description,
-          }))
+      const mapLeaders = (
+        rows: Array<{
+          id: string
+          lat: number
+          lng: number
+          title: string
+          status?: string
+          location?: string
+          description?: string
+        }> | undefined,
+      ) =>
+        usaOnly(rows).map((l) => ({
+          id: l.id,
+          position: { lat: l.lat, lng: l.lng },
+          title: l.title,
+          type: 'admin',
+          status: l.status,
+          location: l.location,
+          description: l.description,
+        }))
 
-        if (stateScoped && Array.isArray(data.citizens)) {
-          setImpactedUsers(mapCitizens(data.citizens))
-        } else if (unifiedMapFeed && Array.isArray(data.citizens)) {
-          setImpactedUsers(mapCitizens(data.citizens))
+      if (stateScoped && Array.isArray(data.citizens)) {
+        setImpactedUsers(mapCitizens(data.citizens))
+      } else if (unifiedMapFeed && Array.isArray(data.citizens)) {
+        setImpactedUsers(mapCitizens(data.citizens))
+      }
+
+      if (stateScoped && Array.isArray(data.responders)) {
+        setResponders(mapResponders(data.responders))
+      } else if (unifiedMapFeed && Array.isArray(data.responders)) {
+        setResponders(mapResponders(data.responders))
+      }
+
+      if (unifiedMapFeed && Array.isArray(data.leaders)) {
+        setSubAdmins(mapLeaders(data.leaders))
+      }
+
+      let coverageIsState = false
+
+      if ((showLayersPanel || stateScoped) && data.coverage?.center) {
+        const mile = data.coverage.radiusMile
+        const isDemoStateWide = data.demo === true && data.coverage?.stateWide === true
+        const isStateCoverage =
+          data.coverage.coverageType === 'state' || isDemoStateWide
+        coverageIsState = isStateCoverage
+        if (isStateCoverage) {
+          const coverageState =
+            typeof data.coverage.state === 'string'
+              ? data.coverage.state
+              : typeof data.coverage.stateCode === 'string'
+                ? data.coverage.stateCode
+                : null
+          if (coverageState?.trim()) {
+            setApiCoverageState(coverageState.trim())
+          }
         }
-
-        if (stateScoped && Array.isArray(data.responders)) {
-          setResponders(mapResponders(data.responders))
-        } else if (unifiedMapFeed && Array.isArray(data.responders)) {
-          setResponders(mapResponders(data.responders))
+        setCoverageMeta({
+          coverageType: isStateCoverage ? 'state' : 'radius',
+          stateWide: isDemoStateWide,
+          radiusMile: typeof mile === 'number' ? mile : undefined,
+          stateCode:
+            typeof data.coverage.stateCode === 'string'
+              ? data.coverage.stateCode
+              : focusState
+                ? normalizeStateToUsps(focusState) ?? undefined
+                : undefined,
+        })
+        if (isStateCoverage) {
+          setCoverageCircle(null)
+        } else if (data.coverage?.radiusMeters) {
+          setCoverageCircle({
+            center: data.coverage.center,
+            radiusMeters: data.coverage.radiusMeters,
+            label:
+              typeof mile === 'number'
+                ? `License coverage · ${mile} mi`
+                : 'License coverage',
+          })
+        } else {
+          setCoverageCircle(null)
         }
-
-        if (unifiedMapFeed && Array.isArray(data.leaders)) {
-          setSubAdmins(mapLeaders(data.leaders))
+        if (
+          Number.isFinite(data.coverage.center.lat) &&
+          Number.isFinite(data.coverage.center.lng) &&
+          !data.tornadoPath?.coordinates?.length
+        ) {
+          if (!isStateCoverage) {
+            setMapCenter(data.coverage.center)
+            if (typeof mile === 'number') {
+              setMapZoom(mapZoomForRadiusMiles(mile))
+            }
+          }
         }
-
-        let coverageIsState = false
-
-        if ((showLayersPanel || stateScoped) && data.coverage?.center) {
-          const mile = data.coverage.radiusMile
-          const isDemoStateWide = data.demo === true && data.coverage?.stateWide === true
-          const isStateCoverage =
-            data.coverage.coverageType === 'state' || isDemoStateWide
-          coverageIsState = isStateCoverage
-          if (isStateCoverage) {
+      } else {
+        setCoverageCircle(null)
+        setCoverageMeta(null)
+        if (data.coverage) {
+          coverageIsState =
+            data.coverage.coverageType === 'state' ||
+            (data.demo === true && data.coverage?.stateWide === true)
+          if (coverageIsState) {
             const coverageState =
               typeof data.coverage.state === 'string'
                 ? data.coverage.state
@@ -680,89 +725,34 @@ export function GISMap({
               setApiCoverageState(coverageState.trim())
             }
           }
-          setCoverageMeta({
-            coverageType: isStateCoverage ? 'state' : 'radius',
-            stateWide: isDemoStateWide,
-            radiusMile: typeof mile === 'number' ? mile : undefined,
-            stateCode:
-              typeof data.coverage.stateCode === 'string'
-                ? data.coverage.stateCode
-                : focusState
-                  ? normalizeStateToUsps(focusState) ?? undefined
-                  : undefined,
-          })
-          if (isStateCoverage) {
-            setCoverageCircle(null)
-          } else if (data.coverage?.radiusMeters) {
-            setCoverageCircle({
-              center: data.coverage.center,
-              radiusMeters: data.coverage.radiusMeters,
-              label:
-                typeof mile === 'number'
-                  ? `License coverage · ${mile} mi`
-                  : 'License coverage',
-            })
-          } else {
-            setCoverageCircle(null)
-          }
-          if (
-            Number.isFinite(data.coverage.center.lat) &&
-            Number.isFinite(data.coverage.center.lng) &&
-            !data.tornadoPath?.coordinates?.length
-          ) {
-            if (!isStateCoverage) {
-              setMapCenter(data.coverage.center)
-              if (typeof mile === 'number') {
-                setMapZoom(mapZoomForRadiusMiles(mile))
-              }
-            }
-          }
-        } else {
-          setCoverageCircle(null)
-          setCoverageMeta(null)
-          if (data.coverage) {
-            coverageIsState =
-              data.coverage.coverageType === 'state' ||
-              (data.demo === true && data.coverage?.stateWide === true)
-            if (coverageIsState) {
-              const coverageState =
-                typeof data.coverage.state === 'string'
-                  ? data.coverage.state
-                  : typeof data.coverage.stateCode === 'string'
-                    ? data.coverage.stateCode
-                    : null
-              if (coverageState?.trim()) {
-                setApiCoverageState(coverageState.trim())
-              }
-            }
-          }
         }
+      }
 
-        const tornadoPath = data.tornadoPath as
-          | { type?: string; coordinates?: [number, number][] }
-          | undefined
-        if (tornadoPath?.coordinates && tornadoPath.coordinates.length >= 2) {
-          const path = tornadoPath.coordinates.map(([lng, lat]) => ({ lat, lng }))
-          setTornadoPathPoints(path)
-          setTornadoPolylines([
-            {
-              path,
-              strokeColor: '#DC2626',
-              strokeWeight: 5,
-              strokeOpacity: 0.92,
-              label: typeof data.scenarioTitle === 'string' ? data.scenarioTitle : 'Tornado path',
-            },
-          ])
-          // State-scoped dashboards keep the full-state viewport; only draw the path overlay.
-          if (!stateScoped && !coverageIsState) {
-            const lats = path.map((p) => p.lat)
-            const lngs = path.map((p) => p.lng)
-            setMapCenter({
-              lat: (Math.min(...lats) + Math.max(...lats)) / 2,
-              lng: (Math.min(...lngs) + Math.max(...lngs)) / 2,
-            })
-            setMapZoom(10)
-          }
+      const tornadoPath = data.tornadoPath as
+        | { type?: string; coordinates?: [number, number][] }
+        | undefined
+      if (tornadoPath?.coordinates && tornadoPath.coordinates.length >= 2) {
+        const path = tornadoPath.coordinates.map(([lng, lat]) => ({ lat, lng }))
+        setTornadoPathPoints(path)
+        setTornadoPolylines([
+          {
+            path,
+            strokeColor: '#DC2626',
+            strokeWeight: 5,
+            strokeOpacity: 0.92,
+            label: typeof data.scenarioTitle === 'string' ? data.scenarioTitle : 'Tornado path',
+          },
+        ])
+        // State-scoped dashboards keep the full-state viewport; only draw the path overlay.
+        if (!stateScoped && !coverageIsState) {
+          const lats = path.map((p) => p.lat)
+          const lngs = path.map((p) => p.lng)
+          setMapCenter({
+            lat: (Math.min(...lats) + Math.max(...lats)) / 2,
+            lng: (Math.min(...lngs) + Math.max(...lngs)) / 2,
+          })
+          setMapZoom(10)
+        }
       } else {
         setTornadoPathPoints([])
         setTornadoPolylines([])
@@ -1561,9 +1551,9 @@ export function GISMap({
     for (const raw of closures) {
       const path = Array.isArray(raw.path)
         ? raw.path.filter(
-            (p: { lat?: number; lng?: number }) =>
-              Number.isFinite(p.lat) && Number.isFinite(p.lng),
-          )
+          (p: { lat?: number; lng?: number }) =>
+            Number.isFinite(p.lat) && Number.isFinite(p.lng),
+        )
         : []
       if (path.length < 2) continue
       if (
@@ -1711,10 +1701,10 @@ export function GISMap({
         const categories = operationalAlertLayersKey.split(',')
         const bounds = clampFetchBounds(
           mapViewportBounds ??
-            stateBoundsRestriction ??
-            mapStateBounds ??
-            infraFetchBounds ??
-            null,
+          stateBoundsRestriction ??
+          mapStateBounds ??
+          infraFetchBounds ??
+          null,
         )
         const polylines: MapPolylineSpec[] = []
 
@@ -1807,10 +1797,10 @@ export function GISMap({
         const filters = operationalIncidentLayersKey.split(',')
         const bounds = clampFetchBounds(
           mapViewportBounds ??
-            stateBoundsRestriction ??
-            mapStateBounds ??
-            infraFetchBounds ??
-            null,
+          stateBoundsRestriction ??
+          mapStateBounds ??
+          infraFetchBounds ??
+          null,
         )
         const markers: any[] = []
 
@@ -2017,41 +2007,18 @@ export function GISMap({
       return pointInCoverageCircle(lat, lng, coverageCircle.center, coverageCircle.radiusMeters)
     }
 
-    if (unifiedIncidents.length > 0) {
-      return unifiedIncidents
-        .filter((inc) => inCoverage(inc.lat, inc.lng))
-        .map((inc) => ({
-          lat: inc.lat,
-          lng: inc.lng,
-          weight: inc.weight,
-        }))
-    }
-
-    const base = [...impactedUsers, ...responders]
-      .filter(
-        (m: any) =>
-          m?.position &&
-          Number.isFinite(m.position.lat) &&
-          Number.isFinite(m.position.lng) &&
-          inCoverage(m.position.lat, m.position.lng),
-      )
-      .map((m: any, i: number) => ({
-        lat: m.position.lat,
-        lng: m.position.lng,
-        weight:
-          m.type === 'incident'
-            ? 0.95
-            : m.isSafe === false
-              ? 0.85
-              : 0.45 + ((i % 4) * 0.08),
+    // Incident heatmap only reflects aligned unified alert rows — never citizen/responder markers.
+    return unifiedIncidents
+      .filter((inc) => inCoverage(inc.lat, inc.lng))
+      .map((inc) => ({
+        lat: inc.lat,
+        lng: inc.lng,
+        weight: inc.weight,
       }))
-    return base.slice(0, 24)
   }, [
     showHeatmap,
     riskHeatEnabled,
     unifiedIncidents,
-    impactedUsers,
-    responders,
     lockToCoverageCircle,
     coverageCircle,
     inUsaView,
@@ -2118,48 +2085,48 @@ export function GISMap({
 
     // 2. Google Places sub-layers — viewport-ranked like Google Maps
     if (showFilterLayers) {
-    GIS_FILTER_MAP_LAYERS.forEach((layer) => {
-      if (!mapLayers[layer.id]) return
+      GIS_FILTER_MAP_LAYERS.forEach((layer) => {
+        if (!mapLayers[layer.id]) return
 
-      const markersForLayer = Array.from(infraCacheRef.current.values())
-        .filter((m: any) => m.placeType === layer.resultType)
-        .filter((m: any) => inUsaView(m.position.lat, m.position.lng))
-        .filter((m: any) => markerInCoverage(m.position))
+        const markersForLayer = Array.from(infraCacheRef.current.values())
+          .filter((m: any) => m.placeType === layer.resultType)
+          .filter((m: any) => inUsaView(m.position.lat, m.position.lng))
+          .filter((m: any) => markerInCoverage(m.position))
 
-      if (markersForLayer.length === 0) return
+        if (markersForLayer.length === 0) return
 
-      if (isDemoSimulation) {
+        if (isDemoSimulation) {
+          if (!viewportRankBounds) {
+            enabledLayerMarkers.push(...markersForLayer)
+            return
+          }
+          const visible = markersForLayer.filter((m: any) =>
+            pointInPaddedBounds(m.position.lat, m.position.lng, viewportRankBounds, 0.35),
+          )
+          enabledLayerMarkers.push(...(visible.length > 0 ? visible : markersForLayer))
+          return
+        }
+
         if (!viewportRankBounds) {
           enabledLayerMarkers.push(...markersForLayer)
           return
         }
-        const visible = markersForLayer.filter((m: any) =>
-          pointInPaddedBounds(m.position.lat, m.position.lng, viewportRankBounds, 0.35),
+
+        const asPlaces: InfrastructurePlaceResult[] = markersForLayer.map((m: any) => ({
+          place_id: m.id,
+          name: m.title,
+          placeType: m.placeType,
+          lat: m.position.lat,
+          lng: m.position.lng,
+          vicinity: m.location,
+          rating: m.rating,
+          user_ratings_total: m.user_ratings_total,
+        }))
+        const rankedIds = new Set(
+          rankPlacesForViewport(asPlaces, viewportRankBounds).map((p) => p.place_id),
         )
-        enabledLayerMarkers.push(...(visible.length > 0 ? visible : markersForLayer))
-        return
-      }
-
-      if (!viewportRankBounds) {
-        enabledLayerMarkers.push(...markersForLayer)
-        return
-      }
-
-      const asPlaces: InfrastructurePlaceResult[] = markersForLayer.map((m: any) => ({
-        place_id: m.id,
-        name: m.title,
-        placeType: m.placeType,
-        lat: m.position.lat,
-        lng: m.position.lng,
-        vicinity: m.location,
-        rating: m.rating,
-        user_ratings_total: m.user_ratings_total,
-      }))
-      const rankedIds = new Set(
-        rankPlacesForViewport(asPlaces, viewportRankBounds).map((p) => p.place_id),
-      )
-      enabledLayerMarkers.push(...markersForLayer.filter((m: any) => rankedIds.has(m.id)))
-    })
+        enabledLayerMarkers.push(...markersForLayer.filter((m: any) => rankedIds.has(m.id)))
+      })
     }
 
     if (showFilterLayers && operationalIncidentMarkers.length > 0) {
@@ -2506,9 +2473,9 @@ export function GISMap({
       for (const closure of roadClosuresQuery.data.closures) {
         const path = Array.isArray(closure.path)
           ? closure.path.filter(
-              (p: { lat?: number; lng?: number }) =>
-                Number.isFinite(p.lat) && Number.isFinite(p.lng),
-            )
+            (p: { lat?: number; lng?: number }) =>
+              Number.isFinite(p.lat) && Number.isFinite(p.lng),
+          )
           : []
         if (path.length < 2) continue
         const mid = path[Math.floor(path.length / 2)]!
@@ -2655,20 +2622,18 @@ export function GISMap({
   const displayHeatCount = useMemo(() => {
     if (!riskHeatEnabled) return 0
     if (restrictToUsa && !viewportInUsa) return 0
-    if (unifiedIncidents.length > 0) {
-      return incidentsVisible ? incidentHeatCount : 0
-    }
+    if (!incidentsVisible) return 0
+    // Badge reflects alerts actually plotted on the map (after coverage filters).
     return heatPoints.length
   }, [
     restrictToUsa,
     viewportInUsa,
-    unifiedIncidents.length,
     incidentsVisible,
-    incidentHeatCount,
+    riskHeatEnabled,
     heatPoints.length,
   ])
 
-  const usesUnifiedHeat = unifiedIncidents.length > 0 && riskHeatEnabled
+  const usesUnifiedHeat = situationalEnabled && riskHeatEnabled
 
   return (
     <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm h-[700px] flex flex-col">
@@ -2735,30 +2700,30 @@ export function GISMap({
           </div>
         )}
         <div className="flex-1 relative min-h-0">
-        <SituationalLeafletMap
-          markers={mapMarkers}
-          zoom={mapZoom}
-          center={mapCenter}
-          heatPoints={heatPoints}
-          showHeatmap={showHeatmap && riskHeatEnabled}
-          showWeatherRadar={Boolean(weatherRadarScope)}
-          weatherRadarScope={weatherRadarScope}
-          stateBounds={mapStateBounds}
-          fitStateOnLoad={Boolean(mapStateBounds)}
-          coverageCircle={showLayersPanel && coverageMeta?.coverageType !== 'state' ? coverageCircle : null}
-          lockToCoverage={lockToCoverageCircle}
-          polylines={combinedPolylines}
-          polygons={mapLayers.power ? powerOutagePolygons : []}
-          disasterZoneCircles={disasterZoneCircles}
-          heatIncidents={usesUnifiedHeat ? heatIncidentsForMap : undefined}
-          heatClickOnly={usesUnifiedHeat}
-          onHeatIncidentSelect={isDemoSimulation ? handleHeatIncidentSelect : undefined}
-          onBoundsChanged={interactiveMapLayersActive ? handleMapBoundsChange : undefined}
-          clusterInfrastructure={interactiveMapLayersActive && !isDemoSimulation}
-          infrastructureClusterMode={resolveInfrastructureClusterMode(mapLayers)}
-          allowZoomOut={stateScoped}
-          layersLoading={mapLayersLoading}
-        />
+          <SituationalLeafletMap
+            markers={mapMarkers}
+            zoom={mapZoom}
+            center={mapCenter}
+            heatPoints={heatPoints}
+            showHeatmap={showHeatmap && riskHeatEnabled}
+            showWeatherRadar={Boolean(weatherRadarScope)}
+            weatherRadarScope={weatherRadarScope}
+            stateBounds={mapStateBounds}
+            fitStateOnLoad={Boolean(mapStateBounds)}
+            coverageCircle={showLayersPanel && coverageMeta?.coverageType !== 'state' ? coverageCircle : null}
+            lockToCoverage={lockToCoverageCircle}
+            polylines={combinedPolylines}
+            polygons={mapLayers.power ? powerOutagePolygons : []}
+            disasterZoneCircles={disasterZoneCircles}
+            heatIncidents={usesUnifiedHeat ? heatIncidentsForMap : undefined}
+            heatClickOnly={usesUnifiedHeat}
+            onHeatIncidentSelect={isDemoSimulation ? handleHeatIncidentSelect : undefined}
+            onBoundsChanged={interactiveMapLayersActive ? handleMapBoundsChange : undefined}
+            clusterInfrastructure={interactiveMapLayersActive && !isDemoSimulation}
+            infrastructureClusterMode={resolveInfrastructureClusterMode(mapLayers)}
+            allowZoomOut={stateScoped}
+            layersLoading={mapLayersLoading}
+          />
         </div>
       </div>
     </div>
@@ -2787,22 +2752,22 @@ function GisHeatMapHeaderPanel({
       {/* Label, Badge, and Switch Row */}
       <div className="flex items-center gap-2 shrink-0 w-fit">
         <div className="flex items-center gap-2">
-        <label
-          htmlFor={heatSwitchId}
-          className="flex items-center gap-2 text-sm font-black text-slate-800 tracking-tight"
-        >
-          <span className="text-base" aria-hidden="true">🔥</span>
-          Incident Heatmap
-        </label>
-        
-        <span className="rounded-full bg-slate-50 px-2.5 py-0.5 text-xs font-black text-slate-700 border border-slate-200/60 min-w-[28px] text-center">
-          {displayHeatCount}
-        </span>
+          <label
+            htmlFor={heatSwitchId}
+            className="flex items-center gap-2 text-sm font-black text-slate-800 tracking-tight"
+          >
+            <span className="text-base" aria-hidden="true">🔥</span>
+            Incident Heatmap
+          </label>
+
+          <span className="rounded-full bg-slate-50 px-2.5 py-0.5 text-xs font-black text-slate-700 border border-slate-200/60 min-w-[28px] text-center">
+            {displayHeatCount}
+          </span>
         </div>
-        <Switch 
-          id={heatSwitchId} 
-          checked={showHeatmap} 
-          onCheckedChange={onShowHeatmapChange} 
+        <Switch
+          id={heatSwitchId}
+          checked={showHeatmap}
+          onCheckedChange={onShowHeatmapChange}
         />
       </div>
 
@@ -2812,9 +2777,9 @@ function GisHeatMapHeaderPanel({
           <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 shrink-0">
             Low
           </span>
-          
+
           <div className="relative min-w-[200px] flex-1 h-2 rounded-full bg-gradient-to-r from-[#2A2E4F] via-yellow-400 via-orange-500 to-red-600" />
-          
+
           <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 shrink-0">
             Critical
           </span>
