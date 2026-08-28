@@ -41,6 +41,7 @@ import {
 import { buildLeafletMarkerIcon, chemicalClusterIcon, clusterIcon, criticalInfraClusterIcon, damClusterIcon, financialClusterIcon, fuelClusterIcon, generatorClusterIcon, heatIncidentPinIcon, itClusterIcon, mealsClusterIcon, pharmacyClusterIcon, policeClusterIcon, resourceClusterIcon, roadClosureClusterIcon, roadClosedIconMarker, shelterClusterIcon, volunteerClusterIcon } from '@/lib/gis/situational-map-marker-icons';
 import type { InfrastructureClusterMode } from '@/lib/gis/map-layer-config';
 import type { UnifiedEventHeatPoint } from '@/lib/geo/unified-event-heatmap';
+import { MapIncidentPopupContent } from '@/components/gis/map-incident-popup-content';
 import {
     NEXRAD_LEAFLET_WMS_OPTIONS,
     NEXRAD_WMS,
@@ -564,89 +565,90 @@ function MarkerPopupContent({
             : formatMarkerStatus(marker.status, marker.isSafe);
 
     return (
-        <div className="p-4 pr-9 min-w-[240px] max-w-[320px] text-slate-900 font-sans">
-            {marker.category && (
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">
-                    {marker.category}
-                </p>
-            )}
-            <h3 className="font-bold text-sm tracking-tight text-slate-900 mb-1.5 leading-snug">
-                {marker.title}
-            </h3>
+        <div className="overflow-hidden min-w-[260px] max-w-[320px] font-sans">
+            <div className="px-4 py-3.5 pr-9">
+                {marker.category && (
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400 mb-1">
+                        {marker.category}
+                    </p>
+                )}
+                <h3 className="text-[15px] font-semibold text-slate-900 leading-snug tracking-tight mb-2">
+                    {marker.title}
+                </h3>
 
-            {marker.description && (
-                <p className="text-xs text-slate-600 mb-2 leading-relaxed font-normal">
-                    {marker.description}
-                </p>
-            )}
+                {marker.description && (
+                    <p className="text-[12px] text-slate-600 mb-2.5 leading-relaxed">
+                        {marker.description}
+                    </p>
+                )}
 
-            {marker.location && (
-                <p className="text-xs text-slate-600 mb-2.5 leading-normal flex items-start gap-1">
-                    <span className="font-semibold text-slate-700 shrink-0">Location:</span>
-                    <span className="text-slate-600">{marker.location}</span>
-                </p>
-            )}
+                {marker.location && (
+                    <p className="text-[12px] text-slate-600 mb-2.5 leading-relaxed">
+                        {marker.location}
+                    </p>
+                )}
 
-            {marker.phone && (
-                <p className="text-xs text-slate-600 mb-2.5 leading-normal flex items-center gap-1">
-                    <span className="font-semibold text-slate-700 shrink-0">Phone:</span>
+                {marker.phone && (
+                    <p className="text-[12px] text-slate-600 mb-2.5">
+                        <span className="font-medium text-slate-700">Phone: </span>
+                        <a
+                            href={`tel:${marker.phone.replace(/[^\d+]/g, '')}`}
+                            className="text-[#33375D] font-medium hover:underline"
+                        >
+                            {marker.phone}
+                        </a>
+                    </p>
+                )}
+
+                {(marker.status || marker.isSafe != null) && (
+                    <div className="mb-3">
+                        <span
+                            className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wide border ${
+                                isHelp || marker.type === 'infrastructure'
+                                    ? 'bg-rose-50 text-rose-700 border-rose-200/80'
+                                    : 'bg-emerald-50 text-emerald-700 border-emerald-200/80'
+                            }`}
+                        >
+                            {statusLabel}
+                        </span>
+                    </div>
+                )}
+
+                {marker.riskReportHref && (
                     <a
-                        href={`tel:${marker.phone.replace(/[^\d+]/g, '')}`}
-                        className="text-blue-600 font-medium hover:underline"
+                        href={marker.riskReportHref}
+                        className="block text-[12px] font-semibold text-[#33375D] hover:text-[#2a2d4d] transition-colors mb-2"
                     >
-                        {marker.phone}
+                        View in AI Risk Assessment →
                     </a>
-                </p>
-            )}
+                )}
 
-            {(marker.status || marker.isSafe != null) && (
-                <div className="mt-1 mb-2">
-                    <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${
-                            isHelp || marker.type === 'infrastructure'
-                                ? 'bg-rose-50 text-rose-700 border border-rose-200/80 shadow-sm'
-                                : 'bg-emerald-50 text-emerald-700 border border-emerald-200/80 shadow-sm'
-                        }`}
+                {marker.incidentId && onViewDetails && (
+                    <button
+                        type="button"
+                        className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-[#33375D] hover:text-[#2a2d4d] transition-colors"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onViewDetails();
+                        }}
                     >
-                        {statusLabel}
-                    </span>
-                </div>
-            )}
+                        View full details →
+                    </button>
+                )}
 
-            {marker.riskReportHref && (
-                <a
-                    href={marker.riskReportHref}
-                    className="mt-2 block text-xs font-bold text-[#33375D] hover:text-blue-600 transition-colors"
-                >
-                    View in AI Risk Assessment →
-                </a>
-            )}
-
-            {marker.incidentId && onViewDetails && (
-                <button
-                    type="button"
-                    className="mt-2 block text-xs font-bold text-[#33375D] hover:text-blue-600 transition-colors text-left"
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        onViewDetails();
-                    }}
-                >
-                    View details →
-                </button>
-            )}
-
-            {onClose && (
-                <button
-                    type="button"
-                    className="mt-3 text-xs font-bold text-slate-400 hover:text-slate-700 transition-colors"
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        onClose();
-                    }}
-                >
-                    Close
-                </button>
-            )}
+                {onClose && (
+                    <button
+                        type="button"
+                        className="mt-3 text-[11px] font-medium text-slate-400 hover:text-slate-600 transition-colors"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onClose();
+                        }}
+                    >
+                        Close
+                    </button>
+                )}
+            </div>
         </div>
     );
 }
@@ -1028,7 +1030,7 @@ export function SituationalLeafletMap({
                                 },
                             }}
                         >
-                            <Popup>
+                            <Popup minWidth={280} maxWidth={320}>
                                 <MarkerPopupContent
                                     marker={marker}
                                     onViewDetails={
@@ -1063,32 +1065,16 @@ export function SituationalLeafletMap({
                         position={[selectedHeatIncident.lat, selectedHeatIncident.lng]}
                         icon={heatIncidentPinIcon()}
                     >
-                        <Popup>
-                            <div className="p-2 min-w-[200px] max-w-[300px]">
-                                <h3 className="font-extrabold text-sm mb-1 uppercase">Incident</h3>
-                                <div className="font-bold text-lg mb-1">{selectedHeatIncident.name}</div>
-                                {selectedHeatIncident.severity && (
-                                    <p className="text-xs text-slate-600 mb-1">
-                                        Severity: {selectedHeatIncident.severity}
-                                    </p>
-                                )}
-                                {selectedHeatIncident.location && (
-                                    <p className="text-xs text-slate-500">{selectedHeatIncident.location}</p>
-                                )}
-                                <button
-                                    type="button"
-                                    className="mt-2 text-xs font-bold text-[#33375D] hover:underline"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        openIncidentDetails({
-                                            eventIds: [selectedHeatIncident.id],
-                                            bulletText: `${selectedHeatIncident.name} — ${selectedHeatIncident.severity} severity${selectedHeatIncident.location ? ` · ${selectedHeatIncident.location}` : ''}`,
-                                        });
-                                    }}
-                                >
-                                    View details →
-                                </button>
-                            </div>
+                        <Popup minWidth={280} maxWidth={320}>
+                            <MapIncidentPopupContent
+                                incident={selectedHeatIncident}
+                                onViewDetails={() => {
+                                    openIncidentDetails({
+                                        eventIds: [selectedHeatIncident.id],
+                                        bulletText: `${selectedHeatIncident.name} — ${selectedHeatIncident.severity} severity${selectedHeatIncident.location ? ` · ${selectedHeatIncident.location}` : ''}`,
+                                    });
+                                }}
+                            />
                         </Popup>
                     </Marker>
                 )}

@@ -1,14 +1,10 @@
-import { pointInUsStateBBox } from '@/lib/constants/us-state-bounding-boxes';
-import { isImpreciseAlertCoords } from '@/lib/geo/resolve-alert-coordinates';
-import { isUsCenterFallbackCoords } from '@/lib/geo/us-center-coords';
 import { getCurrentEvents, type UnifiedEventDoc } from '@/lib/services/unified-event-repo';
 import { buildUserZones } from '@/lib/services/mobile/zone-utils';
 import { unifiedSourceToLegacy } from '@/lib/unified-event/legacy-source';
 import {
-    alertRowMatchesAiAlignedStateScope,
     locationStringsMatchState,
+    matchesStateWideUnifiedAlert,
 } from '@/lib/utils/alert-location-state-match';
-import { normalizeStateToUsps } from '@/lib/utils/us-state-usps';
 import type { UserProfilePayload } from '@/lib/types/mobile/auth';
 import { Alert, AlertSeverity, AlertSource } from '@/lib/types/api-alerts';
 import {
@@ -59,29 +55,19 @@ function unifiedEventMatchesUser(
     zoneStrings: string[],
     states: string[],
 ): boolean {
-    const legacySource = unifiedSourceToLegacy(doc.source);
     const row = {
-        source: legacySource,
+        source: doc.source,
         location: doc.location ?? '',
         description: doc.description ?? '',
         name: doc.name ?? '',
         instructions: doc.instructions ?? [],
+        lat: doc.lat,
+        lng: doc.lng,
     };
 
     for (const state of states) {
         if (!locationStringsMatchState(zoneStrings, state)) continue;
-        if (alertRowMatchesAiAlignedStateScope(row, state)) return true;
-    }
-
-    if (doc.lat != null && doc.lng != null && Number.isFinite(doc.lat) && Number.isFinite(doc.lng)) {
-        if (!isUsCenterFallbackCoords(doc.lat, doc.lng)) {
-            for (const state of states) {
-                const usps = normalizeStateToUsps(state);
-                if (!usps) continue;
-                if (isImpreciseAlertCoords(doc.lat, doc.lng, usps)) continue;
-                if (pointInUsStateBBox(doc.lng, doc.lat, usps)) return true;
-            }
-        }
+        if (matchesStateWideUnifiedAlert(row, state)) return true;
     }
 
     return false;

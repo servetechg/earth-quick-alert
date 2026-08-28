@@ -3,6 +3,10 @@ import { unifiedEventFeedFilter } from '@/lib/constants/unified-event-feed';
 import { syncNwsAlertsNow, syncNwsAlertsIfStale } from '@/lib/services/alert-communication-nws-sync';
 import { syncAllSourcesNow, syncAllSourcesIfStale } from '@/lib/services/alert-communication-multi-sync';
 import {
+    syncEarthquakeAlertsIfStale,
+    syncEarthquakeAlertsNow,
+} from '@/lib/services/alert-communication-earthquake-sync';
+import {
     syncAllHistoricalUnifiedEvents,
     syncHistoricalUnifiedEventsIfStale,
 } from '@/lib/services/unified-event-historical-ingest';
@@ -13,8 +17,9 @@ type MultiReport = Awaited<ReturnType<typeof syncAllSourcesNow>>;
 export async function forceSyncAllAlertCommunicationFeedsNow(): Promise<{
     nws: { upserted: number; removed: number };
     multi: MultiReport;
+    earthquake: { upserted: number; removed: number };
 }> {
-    const [nws, multi] = await Promise.all([
+    const [nws, multi, earthquake] = await Promise.all([
         process.env.NWS_ALERT_SYNC_ENABLED === 'false'
             ? Promise.resolve({ upserted: 0, removed: 0 })
             : syncNwsAlertsNow().catch((e) => {
@@ -27,8 +32,14 @@ export async function forceSyncAllAlertCommunicationFeedsNow(): Promise<{
                   console.error('[multi-source-sync]', e);
                   return {} as MultiReport;
               }),
+        process.env.USGS_EQ_SYNC_ENABLED === 'false'
+            ? Promise.resolve({ upserted: 0, removed: 0 })
+            : syncEarthquakeAlertsNow().catch((e) => {
+                  console.error('[earthquake-sync]', e);
+                  return { upserted: 0, removed: 0 };
+              }),
     ]);
-    return { nws, multi };
+    return { nws, multi, earthquake };
 }
 
 /**
@@ -48,8 +59,11 @@ export async function syncAlertCommunicationFeedsGate(): Promise<void> {
             }
         })().catch((e) => console.error('[feed-sync-gate:cold-start]', e));
     } else {
-        void Promise.all([syncNwsAlertsIfStale(), syncAllSourcesIfStale()])
-            .catch((e) => console.error('[feed-sync-gate:stale]', e));
+        void Promise.all([
+            syncNwsAlertsIfStale(),
+            syncAllSourcesIfStale(),
+            syncEarthquakeAlertsIfStale(),
+        ]).catch((e) => console.error('[feed-sync-gate:stale]', e));
     }
 
     void syncHistoricalUnifiedEventsIfStale();

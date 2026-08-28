@@ -174,9 +174,11 @@ html, body, #__next {
 /* Leaflet custom popup container overrides for clean padding, typography, and shadow */
 .leaflet-popup-content-wrapper {
   padding: 0 !important;
-  border-radius: 1.25rem !important; /* 20px */
-  box-shadow: 0 20px 30px -10px rgba(15, 23, 42, 0.18), 0 8px 12px -6px rgba(15, 23, 42, 0.12) !important;
-  border: 1px solid rgba(226, 232, 240, 0.9) !important;
+  border-radius: 1rem !important;
+  box-shadow:
+    0 24px 48px -12px rgba(15, 23, 42, 0.18),
+    0 0 0 1px rgba(226, 232, 240, 0.95) !important;
+  border: none !important;
   background: #ffffff !important;
   overflow: hidden !important;
 }

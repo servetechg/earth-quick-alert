@@ -72,6 +72,48 @@ const SOURCE_BADGE_STYLES: Record<string, { label: string; className: string }> 
   seed: { label: 'Seed', className: 'border-zinc-300 bg-zinc-50 text-zinc-700' },
 }
 
+/** Card action button — "Alert Sent" only after sub-admin dispatches (status → Get Prepared). */
+function alertCardActionButton(status: string): {
+  text: string
+  className: string
+  dispatchable: boolean
+} {
+  const normalized = String(status ?? '').trim()
+  if (normalized === 'Take Action') {
+    return {
+      text: 'Take Action',
+      className: 'bg-[#EF4444] hover:bg-red-600',
+      dispatchable: true,
+    }
+  }
+  if (normalized === 'Get Prepared') {
+    return {
+      text: 'Alert Sent',
+      className: 'bg-[#22C55E] cursor-default',
+      dispatchable: false,
+    }
+  }
+  if (normalized === 'Monitor') {
+    return {
+      text: 'Monitor',
+      className: 'bg-slate-500 cursor-default',
+      dispatchable: false,
+    }
+  }
+  if (normalized === 'Info') {
+    return {
+      text: 'Info',
+      className: 'bg-slate-400 cursor-default',
+      dispatchable: false,
+    }
+  }
+  return {
+    text: normalized || 'Feed Alert',
+    className: 'bg-slate-400 cursor-default',
+    dispatchable: false,
+  }
+}
+
 function formatPropertyValue(value: unknown): string {
   if (value == null) return '—'
   if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
@@ -448,10 +490,7 @@ export default function AlertsCommunicationPage() {
                 if (alert.iconType === 'lightning') icon = <Zap className={cn('w-5 h-5', iconAccent)} />;
                 if (alert.iconType === 'cloud') icon = <CloudRain className={cn('w-5 h-5', iconAccent)} />;
 
-                const isTakeAction = alert.status === 'Take Action';
-
-                const buttonColor = isTakeAction ? 'bg-[#EF4444] hover:bg-red-600' : 'bg-[#22C55E] cursor-default';
-                const buttonText = isTakeAction ? 'Take Action' : 'Alert Sent';
+                const actionButton = alertCardActionButton(alert.status)
                 const isLocExpanded = !!expandedLocations[alert.id]
                 const hasManyLocations = Array.isArray(alert.locations) && alert.locations.length > 1
 
@@ -521,11 +560,16 @@ export default function AlertsCommunicationPage() {
                       <Button
                         onClick={(e) => {
                           e.stopPropagation()
-                          if (isTakeAction) handleFeedDispatch(alert)
+                          if (actionButton.dispatchable) handleFeedDispatch(alert)
                         }}
-                        className={cn("rounded-lg px-8 py-5 font-black text-white transition-all shadow-sm text-[14px]", buttonColor)}
+                        disabled={!actionButton.dispatchable}
+                        className={cn(
+                          "rounded-lg px-8 py-5 font-black text-white transition-all shadow-sm text-[14px]",
+                          actionButton.className,
+                          !actionButton.dispatchable && 'opacity-95',
+                        )}
                       >
-                        {buttonText}
+                        {actionButton.text}
                       </Button>
                     </div>
                   </Card>
