@@ -6,7 +6,10 @@ import {
   pointInUsCountyBBox,
   normalizeCountyStem,
 } from '@/lib/constants/us-county-bounding-boxes';
-import { getUsStateBbox, pointInUsStateBBox } from '@/lib/constants/us-state-bounding-boxes';
+import {
+    getUsStateMapCenter,
+    pointInUsStateBBox,
+} from '@/lib/constants/us-state-bounding-boxes';
 import { calculateDistance } from '@/lib/services/mock-map-service';
 import { geocodeLocation } from '@/lib/services/location-matching';
 import { normalizeStateToUsps, textMentionsUsState } from '@/lib/utils/us-state-usps';
@@ -117,11 +120,7 @@ async function resolveSubAdminJurisdictionUncached(
     }
 
     if (!center && stateCode) {
-        const bbox = getUsStateBbox(stateCode);
-        if (bbox) {
-            const [west, south, east, north] = bbox;
-            center = { lat: (south + north) / 2, lng: (west + east) / 2 };
-        }
+        center = getUsStateMapCenter(stateCode);
     }
 
     if (!center) return null;

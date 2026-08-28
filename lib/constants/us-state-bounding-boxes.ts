@@ -1,3 +1,5 @@
+import { getStateCenterCoords } from '@/lib/utils/us-state-usps';
+
 /**
  * Approximate WGS84 envelopes (west, south, east, north), Census 500k–style extents.
  * Used for sub-admin alert FIRMS/earthquake bbox checks and AI risk state scoping.
@@ -60,6 +62,28 @@ export const US_STATE_BBOX: Record<string, readonly [number, number, number, num
 export function getUsStateBbox(usps: string): readonly [number, number, number, number] | null {
     const k = usps.trim().toUpperCase();
     return US_STATE_BBOX[k] ?? null;
+}
+
+/** Leaflet-safe map view envelopes (no antimeridian wrap — AK/HI mainland/island groups only). */
+const US_STATE_MAP_VIEW_BBOX: Partial<Record<string, readonly [number, number, number, number]>> = {
+    AK: [-171.5, 51.2, -129.5, 71.5],
+    HI: [-161.0, 18.88, -154.6, 22.45],
+};
+
+export type UsStateMapBounds = { west: number; south: number; east: number; north: number };
+
+/** Bounds for map fitBounds / initial viewport — safe for Alaska and Hawaii. */
+export function getUsStateMapViewBounds(usps: string): UsStateMapBounds | null {
+    const k = usps.trim().toUpperCase();
+    const bbox = US_STATE_MAP_VIEW_BBOX[k] ?? getUsStateBbox(k);
+    if (!bbox) return null;
+    const [west, south, east, north] = bbox;
+    return { west, south, east, north };
+}
+
+/** Representative map center — never averages AK/HI across the dateline. */
+export function getUsStateMapCenter(usps: string): { lat: number; lng: number } | null {
+    return getStateCenterCoords(usps);
 }
 
 /** True if lon/lat lies inside the USPS state's approximate envelope (handles Alaska dateline). */

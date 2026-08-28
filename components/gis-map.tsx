@@ -37,7 +37,12 @@ import {
 } from '@/components/situational-leaflet-map'
 import type { UnifiedEventHeatPoint } from '@/lib/geo/unified-event-heatmap'
 import { cn } from '@/lib/utils'
-import { getUsStateBbox, pointInUsStateBBox, inferUspsStateFromLatLng } from '@/lib/constants/us-state-bounding-boxes'
+import {
+  getUsStateMapCenter,
+  getUsStateMapViewBounds,
+  pointInUsStateBBox,
+  inferUspsStateFromLatLng,
+} from '@/lib/constants/us-state-bounding-boxes'
 import { normalizeStateToUsps } from '@/lib/utils/us-state-usps'
 import { radiusBounds } from '@/lib/gis/geojson-map-utils'
 import { CONUS_MAP_BOUNDS, clampBoundsToUsa, viewportCenterInUsa, pointInUsaBounds } from '@/lib/constants/usa-map-bounds'
@@ -133,10 +138,7 @@ function boundsFromStateHint(hint?: string | null): MapStateBounds | null {
   const usps =
     trimmed.length === 2 ? trimmed.toUpperCase() : normalizeStateToUsps(trimmed)
   if (!usps) return null
-  const bbox = getUsStateBbox(usps)
-  if (!bbox) return null
-  const [west, south, east, north] = bbox
-  return { west, south, east, north }
+  return getUsStateMapViewBounds(usps)
 }
 
 type OpenSourceLayerFetchScope = {
@@ -214,6 +216,15 @@ function initialMapCenterForProps(focusState?: string, scopeState?: string, stat
   const hint =
     readScopedStateHint(focusState, scopeState) ||
     (stateScoped ? readScopedStateHint() : undefined)
+  const trimmed = hint?.trim()
+  if (trimmed) {
+    const usps =
+      trimmed.length === 2 ? trimmed.toUpperCase() : normalizeStateToUsps(trimmed)
+    if (usps) {
+      const center = getUsStateMapCenter(usps)
+      if (center) return center
+    }
+  }
   const bounds = boundsFromStateHint(hint)
   if (bounds) return centerOfBounds(bounds)
   return { lat: 37.0902, lng: -95.7129 }
@@ -983,6 +994,19 @@ export function GISMap({
       if (selectedLocation === 'All') {
         const stAll = (focusState || '').trim()
         if (stAll) {
+          const usps =
+            stAll.length === 2 ? stAll.toUpperCase() : normalizeStateToUsps(stAll)
+          const stateCenter = usps ? getUsStateMapCenter(usps) : null
+          if (
+            stateCenter &&
+            !cancelled &&
+            Number.isFinite(stateCenter.lat) &&
+            Number.isFinite(stateCenter.lng)
+          ) {
+            setMapCenter(stateCenter)
+            setMapZoom(usps === 'AK' || usps === 'HI' ? 5 : 8)
+            return
+          }
           const geo = await geocodeAddress(`${stAll}, USA`)
           if (
             !cancelled &&
