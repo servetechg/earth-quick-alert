@@ -1,5 +1,9 @@
 import { Schema, model, models } from 'mongoose';
-import type { CitizenActivityCategory, CitizenActivityPriority } from '@/lib/citizen-activity/types';
+import type {
+    CitizenActivityCategory,
+    CitizenActivityMissingField,
+    CitizenActivityPriority,
+} from '@/lib/citizen-activity/types';
 
 export type CitizenActivityResolutionStatus = 'pending' | 'completed';
 
@@ -32,6 +36,8 @@ export interface ICitizenActivity {
     source: 'citizen' | 'system' | 'responder';
     pictures: ICitizenActivityMediaRef[];
     videos: ICitizenActivityMediaRef[];
+    requestedMissingFields: CitizenActivityMissingField[];
+    missingInfoRequestedAt?: Date | null;
     reviewedBy?: Schema.Types.ObjectId | null;
     reviewedAt?: Date | null;
     createdAt: Date;
@@ -102,6 +108,12 @@ const CitizenActivitySchema = new Schema<ICitizenActivity>(
         },
         pictures: { type: [MediaRefSchema], default: [] },
         videos: { type: [MediaRefSchema], default: [] },
+        requestedMissingFields: {
+            type: [String],
+            enum: ['details', 'pictures', 'videos'],
+            default: [],
+        },
+        missingInfoRequestedAt: { type: Date, default: null },
         reviewedBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
         reviewedAt: { type: Date, default: null },
     },

@@ -31,7 +31,7 @@ export interface CitizenActivityFeedListProps {
     className?: string
     emptyMessage?: string
     searchQuery?: string
-    onMarkCompleted?: (id: string) => void | Promise<void>
+    onOpenDetail?: (entry: CitizenActivityDisplayRow) => void
 }
 
 function ResolutionBadge({ status }: { status: CitizenActivityResolutionStatus }) {
@@ -168,39 +168,34 @@ function MediaTriggerButton({
 
 function FeedTableRow({
     entry,
-    onMarkCompleted,
+    onOpenDetail,
     onOpenMedia,
 }: {
     entry: CitizenActivityDisplayRow
-    onMarkCompleted?: (id: string) => void | Promise<void>
+    onOpenDetail?: (entry: CitizenActivityDisplayRow) => void
     onOpenMedia: (entry: CitizenActivityDisplayRow) => void
 }) {
-    const isLiveRecord = Boolean(entry.userId)
     return (
-        <tr className="border-b border-slate-100 last:border-0 align-top">
-            <td className="py-4 pr-4 min-w-[240px]">
+        <tr
+            className="cursor-pointer border-b border-slate-100 align-top transition-colors last:border-0 hover:bg-slate-50"
+            onClick={() => onOpenDetail?.(entry)}
+        >
+            <td className="min-w-[240px] py-4 pr-4">
                 <ActivityCell entry={entry} />
-                <MediaTriggerButton entry={entry} onClick={() => onOpenMedia(entry)} />
+                <div onClick={(e) => e.stopPropagation()}>
+                    <MediaTriggerButton entry={entry} onClick={() => onOpenMedia(entry)} />
+                </div>
             </td>
-            <td className="py-4 pr-4 min-w-[120px]">
+            <td className="min-w-[120px] py-4 pr-4">
                 <p className="text-sm font-bold text-slate-900">{entry.citizenName}</p>
             </td>
-            <td className="py-4 pr-4 min-w-[160px]">
-                <p className="text-sm font-medium text-slate-600 leading-snug">{entry.citizenAddress}</p>
+            <td className="min-w-[160px] py-4 pr-4">
+                <p className="text-sm font-medium leading-snug text-slate-600">{entry.citizenAddress}</p>
             </td>
-            <td className="py-4 pr-4 min-w-[280px]">
-                <p className="text-sm leading-relaxed text-slate-600">{entry.takeAction}</p>
-                {entry.resolutionStatus === 'pending' && isLiveRecord && onMarkCompleted ? (
-                    <button
-                        type="button"
-                        onClick={() => void onMarkCompleted(entry.id)}
-                        className="mt-2 rounded-lg bg-[#33375D] px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-white transition-colors hover:bg-[#252847]"
-                    >
-                        Mark completed
-                    </button>
-                ) : null}
+            <td className="min-w-[280px] py-4 pr-4">
+                <p className="line-clamp-2 text-sm leading-relaxed text-slate-600">{entry.takeAction}</p>
             </td>
-            <td className="py-4 text-right whitespace-nowrap">
+            <td className="whitespace-nowrap py-4 text-right">
                 <ResolutionBadge status={entry.resolutionStatus} />
             </td>
         </tr>
@@ -209,13 +204,18 @@ function FeedTableRow({
 
 function CompactFeedRow({
     entry,
+    onOpenDetail,
     onOpenMedia,
 }: {
     entry: CitizenActivityDisplayRow
+    onOpenDetail?: (entry: CitizenActivityDisplayRow) => void
     onOpenMedia: (entry: CitizenActivityDisplayRow) => void
 }) {
     return (
-        <li className="py-3 first:pt-1 last:pb-1">
+        <li
+            className="cursor-pointer py-3 first:pt-1 last:pb-1 hover:bg-slate-50/80"
+            onClick={() => onOpenDetail?.(entry)}
+        >
             <div className="flex items-start justify-between gap-3">
                 <ActivityCell entry={entry} compact />
                 <ResolutionBadge status={entry.resolutionStatus} />
@@ -226,8 +226,10 @@ function CompactFeedRow({
                     <span className="font-medium text-slate-400"> · </span>
                     <span className="font-medium text-slate-500">{entry.citizenAddress}</span>
                 </p>
-                <p className="text-[10px] leading-relaxed text-slate-500 line-clamp-2">{entry.takeAction}</p>
-                <MediaTriggerButton entry={entry} onClick={() => onOpenMedia(entry)} />
+                <p className="line-clamp-2 text-[10px] leading-relaxed text-slate-500">{entry.takeAction}</p>
+                <div onClick={(e) => e.stopPropagation()}>
+                    <MediaTriggerButton entry={entry} onClick={() => onOpenMedia(entry)} />
+                </div>
             </div>
         </li>
     )
@@ -239,7 +241,7 @@ export function CitizenActivityFeedList({
     className,
     emptyMessage = 'No citizen activity to display.',
     searchQuery = '',
-    onMarkCompleted,
+    onOpenDetail,
 }: CitizenActivityFeedListProps) {
     const [selectedMediaEntry, setSelectedMediaEntry] = React.useState<CitizenActivityDisplayRow | null>(null)
 
@@ -280,6 +282,7 @@ export function CitizenActivityFeedList({
                         <CompactFeedRow
                             key={entry.id}
                             entry={entry}
+                            onOpenDetail={onOpenDetail}
                             onOpenMedia={(item) => setSelectedMediaEntry(item)}
                         />
                     ))}
@@ -311,7 +314,7 @@ export function CitizenActivityFeedList({
                                 <FeedTableRow
                                     key={entry.id}
                                     entry={entry}
-                                    onMarkCompleted={onMarkCompleted}
+                                    onOpenDetail={onOpenDetail}
                                     onOpenMedia={(item) => setSelectedMediaEntry(item)}
                                 />
                             ))}
