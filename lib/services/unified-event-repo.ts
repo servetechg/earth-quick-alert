@@ -6,6 +6,9 @@ import {
     jurisdictionLatLngBBox,
     type SubAdminJurisdiction,
 } from '@/lib/sub-admin/jurisdiction';
+import {
+    getUsStateMapViewBounds,
+} from '@/lib/constants/us-state-bounding-boxes';
 import { US_CENTER_LAT, US_CENTER_LNG } from '@/lib/geo/us-center-coords';
 
 export interface UnifiedEventDoc {
@@ -44,28 +47,37 @@ const STATE_NAMES: Record<string, string> = {
     'wv': 'west virginia', 'wi': 'wisconsin', 'wy': 'wyoming'
 };
 
-/** Build a location regex filter for jurisdiction scoping. */
-function locationFilter(stateCd: string | undefined): Record<string, unknown> | null {
+/** State-wide candidate filter — matches text OR coordinates (earthquakes often omit "MT" in location). */
+function stateScopedEventFilter(stateCd: string | undefined): Record<string, unknown> | null {
     if (!stateCd || stateCd === 'us') return null;
+
     const lowerCd = stateCd.toLowerCase();
     const stateName = STATE_NAMES[lowerCd];
-    
-    if (stateName) {
-        // Match either the 2-letter code or the full state name
-        return { 
-            location: { 
-                $regex: `\\b(${lowerCd}|${stateName})\\b`,
-                $options: 'i'
-            } 
-        };
+    const pattern = stateName
+        ? `\\b(${lowerCd}|${stateName})\\b`
+        : `\\b${lowerCd}\\b`;
+    const regex = { $regex: pattern, $options: 'i' };
+
+    const or: Record<string, unknown>[] = [
+        { location: regex },
+        { name: regex },
+        { description: regex },
+    ];
+
+    const bounds = getUsStateMapViewBounds(stateCd.toUpperCase());
+    if (bounds) {
+        or.push({
+            lat: { $gte: bounds.south, $lte: bounds.north },
+            lng: { $gte: bounds.west, $lte: bounds.east },
+        });
     }
-    
-    return { 
-        location: { 
-            $regex: `\\b${lowerCd}\\b`,
-            $options: 'i'
-        } 
-    };
+
+    return { $or: or };
+}
+
+/** @deprecated Use stateScopedEventFilter — kept for callers expecting location-only filter shape. */
+function locationFilter(stateCd: string | undefined): Record<string, unknown> | null {
+    return stateScopedEventFilter(stateCd);
 }
 
 /**
@@ -92,16 +104,12 @@ export async function getCurrentEventsForJurisdiction(
             },
             { lat: null },
             { lng: null },
-            // Treat US Center fallback coordinates as missing
             {
                 lat: { $gte: US_CENTER_LAT - 0.0001, $lte: US_CENTER_LAT + 0.0001 },
                 lng: { $gte: US_CENTER_LNG - 0.0001, $lte: US_CENTER_LNG + 0.0001 },
             },
         ],
     };
-
-    const loc = locationFilter(jurisdiction.stateCode?.toLowerCase());
-    if (loc) Object.assign(filter, loc);
 
     return UnifiedEvent.find(filter).sort({ updatedAt: -1 }).lean() as unknown as UnifiedEventDoc[];
 }
@@ -113,8 +121,8 @@ export async function getCurrentEventsForJurisdiction(
 export async function getCurrentEvents(opts?: { stateCd?: string }): Promise<UnifiedEventDoc[]> {
     await dbConnect();
     const filter: Record<string, unknown> = { ...unifiedEventFeedFilter() };
-    const loc = locationFilter(opts?.stateCd);
-    if (loc) Object.assign(filter, loc);
+    const stateScope = stateScopedEventFilter(opts?.stateCd);
+    if (stateScope) Object.assign(filter, stateScope);
     return UnifiedEvent.find(filter).sort({ updatedAt: -1 }).lean() as unknown as UnifiedEventDoc[];
 }
 
@@ -128,8 +136,8 @@ export async function getPastEventsByCategory(
 ): Promise<UnifiedEventDoc[]> {
     await dbConnect();
     const filter: Record<string, unknown> = { dataStatus: 'past', ...mongoUnifiedEventCategoryFilter(category) };
-    const loc = locationFilter(opts?.stateCd);
-    if (loc) Object.assign(filter, loc);
+    const stateScope = stateScopedEventFilter(opts?.stateCd);
+    if (stateScope) Object.assign(filter, stateScope);
     return UnifiedEvent
         .find(filter)
         .sort({ updatedAt: -1 })

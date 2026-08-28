@@ -12,6 +12,7 @@ import {
 } from '@/lib/constants/us-state-bounding-boxes';
 import { calculateDistance } from '@/lib/services/mock-map-service';
 import { geocodeLocation } from '@/lib/services/location-matching';
+import { matchesStateWideUnifiedAlert } from '@/lib/utils/alert-location-state-match';
 import { normalizeStateToUsps, textMentionsUsState } from '@/lib/utils/us-state-usps';
 import { parseLocations } from '@/lib/utils/alert-communication-hydrate';
 import { maybeDemoJurisdictionOverride, buildArkansasStateWideJurisdiction } from '@/lib/demo/provider';
@@ -312,10 +313,7 @@ export function alertRowMatchesSubAdminJurisdictionSync(
     jurisdiction: SubAdminJurisdiction
 ): boolean {
     if (jurisdiction.coverageType === 'state') {
-        if (!jurisdiction.stateCode) return false;
-        const coords = extractAlertRowCoordinates(row);
-        if (!coords) return false;
-        return pointInUsStateBBox(coords.lng, coords.lat, jurisdiction.stateCode);
+        return matchesStateWideUnifiedAlert(row, jurisdiction.stateRaw);
     }
     if (jurisdiction.coverageType === 'county') {
         const coords = extractAlertRowCoordinates(row);
@@ -337,33 +335,7 @@ export async function alertRowMatchesSubAdminJurisdiction(
     geocodeBudget?: { remaining: number }
 ): Promise<boolean> {
     if (jurisdiction.coverageType === 'state') {
-        if (!jurisdiction.stateCode) return false;
-
-        const coords = extractAlertRowCoordinates(row);
-        if (coords && pointInUsStateBBox(coords.lng, coords.lat, jurisdiction.stateCode)) {
-            return true;
-        }
-
-        const locationText = [
-            row.location,
-            row.name,
-            row.description,
-            ...(row.locations || [])
-        ].filter(Boolean).join(' ');
-
-        if (textMentionsUsState(locationText, jurisdiction.stateCode)) {
-            return true;
-        }
-
-        const queries = locationQueriesFromRow(row);
-        for (const query of queries) {
-            const geo = await geocodeLocationCached(query, geocodeBudget);
-            if (geo && pointInUsStateBBox(geo.lng, geo.lat, jurisdiction.stateCode)) {
-                return true;
-            }
-        }
-
-        return false;
+        return matchesStateWideUnifiedAlert(row, jurisdiction.stateRaw);
     }
 
     if (jurisdiction.coverageType === 'county' && jurisdiction.coverageCounty) {

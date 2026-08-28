@@ -2,7 +2,7 @@ import {
     filterUnifiedEventDocsForJurisdiction,
     resolveSubAdminJurisdiction,
 } from '@/lib/sub-admin/jurisdiction';
-import { alertRowMatchesAiAlignedStateScope } from '@/lib/utils/alert-location-state-match';
+import { matchesStateWideUnifiedAlert } from '@/lib/utils/alert-location-state-match';
 import { syncAlertCommunicationFeedsGate } from '@/lib/services/alert-communication-feed-sync-gate';
 import {
     getCurrentEvents,
@@ -30,7 +30,7 @@ type FeedCacheEntry = {
 const feedCache = new Map<string, FeedCacheEntry>();
 
 function feedCacheKey(userId: string | undefined, role: string): string {
-    return `${userId ?? 'anon'}:${String(role ?? '').toLowerCase()}:aligned-v3`;
+    return `${userId ?? 'anon'}:${String(role ?? '').toLowerCase()}:aligned-v4`;
 }
 
 export function invalidateAlignedFeedCache(userId?: string, role?: string): void {
@@ -44,7 +44,7 @@ export function invalidateAlignedFeedCache(userId?: string, role?: string): void
 /** State-only filter (legacy fallback when jurisdiction cannot be resolved). */
 export function filterHydratedForSubAdminState(hydrated: any[], stateRaw: string) {
     return hydrated.filter((row) =>
-        alertRowMatchesAiAlignedStateScope(
+        matchesStateWideUnifiedAlert(
             {
                 source: typeof row.source === 'string' ? row.source : '',
                 location: typeof row.location === 'string' ? row.location : '',
@@ -52,6 +52,8 @@ export function filterHydratedForSubAdminState(hydrated: any[], stateRaw: string
                 description: typeof row.description === 'string' ? row.description : '',
                 name: typeof row.name === 'string' ? row.name : '',
                 instructions: Array.isArray(row.instructions) ? row.instructions : undefined,
+                lat: typeof row.lat === 'number' ? row.lat : null,
+                lng: typeof row.lng === 'number' ? row.lng : null,
             },
             stateRaw,
         ),
@@ -60,13 +62,15 @@ export function filterHydratedForSubAdminState(hydrated: any[], stateRaw: string
 
 function filterDocsForSubAdminState(docs: UnifiedEventDoc[], stateRaw: string): UnifiedEventDoc[] {
     return docs.filter((doc) =>
-        alertRowMatchesAiAlignedStateScope(
+        matchesStateWideUnifiedAlert(
             {
                 source: doc.source,
                 location: doc.location,
                 description: doc.description,
                 name: doc.name,
                 instructions: doc.instructions,
+                lat: doc.lat,
+                lng: doc.lng,
             },
             stateRaw,
         ),
@@ -161,8 +165,27 @@ async function loadAlignedUnifiedEvents(options: {
     if (role === 'sub-admin' && options.userId) {
         const jurisdiction = await resolveSubAdminJurisdiction(options.userId);
         if (jurisdiction) {
-            const candidates = await getCurrentEventsForJurisdiction(jurisdiction);
-            docs = await filterUnifiedEventDocsForJurisdiction(candidates, jurisdiction);
+            if (jurisdiction.coverageType === 'state') {
+                // Same statewide pool + rules as mobile citizens in that state.
+                const candidates = await getCurrentEvents();
+                docs = candidates.filter((doc) =>
+                    matchesStateWideUnifiedAlert(
+                        {
+                            source: doc.source,
+                            location: doc.location,
+                            description: doc.description,
+                            name: doc.name,
+                            instructions: doc.instructions,
+                            lat: doc.lat,
+                            lng: doc.lng,
+                        },
+                        jurisdiction.stateRaw,
+                    ),
+                );
+            } else {
+                const candidates = await getCurrentEventsForJurisdiction(jurisdiction);
+                docs = await filterUnifiedEventDocsForJurisdiction(candidates, jurisdiction);
+            }
         } else {
             const u = await User.findById(options.userId).select('state').lean();
             const stateRaw = typeof u?.state === 'string' ? u.state.trim() : '';
@@ -190,7 +213,7 @@ async function loadAlignedUnifiedEvents(options: {
 
 /**
  * Live unified events for this session — same rows as Alerts & Communication.
- * Sub-admins: license radius only (not whole state).
+ * Sub-admins: radius/county license = alerts inside coverage; state license = full state (same as mobile).
  */
 export async function fetchAlignedUnifiedEventDocsForSession(options: {
     userId?: string;
@@ -205,7 +228,7 @@ export async function fetchAlignedUnifiedEventDocsForSession(options: {
 }
 
 /**
- * Live unified event cards after optional feed sync + sub-admin radius filter.
+ * Live unified event cards after optional feed sync + sub-admin jurisdiction filter.
  * Pass `syncFeeds: true` only from Alerts & Communication (throttled upstream refresh).
  */
 export async function fetchAlignedUnifiedEventFeed(options: {
