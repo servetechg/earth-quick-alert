@@ -1,5 +1,20 @@
 import { pointInUsStateBBox } from '@/lib/constants/us-state-bounding-boxes'
+import { isImpreciseAlertCoords } from '@/lib/geo/resolve-alert-coordinates'
+import { isUsCenterFallbackCoords } from '@/lib/geo/us-center-coords'
+import { unifiedSourceToLegacy } from '@/lib/unified-event/legacy-source'
 import { normalizeStateToUsps, textMentionsUsState } from '@/lib/utils/us-state-usps'
+
+/** Row shape for statewide alert visibility (mobile citizens + state-licensed sub-admins). */
+export type StateWideAlertRow = {
+  source?: string
+  location?: string
+  locations?: string[]
+  description?: string
+  name?: string
+  instructions?: string[]
+  lat?: number | null
+  lng?: number | null
+}
 
 /** True when sub-admin state is non-empty and we should filter the alerts feed. */
 export function shouldFilterAlertsByState(stateRaw: string | null | undefined): boolean {
@@ -129,4 +144,48 @@ export function alertRowMatchesAiAlignedStateScope(
     alertRowMatchesUserState({ location: row.location, locations: row.locations }, stateRaw) ||
     textMentionsUsState(textBlob, usps)
   )
+}
+
+/**
+ * Single statewide visibility rule shared by mobile (user's home state) and sub-admins
+ * with `coverageType: 'state'`. Radius/county licenses use jurisdiction radius instead.
+ */
+export function matchesStateWideUnifiedAlert(
+  row: StateWideAlertRow,
+  stateRaw: string,
+): boolean {
+  if (!shouldFilterAlertsByState(stateRaw)) return true
+
+  const legacySource = unifiedSourceToLegacy(String(row.source ?? ''))
+  if (
+    alertRowMatchesAiAlignedStateScope(
+      {
+        source: legacySource,
+        location: row.location,
+        locations: row.locations,
+        description: row.description,
+        name: row.name,
+        instructions: row.instructions,
+      },
+      stateRaw,
+    )
+  ) {
+    return true
+  }
+
+  const usps = normalizeStateToUsps(stateRaw)
+  if (
+    usps &&
+    typeof row.lat === 'number' &&
+    typeof row.lng === 'number' &&
+    Number.isFinite(row.lat) &&
+    Number.isFinite(row.lng) &&
+    !isUsCenterFallbackCoords(row.lat, row.lng) &&
+    !isImpreciseAlertCoords(row.lat, row.lng, usps) &&
+    pointInUsStateBBox(row.lng, row.lat, usps)
+  ) {
+    return true
+  }
+
+  return false
 }

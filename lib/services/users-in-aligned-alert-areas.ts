@@ -11,7 +11,7 @@ import { calculateDistance } from '@/lib/services/mock-map-service';
 import { buildUserZones, formatProfileAddress } from '@/lib/services/mobile/zone-utils';
 import type { UserProfilePayload } from '@/lib/types/mobile/auth';
 import { parseLocations } from '@/lib/utils/alert-communication-hydrate';
-import { alertRowMatchesAiAlignedStateScope, locationStringsMatchState } from '@/lib/utils/alert-location-state-match';
+import { matchesStateWideUnifiedAlert, locationStringsMatchState } from '@/lib/utils/alert-location-state-match';
 import {
     coordinatesInJurisdiction,
     extractAlertRowCoordinates,
@@ -190,7 +190,7 @@ function userInSubAdminStateForAlert(
 ): boolean {
     if (!jurisdiction.stateRaw.trim()) return false;
     if (!locationStringsMatchState(zoneStrings, jurisdiction.stateRaw)) return false;
-    return alertRowMatchesAiAlignedStateScope(row, jurisdiction.stateRaw);
+    return matchesStateWideUnifiedAlert(row, jurisdiction.stateRaw);
 }
 
 function userAffectedByPreparedAlerts(

@@ -2,7 +2,6 @@ import connectDB from '@/lib/mongodb';
 import CommunityAlert from '@/models/CommunityAlert';
 import WeatherAlertRecord from '@/models/WeatherAlertRecord';
 import WeatherAlertTypeConfig from '@/models/WeatherAlertTypeConfig';
-import { alertProcessor } from '@/lib/services/alert-processor';
 import { Alert, AlertSource, AlertSeverity } from '@/lib/types/api-alerts';
 import {
     geocodeLocation,
@@ -27,13 +26,6 @@ import {
 import { buildUserZones, type UserZone } from '@/lib/services/mobile/zone-utils';
 import type { UserProfilePayload } from '@/lib/types/mobile/auth';
 import type { MobileAlertSeverity, MobileWeatherAlert } from '@/lib/types/mobile/alerts';
-import { alertRowMatchesAiAlignedStateScope } from '@/lib/utils/alert-location-state-match';
-import { normalizeStateToUsps } from '@/lib/utils/us-state-usps';
-import { pointInUsStateBBox } from '@/lib/constants/us-state-bounding-boxes';
-
-function statesFromProfileLocal(profile: UserProfilePayload | null): string[] {
-    return statesFromProfile(profile);
-}
 
 type WeatherAlertDoc = {
     alertId: string;
@@ -227,64 +219,6 @@ export async function fetchMobileAlertsForUser(
         } as UnifiedMobileAlert);
     }
 
-    const earthquakeAlerts: Alert[] = [];
-    for (const location of geocodedLocations) {
-        try {
-            const fetched = await alertProcessor.fetchAllAlerts(
-                { lat: location.lat, lon: location.lon },
-                [AlertSource.EARTHQUAKE_API],
-            );
-            for (const alert of fetched) {
-                // Strictly filter earthquakes to ensure they actually match the user's state
-                const row = {
-                    source: alert.source,
-                    location: alert.areaDesc ?? alert.affectedAreas?.[0] ?? '',
-                    name: alert.title,
-                };
-                let matchesState = false;
-                for (const state of statesFromProfileLocal(profile)) {
-                    if (alertRowMatchesAiAlignedStateScope(row, state)) {
-                        matchesState = true;
-                        break;
-                    }
-                    if (alert.coordinates?.lat && alert.coordinates?.lon) {
-                        const usps = normalizeStateToUsps(state);
-                        if (usps && pointInUsStateBBox(alert.coordinates.lon, alert.coordinates.lat, usps)) {
-                            matchesState = true;
-                            break;
-                        }
-                    }
-                }
-                if (!matchesState) continue;
-
-                const existing = earthquakeAlerts.find((item) => item.id === alert.id);
-                if (!existing) {
-                    earthquakeAlerts.push({
-                        ...alert,
-                        affectedAreas: unique([...(alert.affectedAreas || []), location.name]),
-                        unifiedSource: 'earthquake',
-                        sourceUrl: resolveLegacyAlertSourceUrl({
-                            id: alert.id,
-                            source: alert.source,
-                            unifiedSource: 'earthquake',
-                            sourceUrl:
-                                'sourceUrl' in alert && typeof alert.sourceUrl === 'string'
-                                    ? alert.sourceUrl
-                                    : undefined,
-                        }),
-                    } as UnifiedMobileAlert);
-                } else {
-                    existing.affectedAreas = unique([
-                        ...(existing.affectedAreas || []),
-                        location.name,
-                    ]);
-                }
-            }
-        } catch (error) {
-            console.error(`Mobile alerts: earthquake fetch for ${location.name}:`, error);
-        }
-    }
-
     const communityRaw = await CommunityAlert.find({
         $or: [
             { expiresAt: { $exists: false } },
@@ -346,7 +280,6 @@ export async function fetchMobileAlertsForUser(
 
     for (const alert of unifiedAlerts) addAlert(alert);
     for (const alert of Array.from(mergedWeatherMap.values())) addAlert(alert);
-    for (const alert of earthquakeAlerts) addAlert(alert);
     for (const alert of communityAlerts) addAlert(alert);
 
     const allAlerts = Array.from(merged.values());

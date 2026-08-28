@@ -45,6 +45,17 @@ function magnitudeSeverity(mag: number | null): UnifiedEventInsert['severity'] {
     return 'Low';
 }
 
+/** M3.0+ earthquakes are actionable for sub-admin dispatch; smaller events stay Monitor-only. */
+function earthquakeUserStatus(
+    mag: number | null,
+    severity: UnifiedEventInsert['severity'],
+): UnifiedEventInsert['status'] {
+    if (severity === 'Low') return 'Monitor';
+    if (mag != null && Number.isFinite(mag) && mag >= 3) return 'Take Action';
+    if (severity === 'Moderate' || severity === 'High' || severity === 'Extreme') return 'Take Action';
+    return 'Monitor';
+}
+
 export function buildUnifiedEventFromEarthquakeFeature(
     feature: UsgsEarthquakeFeature,
 ): UnifiedEventInsert | null {
@@ -62,17 +73,27 @@ export function buildUnifiedEventFromEarthquakeFeature(
     const externalId = normalizeExternalId('earthquake', id.startsWith('eq:') ? id : `eq:${id}`);
 
     const occurredAt = new Date(p.time).toISOString();
+    const severity = magnitudeSeverity(mag);
+    const status = earthquakeUserStatus(mag, severity);
+    const instructions =
+        status === 'Take Action'
+            ? [
+                  'Drop, cover, and hold on if shaking occurs.',
+                  'After shaking stops, check for injuries and hazards.',
+                  'Avoid damaged buildings until authorities clear the area.',
+              ]
+            : ['Stay informed.', 'Avoid unstable structures.'];
 
     return {
         externalId,
         source: 'earthquake',
         category: 'earthquake',
-        name: `Earthquake · ${displayMag}`,
+        name: `M ${mag != null && Number.isFinite(mag) ? mag.toFixed(1) : '?'} - ${(p.place ?? 'Unknown location').replace(/^\d+\s*km\s*[A-Z0-9]+\s+of\s+/i, '')}`,
         description: `USGS ${displayMag} — ${p.place ?? 'Unknown location'}`,
-        severity: magnitudeSeverity(mag),
-        type: 'Statement',
+        severity,
+        type: status === 'Take Action' ? 'Warning' : 'Statement',
         iconType: 'triangle',
-        status: 'Monitor',
+        status,
         location: p.place ?? (lat != null && lng != null ? `${lat.toFixed(3)}, ${lng.toFixed(3)}` : 'Unknown'),
         lat,
         lng,
@@ -82,7 +103,7 @@ export function buildUnifiedEventFromEarthquakeFeature(
                 : null,
         issuedAt: formatIssued(p.time),
         expiresAt: 'See USGS event page',
-        instructions: ['Stay informed.', 'Avoid unstable structures.'],
+        instructions,
         properties: {
             earthquake: {
                 intensity:

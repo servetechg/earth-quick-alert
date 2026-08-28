@@ -11,6 +11,7 @@ import {
     type LatLngPoint,
 } from '@/lib/geo/license-coverage-radius'
 import type { UnifiedEventHeatPoint } from '@/lib/geo/unified-event-heatmap'
+import { MapIncidentPopupContent } from '@/components/gis/map-incident-popup-content'
 import { IncidentDetailDialog } from '@/components/incident/incident-detail-dialog'
 import { GoogleMapsUnavailable } from '@/components/google-maps-unavailable'
 import { GoogleMapErrorBoundary } from '@/components/google-map-error-boundary'
@@ -1171,32 +1172,11 @@ function GoogleMapInner({
                         position={{ lat: selectedHeatIncident.lat, lng: selectedHeatIncident.lng }}
                         onCloseClick={() => setSelectedHeatIncident(null)}
                     >
-                        <div className="p-2 min-w-[200px] max-w-[300px] bg-white text-slate-900 rounded-lg">
-                            <h3 className="font-extrabold text-sm mb-1 uppercase tracking-tight flex items-center gap-2">
-                                ⚠️ Incident
-                            </h3>
-                            <div className="font-bold text-lg mb-1">{selectedHeatIncident.name}</div>
-                            {selectedHeatIncident.severity && (
-                                <div className="text-[10px] font-black uppercase mb-1 inline-block px-2 py-0.5 rounded bg-amber-100 text-amber-800">
-                                    {selectedHeatIncident.severity}
-                                </div>
-                            )}
-                            {selectedHeatIncident.location && (
-                                <p className="text-xs text-slate-700 mb-2 leading-relaxed">
-                                    {selectedHeatIncident.location}
-                                </p>
-                            )}
-                            <p className="text-[10px] text-slate-500 mb-2">
-                                {selectedHeatIncident.category || selectedHeatIncident.source || 'Active alert'}
-                            </p>
-                            <button
-                                type="button"
-                                onClick={() => setIncidentDialogOpen(true)}
-                                className="mt-1 inline-flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wide text-[#33375D] hover:underline"
-                            >
-                                View AI Report →
-                            </button>
-                        </div>
+                        <MapIncidentPopupContent
+                            incident={selectedHeatIncident}
+                            detailsLabel="View full details"
+                            onViewDetails={() => setIncidentDialogOpen(true)}
+                        />
                     </InfoWindow>
                 )}
 

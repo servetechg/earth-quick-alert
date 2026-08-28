@@ -35,14 +35,14 @@ export async function GET() {
 export async function POST() {
     try {
         await dbConnect();
-        const { nws, multi } = await forceSyncAllAlertCommunicationFeedsNow();
+        const { nws, multi, earthquake } = await forceSyncAllAlertCommunicationFeedsNow();
         const session = await getSession();
         const role = String(session?.user?.role ?? '');
         const userId = session?.user?.id as string | undefined;
         invalidateAlignedFeedCache(userId, role);
         const filtered = await fetchAlignedUnifiedEventFeed({ userId, role, syncFeeds: false });
 
-        return NextResponse.json({ stats: { nws, ...multi }, data: filtered });
+        return NextResponse.json({ stats: { nws, earthquake, ...multi }, data: filtered });
     } catch (error: any) {
         return NextResponse.json({ error: error.message }, { status: 500 });
     }

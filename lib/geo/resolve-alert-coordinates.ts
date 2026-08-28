@@ -158,7 +158,7 @@ export function storedAlertCoordsAreTrustworthy(
     const source = String(row.source ?? '').toLowerCase();
     const ugc = extractUgcZonesFromRow(row);
 
-    if (hasUsNwsUgcZones(ugc) || source === 'nws' || source === 'usgs') {
+    if (hasUsNwsUgcZones(ugc) || source === 'nws' || source === 'usgs' || source === 'earthquake') {
         return pointInUsaBounds(lat, lng);
     }
 
