@@ -66,3 +66,23 @@ export interface CitizenActivityFeedResponse {
     stats: CitizenActivityStats
     source?: 'live'
 }
+
+export type CitizenActivityMissingField = 'details' | 'pictures' | 'videos'
+
+export const CITIZEN_ACTIVITY_MISSING_FIELDS = [
+    'details',
+    'pictures',
+    'videos',
+] as const satisfies readonly CitizenActivityMissingField[]
+
+export type CitizenActivityDetail = CitizenActivityItem & {
+    description: string
+    details: string
+    citizenPhone?: string
+    userEmail?: string
+    missingOptionalFields: CitizenActivityMissingField[]
+    requestedMissingFields: CitizenActivityMissingField[]
+    missingInfoRequestedAt?: string | null
+    reviewedAt?: string | null
+    canRequestMissingInfo: boolean
+}

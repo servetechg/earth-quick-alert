@@ -9,6 +9,8 @@ import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { CitizenActivityFeedList } from '@/components/citizen-activity/citizen-activity-feed-list'
+import { CitizenActivityDetailDialog } from '@/components/citizen-activity/citizen-activity-detail-dialog'
+import type { CitizenActivityDisplayRow } from '@/components/citizen-activity/citizen-activity-display'
 import {
     CITIZEN_ACTIVITY_FILTER_LABELS,
 } from '@/lib/citizen-activity/category-meta'
@@ -54,6 +56,8 @@ export default function CitizenActivityFeedPage() {
     const [query, setQuery] = useState('')
     const [debouncedQuery, setDebouncedQuery] = useState('')
     const [payload, setPayload] = useState<CitizenActivityFeedResponse | null>(null)
+    const [selectedEntry, setSelectedEntry] = useState<CitizenActivityDisplayRow | null>(null)
+    const [detailOpen, setDetailOpen] = useState(false)
 
     useEffect(() => {
         const t = window.setTimeout(() => setDebouncedQuery(query.trim()), 250)
@@ -198,20 +202,23 @@ export default function CitizenActivityFeedPage() {
                 ) : (
                     <CitizenActivityFeedList
                         items={items}
-                        onMarkCompleted={async (id) => {
-                            await fetch(`/api/admin/citizen-activity/${id}`, {
-                                method: 'PATCH',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                    resolutionStatus: 'completed',
-                                    status: 'Resolved',
-                                }),
-                            })
-                            await loadFeed()
+                        onOpenDetail={(entry) => {
+                            setSelectedEntry(entry)
+                            setDetailOpen(true)
                         }}
                     />
                 )}
             </Card>
+
+            <CitizenActivityDetailDialog
+                entry={selectedEntry}
+                open={detailOpen}
+                onOpenChange={(open) => {
+                    setDetailOpen(open)
+                    if (!open) setSelectedEntry(null)
+                }}
+                onUpdated={() => loadFeed()}
+            />
         </AdminPageShell>
     )
 }

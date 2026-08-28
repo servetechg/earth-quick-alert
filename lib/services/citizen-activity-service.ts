@@ -1,11 +1,14 @@
 import connectDB from '@/lib/mongodb';
+import mongoose from 'mongoose';
 import User from '@/models/User';
 import CitizenActivity, { type ICitizenActivity } from '@/models/CitizenActivity';
 import { CITIZEN_ACTIVITY_CATEGORY_META, categoryMatchesFilter } from '@/lib/citizen-activity/category-meta';
 import type {
     CitizenActivityCategory,
+    CitizenActivityDetail,
     CitizenActivityFilter,
     CitizenActivityItem,
+    CitizenActivityMissingField,
     CitizenActivityPriority,
     CitizenActivityStats,
 } from '@/lib/citizen-activity/types';
@@ -20,10 +23,13 @@ import {
 import { maybeDemoJurisdictionOverride } from '@/lib/demo/provider';
 import { normalizeStateToUsps } from '@/lib/utils/us-state-usps';
 import { geocodeLocation } from '@/lib/services/location-matching';
+import { sendCitizenActivityMissingInfoEmail } from '@/lib/email/citizen-activity-missing-info-send';
 import {
+    dispatchUserNotification,
     notifyAdminsOfCitizenActivity,
     notifyCitizenOfReportResolution,
 } from '@/lib/services/user-notification-service';
+import { sendExpoPushNotification } from '@/lib/services/mobile/expo-push-service';
 import {
     CITIZEN_ACTIVITY_MAX_PICTURES,
     CITIZEN_ACTIVITY_MAX_VIDEOS,
@@ -42,6 +48,65 @@ export const MOBILE_REPORT_CATEGORIES = [
 ] as const;
 
 export type MobileReportCategory = (typeof MOBILE_REPORT_CATEGORIES)[number];
+
+const MISSING_FIELD_LABELS: Record<CitizenActivityMissingField, string> = {
+    details: 'additional details',
+    pictures: 'pictures',
+    videos: 'videos',
+};
+
+function categorySupportsMissingInfo(category: CitizenActivityCategory): boolean {
+    return (MOBILE_REPORT_CATEGORIES as readonly string[]).includes(category);
+}
+
+export function detectMissingOptionalCitizenActivityFields(row: {
+    category: CitizenActivityCategory;
+    details?: string | null;
+    pictures?: CitizenActivityMediaRef[] | null;
+    videos?: CitizenActivityMediaRef[] | null;
+}): CitizenActivityMissingField[] {
+    if (!categorySupportsMissingInfo(row.category)) return [];
+
+    const missing: CitizenActivityMissingField[] = [];
+    if (!String(row.details ?? '').trim()) missing.push('details');
+    if (!Array.isArray(row.pictures) || row.pictures.length === 0) missing.push('pictures');
+    if (!Array.isArray(row.videos) || row.videos.length === 0) missing.push('videos');
+    return missing;
+}
+
+function mapCitizenActivityDocToDetail(
+    doc: ICitizenActivity & { _id: { toString(): string } },
+    userEmail?: string,
+): CitizenActivityDetail {
+    const item = mapCitizenActivityDocToFeedItem(doc);
+    const pictures = normalizeMediaList(doc.pictures, CITIZEN_ACTIVITY_MAX_PICTURES);
+    const videos = normalizeMediaList(doc.videos, CITIZEN_ACTIVITY_MAX_VIDEOS);
+    const missingOptionalFields = detectMissingOptionalCitizenActivityFields({
+        category: doc.category,
+        details: doc.details,
+        pictures,
+        videos,
+    });
+
+    return {
+        ...item,
+        description: doc.description ?? '',
+        details: doc.details ?? '',
+        citizenPhone: doc.citizenPhone,
+        userEmail,
+        pictures: pictures.length ? pictures : undefined,
+        videos: videos.length ? videos : undefined,
+        missingOptionalFields,
+        requestedMissingFields: Array.isArray(doc.requestedMissingFields)
+            ? (doc.requestedMissingFields as CitizenActivityMissingField[])
+            : [],
+        missingInfoRequestedAt: doc.missingInfoRequestedAt
+            ? new Date(doc.missingInfoRequestedAt).toISOString()
+            : null,
+        reviewedAt: doc.reviewedAt ? new Date(doc.reviewedAt).toISOString() : null,
+        canRequestMissingInfo: categorySupportsMissingInfo(doc.category),
+    };
+}
 
 function formatDisplayTime(value: Date | string): string {
     const d = value instanceof Date ? value : new Date(value);
@@ -460,4 +525,252 @@ export async function updateCitizenActivityForAdmin(
     }
 
     return mapCitizenActivityDocToFeedItem(doc as ICitizenActivity & { _id: { toString(): string } });
+}
+
+export async function getCitizenActivityDetailForAdmin(activityId: string) {
+    await connectDB();
+    const doc = (await CitizenActivity.findById(activityId).lean()) as
+        | (ICitizenActivity & { _id: { toString(): string } })
+        | null;
+    if (!doc) throw new Error('NOT_FOUND');
+
+    const user = (await User.findById(doc.userId).select('email').lean()) as { email?: string } | null;
+    return mapCitizenActivityDocToDetail(doc, user?.email);
+}
+
+export async function requestCitizenActivityMissingInfo(
+    activityId: string,
+    actorUserId: string,
+    fields?: CitizenActivityMissingField[],
+) {
+    await connectDB();
+
+    const doc = (await CitizenActivity.findById(activityId).lean()) as
+        | (ICitizenActivity & { _id: { toString(): string } })
+        | null;
+    if (!doc) throw new Error('NOT_FOUND');
+
+    const pictures = normalizeMediaList(doc.pictures, CITIZEN_ACTIVITY_MAX_PICTURES);
+    const videos = normalizeMediaList(doc.videos, CITIZEN_ACTIVITY_MAX_VIDEOS);
+    const autoMissing = detectMissingOptionalCitizenActivityFields({
+        category: doc.category,
+        details: doc.details,
+        pictures,
+        videos,
+    });
+    const missing =
+        Array.isArray(fields) && fields.length > 0
+            ? fields.filter((f) => autoMissing.includes(f))
+            : autoMissing;
+
+    if (missing.length === 0) throw new Error('NOTHING_MISSING');
+
+    const user = (await User.findById(doc.userId)
+        .select('email firstName name expoPushToken')
+        .lean()) as {
+        email?: string;
+        firstName?: string;
+        name?: string;
+        expoPushToken?: string;
+    } | null;
+    if (!user?.email) throw new Error('USER_NOT_FOUND');
+
+    await CitizenActivity.updateOne(
+        { _id: doc._id },
+        {
+            $set: {
+                requestedMissingFields: missing,
+                missingInfoRequestedAt: new Date(),
+                reviewedBy: actorUserId,
+                reviewedAt: new Date(),
+            },
+        },
+    );
+
+    const labelList = missing.map((f) => MISSING_FIELD_LABELS[f]).join(', ');
+    const title = doc.title || 'Citizen report';
+    const body = `Please add the missing report details (${labelList}) for your ${title}.`;
+
+    const notif = await dispatchUserNotification({
+        userId: String(doc.userId),
+        type: 'citizen_activity',
+        title: 'Additional report details needed',
+        body,
+        priority: 'high',
+        audience: 'citizen',
+        deepLink: 'citizenAssistance',
+        meta: {
+            dedupeKey: `citizen_activity_missing:${String(doc._id)}:${missing.sort().join(',')}:${Date.now()}`,
+            activityId: String(doc._id),
+            requestedMissingFields: missing,
+        },
+        push: {
+            title: 'Additional report details needed',
+            body,
+            channelId: 'disaster-alerts',
+            data: {
+                screen: 'citizenAssistance',
+                notificationType: 'citizen_activity',
+                activityId: String(doc._id),
+                requestedMissingFields: missing,
+            },
+        },
+    });
+
+    let pushSent = notif.pushSent;
+    if (!pushSent) {
+        const token = String(user.expoPushToken ?? '').trim();
+        if (token) {
+            const push = await sendExpoPushNotification({
+                to: token,
+                title: 'Additional report details needed',
+                body,
+                data: {
+                    screen: 'citizenAssistance',
+                    notificationType: 'citizen_activity',
+                    activityId: String(doc._id),
+                },
+            });
+            pushSent = push.ok;
+        }
+    }
+
+    const emailSent = await sendCitizenActivityMissingInfoEmail(
+        user.email,
+        user.firstName || user.name || '',
+        title,
+        missing,
+    );
+
+    return {
+        activityId: String(doc._id),
+        requestedMissingFields: missing,
+        pushSent,
+        emailSent,
+        inboxSent: Boolean(notif.item),
+    };
+}
+
+export async function supplementCitizenActivity(
+    userId: string,
+    input: {
+        activityId: string;
+        details?: string;
+        pictures?: CitizenActivityMediaRef[];
+        videos?: CitizenActivityMediaRef[];
+    },
+) {
+    await connectDB();
+
+    const doc = await CitizenActivity.findOne({ _id: input.activityId, userId });
+    if (!doc) throw new Error('NOT_FOUND');
+
+    const requested = Array.isArray(doc.requestedMissingFields)
+        ? (doc.requestedMissingFields as CitizenActivityMissingField[])
+        : [];
+
+    const setDoc: Record<string, unknown> = {};
+    if (requested.includes('details') && input.details?.trim()) {
+        setDoc.details = input.details.trim();
+    }
+    if (requested.includes('pictures') && input.pictures?.length) {
+        const merged = [
+            ...normalizeMediaList(doc.pictures, CITIZEN_ACTIVITY_MAX_PICTURES),
+            ...normalizeMediaList(input.pictures, CITIZEN_ACTIVITY_MAX_PICTURES),
+        ].slice(0, CITIZEN_ACTIVITY_MAX_PICTURES);
+        setDoc.pictures = merged;
+    }
+    if (requested.includes('videos') && input.videos?.length) {
+        const merged = [
+            ...normalizeMediaList(doc.videos, CITIZEN_ACTIVITY_MAX_VIDEOS),
+            ...normalizeMediaList(input.videos, CITIZEN_ACTIVITY_MAX_VIDEOS),
+        ].slice(0, CITIZEN_ACTIVITY_MAX_VIDEOS);
+        setDoc.videos = merged;
+    }
+
+    if (Object.keys(setDoc).length === 0) throw new Error('NO_CHANGES');
+
+    await CitizenActivity.updateOne({ _id: doc._id }, { $set: setDoc });
+
+    const refreshed = (await CitizenActivity.findById(doc._id).lean()) as ICitizenActivity & {
+        _id: { toString(): string };
+    };
+    const pictures = normalizeMediaList(refreshed.pictures, CITIZEN_ACTIVITY_MAX_PICTURES);
+    const videos = normalizeMediaList(refreshed.videos, CITIZEN_ACTIVITY_MAX_VIDEOS);
+    const stillMissing = detectMissingOptionalCitizenActivityFields({
+        category: refreshed.category,
+        details: refreshed.details,
+        pictures,
+        videos,
+    });
+
+    if (stillMissing.length === 0) {
+        await CitizenActivity.updateOne(
+            { _id: doc._id },
+            { $set: { requestedMissingFields: [] } },
+        );
+    } else {
+        await CitizenActivity.updateOne(
+            { _id: doc._id },
+            { $set: { requestedMissingFields: stillMissing } },
+        );
+    }
+
+    return {
+        activityId: String(doc._id),
+        remainingMissingFields: stillMissing,
+        completed: stillMissing.length === 0,
+    };
+}
+
+export async function getPendingCitizenActivitySupplement(userId: string) {
+    await connectDB();
+
+    const userObjectId = mongoose.Types.ObjectId.isValid(userId)
+        ? new mongoose.Types.ObjectId(userId)
+        : userId;
+
+    const doc = (await CitizenActivity.findOne({
+        userId: userObjectId,
+        $or: [
+            { 'requestedMissingFields.0': { $exists: true } },
+            { missingInfoRequestedAt: { $ne: null } },
+        ],
+    })
+        .sort({ missingInfoRequestedAt: -1, createdAt: -1 })
+        .lean()) as (ICitizenActivity & { _id: { toString(): string } }) | null;
+
+    if (!doc) return null;
+
+    const pictures = normalizeMediaList(doc.pictures, CITIZEN_ACTIVITY_MAX_PICTURES);
+    const videos = normalizeMediaList(doc.videos, CITIZEN_ACTIVITY_MAX_VIDEOS);
+
+    let requested = Array.isArray(doc.requestedMissingFields)
+        ? (doc.requestedMissingFields as CitizenActivityMissingField[])
+        : [];
+
+    if (requested.length === 0) {
+        requested = detectMissingOptionalCitizenActivityFields({
+            category: doc.category,
+            details: doc.details,
+            pictures,
+            videos,
+        });
+    }
+
+    if (requested.length === 0) return null;
+
+    return {
+        activityId: String(doc._id),
+        title: doc.title,
+        description: doc.description,
+        details: doc.details ?? '',
+        category: doc.category,
+        requestedMissingFields: requested,
+        existingPictures: pictures,
+        existingVideos: videos,
+        missingInfoRequestedAt: doc.missingInfoRequestedAt
+            ? new Date(doc.missingInfoRequestedAt).toISOString()
+            : null,
+    };
 }
