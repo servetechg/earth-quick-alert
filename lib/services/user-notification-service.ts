@@ -176,7 +176,8 @@ async function sendPushToUser(
     const requiresMajorAlerts =
         (priority === 'critical' || priority === 'high') &&
         notificationType !== 'disaster_survey' &&
-        notificationType !== 'ida_application';
+        notificationType !== 'ida_application' &&
+        notificationType !== 'citizen_activity';
     if (requiresMajorAlerts && !prefsAllowMajorAlerts(prefs)) return false;
 
     const token = String((user as { expoPushToken?: string }).expoPushToken ?? '').trim();
@@ -196,7 +197,9 @@ async function sendPushToUser(
         sound: 'default',
         channelId:
             push.channelId ??
-            (notificationType === 'disaster_survey' || notificationType === 'ida_application'
+            (notificationType === 'disaster_survey' ||
+            notificationType === 'ida_application' ||
+            notificationType === 'citizen_activity'
                 ? 'disaster-alerts'
                 : 'inbox-updates'),
         priority: priority === 'critical' || priority === 'high' ? 'high' : 'default',
