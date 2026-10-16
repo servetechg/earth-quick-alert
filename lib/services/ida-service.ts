@@ -744,10 +744,13 @@ export async function getActiveIdaInvitation(userId: string) {
 
 export async function markIdaOpened(userId: string, invitationId: string) {
     await connectDB();
-    await IdaInvitation.updateOne(
+    const result = await IdaInvitation.updateOne(
         { _id: invitationId, userId, status: 'pending' },
         { $set: { status: 'opened', openedAt: new Date() } },
     );
+    if (result.matchedCount === 0) {
+        throw new Error('INVITATION_NOT_FOUND');
+    }
 }
 
 export async function submitIdaApplication(

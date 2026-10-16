@@ -4,10 +4,16 @@ import { apiError, apiJson, validationError } from '@/lib/api/json-response';
 import { requireMobileBearerUser } from '@/lib/auth/mobile/require-mobile-user';
 import { markIdaOpened } from '@/lib/services/ida-service';
 import { zodFieldErrors } from '@/lib/validation/mobile/auth';
+import mongoose from 'mongoose';
 
 export const dynamic = 'force-dynamic';
 
-const schema = z.object({ invitationId: z.string().min(1) });
+const schema = z.object({
+    invitationId: z
+        .string()
+        .min(1)
+        .refine((id) => mongoose.Types.ObjectId.isValid(id), 'Invalid invitation id'),
+});
 
 export async function POST(req: NextRequest) {
     try {
