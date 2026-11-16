@@ -584,10 +584,13 @@ export async function getActiveDisasterSurveyInvitation(userId: string) {
 
 export async function markDisasterSurveyOpened(userId: string, invitationId: string) {
     await connectDB();
-    await DisasterSurveyInvitation.updateOne(
+    const result = await DisasterSurveyInvitation.updateOne(
         { _id: invitationId, userId, status: 'pending' },
         { $set: { status: 'opened', openedAt: new Date() } },
     );
+    if (result.matchedCount === 0) {
+        throw new Error('INVITATION_NOT_FOUND');
+    }
 }
 
 async function buildProfileSnapshot(userId: string) {

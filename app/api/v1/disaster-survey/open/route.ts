@@ -4,10 +4,16 @@ import { apiError, apiJson, validationError } from '@/lib/api/json-response';
 import { requireMobileBearerUser } from '@/lib/auth/mobile/require-mobile-user';
 import { markDisasterSurveyOpened } from '@/lib/services/disaster-survey-service';
 import { zodFieldErrors } from '@/lib/validation/mobile/auth';
+import mongoose from 'mongoose';
 
 export const dynamic = 'force-dynamic';
 
-const schema = z.object({ invitationId: z.string().min(1) });
+const schema = z.object({
+    invitationId: z
+        .string()
+        .min(1)
+        .refine((id) => mongoose.Types.ObjectId.isValid(id), 'Invalid invitation id'),
+});
 
 export async function POST(req: NextRequest) {
     try {
@@ -21,6 +27,10 @@ export async function POST(req: NextRequest) {
         await markDisasterSurveyOpened(auth.userId, parsed.data.invitationId);
         return apiJson({ message: 'Survey opened' });
     } catch (e) {
+        const msg = e instanceof Error ? e.message : 'OPEN_FAILED';
+        if (msg === 'INVITATION_NOT_FOUND') {
+            return apiError('Invitation not found', 404, { code: 'NOT_FOUND' });
+        }
         console.error('POST /disaster-survey/open:', e);
         return apiError('Failed to update survey', 500);
     }
