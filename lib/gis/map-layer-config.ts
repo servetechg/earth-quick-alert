@@ -314,7 +314,10 @@ export function buildDefaultMapLayerState(opts?: {
   return defaults
 }
 
-/** Arkansas demo — turn on every infrastructure filter so the presentation map is populated. */
+/**
+ * @deprecated Presentation demo now uses {@link buildDefaultMapLayerState} (risk areas only).
+ * Kept for scripts/tests that need a fully populated filter set.
+ */
 export function buildDemoMapLayerState(opts?: {
   includeCriticalInfra?: boolean
   includeDisasterZones?: boolean
