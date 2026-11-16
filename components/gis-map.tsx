@@ -55,7 +55,6 @@ import { MapLayersDropdown } from '@/components/gis/map-layers-dropdown'
 import {
   GIS_FILTER_MAP_LAYERS,
   buildDefaultMapLayerState,
-  buildDemoMapLayerState,
   DAMS_MAP_LAYER,
   FUEL_SITES_MAP_LAYER,
   PHARMACIES_MAP_LAYER,
@@ -1448,13 +1447,13 @@ export function GISMap({
     }
   }, [isDemoSimulation])
 
-  // Arkansas presentation demo — enable every infrastructure layer so each filter shows fixtures.
+  // Arkansas presentation demo — keep default layer toggles (risk areas only), not all filters.
   useEffect(() => {
     if (!isDemoSimulation) return
     if (demoLayersInitializedRef.current) return
     demoLayersInitializedRef.current = true
     setMapLayers(
-      buildDemoMapLayerState({
+      buildDefaultMapLayerState({
         includeCriticalInfra: showCriticalInfraLayers,
         includeDisasterZones: showDisasterZones,
       }),
